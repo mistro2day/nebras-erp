@@ -7,3 +7,5 @@ celery>=5.4,<5.5
 gunicorn>=23.0,<24.0
 django-cors-headers>=4.4,<4.5
 pillow>=11.0.0
+django-celery-beat>=2.7,<2.8
+cryptography>=43.0,<44.0

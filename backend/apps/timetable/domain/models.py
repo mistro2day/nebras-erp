@@ -92,7 +92,7 @@ class TeachingLoad(CombinedSharedModel):
 
 # 7. Teaching Assignment
 class TeachingAssignment(CombinedSharedModel):
-    teacher = models.ForeignKey(FacultyMember, on_delete=models.CASCADE, related_name='assignments')
+    teacher = models.ForeignKey(FacultyMember, on_delete=models.CASCADE, related_name='timetable_assignments')
     subject_id = models.UUIDField(db_index=True)
     grade_section_id = models.UUIDField(db_index=True)
     weekly_periods = models.IntegerField(default=4)
