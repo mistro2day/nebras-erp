@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
 import { TenantService } from '../../core/services/tenant.service';
 import { ThemeService } from '../../core/services/theme.service';

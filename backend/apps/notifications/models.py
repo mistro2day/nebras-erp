@@ -1,0 +1,1 @@
+from apps.notifications.domain.models import NotificationTemplate, NotificationHistory

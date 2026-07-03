@@ -1,0 +1,1 @@
+from apps.tenants.domain.models import Tenant

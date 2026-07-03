@@ -1,0 +1,1 @@
+from apps.library.domain.models import Book

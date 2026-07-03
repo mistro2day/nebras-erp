@@ -1,0 +1,1 @@
+from apps.settings.domain.models import TenantSetting

@@ -1,0 +1,1 @@
+from apps.cms.domain.models import CMSPage

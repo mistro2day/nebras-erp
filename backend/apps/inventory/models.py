@@ -1,0 +1,1 @@
+from apps.inventory.domain.models import Warehouse, Product

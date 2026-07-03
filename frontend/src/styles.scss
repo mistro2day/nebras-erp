@@ -1,0 +1,34 @@
+@use '@angular/material' as mat;
+@import './styles/design-system.scss';
+
+html {
+  color-scheme: light;
+  background: var(--background-color);
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.mat-mdc-snack-bar-container {
+  direction: rtl;
+}

@@ -1,0 +1,1 @@
+from apps.storage.domain.models import FileAsset

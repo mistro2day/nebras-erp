@@ -1,0 +1,1 @@
+from apps.reports.domain.models import SavedReport
