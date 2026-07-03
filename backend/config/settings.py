@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     'apps.apps.RulesConfig',
     'apps.apps.TimetableConfig',
     'apps.apps.CommunicationsConfig',
+    'apps.apps.ReportingConfig',
+    'apps.apps.ExaminationsConfig',
     'apps.common',
 ]
 

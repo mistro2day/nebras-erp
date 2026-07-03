@@ -372,6 +372,30 @@ export class DashboardLayoutComponent implements OnInit {
       ]
     },
     {
+      label: 'الاتصالات الموحدة والإشعارات',
+      icon: 'contact_mail',
+      expanded: false,
+      children: [
+        { label: 'لوحة التحكم والمنصة', link: '/communications/dashboard', icon: 'analytics' },
+      ]
+    },
+    {
+      label: 'ذكاء الأعمال والتقارير والتحليلات',
+      icon: 'analytics',
+      expanded: false,
+      children: [
+        { label: 'لوحة التحكم والتحليلات', link: '/reporting/dashboard', icon: 'trending_up' },
+      ]
+    },
+    {
+      label: 'الامتحانات والتقييم الأكاديمي',
+      icon: 'assignment',
+      expanded: false,
+      children: [
+        { label: 'لوحة التحكم والدرجات', link: '/examinations/dashboard', icon: 'grade' },
+      ]
+    },
+    {
       label: 'نواة المنصة والإعدادات',
       icon: 'settings_suggest',
       expanded: false,

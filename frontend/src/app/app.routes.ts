@@ -62,9 +62,21 @@ export const routes: Routes = [
         loadChildren: () => import('./features/timetable/timetable.routes').then((m) => m.TIMETABLE_ROUTES),
       },
       {
+        path: 'communications',
+        loadChildren: () => import('./features/communications/communications.routes').then((m) => m.COMMUNICATIONS_ROUTES),
+      },
+      {
+        path: 'reporting',
+        loadChildren: () => import('./features/reporting/reporting.routes').then((m) => m.REPORTING_ROUTES),
+      },
+      {
+        path: 'examinations',
+        loadChildren: () => import('./features/examinations/examinations.routes').then((m) => m.EXAMINATIONS_ROUTES),
+      },
+      {
         path: 'finance',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/finance/finance.routes').then((m) => m.FINANCE_ROUTES),
       },
       {
         path: 'hr',

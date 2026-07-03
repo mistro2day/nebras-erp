@@ -4,11 +4,13 @@ class TenantsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.tenants'
     label = 'tenants'
+    verbose_name = 'إدارة المستأجرين والمؤسسات'
 
 class IdentityConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.identity'
     label = 'identity'
+    verbose_name = 'الحسابات وإدارة الهوية'
 
 class AcademicsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -177,6 +179,21 @@ class CommunicationsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.communications'
     label = 'communications'
+    verbose_name = 'الاتصالات والإشعارات الموحدة'
+
+
+class ReportingConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.reporting'
+    label = 'reporting'
+    verbose_name = 'ذكاء الأعمال والتقارير والتحليلات'
+
+
+class ExaminationsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.examinations'
+    label = 'examinations'
+    verbose_name = 'الامتحانات والتقييمات الأكاديمية'
 
 
 
