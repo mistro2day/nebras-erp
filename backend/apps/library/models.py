@@ -1,1 +1,1 @@
-from apps.library.domain.models import Book
+from apps.library.domain.models import *

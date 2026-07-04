@@ -53,3 +53,15 @@ class CorrectionRequest(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_attendance_correction_requests'
+
+
+# 5. Student Daily Attendance
+class StudentDailyAttendance(CombinedSharedModel):
+    student_id = models.UUIDField(db_index=True)
+    date = models.DateField()
+    status = models.CharField(max_length=30, default='present', db_index=True) # present, absent, excused_absence
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'nebras_attendance_student_daily'
+        unique_together = ('student_id', 'date')

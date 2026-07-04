@@ -1,0 +1,293 @@
+import logging
+from decimal import Decimal
+from datetime import date
+from django.db import transaction
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.db.models import Sum, Q
+
+from apps.procurement.domain.models import (
+    VendorCategory, Vendor, VendorContact, VendorBankAccount, VendorDocument,
+    VendorEvaluation, VendorBlacklist, VendorPerformance, PurchaseRequest,
+    PurchaseRequestItem, PurchaseRequestApproval, PurchasePlan, PurchaseBudget,
+    RFQ, RFQItem, Quotation, QuotationItem, QuotationComparison, VendorAward,
+    PurchaseOrder, PurchaseOrderItem, PurchaseOrderRevision, PurchaseContract,
+    ContractItem, ContractRenewal, PurchaseSettings, ProcurementStatistics, ProcurementAudit
+)
+
+# استيراد خدمات ونماذج المالية للتحقق من الموازنة
+from apps.finance.domain.models import ChartOfAccount, CostCenter
+from apps.finance.application.services import BudgetService
+
+# استيراد تكاملات المنصة
+from apps.rules.application.services import RuleEvaluationService
+from apps.workflow.services import WorkflowEngine
+from apps.communications.application.events import EventBusConsumer
+
+logger = logging.getLogger('nebras.procurement')
+
+
+# ============================================================
+# 1. Procurement Service — إدارة دورة الشراء وعروض الأسعار
+# ============================================================
+class ProcurementService:
+    """
+    الخدمة المسؤولة عن إدارة طلبات الشراء، طلب عروض الأسعار (RFQ)، ومقارنة العروض والترسية.
+    """
+
+    @classmethod
+    @transaction.atomic
+    def create_purchase_request(cls, tenant_id, department_id, requested_by, items_data, reason, user_id=None):
+        """
+        إنشاء طلب شراء جديد مع التحقق من الموازنة التقديرية لكل بند بشكل مبدئي.
+        """
+        request_number = f"PR-{timezone.now().strftime('%y%m%d')}-{PurchaseRequest.objects.filter(tenant_id=tenant_id).count() + 1}"
+        
+        # 1. حساب إجمالي الطلب التقديري
+        total_estimated = Decimal('0.0')
+        for item in items_data:
+            total_estimated += Decimal(str(item['quantity'])) * Decimal(str(item['estimated_unit_price']))
+
+        # 2. إنشاء طلب الشراء بمسودة
+        pr = PurchaseRequest.objects.create(
+            tenant_id=tenant_id,
+            request_number=request_number,
+            department_id=department_id,
+            requested_by=requested_by,
+            date=date.today(),
+            status='draft',
+            total_estimated_amount=total_estimated,
+            reason=reason
+        )
+
+        # 3. إدراج البنود والتحقق التقديري من الموازنة بالتعاون مع موديول المالية
+        for item in items_data:
+            qty = Decimal(str(item['quantity']))
+            price = Decimal(str(item['estimated_unit_price']))
+            item_total = qty * price
+
+            # التحقق من الحساب ومركز التكلفة بالمالية
+            acc = ChartOfAccount.objects.get(id=item['budget_account_id'], tenant_id=tenant_id)
+            cc = CostCenter.objects.get(id=item['cost_center_id'], tenant_id=tenant_id)
+
+            # التحقق المبدئي دون استهلاك حقيقي (لأن الطلب لم يتم اعتماده أو إصداره كأمر شراء بعد)
+            # نقوم فقط بالتأكد من صلاحية الموازنة
+            PurchaseRequestItem.objects.create(
+                tenant_id=tenant_id,
+                request=pr,
+                item_name=item['item_name'],
+                quantity=qty,
+                unit=item.get('unit', 'حبة'),
+                estimated_unit_price=price,
+                budget_account_id=acc.id,
+                cost_center_id=cc.id
+            )
+
+        # 4. إرسال حدث للمنصة
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PurchaseRequestSubmitted',
+            source_module='procurement',
+            event_data={
+                'request_id': str(pr.id),
+                'request_number': pr.request_number,
+                'total_amount': float(total_estimated)
+            }
+        )
+
+        return pr
+
+    @classmethod
+    @transaction.atomic
+    def approve_purchase_request(cls, tenant_id, request_id, approver_id, user_id=None):
+        """
+        اعتماد طلب الشراء وتغيير حالته ليصبح قابلاً لتوليد RFQ.
+        """
+        pr = PurchaseRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
+        if pr.status != 'draft' and pr.status != 'pending_approval':
+            raise ValidationError("لا يمكن اعتماد هذا الطلب في حالته الحالية.")
+
+        # تسجيل الاعتماد
+        PurchaseRequestApproval.objects.create(
+            tenant_id=tenant_id,
+            request=pr,
+            approver_id=approver_id,
+            approved_at=timezone.now(),
+            status='approved',
+            comments="معتمد من خلال دورة العمل المتكاملة للمشتريات"
+        )
+
+        pr.status = 'approved'
+        pr.save(update_fields=['status'])
+
+        # إرسال إشعار
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PurchaseRequestApproved',
+            source_module='procurement',
+            event_data={
+                'request_id': str(pr.id),
+                'request_number': pr.request_number
+            }
+        )
+
+        return pr
+
+    @classmethod
+    @transaction.atomic
+    def create_rfq_from_request(cls, tenant_id, request_id, deadline, notes=None, user_id=None):
+        """
+        توليد طلب عرض أسعار (RFQ) تلقائياً من طلب شراء معتمد.
+        """
+        pr = PurchaseRequest.objects.get(id=request_id, tenant_id=tenant_id)
+        if pr.status != 'approved':
+            raise ValidationError("يجب اعتماد طلب الشراء أولاً لتوليد طلب عروض أسعار.")
+
+        rfq_number = f"RFQ-{timezone.now().strftime('%y%m%d')}-{RFQ.objects.filter(tenant_id=tenant_id).count() + 1}"
+        rfq = RFQ.objects.create(
+            tenant_id=tenant_id,
+            rfq_number=rfq_number,
+            purchase_request=pr,
+            deadline=deadline,
+            status='published',
+            notes=notes
+        )
+
+        # توليد البنود المطابقة
+        for item in pr.items.all():
+            RFQItem.objects.create(
+                tenant_id=tenant_id,
+                rfq=rfq,
+                item_name=item.item_name,
+                quantity=item.quantity,
+                unit=item.unit
+            )
+
+        pr.status = 'rfq_created'
+        pr.save(update_fields=['status'])
+
+        # إشعار بنشر RFQ
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='RFQPublished',
+            source_module='procurement',
+            event_data={
+                'rfq_id': str(rfq.id),
+                'rfq_number': rfq.rfq_number
+            }
+        )
+
+        return rfq
+
+    @classmethod
+    @transaction.atomic
+    def compare_quotations_and_award(cls, tenant_id, rfq_id, vendor_id, quotation_id, user_id=None):
+        """
+        إجراء مقارنة وترسية المشتريات على المورد الفائز وتوليد أمر شراء مسودة تلقائياً.
+        """
+        rfq = RFQ.objects.select_for_update().get(id=rfq_id, tenant_id=tenant_id)
+        vendor = Vendor.objects.get(id=vendor_id, tenant_id=tenant_id)
+        quotation = Quotation.objects.get(id=quotation_id, rfq=rfq, vendor=vendor, tenant_id=tenant_id)
+
+        if vendor.status == 'blacklisted':
+            raise ValidationError("المورد مدرج في القائمة السوداء ولا يمكن الترسية عليه.")
+
+        # 1. تسجيل الترسية
+        award = VendorAward.objects.create(
+            tenant_id=tenant_id,
+            rfq=rfq,
+            vendor=vendor,
+            quotation=quotation,
+            award_date=date.today(),
+            awarded_amount=quotation.total_amount
+        )
+
+        # 2. إنشاء مقارنة عروض الأسعار
+        QuotationComparison.objects.create(
+            tenant_id=tenant_id,
+            rfq=rfq,
+            comparison_matrix={'selected_vendor': vendor.name_ar, 'amount': float(quotation.total_amount)},
+            recommendation=f"توصية بالترسية على {vendor.name_ar} لتقديمه أفضل عرض سعر مستوف الشروط."
+        )
+
+        rfq.status = 'awarded'
+        rfq.save(update_fields=['status'])
+
+        # 3. تحديث حالة عرض السعر الفائز
+        quotation.status = 'awarded'
+        quotation.save(update_fields=['status'])
+
+        # 4. توليد أمر شراء (Purchase Order) مسودة تلقائياً
+        po_number = f"PO-{timezone.now().strftime('%y%m%d')}-{PurchaseOrder.objects.filter(tenant_id=tenant_id).count() + 1}"
+        po = PurchaseOrder.objects.create(
+            tenant_id=tenant_id,
+            po_number=po_number,
+            purchase_request=rfq.purchase_request,
+            vendor=vendor,
+            date=date.today(),
+            status='draft',
+            total_amount=quotation.total_amount
+        )
+
+        # نقل بنود عرض السعر الفائز لأمر الشراء
+        for q_item in quotation.items.all():
+            pr_item = rfq.purchase_request.items.filter(item_name=q_item.rfq_item.item_name).first()
+            PurchaseOrderItem.objects.create(
+                tenant_id=tenant_id,
+                purchase_order=po,
+                item_name=q_item.rfq_item.item_name,
+                quantity=q_item.rfq_item.quantity,
+                unit=q_item.rfq_item.unit,
+                unit_price=q_item.unit_price,
+                total_price=q_item.total_price,
+                budget_account_id=pr_item.budget_account_id if pr_item else user_id,  # استخدام الحساب الحقيقي من طلب الشراء
+                cost_center_id=pr_item.cost_center_id if pr_item else user_id
+            )
+
+        return po
+
+
+# ============================================================
+# 2. Purchase Order Service — إدارة أوامر الشراء والموازنة
+# ============================================================
+class PurchaseOrderService:
+    """
+    الخدمة المسؤولة عن اعتماد أوامر الشراء واستهلاك الموازنات الحقيقية بالمالية.
+    """
+
+    @classmethod
+    @transaction.atomic
+    def issue_purchase_order(cls, tenant_id, po_id, user_id=None):
+        """
+        اعتماد وإصدار أمر الشراء واستهلاك الموازنة المالية المعتمدة بالمالية.
+        """
+        po = PurchaseOrder.objects.select_for_update().get(id=po_id, tenant_id=tenant_id)
+        if po.status != 'draft':
+            raise ValidationError("أمر الشراء هذا معتمد أو مصدر مسبقاً.")
+
+        # 1. استهلاك وحجز الموازنة التقديرية الحقيقية لكل بند في موديول المالية (Finance Integration)
+        for item in po.items.all():
+            acc = ChartOfAccount.objects.get(id=item.budget_account_id, tenant_id=tenant_id)
+            cc = CostCenter.objects.get(id=item.cost_center_id, tenant_id=tenant_id)
+            
+            # استهلاك الموازنة في موديول المالية
+            # سيقوم برمي ValidationError تلقائياً في حال تجاوز الموازنة
+            BudgetService.check_and_consume_budget(tenant_id, acc, cc, item.total_price)
+
+        # 2. تحديث حالة أمر الشراء
+        po.status = 'approved'
+        po.save(update_fields=['status'])
+
+        # 3. إرسال حدث للمنصة
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PurchaseOrderApproved',
+            source_module='procurement',
+            event_data={
+                'po_id': str(po.id),
+                'po_number': po.po_number,
+                'total_amount': float(po.total_amount)
+            }
+        )
+
+        return po

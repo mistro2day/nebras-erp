@@ -1,1 +1,1 @@
-from apps.clinic.domain.models import ClinicPatient, ClinicVisit
+from apps.clinic.domain.models import *

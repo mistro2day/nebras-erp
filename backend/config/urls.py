@@ -22,5 +22,13 @@ urlpatterns = [
     path('api/v1/reporting/', include('apps.reporting.interfaces.urls')),
     path('api/v1/examinations/', include('apps.examinations.interfaces.urls')),
     path('api/v1/finance/', include('apps.finance.interfaces.urls')),
+    path('api/v1/student-finance/', include('apps.student_finance.interfaces.urls')),
+    path('api/v1/procurement/', include('apps.procurement.interfaces.urls')),
+    path('api/v1/inventory/', include('apps.inventory.interfaces.urls')),
+    path('api/v1/assets/', include('apps.assets.interfaces.urls')),
+    path('api/v1/maintenance/', include('apps.maintenance.interfaces.urls')),
+    path('api/v1/library/', include('apps.library.interfaces.urls')),
+    path('api/v1/clinic/', include('apps.clinic.interfaces.urls')),
+    path('api/v1/transport/', include('apps.transport.interfaces.urls')),
     path('api/v1/platform/', include('apps.platform.interfaces.urls')),
 ]

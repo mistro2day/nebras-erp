@@ -1,1 +1,1 @@
-from apps.transport.domain.models import Vehicle, Route
+from apps.transport.domain.models import *

@@ -79,6 +79,16 @@ export const routes: Routes = [
           import('./features/finance/finance.routes').then((m) => m.FINANCE_ROUTES),
       },
       {
+        path: 'student-finance',
+        loadChildren: () =>
+          import('./features/student-finance/student-finance.routes').then((m) => m.STUDENT_FINANCE_ROUTES),
+      },
+      {
+        path: 'procurement',
+        loadChildren: () =>
+          import('./features/procurement/procurement.routes').then((m) => m.PROCUREMENT_ROUTES),
+      },
+      {
         path: 'hr',
         loadChildren: () =>
           import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
@@ -86,12 +96,27 @@ export const routes: Routes = [
       {
         path: 'inventory',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/inventory/inventory.routes').then((m) => m.INVENTORY_ROUTES),
+      },
+      {
+        path: 'assets',
+        loadChildren: () =>
+          import('./features/assets/assets.routes').then((m) => m.ASSETS_ROUTES),
+      },
+      {
+        path: 'maintenance',
+        loadChildren: () =>
+          import('./features/maintenance/maintenance.routes').then((m) => m.MAINTENANCE_ROUTES),
       },
       {
         path: 'library',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/library/library.routes').then((m) => m.LIBRARY_ROUTES),
+      },
+      {
+        path: 'clinic',
+        loadChildren: () =>
+          import('./features/clinic/clinic.routes').then((m) => m.CLINIC_ROUTES),
       },
       {
         path: 'attendance',

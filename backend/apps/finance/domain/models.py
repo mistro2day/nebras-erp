@@ -10,17 +10,19 @@ class FiscalYear(CombinedSharedModel):
         ('locked', 'مقفلة'),
         ('reopened', 'معاد فتحها'),
     )
-    name = models.CharField(max_length=100)
-    start_date = models.DateField()
-    end_date = models.DateField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True)
-    is_current = models.BooleanField(default=False)
-    notes = models.TextField(blank=True, null=True)
+    name = models.CharField(max_length=100, verbose_name="اسم السنة المالية")
+    start_date = models.DateField(verbose_name="تاريخ البدء")
+    end_date = models.DateField(verbose_name="تاريخ الانتهاء")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True, verbose_name="الحالة")
+    is_current = models.BooleanField(default=False, verbose_name="السنة المالية الحالية")
+    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
 
     class Meta:
         db_table = 'nebras_fiscal_years'
         unique_together = ('tenant_id', 'name')
         ordering = ['-start_date']
+        verbose_name = "السنة المالية"
+        verbose_name_plural = "السنوات المالية"
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
@@ -33,16 +35,18 @@ class AccountingPeriod(CombinedSharedModel):
         ('closed', 'مغلقة'),
         ('locked', 'مقفلة'),
     )
-    fiscal_year = models.ForeignKey(FiscalYear, on_delete=models.CASCADE, related_name='periods')
-    name = models.CharField(max_length=100)
-    start_date = models.DateField()
-    end_date = models.DateField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True)
+    fiscal_year = models.ForeignKey(FiscalYear, on_delete=models.CASCADE, related_name='periods', verbose_name="السنة المالية")
+    name = models.CharField(max_length=100, verbose_name="اسم الفترة")
+    start_date = models.DateField(verbose_name="تاريخ البدء")
+    end_date = models.DateField(verbose_name="تاريخ الانتهاء")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open', db_index=True, verbose_name="الحالة")
 
     class Meta:
         db_table = 'nebras_accounting_periods'
         unique_together = ('tenant_id', 'fiscal_year', 'name')
         ordering = ['start_date']
+        verbose_name = "الفترة المحاسبية"
+        verbose_name_plural = "الفترات المحاسبية"
 
     def __str__(self):
         return f"{self.name} - {self.fiscal_year.name}"
@@ -62,6 +66,8 @@ class AccountType(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_account_types'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "نوع الحساب"
+        verbose_name_plural = "أنواع الحسابات"
 
     def __str__(self):
         return f"{self.name_ar} ({self.code})"
@@ -77,6 +83,8 @@ class AccountCategory(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_account_categories'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "تصنيف الحساب"
+        verbose_name_plural = "تصنيفات الحسابات"
 
     def __str__(self):
         return self.name_ar
@@ -92,24 +100,26 @@ class ChartOfAccount(CombinedSharedModel):
         ('debit', 'مدين'),
         ('credit', 'دائن'),
     )
-    code = models.CharField(max_length=50, db_index=True)
-    name_ar = models.CharField(max_length=255)
-    name_en = models.CharField(max_length=255)
+    code = models.CharField(max_length=50, db_index=True, verbose_name="رمز الحساب")
+    name_ar = models.CharField(max_length=255, verbose_name="الاسم العربي")
+    name_en = models.CharField(max_length=255, verbose_name="الاسم الإنجليزي")
     
-    account_type = models.ForeignKey(AccountType, on_delete=models.PROTECT, related_name='accounts')
-    account_category = models.ForeignKey(AccountCategory, on_delete=models.PROTECT, related_name='accounts', null=True, blank=True)
-    parent = models.ForeignKey('self', on_delete=models.PROTECT, related_name='children', null=True, blank=True)
+    account_type = models.ForeignKey(AccountType, on_delete=models.PROTECT, related_name='accounts', verbose_name="نوع الحساب")
+    account_category = models.ForeignKey(AccountCategory, on_delete=models.PROTECT, related_name='accounts', null=True, blank=True, verbose_name="تصنيف الحساب")
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, related_name='children', null=True, blank=True, verbose_name="الحساب الأب")
     
-    is_control_account = models.BooleanField(default=False)
-    is_sub_account = models.BooleanField(default=False)
-    normal_balance = models.CharField(max_length=10, choices=BALANCE_CHOICES)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
-    description = models.TextField(blank=True, null=True)
+    is_control_account = models.BooleanField(default=False, verbose_name="حساب تحكم الرئيسي")
+    is_sub_account = models.BooleanField(default=False, verbose_name="حساب فرعي")
+    normal_balance = models.CharField(max_length=10, choices=BALANCE_CHOICES, verbose_name="طبيعة الحساب")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True, verbose_name="الحالة")
+    description = models.TextField(blank=True, null=True, verbose_name="الوصف")
 
     class Meta:
         db_table = 'nebras_chart_of_accounts'
         unique_together = ('tenant_id', 'code')
         ordering = ['code']
+        verbose_name = "الحساب المالي"
+        verbose_name_plural = "شجرة الحسابات (COA)"
 
     def __str__(self):
         return f"{self.code} - {self.name_ar}"
@@ -129,19 +139,21 @@ class CostCenter(CombinedSharedModel):
         ('activity', 'نشاط'),
         ('custom', 'مخصص'),
     )
-    code = models.CharField(max_length=50, db_index=True)
-    name_ar = models.CharField(max_length=255)
-    name_en = models.CharField(max_length=255)
-    type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='custom')
-    parent = models.ForeignKey('self', on_delete=models.PROTECT, related_name='children', null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
-    budget_allocated = models.DecimalField(max_digits=15, decimal_places=2, default=0.0)
-    description = models.TextField(blank=True, null=True)
+    code = models.CharField(max_length=50, db_index=True, verbose_name="رمز مركز التكلفة")
+    name_ar = models.CharField(max_length=255, verbose_name="الاسم العربي")
+    name_en = models.CharField(max_length=255, verbose_name="الاسم الإنجليزي")
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='custom', verbose_name="النوع")
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, related_name='children', null=True, blank=True, verbose_name="المركز الأب")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True, verbose_name="الحالة")
+    budget_allocated = models.DecimalField(max_digits=15, decimal_places=2, default=0.0, verbose_name="الميزانية المخصصة")
+    description = models.TextField(blank=True, null=True, verbose_name="الوصف")
 
     class Meta:
         db_table = 'nebras_cost_centers'
         unique_together = ('tenant_id', 'code')
         ordering = ['code']
+        verbose_name = "مركز التكلفة"
+        verbose_name_plural = "مراكز التكلفة"
 
     def __str__(self):
         return f"{self.code} - {self.name_ar}"
@@ -155,6 +167,8 @@ class CostCenterHierarchy(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_cost_center_hierarchies'
+        verbose_name = "هيكل مراكز التكلفة"
+        verbose_name_plural = "هياكل مراكز التكلفة"
 
     def __str__(self):
         return self.name
@@ -176,6 +190,8 @@ class Currency(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_currencies'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "العملة"
+        verbose_name_plural = "العملات"
 
     def __str__(self):
         return f"{self.code} ({self.name_ar})"
@@ -193,6 +209,8 @@ class ExchangeRate(CombinedSharedModel):
         db_table = 'nebras_exchange_rates'
         unique_together = ('tenant_id', 'from_currency', 'to_currency', 'rate_date')
         ordering = ['-rate_date']
+        verbose_name = "سعر الصرف"
+        verbose_name_plural = "أسعار الصرف"
 
     def __str__(self):
         return f"1 {self.from_currency.code} = {self.rate} {self.to_currency.code} on {self.rate_date}"
@@ -236,6 +254,8 @@ class JournalEntry(CombinedSharedModel):
         db_table = 'nebras_journal_entries'
         unique_together = ('tenant_id', 'entry_number')
         ordering = ['-date', '-entry_number']
+        verbose_name = "قيد اليومية"
+        verbose_name_plural = "قيود اليومية العامة"
 
     def __str__(self):
         return f"{self.entry_number} ({self.get_status_display()})"
@@ -256,6 +276,8 @@ class JournalEntryLine(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_journal_entry_lines'
+        verbose_name = "سطر القيد"
+        verbose_name_plural = "تفاصيل سطور القيود"
 
     def __str__(self):
         return f"{self.journal_entry.entry_number} - {self.account.code} (D:{self.debit} C:{self.credit})"
@@ -270,6 +292,8 @@ class Ledger(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_ledgers'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "دفتر الأستاذ"
+        verbose_name_plural = "دفاتر الأستاذ"
 
     def __str__(self):
         return self.name
@@ -290,6 +314,8 @@ class LedgerEntry(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_ledger_entries'
         ordering = ['date', 'created_at']
+        verbose_name = "حركة دفتر الأستاذ"
+        verbose_name_plural = "حركات وقيود دفتر الأستاذ"
 
     def __str__(self):
         return f"{self.account.code} - D:{self.debit} C:{self.credit} (Bal:{self.balance_snapshot})"
@@ -305,6 +331,8 @@ class Bank(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_banks'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "البنك"
+        verbose_name_plural = "البنوك والمصارف"
 
     def __str__(self):
         return self.name_ar
@@ -326,6 +354,8 @@ class BankAccount(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_bank_accounts'
         unique_together = ('tenant_id', 'account_number')
+        verbose_name = "الحساب البنكي"
+        verbose_name_plural = "الحسابات البنكية للمنشأة"
 
     def __str__(self):
         return f"{self.bank.name_ar} - {self.account_number}"
@@ -347,6 +377,8 @@ class CashBox(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_cash_boxes'
         unique_together = ('tenant_id', 'name_en')
+        verbose_name = "الصندوق المالي"
+        verbose_name_plural = "الصناديق المالية (الخزائن)"
 
     def __str__(self):
         return self.name_ar
@@ -366,6 +398,8 @@ class PaymentMethod(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_payment_methods'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "طريقة الدفع"
+        verbose_name_plural = "طرق الدفع"
 
     def __str__(self):
         return self.name_ar
@@ -388,6 +422,8 @@ class Tax(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_taxes'
         unique_together = ('tenant_id', 'code')
+        verbose_name = "الضريبة"
+        verbose_name_plural = "الضرائب المعتمدة"
 
     def __str__(self):
         return f"{self.name_ar} ({self.rate_percentage}%)"
@@ -401,6 +437,8 @@ class TaxGroup(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_tax_groups'
+        verbose_name = "مجموعة الضرائب"
+        verbose_name_plural = "مجموعات الضرائب"
 
     def __str__(self):
         return self.name_ar
@@ -422,6 +460,8 @@ class Budget(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_budgets'
         unique_together = ('tenant_id', 'fiscal_year', 'cost_center')
+        verbose_name = "الموازنة التقديرية"
+        verbose_name_plural = "الموازنات التقديرية"
 
     def __str__(self):
         return f"{self.name} - {self.fiscal_year.name}"
@@ -437,6 +477,8 @@ class BudgetItem(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_budget_items'
         unique_together = ('tenant_id', 'budget', 'account')
+        verbose_name = "بند الموازنة"
+        verbose_name_plural = "بنود الموازنة التقديرية"
 
     def __str__(self):
         return f"{self.account.code} - Allocated: {self.amount} (Consumed: {self.consumed_amount})"
@@ -457,6 +499,8 @@ class FinancialDocument(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_financial_documents'
+        verbose_name = "المستند المرجعي"
+        verbose_name_plural = "المستندات المالية المرجعية"
 
     def __str__(self):
         return f"{self.document_type} - {self.document_number}"
@@ -493,6 +537,8 @@ class Voucher(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_vouchers'
         unique_together = ('tenant_id', 'voucher_number')
+        verbose_name = "السند المالي"
+        verbose_name_plural = "السندات المالية (صرف/قبض)"
 
     def __str__(self):
         return f"{self.voucher_type} - {self.voucher_number}"
@@ -526,6 +572,8 @@ class FinancialTransaction(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_financial_transactions'
+        verbose_name = "التحويلة المالية"
+        verbose_name_plural = "الحركات والتحويلات المالية"
 
     def __str__(self):
         return f"{self.transaction_type} - {self.transaction_number}"
@@ -548,6 +596,8 @@ class RecurringJournal(CombinedSharedModel):
     class Meta:
         db_table = 'nebras_recurring_journals'
         unique_together = ('tenant_id', 'name')
+        verbose_name = "القيد الدوري"
+        verbose_name_plural = "القيود الدورية المتكررة"
 
     def __str__(self):
         return self.name
@@ -575,6 +625,8 @@ class FinancialClosing(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_financial_closings'
+        verbose_name = "الإغلاق المالي"
+        verbose_name_plural = "عمليات الإغلاق المالي"
 
     def __str__(self):
         return f"{self.closing_type} - {self.get_status_display()}"
@@ -590,6 +642,8 @@ class FinancialAudit(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_financial_audits'
+        verbose_name = "سجل تدقيق مالي"
+        verbose_name_plural = "سجلات تدقيق العمليات المالية"
 
     def __str__(self):
         return f"{self.action_type} by {self.performed_by} at {self.performed_at}"
@@ -605,6 +659,8 @@ class FinanceSettings(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_finance_settings'
+        verbose_name = "الإعدادات المالية"
+        verbose_name_plural = "إعدادات النظام المالي"
 
     def __str__(self):
         return f"Settings for Tenant: {self.tenant_id}"
@@ -621,6 +677,8 @@ class FinanceStatistics(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_finance_statistics'
+        verbose_name = "الإحصائيات المالية"
+        verbose_name_plural = "الإحصائيات والملخصات المالية"
 
     def __str__(self):
         return f"Stats on {self.as_of_date}"

@@ -61,26 +61,55 @@ class FinanceConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.finance'
     label = 'finance'
+    verbose_name = "إدارة الحسابات والمالية"
+
+class StudentFinanceConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.student_finance'
+    label = 'student_finance'
+    verbose_name = "إدارة فوترة الطلاب وحسابات القبض"
+
+class ProcurementConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.procurement'
+    label = 'procurement'
+    verbose_name = "إدارة المشتريات والتعاقدات"
 
 class InventoryConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.inventory'
     label = 'inventory'
+    verbose_name = "إدارة المستودعات والتحكم في المخزون"
+
+class AssetsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.assets'
+    label = 'assets'
+    verbose_name = "إدارة الأصول الثابتة ودورة حياة الأصل"
+
+class MaintenanceConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.maintenance'
+    label = 'maintenance'
+    verbose_name = "إدارة الصيانة وأوامر العمل (CMMS)"
 
 class TransportConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.transport'
     label = 'transport'
+    verbose_name = "إدارة النقل وأسطول الحافلات"
 
 class LibraryConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.library'
     label = 'library'
+    verbose_name = "إدارة المكتبات ومصادر التعلم"
 
 class ClinicConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.clinic'
     label = 'clinic'
+    verbose_name = "إدارة العيادة المدرسية والسجلات الصحية"
 
 class CRMConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'

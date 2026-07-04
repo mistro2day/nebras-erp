@@ -1,1 +1,1 @@
-from apps.inventory.domain.models import Warehouse, Product
+from apps.inventory.domain.models import *
