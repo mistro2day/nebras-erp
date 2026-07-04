@@ -67,7 +67,7 @@ import { MatSliderModule } from '@angular/material/slider';
         <!-- Right: Tabbed Configuration Panels -->
         <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
           <mat-card-content style="padding: 12px 0 0 0;">
-            <mat-tabs>
+            <mat-tab-group>
               <!-- Accessibility Tab -->
               <mat-tab label="الوصول الميسر (Accessibility)">
                 <div style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
@@ -120,7 +120,7 @@ import { MatSliderModule } from '@angular/material/slider';
                   </div>
                 </div>
               </mat-tab>
-            </mat-tabs>
+            </mat-tab-group>
           </mat-card-content>
         </mat-card>
       </div>

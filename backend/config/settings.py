@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'apps.apps.FormsConfig',
     'apps.apps.CommandCenterConfig',
     'apps.apps.PersonalizationConfig',
+    'apps.apps.ConfigurationConfig',
+    'apps.apps.ApprovalCenterConfig',
     'apps.common',
 ]
 

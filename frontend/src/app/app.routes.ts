@@ -174,6 +174,11 @@ export const routes: Routes = [
           import('./features/personalization/personalization.routes').then((m) => m.PERSONALIZATION_ROUTES),
       },
       {
+        path: 'config',
+        loadChildren: () =>
+          import('./features/config/config.routes').then((m) => m.CONFIG_ROUTES),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',

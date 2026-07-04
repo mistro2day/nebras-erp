@@ -260,6 +260,20 @@ class PersonalizationConfig(AppConfig):
     label = 'personalization'
     verbose_name = 'منصة التخصيص وتفضيلات تجربة المستخدم وتوطين اللغات والوصول الميسر'
 
+class ConfigurationConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.configuration'
+    label = 'configuration'
+    verbose_name = 'منصة الإعدادات والميزات الفورية والبيانات الوصفية'
+
+class ApprovalCenterConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.approval_center'
+    label = 'approval_center'
+    verbose_name = 'مركز الموافقات وصندوق الوارد المؤسسي الموحد'
+
+
+
 
 
 
