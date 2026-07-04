@@ -31,4 +31,7 @@ urlpatterns = [
     path('api/v1/clinic/', include('apps.clinic.interfaces.urls')),
     path('api/v1/transport/', include('apps.transport.interfaces.urls')),
     path('api/v1/platform/', include('apps.platform.interfaces.urls')),
+    path('api/v1/portal/', include('apps.portal.interfaces.urls')),
+    path('api/v1/integration/', include('apps.integration.interfaces.urls')),
+    path('api/v1/crm/', include('apps.crm.interfaces.urls')),
 ]

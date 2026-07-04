@@ -224,13 +224,14 @@ class ExaminationsConfig(AppConfig):
     label = 'examinations'
     verbose_name = 'الامتحانات والتقييمات الأكاديمية'
 
+class PortalConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.portal'
+    label = 'portal'
+    verbose_name = 'بوابات التجربة الرقمية للطلاب وأولياء الأمور والمتقدمين'
 
-
-
-
-
-
-
-
-
-
+class IntegrationConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.integration'
+    label = 'integration'
+    verbose_name = 'بوابة التكامل والربط المؤسسي وBFF'

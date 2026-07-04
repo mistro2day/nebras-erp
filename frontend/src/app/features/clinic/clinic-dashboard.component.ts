@@ -27,7 +27,7 @@ import { ClinicService } from './clinic.service';
           <p>لوحة المراقبة الحية لزيارات العيادة اليومية، الحالات الطارئة، طلبات الإجازات المرضية، وحالات العزل</p>
         </div>
         <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon تحديث البيانات
+          <mat-icon>refresh</mat-icon> تحديث البيانات
         </button>
       </div>
 

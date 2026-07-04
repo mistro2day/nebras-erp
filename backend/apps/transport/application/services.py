@@ -210,6 +210,7 @@ class VehicleInspectionService:
                     title=f"بلاغ صيانة تلقائي لفشل فحص الحافلة {vehicle.vehicle_number}",
                     description=notes or "فشلت المركبة في الفحص الفني اليومي التابع لقطاع النقل والمواصلات.",
                     status='submitted',
+                    reported_by_user_id=user_id or uuid.UUID('00000000-0000-0000-0000-000000000000'),
                     created_by=user_id
                 )
 

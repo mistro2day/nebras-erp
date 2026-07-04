@@ -27,7 +27,7 @@ import { MaintenanceService } from './maintenance.service';
           <p>لوحة التحكم الفورية بطلبات الصيانة، الصيانة الوقائية للأصول، استهلاك المواد، والتكاليف المالية المترتبة</p>
         </div>
         <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon تحديث البيانات
+          <mat-icon>refresh</mat-icon> تحديث البيانات
         </button>
       </div>
 

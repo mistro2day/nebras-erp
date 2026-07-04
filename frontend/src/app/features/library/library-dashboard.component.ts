@@ -27,7 +27,7 @@ import { LibraryService } from './library.service';
           <p>لوحة التحكم الفورية بفهرس الكتب والمصنفات، الاستعارات النشطة، الغرامات المحتسبة، والكتب الرقمية</p>
         </div>
         <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon تحديث البيانات
+          <mat-icon>refresh</mat-icon> تحديث البيانات
         </button>
       </div>
 

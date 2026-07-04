@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     'apps.apps.CommunicationsConfig',
     'apps.apps.ReportingConfig',
     'apps.apps.ExaminationsConfig',
+    'apps.apps.PortalConfig',
+    'apps.apps.IntegrationConfig',
     'apps.common',
 ]
 

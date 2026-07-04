@@ -126,7 +126,7 @@ export const routes: Routes = [
       {
         path: 'transport',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/transport/transport.routes').then((m) => m.TRANSPORT_ROUTES),
       },
       {
         path: 'reports',
@@ -137,6 +137,21 @@ export const routes: Routes = [
         path: 'ai',
         loadChildren: () =>
           import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+      },
+      {
+        path: 'portal',
+        loadChildren: () =>
+          import('./features/portal/portal.routes').then((m) => m.PORTAL_ROUTES),
+      },
+      {
+        path: 'integration',
+        loadChildren: () =>
+          import('./features/integration/integration.routes').then((m) => m.INTEGRATION_ROUTES),
+      },
+      {
+        path: 'crm',
+        loadChildren: () =>
+          import('./features/crm/crm.routes').then((m) => m.CRM_ROUTES),
       },
       {
         path: '',

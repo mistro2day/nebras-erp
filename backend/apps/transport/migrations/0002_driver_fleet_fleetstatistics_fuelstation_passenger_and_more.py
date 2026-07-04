@@ -216,14 +216,7 @@ class Migration(migrations.Migration):
             name='vehicle',
             options={'verbose_name': 'المركبة', 'verbose_name_plural': 'أسطول المركبات والحافلات'},
         ),
-        migrations.AlterUniqueTogether(
-            name='route',
-            unique_together={('tenant_id', 'code')},
-        ),
-        migrations.AlterUniqueTogether(
-            name='vehicle',
-            unique_together={('tenant_id', 'vehicle_number')},
-        ),
+
         migrations.AddField(
             model_name='route',
             name='code',
@@ -278,6 +271,14 @@ class Migration(migrations.Migration):
             model_name='vehicle',
             name='vin',
             field=models.CharField(blank=True, max_length=100, null=True, verbose_name='رقم الشاصيه (VIN)'),
+        ),
+        migrations.AlterUniqueTogether(
+            name='route',
+            unique_together={('tenant_id', 'code')},
+        ),
+        migrations.AlterUniqueTogether(
+            name='vehicle',
+            unique_together={('tenant_id', 'vehicle_number')},
         ),
         migrations.AlterField(
             model_name='route',
