@@ -64,6 +64,10 @@ INSTALLED_APPS = [
     'apps.apps.ExaminationsConfig',
     'apps.apps.PortalConfig',
     'apps.apps.IntegrationConfig',
+    'apps.apps.DocumentManagementConfig',
+    'apps.apps.FormsConfig',
+    'apps.apps.CommandCenterConfig',
+    'apps.apps.PersonalizationConfig',
     'apps.common',
 ]
 

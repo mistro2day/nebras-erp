@@ -34,4 +34,8 @@ urlpatterns = [
     path('api/v1/portal/', include('apps.portal.interfaces.urls')),
     path('api/v1/integration/', include('apps.integration.interfaces.urls')),
     path('api/v1/crm/', include('apps.crm.interfaces.urls')),
+    path('api/v1/documents/', include('apps.document_management.interfaces.urls')),
+    path('api/v1/forms/', include('apps.forms.interfaces.urls')),
+    path('api/v1/commands/', include('apps.command_center.interfaces.urls')),
+    path('api/v1/personalization/', include('apps.personalization.interfaces.urls')),
 ]

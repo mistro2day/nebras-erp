@@ -76,7 +76,7 @@ import { MatDividerModule } from '@angular/material/divider';
       </div>
 
       <!-- Detail Tabs -->
-      <mat-tabs style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
+      <mat-tab-group style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
         <mat-tab label="متابعة قمع الاستقطاب (Lead Funnel)">
           <div style="padding: 20px;">
             <h3 style="font-weight: 600; color: #0f172a; margin-bottom: 16px;">آخر المتابعات والعملاء المحتملين</h3>
@@ -92,25 +92,7 @@ import { MatDividerModule } from '@angular/material/divider';
             </mat-list>
           </div>
         </mat-tab>
-        <mat-tab label="قضايا وشكاوى أولياء الأمور">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a; margin-bottom: 16px;">آخر القضايا النشطة</h3>
-            <mat-list>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #ef4444; margin-left: 12px;">warning</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">شكوى عدم وصول الحافلة المدرسية للابن</span>
-                <span matListItemLine style="color: #64748b;">المشتكي: ولي الأمر خالد - الأهمية: عالية | الحالة: قيد المراجعة</span>
-              </mat-list-item>
-              <mat-divider></mat-divider>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #3b82f6; margin-left: 12px;">help</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">استفسار عن خطة الرسوم للفصل الثاني</span>
-                <span matListItemLine style="color: #64748b;">المستعلم: ولي الأمر أحمد - الأهمية: عادية | الحالة: تم الحل</span>
-              </mat-list-item>
-            </mat-list>
-          </div>
-        </mat-tab>
-      </mat-tabs>
+      </mat-tab-group>
     </div>
   `
 })

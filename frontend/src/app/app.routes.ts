@@ -154,6 +154,26 @@ export const routes: Routes = [
           import('./features/crm/crm.routes').then((m) => m.CRM_ROUTES),
       },
       {
+        path: 'documents',
+        loadChildren: () =>
+          import('./features/documents/documents.routes').then((m) => m.DOCUMENT_ROUTES),
+      },
+      {
+        path: 'forms',
+        loadChildren: () =>
+          import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
+      },
+      {
+        path: 'command',
+        loadChildren: () =>
+          import('./features/command/command.routes').then((m) => m.COMMAND_ROUTES),
+      },
+      {
+        path: 'personalization',
+        loadChildren: () =>
+          import('./features/personalization/personalization.routes').then((m) => m.PERSONALIZATION_ROUTES),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',

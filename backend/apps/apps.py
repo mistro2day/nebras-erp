@@ -235,3 +235,31 @@ class IntegrationConfig(AppConfig):
     name = 'apps.integration'
     label = 'integration'
     verbose_name = 'بوابة التكامل والربط المؤسسي وBFF'
+
+class DocumentManagementConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.document_management'
+    label = 'document_management'
+    verbose_name = 'إدارة المستندات والأرشفة الإلكترونية المؤسسية DMS'
+
+class FormsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.forms'
+    label = 'forms'
+    verbose_name = 'منصة النماذج الإلكترونية ومطور الاستمارات low-code'
+
+class CommandCenterConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.command_center'
+    label = 'command_center'
+    verbose_name = 'منصة القيادة والتحكم المركزية ولوحة الأوامر العالمية'
+
+class PersonalizationConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.personalization'
+    label = 'personalization'
+    verbose_name = 'منصة التخصيص وتفضيلات تجربة المستخدم وتوطين اللغات والوصول الميسر'
+
+
+
+
