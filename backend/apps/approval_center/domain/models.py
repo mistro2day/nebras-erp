@@ -26,17 +26,22 @@ class InboxItem(CombinedSharedModel):
     title_en = models.CharField(max_length=255)
     status = models.CharField(max_length=50, default='pending') # pending, read, archived
     is_starred = models.BooleanField(default=False)
+    priority_code = models.CharField(max_length=20, blank=True, null=True)
 
     class Meta:
         db_table = 'nebras_apv_inbox_items'
 
 
 class ApprovalRequest(CombinedSharedModel):
-    workflow_instance_id = models.UUIDField(db_index=True) # reference to Workflow engine instance
+    workflow_instance_id = models.UUIDField(db_index=True, null=True, blank=True) # reference to Workflow engine instance
     category = models.ForeignKey(ApprovalCategory, on_delete=models.CASCADE)
     requester_id = models.UUIDField()
     status = models.CharField(max_length=50, default='pending') # pending, approved, rejected, returned
     payload = models.JSONField(default=dict)
+    title_ar = models.CharField(max_length=255, blank=True, default='')
+    title_en = models.CharField(max_length=255, blank=True, default='')
+    priority = models.ForeignKey('ApprovalPriority', on_delete=models.SET_NULL, null=True, blank=True)
+    current_step = models.ForeignKey('ApprovalStep', on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_apv_requests'
@@ -94,6 +99,7 @@ class ApprovalRule(CombinedSharedModel):
     category = models.ForeignKey(ApprovalCategory, on_delete=models.CASCADE)
     rule_code = models.CharField(max_length=100)
     expression = models.TextField()
+    rule_id = models.UUIDField(null=True, blank=True) # reference to Rule Engine's Rule.id
 
     class Meta:
         db_table = 'nebras_apv_rules'
@@ -138,6 +144,10 @@ class ApprovalEscalation(CombinedSharedModel):
     original_approver_id = models.UUIDField()
     escalated_to_id = models.UUIDField()
     escalated_at = models.DateTimeField(auto_now_add=True)
+    escalation_level = models.IntegerField(default=1)
+    reason = models.TextField(blank=True, null=True)
+    resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_apv_escalations'
@@ -149,6 +159,9 @@ class ApprovalDelegation(CombinedSharedModel):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     is_active = models.BooleanField(default=True)
+    category = models.ForeignKey(ApprovalCategory, on_delete=models.CASCADE, null=True, blank=True)
+    department_id = models.UUIDField(null=True, blank=True)
+    reason = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = 'nebras_apv_delegations'
@@ -158,6 +171,8 @@ class ApprovalReminder(CombinedSharedModel):
     request = models.ForeignKey(ApprovalRequest, on_delete=models.CASCADE)
     remind_at = models.DateTimeField()
     message = models.TextField()
+    is_sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_apv_reminders'
@@ -200,6 +215,8 @@ class ApprovalNotification(CombinedSharedModel):
     user_id = models.UUIDField()
     message = models.TextField()
     is_read = models.BooleanField(default=False)
+    request = models.ForeignKey(ApprovalRequest, on_delete=models.CASCADE, null=True, blank=True)
+    link = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         db_table = 'nebras_apv_notifications'
@@ -233,6 +250,9 @@ class SLATracking(CombinedSharedModel):
     request = models.ForeignKey(ApprovalRequest, on_delete=models.CASCADE)
     due_at = models.DateTimeField()
     is_violated = models.BooleanField(default=False)
+    warning_at = models.DateTimeField(null=True, blank=True)
+    violated_at = models.DateTimeField(null=True, blank=True)
+    business_hours_only = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'nebras_apv_sla_tracking'
@@ -249,6 +269,8 @@ class ApprovalDeadline(CombinedSharedModel):
 class ApprovalOutcome(CombinedSharedModel):
     request = models.OneToOneField(ApprovalRequest, on_delete=models.CASCADE)
     outcome_code = models.CharField(max_length=50) # approved, rejected
+    decided_by = models.UUIDField(null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_apv_outcomes'

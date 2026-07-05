@@ -160,7 +160,29 @@ class SearchService:
                 'subtitle': f"رقم التقديم: {app.application_number}",
                 'module': 'admissions'
             })
-            
+
+        # 3. البحث في طلبات الاعتماد (مركز الموافقات)
+        from apps.approval_center.domain.models import ApprovalRequest
+
+        request_qs = ApprovalRequest.objects.filter(deleted_at__isnull=True)
+        if tenant_id:
+            request_qs = request_qs.filter(tenant_id=tenant_id)
+
+        approval_requests = request_qs.filter(
+            Q(title_ar__icontains=query) |
+            Q(title_en__icontains=query) |
+            Q(category__name_ar__icontains=query)
+        )[:10]
+
+        for req in approval_requests:
+            results.append({
+                'id': str(req.id),
+                'type': 'approval_request',
+                'title': req.title_ar or req.title_en or req.category.name_ar,
+                'subtitle': f"الحالة: {req.status}",
+                'module': 'approval_center'
+            })
+
         return results
 
 

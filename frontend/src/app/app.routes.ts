@@ -184,6 +184,11 @@ export const routes: Routes = [
           import('./features/automation/automation.routes').then((m) => m.AUTOMATION_ROUTES),
       },
       {
+        path: 'approvals',
+        loadChildren: () =>
+          import('./features/approvals/approval.routes').then((m) => m.APPROVAL_ROUTES),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',

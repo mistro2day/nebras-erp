@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/d/nebras-erp/.venv/Scripts/python.exe manage.py showmigrations approval_center document_management command_center configuration personalization workflow rules communications)"
+    ]
+  }
+}

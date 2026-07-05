@@ -21,21 +21,25 @@ class AuditConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.audit'
     label = 'audit'
+    verbose_name = 'سجلات المراقبة والتدقيق'
 
 class SettingsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.settings'
     label = 'settings'
+    verbose_name = 'إعدادات المستأجرين'
 
 class NotificationsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.notifications'
     label = 'notifications'
+    verbose_name = 'قوالب وسجل الإشعارات'
 
 class StorageConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.storage'
     label = 'storage'
+    verbose_name = 'إدارة الملفات والتخزين'
 
 class AdmissionsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -51,11 +55,13 @@ class TeachersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.teachers'
     label = 'teachers'
+    verbose_name = 'إدارة المعلمين والتكليفات التدريسية'
 
 class HRConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.hr'
     label = 'hr'
+    verbose_name = 'إدارة الموارد البشرية والعقود'
 
 class FinanceConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -120,16 +126,19 @@ class AIConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.ai'
     label = 'ai'
+    verbose_name = 'المحادثات والمساعد الذكي'
 
 class ReportsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.reports'
     label = 'reports'
+    verbose_name = 'التقارير المحفوظة'
 
 class CMSConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.cms'
     label = 'cms'
+    verbose_name = 'إدارة محتوى الصفحات'
 
 
 class OrganizationConfig(AppConfig):
@@ -142,6 +151,7 @@ class WorkflowConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.workflow'
     label = 'workflow'
+    verbose_name = 'محرك سير العمل ومسارات الاعتماد'
 
 
 class PlatformConfig(AppConfig):
