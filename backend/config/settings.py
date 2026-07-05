@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'apps.apps.PersonalizationConfig',
     'apps.apps.ConfigurationConfig',
     'apps.apps.ApprovalCenterConfig',
+    'apps.apps.AutomationPlatformConfig',
     'apps.common',
 ]
 
