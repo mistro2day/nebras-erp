@@ -179,6 +179,11 @@ export const routes: Routes = [
           import('./features/config/config.routes').then((m) => m.CONFIG_ROUTES),
       },
       {
+        path: 'automation',
+        loadChildren: () =>
+          import('./features/automation/automation.routes').then((m) => m.AUTOMATION_ROUTES),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
