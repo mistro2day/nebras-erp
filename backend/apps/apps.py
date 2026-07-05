@@ -272,6 +272,12 @@ class ApprovalCenterConfig(AppConfig):
     label = 'approval_center'
     verbose_name = 'مركز الموافقات وصندوق الوارد المؤسسي الموحد'
 
+class AutomationPlatformConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.automation_platform'
+    label = 'automation_platform'
+    verbose_name = 'منصة الأتمتة المؤسسية: مصمم مسارات العمل والمنصة منخفضة الشيفرة والعمليات وDevOps'
+
 
 
 

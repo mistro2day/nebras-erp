@@ -65,7 +65,7 @@ import { MatDividerModule } from '@angular/material/divider';
       </div>
 
       <!-- Tabs for Details -->
-      <mat-tabs style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
+      <mat-tab-group style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
         <mat-tab label="الفواتير والمدفوعات">
           <div style="padding: 20px;">
             <h3 style="font-weight: 600; color: #0f172a;">الملخص المالي</h3>
@@ -99,7 +99,7 @@ import { MatDividerModule } from '@angular/material/divider';
             </mat-list>
           </div>
         </mat-tab>
-      </mat-tabs>
+      </mat-tab-group>
     </div>
   `
 })

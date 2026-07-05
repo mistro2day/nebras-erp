@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'apps.apps.PersonalizationConfig',
     'apps.apps.ConfigurationConfig',
     'apps.apps.ApprovalCenterConfig',
+    'apps.apps.AutomationPlatformConfig',
     'apps.common',
 ]
 
@@ -149,6 +150,54 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
+# R19: STATIC_ROOT مطلوب لأمر collectstatic في بيئة الإنتاج (لا يؤثر على التطوير)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# ---------------------------------------------------------------------------
+# R19: Celery configuration (production integration for the Automation Platform)
+# ---------------------------------------------------------------------------
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = int(os.environ.get('CELERY_TASK_TIME_LIMIT', '600'))
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# تشغيل متزامن للمهام في الاختبارات/التطوير بدون وسيط (broker) عبر متغير بيئة
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# طوابير المهام + طابور الرسائل الميتة (Dead Letter Queue placeholder)
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_QUEUES = {
+    'default': {},
+    'automation': {},
+    'scheduled': {},
+    'dead_letter': {},  # placeholder — تُوجَّه إليه المهام الفاشلة نهائياً
+}
+CELERY_TASK_ROUTES = {
+    'apps.automation_platform.application.tasks.execute_automation_flow': {'queue': 'automation'},
+    'apps.automation_platform.application.tasks.execute_scheduled_job': {'queue': 'scheduled'},
+}
+
+# django-celery-beat اختياري: يُفعَّل جدول قاعدة البيانات الديناميكي فقط إذا كان مثبّتاً
+# ومتوافقاً مع إصدار Django الحالي (5.2). خلاف ذلك نعتمد الجدولة الثابتة الافتراضية.
+try:
+    import django_celery_beat  # noqa: F401
+    if 'django_celery_beat' not in INSTALLED_APPS:
+        INSTALLED_APPS.append('django_celery_beat')
+    CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+    DJANGO_CELERY_BEAT_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
+    DJANGO_CELERY_BEAT_AVAILABLE = False
