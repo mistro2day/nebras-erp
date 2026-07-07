@@ -1,100 +1,62 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../../shared/nebras/nb-stat-card.component';
 
+/**
+ * لوحة تحكم إدارة علاقات العملاء (CRM) — لغة تصميم Nebras OS.
+ * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-crm-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTabsModule,
-    MatListModule,
-    MatDividerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatTabsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="portal-container" dir="rtl" style="padding: 24px; font-family: 'Outfit', 'Inter', sans-serif; background: #f8fafc; min-height: 100vh;">
-      <!-- Header -->
-      <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-        <div>
-          <h1 style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">لوحة تحكم إدارة علاقات العملاء (CRM)</h1>
-          <p style="color: #64748b; margin-top: 4px;">متابعة طلبات الاستقطاب، حملات التسويق، رضا أولياء الأمور، وقضايا وشكاوى الدعم الفني.</p>
-        </div>
-        <button mat-flat-button color="primary" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); border-radius: 8px; padding: 0 20px;">
-          <mat-icon style="margin-left: 8px;">refresh</mat-icon>تحديث لوحة التحليلات
-        </button>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="لوحة تحكم إدارة علاقات العملاء (CRM)"
+        subtitle="متابعة طلبات الاستقطاب، حملات التسويق، رضا أولياء الأمور، وقضايا وشكاوى الدعم الفني."
+      >
+        <button class="nb-btn-secondary">تحديث لوحة التحليلات</button>
+      </nb-page-header>
+
+      <div class="stats-grid">
+        <nb-stat-card label="العملاء المحتملين الجدد" value="148" suffix="عميل" valueKind="info"></nb-stat-card>
+        <nb-stat-card label="نسبة تحويل الطلاب" value="65.4" suffix="%" valueKind="success"></nb-stat-card>
+        <nb-stat-card label="الحالات والشكاوى المفتوحة" value="12" suffix="حالة" valueKind="warning"></nb-stat-card>
+        <nb-stat-card label="مؤشر رضا أولياء الأمور" value="4.6 / 5"></nb-stat-card>
       </div>
 
-      <!-- Quick Metrics Grid -->
-      <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 32px;">
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #ec4899; margin-left: 12px;">group_add</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">العملاء المحتملين الجدد</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            148 عميل
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #10b981; margin-left: 12px;">trending_up</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">نسبة تحويل الطلاب</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            65.4%
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #3b82f6; margin-left: 12px;">contact_support</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">الحالات والشكاوى المفتوحة</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            12 حالة
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #f59e0b; margin-left: 12px;">star</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">مؤشر رضا أولياء الأمور</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            4.6 / 5
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <!-- Detail Tabs -->
-      <mat-tab-group style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-        <mat-tab label="متابعة قمع الاستقطاب (Lead Funnel)">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a; margin-bottom: 16px;">آخر المتابعات والعملاء المحتملين</h3>
-            <mat-list>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="متابعة قمع الاستقطاب (Lead Funnel)">
+            <div class="list">
+              <h3>آخر المتابعات والعملاء المحتملين</h3>
               @for (lead of leads(); track lead.name) {
-                <mat-list-item>
-                  <mat-icon matListItemIcon style="color: #ec4899; margin-left: 12px;">person_outline</mat-icon>
-                  <span matListItemTitle style="font-weight: 500;">{{ lead.name }}</span>
-                  <span matListItemLine style="color: #64748b;">درجة الاهتمام: {{ lead.interest === 'high' ? 'عالية جداً' : 'متوسطة' }} | القناة: {{ lead.source }}</span>
-                </mat-list-item>
-                <mat-divider></mat-divider>
+                <div class="row">
+                  <div><strong>{{ lead.name }}</strong><span class="meta">درجة الاهتمام: {{ lead.interest === 'high' ? 'عالية جداً' : 'متوسطة' }} | القناة: {{ lead.source }}</span></div>
+                  <span [class]="lead.interest === 'high' ? 'nb-badge-success' : 'nb-badge-warning'">{{ lead.interest === 'high' ? 'عالية' : 'متوسطة' }}</span>
+                </div>
               }
-            </mat-list>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
-  `
+  `,
+  styles: [`
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .nb-tabs { padding: 4px 8px 8px; }
+    .list { padding: 16px; }
+    .list h3 { font-weight: 700; color: var(--nb-text); margin: 0 0 14px; font-size: 14px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nb-border-soft); }
+    .row:last-child { border-bottom: none; }
+    .row strong { display: block; font-size: 13px; color: var(--nb-text); }
+    .row .meta { font-size: 11px; color: var(--nb-text-muted); }
+  `]
 })
 export class CrmDashboardComponent {
   leads = signal([

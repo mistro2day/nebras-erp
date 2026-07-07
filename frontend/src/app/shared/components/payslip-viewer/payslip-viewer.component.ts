@@ -28,7 +28,7 @@ export interface PayslipInfo {
           <h3>قسيمة الراتب التفصيلية</h3>
           <span class="period">الفترة: {{ payslip().period_code }}</span>
         </div>
-        <span class="status-badge" [ngClass]="payslip().status">
+        <span [class]="payslip().status === 'paid' ? 'nb-badge-success' : 'nb-badge-warning'">
           {{ payslip().status === 'paid' ? 'تم الدفع' : 'قيد المراجعة' }}
         </span>
       </div>
@@ -61,62 +61,56 @@ export interface PayslipInfo {
       </mat-card-content>
 
       <mat-card-actions class="payslip-footer">
-        <button mat-flat-button color="primary">
-          <mat-icon>download</mat-icon> تحميل PDF
-        </button>
+        <button class="nb-btn-secondary" style="width:100%">تحميل PDF</button>
       </mat-card-actions>
     </mat-card>
   `,
   styles: [`
     .payslip-card {
-      background: #1e293b !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
-      border-radius: 16px !important;
-      color: #f8fafc !important;
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      background: var(--nb-surface) !important;
+      border: 1px solid var(--nb-border) !important;
+      border-radius: var(--nb-radius-card) !important;
+      color: var(--nb-text) !important;
+      padding: 20px;
+      font-family: var(--nb-font-family);
+      box-shadow: var(--nb-shadow-card);
     }
     .payslip-header {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 16px;
       position: relative;
     }
     .header-icon {
-      font-size: 32px;
-      width: 32px;
-      height: 32px;
-      color: #10b981;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      color: var(--nb-success);
     }
     .title-meta h3 {
-      font-size: 1rem;
-      font-weight: bold;
+      font-size: 14px;
+      font-weight: 700;
       margin: 0;
+      color: var(--nb-text);
     }
     .title-meta .period {
-      font-size: 0.75rem;
-      color: #94a3b8;
+      font-size: 12px;
+      color: var(--nb-text-muted);
     }
-    .status-badge {
+    .payslip-header > span:last-child {
       position: absolute;
       left: 0;
       top: 0;
-      font-size: 0.65rem;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-weight: bold;
     }
-    .status-badge.paid { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .status-badge.draft { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-
     .emp-summary {
-      background: rgba(15, 23, 42, 0.3);
+      background: var(--nb-surface-raised);
+      border: 1px solid var(--nb-border-soft);
       padding: 10px 12px;
-      border-radius: 8px;
-      margin-bottom: 1.25rem;
-      font-size: 0.8rem;
+      border-radius: var(--nb-radius);
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--nb-text-secondary);
     }
     .emp-summary p { margin: 4px 0; }
 
@@ -128,29 +122,27 @@ export interface PayslipInfo {
     .row {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
-      color: #cbd5e1;
+      font-size: 13px;
+      color: var(--nb-text-secondary);
     }
-    .row.positive { color: #34d399; }
-    .row.negative { color: #f87171; }
+    .row .value { font-variant-numeric: tabular-nums; }
+    .row.positive { color: var(--nb-success); }
+    .row.negative { color: var(--nb-danger); }
     .row.net {
-      font-size: 1rem;
+      font-size: 15px;
       font-weight: 800;
-      color: #38bdf8;
+      color: var(--nb-primary-600);
     }
     .divider {
       border: 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid var(--nb-border);
       margin: 8px 0;
     }
     .payslip-footer {
       display: flex;
       justify-content: flex-end;
       padding: 0;
-      margin-top: 1.5rem;
-    }
-    .payslip-footer button {
-      width: 100%;
+      margin-top: 16px;
     }
   `]
 })

@@ -1,276 +1,237 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { StudentsService, Student } from '../students.service';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { StudentsService } from '../students.service';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * قائمة الطلاب — لغة تصميم Nebras OS (القسم 1d: جدول مؤسسي، شارات حالة، حقول بحث).
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-students-list',
   standalone: true,
-  imports: [
-    CommonModule, MatTableModule, MatButtonModule, MatIconModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="list-container" dir="rtl">
-      <header class="list-header animate-fade-in">
-        <div class="header-info">
-          <h1>قائمة الطلاب</h1>
-          <p>عرض تفصيلي وسجل البحث المتقدم والفرز والتوزيع الأكاديمي للطلاب</p>
-        </div>
-        <div class="header-actions">
-          <button mat-flat-button color="primary" (click)="navigateToCreate()">
-            <mat-icon>person_add</mat-icon> إضافة طالب جديد
-          </button>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="قائمة الطلاب"
+        subtitle="عرض تفصيلي وسجل البحث المتقدم والفرز والتوزيع الأكاديمي للطلاب"
+      >
+        <button class="nb-btn-primary" (click)="navigateToCreate()">إضافة طالب جديد</button>
+      </nb-page-header>
 
-      <!-- Advanced Filtering & Search -->
-      <div class="filter-card animate-slide-up">
-        <div class="search-box">
-          <mat-icon>search</mat-icon>
-          <input type="text" [(ngModel)]="searchQuery" (input)="onFilterChange()" placeholder="البحث برقم الطالب، الاسم، رقم الهوية أو الهاتف...">
+      <!-- شريط التصفية -->
+      <div class="filter-bar">
+        <div class="search">
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            (input)="onFilterChange()"
+            placeholder="البحث برقم الطالب، الاسم، رقم الهوية أو الهاتف…"
+          />
         </div>
-        
-        <div class="select-filters">
-          <mat-form-field appearance="outline">
-            <mat-label>حالة الطالب</mat-label>
-            <mat-select [(ngModel)]="statusFilter" (selectionChange)="onFilterChange()">
-              <mat-option value="">الكل</mat-option>
-              <mat-option value="registered">مسجل</mat-option>
-              <mat-option value="active">نشط</mat-option>
-              <mat-option value="suspended">موقوف</mat-option>
-              <mat-option value="graduated">متخرج</mat-option>
-              <mat-option value="withdrawn">منسحب</mat-option>
-            </mat-select>
-          </mat-form-field>
+        <div class="field">
+          <label>حالة الطالب</label>
+          <select [(ngModel)]="statusFilter" (change)="onFilterChange()">
+            <option value="">الكل</option>
+            <option value="registered">مسجل</option>
+            <option value="active">نشط</option>
+            <option value="suspended">موقوف</option>
+            <option value="graduated">متخرج</option>
+            <option value="withdrawn">منسحب</option>
+          </select>
         </div>
       </div>
 
-      <!-- Table View -->
-      <div class="table-card animate-slide-up">
-        <table mat-table [dataSource]="students()" class="mat-elevation-z8">
-          
-          <ng-container matColumnDef="student_number">
-            <th mat-header-cell *matHeaderCellDef> الرقم الأكاديمي </th>
-            <td mat-cell *matCellDef="let element"> {{element.student_number}} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="arabic_name">
-            <th mat-header-cell *matHeaderCellDef> الاسم العربي </th>
-            <td mat-cell *matCellDef="let element"> {{element.profile?.arabic_name}} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="gender">
-            <th mat-header-cell *matHeaderCellDef> الجنس </th>
-            <td mat-cell *matCellDef="let element"> {{element.profile?.gender === 'male' ? 'ذكر' : 'أنثى'}} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="nationality">
-            <th mat-header-cell *matHeaderCellDef> الجنسية </th>
-            <td mat-cell *matCellDef="let element"> {{element.profile?.nationality}} </td>
-          </ng-container>
-
-          <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef> الحالة </th>
-            <td mat-cell *matCellDef="let element">
-              <span class="badge" [ngClass]="element.status">{{element.status}}</span>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef> إجراءات </th>
-            <td mat-cell *matCellDef="let element">
-              <button mat-icon-button color="accent" (click)="viewDetails(element.id)">
-                <mat-icon>visibility</mat-icon>
-              </button>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-        </table>
-
-        <div class="no-data" *ngIf="students().length === 0">
-          <p>لا يوجد طلاب يطابقون خيارات البحث.</p>
+      <!-- الجدول -->
+      <nb-panel [flush]="true">
+        <div class="tbl">
+          <div class="tbl-head">
+            <span>الرقم الأكاديمي</span>
+            <span>الاسم العربي</span>
+            <span>الجنس</span>
+            <span>الجنسية</span>
+            <span>الحالة</span>
+            <span>إجراءات</span>
+          </div>
+          @for (element of students(); track element.id) {
+            <div class="tbl-row">
+              <span>{{ element.student_number }}</span>
+              <span class="strong">{{ element.profile?.arabic_name }}</span>
+              <span>{{ element.profile?.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
+              <span>{{ element.profile?.nationality }}</span>
+              <span>
+                <span [class]="statusBadge(element.status)">{{ statusText(element.status) }}</span>
+              </span>
+              <span>
+                <button class="nb-btn-ghost sm" (click)="viewDetails(element.id)">عرض</button>
+              </span>
+            </div>
+          }
+          @if (students().length === 0) {
+            <div class="tbl-empty">لا يوجد طلاب يطابقون خيارات البحث.</div>
+          }
         </div>
-      </div>
+      </nb-panel>
     </div>
   `,
-  styles: [`
-    .list-container {
-      padding: 2rem;
-      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-      color: #f8fafc;
-      min-height: 100vh;
-      font-family: 'Outfit', 'Cairo', sans-serif;
-    }
+  styles: [
+    `
+      .page {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        min-width: 0;
+      }
 
-    .list-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 1.5rem;
-    }
+      .filter-bar {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
 
-    .list-header h1 {
-      font-size: 2.25rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #818cf8, #c084fc);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
+      .search {
+        flex: 1;
+        min-width: 260px;
+        height: 34px;
+        background: var(--nb-surface);
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
 
-    .list-header p {
-      color: #94a3b8;
-      margin: 0.5rem 0 0 0;
-    }
+        input {
+          flex: 1;
+          border: none;
+          background: transparent;
+          outline: none;
+          font-family: var(--nb-font-family);
+          font-size: 13px;
+          color: var(--nb-text);
 
-    .filter-card {
-      background: rgba(30, 41, 59, 0.7);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
+          &::placeholder { color: var(--nb-text-faint); }
+        }
+      }
 
-    .search-box {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 0.75rem 1rem;
-      color: white;
-    }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
 
-    .search-box input {
-      background: transparent;
-      border: none;
-      color: white;
-      width: 100%;
-      outline: none;
-      margin-right: 8px;
-      font-size: 1rem;
-    }
+        label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
 
-    .search-box mat-icon {
-      color: #94a3b8;
-    }
+        select {
+          height: 34px;
+          min-width: 180px;
+          border: 1px solid var(--nb-border);
+          border-radius: var(--nb-radius);
+          padding: 0 10px;
+          font-family: var(--nb-font-family);
+          font-size: 13px;
+          color: var(--nb-text);
+          background: var(--nb-surface);
+          outline: none;
+        }
+      }
 
-    .select-filters {
-      display: flex;
-      gap: 1rem;
-    }
+      /* جدول */
+      .tbl { display: flex; flex-direction: column; }
+      .tbl-head,
+      .tbl-row {
+        display: grid;
+        grid-template-columns: 1.2fr 1.8fr 0.8fr 1fr 1fr 0.8fr;
+        gap: 8px;
+        padding: 9px 16px;
+        align-items: center;
+      }
+      .tbl-head {
+        background: var(--nb-surface-raised);
+        border-bottom: 1px solid var(--nb-border-soft);
+        padding: 8px 16px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--nb-text-muted);
+      }
+      .tbl-row {
+        border-bottom: 1px solid var(--nb-border-row);
+        font-size: 13px;
+        color: var(--nb-text);
+      }
+      .tbl-row:last-child { border-bottom: none; }
+      .tbl-row:hover { background: var(--nb-surface-raised); }
+      .strong { font-weight: 600; }
+      .tbl-empty {
+        padding: 28px 16px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--nb-text-muted);
+      }
 
-    ::ng-deep .mat-mdc-form-field-parent {
-      background: rgba(30, 41, 59, 0.5) !important;
-      border-radius: 12px;
-    }
-
-    .table-card {
-      background: rgba(30, 41, 59, 0.5);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1rem;
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      background: transparent !important;
-      color: #f8fafc !important;
-    }
-
-    th {
-      color: #94a3b8 !important;
-      font-weight: 700 !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-
-    td {
-      color: #e2e8f0 !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-    }
-
-    tr:hover td {
-      background-color: rgba(255, 255, 255, 0.03) !important;
-    }
-
-    .badge {
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-
-    .badge.active { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-    .badge.registered { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
-    .badge.suspended { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-    .badge.graduated { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
-
-    .no-data {
-      text-align: center;
-      padding: 3rem;
-      color: #94a3b8;
-    }
-
-    /* Micro-animations */
-    .animate-fade-in { animation: fadeIn 0.8s ease-out; }
-    .animate-slide-up { animation: slideUp 0.8s ease-out; }
-
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-  `]
+      .nb-btn-ghost.sm {
+        height: 26px;
+        padding: 0 12px;
+        font-size: 12px;
+      }
+    `,
+  ],
 })
 export class StudentsListComponent implements OnInit {
-  private studentsService = inject(StudentsService);
-  private router = inject(Router);
+  private readonly studentsService = inject(StudentsService);
+  private readonly router = inject(Router);
 
-  students = this.studentsService.students;
-  displayedColumns: string[] = ['student_number', 'arabic_name', 'gender', 'nationality', 'status', 'actions'];
+  readonly students = this.studentsService.students;
 
   searchQuery = '';
   statusFilter = '';
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.loadStudents();
   }
 
-  loadStudents() {
-    const params: any = {};
-    if (this.searchQuery) params.search = this.searchQuery;
-    if (this.statusFilter) params.status = this.statusFilter;
-
+  loadStudents(): void {
+    const params: Record<string, string> = {};
+    if (this.searchQuery) params['search'] = this.searchQuery;
+    if (this.statusFilter) params['status'] = this.statusFilter;
     this.studentsService.getStudents(params).subscribe();
   }
 
-  onFilterChange() {
+  onFilterChange(): void {
     this.loadStudents();
   }
 
-  viewDetails(id: string) {
+  statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      active: 'nb-badge-success',
+      registered: 'nb-badge-info',
+      suspended: 'nb-badge-danger',
+      graduated: 'nb-badge-ai',
+      withdrawn: 'nb-badge-neutral',
+    };
+    return map[status] || 'nb-badge-neutral';
+  }
+
+  statusText(status: string): string {
+    const map: Record<string, string> = {
+      active: 'نشط',
+      registered: 'مسجل',
+      suspended: 'موقوف',
+      graduated: 'متخرج',
+      withdrawn: 'منسحب',
+    };
+    return map[status] || status;
+  }
+
+  viewDetails(id: string): void {
     this.router.navigate([`/features/students/details/${id}`]);
   }
 
-  navigateToCreate() {
+  navigateToCreate(): void {
     this.router.navigate(['/features/students/create']);
   }
 }

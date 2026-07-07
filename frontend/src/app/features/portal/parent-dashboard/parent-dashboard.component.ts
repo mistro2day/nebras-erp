@@ -1,107 +1,93 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * بوابة أولياء الأمور — لغة تصميم Nebras OS.
+ * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-parent-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTabsModule,
-    MatListModule,
-    MatDividerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatTabsModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="portal-container" dir="rtl" style="padding: 24px; font-family: 'Outfit', 'Inter', sans-serif; background: #f8fafc; min-height: 100vh;">
-      <!-- Header -->
-      <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-        <div>
-          <h1 style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">بوابة أولياء الأمور</h1>
-          <p style="color: #64748b; margin-top: 4px;">مرحباً بك، أحمد! تابع أداء أبنائك الدراسي والمالي والصحي بكل سهولة.</p>
-        </div>
-        <button mat-flat-button color="primary" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 8px; padding: 0 20px;">
-          <mat-icon style="margin-left: 8px;">refresh</mat-icon>تحديث البيانات
-        </button>
-      </div>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="بوابة أولياء الأمور"
+        subtitle="مرحباً بك، أحمد! تابع أداء أبنائك الدراسي والمالي والصحي بكل سهولة."
+      >
+        <button class="nb-btn-secondary">تحديث البيانات</button>
+      </nb-page-header>
 
-      <!-- Children Grid -->
-      <h2 style="font-size: 1.25rem; font-weight: 600; color: #334155; margin-bottom: 16px;">الأبناء المكفولين</h2>
-      <div class="children-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 32px;">
+      <h2 class="section-title">الأبناء المكفولين</h2>
+      <div class="children-grid">
         @for (child of children(); track child.student_id) {
-          <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-            <mat-card-header style="margin-bottom: 16px;">
-              <div style="width: 48px; height: 48px; border-radius: 50%; background: #eff6ff; display: flex; align-items: center; justify-content: center; margin-left: 16px;">
-                <mat-icon style="color: #3b82f6;">face</mat-icon>
-              </div>
-              <mat-card-title style="font-weight: 600; color: #0f172a;">{{ child.name }}</mat-card-title>
-              <mat-card-subtitle style="color: #64748b;">طالب - الصف العاشر</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-                <div style="background: #f1f5f9; padding: 12px; border-radius: 8px;">
-                  <span style="font-size: 0.85rem; color: #64748b; display: block;">نسبة الحضور</span>
-                  <span style="font-size: 1.1rem; font-weight: 700; color: #10b981;">{{ child.attendance_rate }}%</span>
-                </div>
-                <div style="background: #f1f5f9; padding: 12px; border-radius: 8px;">
-                  <span style="font-size: 0.85rem; color: #64748b; display: block;">الرسوم المتبقية</span>
-                  <span style="font-size: 1.1rem; font-weight: 700; color: #ef4444;">{{ child.outstanding_fees }} ر.س</span>
-                </div>
-              </div>
-              <div style="margin-top: 16px; font-size: 0.9rem; color: #475569;">
-                <p style="margin: 4px 0;"><mat-icon style="font-size: 16px; vertical-align: middle; margin-left: 8px; color: #3b82f6;">event</mat-icon>الاختبار القادم: {{ child.next_exam }}</p>
-                <p style="margin: 4px 0;"><mat-icon style="font-size: 16px; vertical-align: middle; margin-left: 8px; color: #10b981;">directions_bus</mat-icon>حالة النقل: {{ child.transport_status }}</p>
-              </div>
-            </mat-card-content>
-          </mat-card>
+          <div class="nb-card child-card">
+            <div class="child-head">
+              <div class="avatar">{{ child.name.charAt(0) }}</div>
+              <div><strong>{{ child.name }}</strong><span class="sub">طالب - الصف العاشر</span></div>
+            </div>
+            <div class="child-stats">
+              <div class="cs"><span class="cs-label">نسبة الحضور</span><span class="cs-val ok">{{ child.attendance_rate }}%</span></div>
+              <div class="cs"><span class="cs-label">الرسوم المتبقية</span><span class="cs-val" [class.bad]="child.outstanding_fees > 0">{{ child.outstanding_fees }} ر.س</span></div>
+            </div>
+            <div class="child-meta">
+              <p>📅 الاختبار القادم: {{ child.next_exam }}</p>
+              <p>🚌 حالة النقل: {{ child.transport_status }}</p>
+            </div>
+          </div>
         }
       </div>
 
-      <!-- Tabs for Details -->
-      <mat-tab-group style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-        <mat-tab label="الفواتير والمدفوعات">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a;">الملخص المالي</h3>
-            <mat-list>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #10b981; margin-left: 12px;">check_circle</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">تم سداد دفعة الفصل الدراسي الأول</span>
-                <span matListItemLine style="color: #64748b;">المبلغ: 3,750 ر.س - 2026-06-15</span>
-              </mat-list-item>
-              <mat-divider></mat-divider>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #f59e0b; margin-left: 12px;">error</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">فاتورة مستحقة - رسوم حافلة النقل</span>
-                <span matListItemLine style="color: #ef4444;">المبلغ: 1,250 ر.س - يستحق في 2026-07-20</span>
-              </mat-list-item>
-            </mat-list>
-          </div>
-        </mat-tab>
-        <mat-tab label="الإعلانات والرسائل">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a;">آخر الإعلانات</h3>
-            <mat-list>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="الفواتير والمدفوعات">
+            <div class="list">
+              <h3>الملخص المالي</h3>
+              <div class="row"><span class="nb-dot success"></span><div><strong>تم سداد دفعة الفصل الدراسي الأول</strong><span class="meta">المبلغ: 3,750 ر.س - 2026-06-15</span></div></div>
+              <div class="row"><span class="nb-dot warning"></span><div><strong>فاتورة مستحقة - رسوم حافلة النقل</strong><span class="meta danger">المبلغ: 1,250 ر.س - يستحق في 2026-07-20</span></div></div>
+            </div>
+          </mat-tab>
+          <mat-tab label="الإعلانات والرسائل">
+            <div class="list">
+              <h3>آخر الإعلانات</h3>
               @for (ann of announcements(); track ann.id) {
-                <mat-list-item>
-                  <mat-icon matListItemIcon style="color: #3b82f6; margin-left: 12px;">campaign</mat-icon>
-                  <span matListItemTitle style="font-weight: 500;">{{ ann.title }}</span>
-                  <span matListItemLine style="color: #64748b;">{{ ann.content }}</span>
-                </mat-list-item>
-                <mat-divider></mat-divider>
+                <div class="row"><span class="ico">📣</span><div><strong>{{ ann.title }}</strong><span class="meta">{{ ann.content }}</span></div></div>
               }
-            </mat-list>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
-  `
+  `,
+  styles: [`
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 0 0 12px; }
+    .children-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .child-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--nb-primary-50); color: var(--nb-primary-600); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+    .child-head strong { display: block; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .child-head .sub { font-size: 12px; color: var(--nb-text-muted); }
+    .child-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .cs { background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); padding: 10px 12px; border-radius: var(--nb-radius); }
+    .cs-label { font-size: 11px; color: var(--nb-text-muted); display: block; }
+    .cs-val { font-size: 15px; font-weight: 700; color: var(--nb-text); }
+    .cs-val.ok { color: var(--nb-success); }
+    .cs-val.bad { color: var(--nb-danger); }
+    .child-meta { margin-top: 14px; font-size: 12px; color: var(--nb-text-secondary); }
+    .child-meta p { margin: 4px 0; }
+    .nb-tabs { padding: 4px 8px 8px; }
+    .list { padding: 16px; }
+    .list h3 { font-weight: 700; color: var(--nb-text); margin: 0 0 14px; font-size: 14px; }
+    .row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nb-border-soft); }
+    .row:last-child { border-bottom: none; }
+    .row .nb-dot { margin-top: 5px; }
+    .row strong { display: block; font-size: 13px; color: var(--nb-text); }
+    .row .meta { font-size: 11px; color: var(--nb-text-muted); }
+    .row .meta.danger { color: var(--nb-danger); }
+  `]
 })
 export class ParentDashboardComponent {
   children = signal([

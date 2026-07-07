@@ -1,189 +1,98 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { TenantService } from '../../core/services/tenant.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * محرك الجدولة الموحد للمؤسسة — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-scheduling-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="scheduling-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>محرك الجدولة الموحد للمؤسسة</h1>
-          <p>لوحة تعقب الموارد والتعارضات والحجوزات لـ {{ ($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP' }}</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="محرك الجدولة الموحد للمؤسسة"
+        [subtitle]="'تعقب الموارد والتعارضات والحجوزات لـ ' + (($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP')"
+      ></nb-page-header>
 
-      <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon schedules">event_note</mat-icon>
-          <div class="meta">
-            <h3>إجمالي الجداول</h3>
-            <p class="value">{{ schedulesCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon resources">meeting_room</mat-icon>
-          <div class="meta">
-            <h3>الموارد المجدولة</h3>
-            <p class="value">{{ resourcesCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon reservations">book_online</mat-icon>
-          <div class="meta">
-            <h3>الحجوزات النشطة</h3>
-            <p class="value">{{ reservationsCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon conflicts">warning</mat-icon>
-          <div class="meta">
-            <h3>التعارضات المكتشفة</h3>
-            <p class="value">{{ conflictsCount() }}</p>
-          </div>
-        </div>
+        <nb-stat-card label="إجمالي الجداول" [value]="schedulesCount()"></nb-stat-card>
+        <nb-stat-card label="الموارد المجدولة" [value]="resourcesCount()" valueKind="info"></nb-stat-card>
+        <nb-stat-card label="الحجوزات النشطة" [value]="reservationsCount()" valueKind="success"></nb-stat-card>
+        <nb-stat-card label="التعارضات المكتشفة" [value]="conflictsCount()" [valueKind]="conflictsCount() ? 'danger' : 'default'"></nb-stat-card>
       </div>
 
-      <!-- Conflicts Alert Panel -->
-      <div class="conflict-panel" *ngIf="conflictsCount() > 0">
-        <div class="panel-header">
-          <mat-icon>report_problem</mat-icon>
-          <h3>مركز حل التعارضات والتحذيرات</h3>
-        </div>
-        <div class="conflict-list">
-          <div class="conflict-item" *ngFor="let conf of conflicts()">
-            <span class="severity-badge" [ngClass]="conf.severity">{{ conf.severity === 'high' ? 'حرج' : 'متوسط' }}</span>
-            <p class="desc">{{ conf.description }}</p>
-            <span class="time">{{ conf.detected_at | date:'shortTime' }}</span>
+      @if (conflictsCount() > 0) {
+        <nb-panel title="مركز حل التعارضات والتحذيرات">
+          <div class="conflict-list">
+            @for (conf of conflicts(); track $index) {
+              <div class="conflict-item">
+                <span [class]="conf.severity === 'high' ? 'nb-badge-danger' : 'nb-badge-warning'">{{ conf.severity === 'high' ? 'حرج' : 'متوسط' }}</span>
+                <p class="desc">{{ conf.description }}</p>
+                <span class="time">{{ conf.detected_at | date:'shortTime' }}</span>
+              </div>
+            }
           </div>
-        </div>
-      </div>
+        </nb-panel>
+      }
 
-      <!-- Main Schedule Grid -->
-      <div class="section-title">
-        <h2>قائمة الجداول النشطة</h2>
-      </div>
-
-      <div class="scheduling-grid">
-        <div class="schedule-card" *ngFor="let sch of schedules()">
-          <div class="card-header">
-            <span class="type-badge">{{ sch.schedule_type }}</span>
-            <h3>{{ sch.name }}</h3>
+      <h2 class="section-title">قائمة الجداول النشطة</h2>
+      <div class="cards-grid">
+        @for (sch of schedules(); track sch.id) {
+          <div class="nb-card sc-card">
+            <div class="card-header">
+              <span class="nb-badge-info">{{ sch.schedule_type }}</span>
+              <h3>{{ sch.name }}</h3>
+            </div>
+            <p class="code">الرمز المرجعي: {{ sch.code }}</p>
+            <p class="desc">{{ sch.description || 'لا يوجد وصف.' }}</p>
+            <div class="card-footer">
+              <span [class]="sch.status === 'published' ? 'nb-badge-success' : 'nb-badge-warning'">{{ sch.status === 'published' ? 'منشور' : 'مسودة' }}</span>
+              <button class="nb-btn-secondary sm">إدارة الجدول</button>
+            </div>
           </div>
-          <p class="code">الرمز المرجعي: {{ sch.code }}</p>
-          <p class="desc">{{ sch.description || 'لا يوجد وصف.' }}</p>
-          <div class="card-footer">
-            <span class="status-badge" [ngClass]="sch.status">{{ sch.status === 'published' ? 'منشور' : 'مسودة' }}</span>
-            <button mat-flat-button color="primary">إدارة الجدول</button>
-          </div>
-        </div>
-        <div class="no-schedules" *ngIf="schedules().length === 0">
-          <mat-icon>calendar_today</mat-icon>
-          <p>لا توجد جداول نشطة حالياً.</p>
-        </div>
+        }
+        @if (schedules().length === 0) {
+          <div class="no-data">لا توجد جداول نشطة حالياً.</div>
+        }
       </div>
     </div>
   `,
   styles: [`
-    .scheduling-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #8b5cf6, #3b82f6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
-    
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    .stat-card .icon {
-      font-size: 32px; width: 32px; height: 32px;
-      padding: 8px; border-radius: 12px;
-    }
-    .stat-card .icon.schedules { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
-    .stat-card .icon.resources { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .stat-card .icon.reservations { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .stat-card .icon.conflicts { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .stat-card h3 { font-size: 0.75rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.6rem; font-weight: bold; margin: 2px 0 0 0; }
-
-    .conflict-panel {
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      border-radius: 16px;
-      padding: 1.25rem;
-      margin-bottom: 2rem;
-    }
-    .conflict-panel .panel-header {
-      display: flex; align-items: center; gap: 8px; color: #f87171; margin-bottom: 1rem;
-    }
-    .conflict-panel .panel-header h3 { margin: 0; font-size: 1.1rem; font-weight: bold; }
-    .conflict-list { display: flex; flexDirection: column; gap: 8px; }
+    .conflict-list { display: flex; flex-direction: column; gap: 8px; }
     .conflict-item {
-      background: rgba(15, 23, 42, 0.6);
-      padding: 10px 14px; border-radius: 8px;
+      background: var(--nb-surface-raised);
+      border: 1px solid var(--nb-border-soft);
+      padding: 10px 14px;
+      border-radius: var(--nb-radius);
       display: flex; align-items: center; gap: 12px;
     }
-    .severity-badge {
-      font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
-    }
-    .severity-badge.high { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    .desc { flex: 1; margin: 0; font-size: 0.85rem; color: #cbd5e1; }
-    .time { font-size: 0.75rem; color: #64748b; }
-
-    .section-title h2 { font-size: 1.25rem; font-weight: bold; margin-bottom: 1.5rem; color: #cbd5e1; }
-    .scheduling-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
-    }
-    .schedule-card {
-      background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px; padding: 1.25rem; display: flex; flexDirection: column; gap: 10px;
-    }
-    .card-header { display: flex; justify-content: space-between; align-items: center; }
-    .card-header h3 { margin: 0; font-size: 1.15rem; font-weight: bold; color: #f8fafc; }
-    .type-badge { font-size: 0.75rem; background: rgba(59,130,246,0.15); color: #60a5fa; padding: 2px 8px; border-radius: 9999px; }
-    .code { font-size: 0.8rem; color: #64748b; margin: 0; }
-    .desc { font-size: 0.85rem; color: #94a3b8; flex: 1; margin: 0; }
-    .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-    .status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 6px; font-weight: bold; }
-    .status-badge.published { background: rgba(16,185,129,0.2); color: #34d399; }
-    .status-badge.draft { background: rgba(245,158,11,0.2); color: #fbbf24; }
-    .no-schedules { grid-column: span 3; text-align: center; padding: 4rem; color: #64748b; }
-    .no-schedules mat-icon { font-size: 48px; width: 48px; height: 48px; margin-bottom: 10px; }
+    .conflict-item .desc { flex: 1; margin: 0; font-size: 13px; color: var(--nb-text-secondary); }
+    .conflict-item .time { font-size: 11px; color: var(--nb-text-muted); }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 16px 0 12px; }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .sc-card { display: flex; flex-direction: column; gap: 10px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .card-header h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .code { font-size: 11px; color: var(--nb-text-muted); margin: 0; }
+    .desc { font-size: 12px; color: var(--nb-text-secondary); flex: 1; margin: 0; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+    .nb-btn-secondary.sm { height: 26px; padding: 0 12px; font-size: 12px; }
+    .no-data { grid-column: 1 / -1; text-align: center; padding: 28px; color: var(--nb-text-muted); font-size: 13px; }
   `]
 })
 export class SchedulingDashboardComponent implements OnInit {

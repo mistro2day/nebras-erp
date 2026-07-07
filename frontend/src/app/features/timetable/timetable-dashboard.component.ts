@@ -1,148 +1,69 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { TenantService } from '../../core/services/tenant.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * إدارة الجدول الأكاديمي والجدولة الذكية — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-timetable-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbStatCardComponent],
   template: `
-    <div class="timetable-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>إدارة الجدول الأكاديمي والجدولة الذكية</h1>
-          <p>بوابة إدارة وتوزيع الفصول الدراسية وحصص المعلمين لـ {{ ($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP' }}</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="إدارة الجدول الأكاديمي والجدولة الذكية"
+        [subtitle]="'توزيع الفصول الدراسية وحصص المعلمين لـ ' + (($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP')"
+      ></nb-page-header>
 
-      <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon timetable">calendar_today</mat-icon>
-          <div class="meta">
-            <h3>الجداول المفعلة</h3>
-            <p class="value">{{ timetablesCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon assignments">assignment_ind</mat-icon>
-          <div class="meta">
-            <h3>توزيع الحصص الأسبوعية</h3>
-            <p class="value">{{ entriesCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon utilization">insights</mat-icon>
-          <div class="meta">
-            <h3>نسبة إشغال القاعات</h3>
-            <p class="value">82%</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon conflict">warning</mat-icon>
-          <div class="meta">
-            <h3>التعارضات النشطة</h3>
-            <p class="value">0</p>
-          </div>
-        </div>
+        <nb-stat-card label="الجداول المفعلة" [value]="timetablesCount()"></nb-stat-card>
+        <nb-stat-card label="توزيع الحصص الأسبوعية" [value]="entriesCount()" valueKind="success"></nb-stat-card>
+        <nb-stat-card label="نسبة إشغال القاعات" value="82" suffix="%" valueKind="info"></nb-stat-card>
+        <nb-stat-card label="التعارضات النشطة" [value]="0"></nb-stat-card>
       </div>
 
-      <!-- Class Schedules Grid -->
-      <div class="section-title">
-        <h2>الجداول الدراسية النشطة</h2>
-      </div>
-
-      <div class="timetable-grid">
-        <div class="timetable-card" *ngFor="let tt of timetables()">
-          <div class="card-header">
-            <span class="status-badge" [ngClass]="tt.status">
-              {{ tt.status === 'published' ? 'منشور' : 'مسودة' }}
-            </span>
-            <h3>{{ tt.name }}</h3>
+      <h2 class="section-title">الجداول الدراسية النشطة</h2>
+      <div class="cards-grid">
+        @for (tt of timetables(); track tt.id) {
+          <div class="nb-card tt-card">
+            <div class="card-header">
+              <span [class]="tt.status === 'published' ? 'nb-badge-success' : 'nb-badge-warning'">{{ tt.status === 'published' ? 'منشور' : 'مسودة' }}</span>
+              <h3>{{ tt.name }}</h3>
+            </div>
+            <p class="meta-info">السنة الدراسية: {{ tt.academic_year }} | الفصل الدراسي: {{ tt.term }}</p>
+            <div class="card-footer">
+              <button class="nb-btn-secondary sm">عرض جدول الحصص</button>
+            </div>
           </div>
-          <p class="meta-info">السنة الدراسية: {{ tt.academic_year }} | الفصل الدراسي: {{ tt.term }}</p>
-          <div class="card-footer">
-            <button mat-flat-button color="primary">عرض جدول الحصص</button>
-          </div>
-        </div>
-        <div class="no-data" *ngIf="timetables().length === 0">
-          لا توجد جداول أكاديمية نشطة حالياً.
-        </div>
+        }
+        @if (timetables().length === 0) {
+          <div class="no-data">لا توجد جداول أكاديمية نشطة حالياً.</div>
+        }
       </div>
     </div>
   `,
   styles: [`
-    .timetable-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #3b82f6, #10b981);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
-    
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    .stat-card .icon {
-      font-size: 32px; width: 32px; height: 32px;
-      padding: 8px; border-radius: 12px;
-    }
-    .stat-card .icon.timetable { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .stat-card .icon.assignments { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .stat-card .icon.utilization { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .stat-card .icon.conflict { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .stat-card h3 { font-size: 0.75rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.6rem; font-weight: bold; margin: 2px 0 0 0; }
-
-    .section-title h2 { font-size: 1.25rem; font-weight: bold; margin-bottom: 1.5rem; color: #cbd5e1; }
-    
-    .timetable-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
-    }
-    .timetable-card {
-      background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px; padding: 1.25rem; display: flex; flexDirection: column; gap: 10px;
-    }
-    .card-header { display: flex; justify-content: space-between; align-items: center; }
-    .card-header h3 { margin: 0; font-size: 1.15rem; font-weight: bold; color: #f8fafc; }
-    .meta-info { font-size: 0.8rem; color: #94a3b8; margin: 0; }
-    .status-badge {
-      font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
-    }
-    .status-badge.published { background: rgba(16,185,129,0.2); color: #34d399; }
-    .status-badge.draft { background: rgba(245,158,11,0.2); color: #fbbf24; }
-    .no-data { grid-column: span 3; text-align: center; padding: 3rem; color: #64748b; }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 0 0 12px; }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .tt-card { display: flex; flex-direction: column; gap: 10px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .card-header h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .meta-info { font-size: 12px; color: var(--nb-text-muted); margin: 0; }
+    .card-footer { display: flex; justify-content: flex-start; margin-top: 4px; }
+    .nb-btn-secondary.sm { height: 26px; padding: 0 12px; font-size: 12px; }
+    .no-data { grid-column: 1 / -1; text-align: center; padding: 28px; color: var(--nb-text-muted); font-size: 13px; }
   `]
 })
 export class TimetableDashboardComponent implements OnInit {

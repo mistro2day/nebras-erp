@@ -1,84 +1,65 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * بوابة المتقدمين الجدد — لغة تصميم Nebras OS.
+ * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-applicant-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatListModule,
-    MatDividerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="portal-container" dir="rtl" style="padding: 24px; font-family: 'Outfit', 'Inter', sans-serif; background: #f8fafc; min-height: 100vh;">
-      <!-- Header -->
-      <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="بوابة المتقدمين الجدد"
+        subtitle="مرحباً بك يا سعيد! تابع هنا حالة طلب الانضمام والخطوات القادمة للقبول."
+      >
+        <button class="nb-btn-secondary">تحديث الطلب</button>
+      </nb-page-header>
+
+      <div class="status-banner">
+        <span class="mark">✦</span>
         <div>
-          <h1 style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">بوابة المتقدمين الجدد</h1>
-          <p style="color: #64748b; margin-top: 4px;">مرحباً بك يا سعيد! تابع هنا حالة طلب الانضمام والخطوات القادمة للقبول.</p>
+          <strong>حالة طلب التقديم الحالي — المرحلة الحالية: تحت المراجعة والدراسة الأكاديمية</strong>
+          <p>لقد استلمنا مستنداتك المرفوعة بنجاح. الخطوة التالية هي حضور اختبار القبول والمفاضلة المحدد أدناه.</p>
         </div>
-        <button mat-flat-button color="primary" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border-radius: 8px; padding: 0 20px;">
-          <mat-icon style="margin-left: 8px;">refresh</mat-icon>تحديث الطلب
-        </button>
       </div>
 
-      <!-- Application Status -->
-      <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 32px; background: #eef2ff;">
-        <mat-card-header>
-          <mat-icon style="color: #4f46e5; margin-left: 12px; font-size: 28px; width: 28px; height: 28px;">info</mat-icon>
-          <mat-card-title style="color: #4f46e5; font-weight: 600;">حالة طلب التقديم الحالي</mat-card-title>
-          <mat-card-subtitle style="color: #6366f1;">المرحلة الحالية: تحت المراجعة والدراسة الأكاديمية</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content style="margin-top: 16px; color: #3730a3;">
-          لقد استلمنا مستنداتك المرفوعة بنجاح. الخطوة التالية هي حضور اختبار القبول والمفاضلة المحدد أدناه.
-        </mat-card-content>
-      </mat-card>
+      <div class="grid">
+        <nb-panel title="جدول اختبار القبول">
+          <p class="info"><strong>المادة:</strong> اختبار الذكاء والقدرات الرياضية واللغوية</p>
+          <p class="info"><strong>التاريخ:</strong> 2026-07-08 09:00 ص</p>
+          <p class="info"><strong>الموقع:</strong> قاعة المدرسة الكبرى - المبنى الرئيسي</p>
+        </nb-panel>
 
-      <!-- Grid for Schedule and Required Documents -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
-        <!-- Schedule card -->
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; padding: 16px;">
-          <h3 style="font-weight: 600; color: #0f172a; display: flex; align-items: center; margin-bottom: 16px;">
-            <mat-icon style="color: #f59e0b; margin-left: 8px;">event</mat-icon>جدول اختبار القبول
-          </h3>
-          <p style="margin: 8px 0; color: #334155;"><strong>المادة:</strong> اختبار الذكاء والقدرات الرياضية واللغوية</p>
-          <p style="margin: 8px 0; color: #334155;"><strong>التاريخ:</strong> 2026-07-08 09:00 ص</p>
-          <p style="margin: 8px 0; color: #334155;"><strong>الموقع:</strong> قاعة المدرسة الكبرى - المبنى الرئيسي</p>
-        </mat-card>
-
-        <!-- Document status card -->
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; padding: 16px;">
-          <h3 style="font-weight: 600; color: #0f172a; display: flex; align-items: center; margin-bottom: 16px;">
-            <mat-icon style="color: #10b981; margin-left: 8px;">upload_file</mat-icon>الوثائق والمستندات المطلوبة
-          </h3>
-          <mat-list>
-            <mat-list-item>
-              <mat-icon matListItemIcon style="color: #10b981; margin-left: 8px;">check_circle</mat-icon>
-              <span matListItemTitle style="color: #0f172a;">صورة الهوية الوطنية / الإقامة لولي الأمر</span>
-            </mat-list-item>
-            <mat-divider></mat-divider>
-            <mat-list-item>
-              <mat-icon matListItemIcon style="color: #10b981; margin-left: 8px;">check_circle</mat-icon>
-              <span matListItemTitle style="color: #0f172a;">شهادة ميلاد الطالب</span>
-            </mat-list-item>
-            <mat-divider></mat-divider>
-            <mat-list-item>
-              <mat-icon matListItemIcon style="color: #ef4444; margin-left: 8px;">pending</mat-icon>
-              <span matListItemTitle style="color: #ef4444;">سجل التطعيمات وتقرير اللياقة الطبية (مطلوب)</span>
-            </mat-list-item>
-          </mat-list>
-        </mat-card>
+        <nb-panel title="الوثائق والمستندات المطلوبة">
+          <div class="doc"><span class="nb-dot success"></span><span>صورة الهوية الوطنية / الإقامة لولي الأمر</span></div>
+          <div class="doc"><span class="nb-dot success"></span><span>شهادة ميلاد الطالب</span></div>
+          <div class="doc"><span class="nb-dot danger"></span><span class="req">سجل التطعيمات وتقرير اللياقة الطبية (مطلوب)</span></div>
+        </nb-panel>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .status-banner {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--nb-primary-50); border: 1px solid var(--nb-primary-200);
+      border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 16px;
+    }
+    .status-banner .mark { width: 24px; height: 24px; background: var(--nb-primary-600); color: var(--nb-on-primary); border-radius: var(--nb-radius-compact); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+    .status-banner strong { display: block; color: var(--nb-primary-700, var(--nb-primary-600)); font-size: 13px; }
+    .status-banner p { margin: 6px 0 0; font-size: 12px; color: var(--nb-text-secondary); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .info { margin: 8px 0; color: var(--nb-text-secondary); font-size: 13px; }
+    .info strong { color: var(--nb-text); }
+    .doc { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nb-border-soft); font-size: 13px; color: var(--nb-text); }
+    .doc:last-child { border-bottom: none; }
+    .doc .req { color: var(--nb-danger); }
+  `]
 })
 export class ApplicantDashboardComponent {
   // Logic here

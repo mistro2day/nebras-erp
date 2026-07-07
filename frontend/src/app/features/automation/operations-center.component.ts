@@ -21,7 +21,7 @@ import { STUDIO_STYLES } from './studio-theme';
           <div>
             <h3>{{ labelFor(c.key) }}</h3>
             <p class="value"><span class="badge" [ngClass]="c.status">{{ c.status }}</span></p>
-            <small style="color:#64748b">{{ c.latency_ms }} ms</small>
+            <small style="color:var(--nb-text-muted)">{{ c.latency_ms }} ms</small>
           </div>
         </div>
         <div class="stat-card"><mat-icon>notifications_active</mat-icon>

@@ -31,7 +31,7 @@ import { CommonModule } from '@angular/common';
             </div>
           </div>
 
-          <button type="submit" class="btn-primary w-100" [disabled]="isLoading() || forgotForm.invalid">
+          <button type="submit" class="nb-btn-primary w-100" [disabled]="isLoading() || forgotForm.invalid">
             {{ isLoading() ? 'جاري الإرسال...' : 'إرسال رابط استعادة الحساب' }}
           </button>
         </form>
@@ -50,92 +50,37 @@ import { CommonModule } from '@angular/common';
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background: radial-gradient(circle, var(--background-color) 0%, #111827 100%);
+      min-height: 100vh;
+      background: var(--nb-bg);
+      font-family: var(--nb-font-family);
     }
     .auth-card {
       width: 100%;
       max-width: 420px;
-      padding: 36px;
-      background-color: var(--surface-color, #1f2937);
-      border: 1px solid var(--border-color, #374151);
-      border-radius: 12px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      padding: 32px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      box-shadow: var(--nb-shadow-dialog);
     }
-    .header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .header h2 {
-      font-size: 24px;
-      color: #f3f4f6;
-      margin-bottom: 8px;
-    }
-    .header p {
-      font-size: 14px;
-      color: #9ca3af;
-    }
-    .form-group {
-      margin-bottom: 20px;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 8px;
-      color: #d1d5db;
-      font-size: 14px;
-    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h2 { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0 0 8px; }
+    .header p { font-size: 13px; color: var(--nb-text-muted); margin: 0; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 5px; color: var(--nb-text); font-size: 12px; font-weight: 600; }
     .form-control {
-      width: 100%;
-      padding: 10px 14px;
-      border: 1px solid #4b5563;
-      border-radius: 8px;
-      background-color: #111827;
-      color: #fff;
-      font-size: 14px;
+      width: 100%; height: 34px; padding: 0 12px;
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
+      background: var(--nb-surface); color: var(--nb-text);
+      font-family: var(--nb-font-family); font-size: 13px; outline: none;
     }
-    .w-100 {
-      width: 100%;
-    }
-    .btn-primary {
-      padding: 12px;
-      background-color: var(--primary-color, #2563eb);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-primary:disabled {
-      background-color: #4b5563;
-      cursor: not-allowed;
-    }
-    .success-msg {
-      color: #10b981;
-      margin-top: 16px;
-      text-align: center;
-      font-size: 14px;
-    }
-    .error-msg {
-      color: #ef4444;
-      margin-top: 16px;
-      text-align: center;
-      font-size: 14px;
-    }
-    .validation-msg {
-      color: #f87171;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-    .footer {
-      text-align: center;
-      margin-top: 24px;
-    }
-    .footer a {
-      color: var(--primary-color, #2563eb);
-      text-decoration: none;
-      font-size: 14px;
-    }
+    .form-control:focus { border-color: var(--nb-primary-400); box-shadow: var(--nb-focus-ring); }
+    .w-100 { width: 100%; }
+    .success-msg { color: var(--nb-success); margin-top: 16px; text-align: center; font-size: 13px; }
+    .error-msg { color: var(--nb-danger); margin-top: 16px; text-align: center; font-size: 13px; }
+    .validation-msg { color: var(--nb-danger); font-size: 11px; margin-top: 4px; }
+    .footer { text-align: center; margin-top: 20px; }
+    .footer a { color: var(--nb-primary-600); text-decoration: none; font-size: 13px; }
   `]
 })
 export class ForgotPasswordComponent {

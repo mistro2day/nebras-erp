@@ -1,438 +1,474 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { RouterOutlet, RouterLink, Router } from '@angular/router';
-import { TenantService } from '../../core/services/tenant.service';
-import { ThemeService } from '../../core/services/theme.service';
-import { AuthService } from '../../core/auth/auth.service';
-import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatButtonModule } from '@angular/material/button';
-import { FormsModule } from '@angular/forms';
+import { TenantService } from '../../core/services/tenant.service';
+import { AuthService } from '../../core/auth/auth.service';
 
-interface MenuItem {
+interface NavItem {
   label: string;
   link?: string;
-  icon?: string;
-  disabled?: boolean;
-  permission?: string;
-  children?: MenuItem[];
-  expanded?: boolean;
+  count?: number;
+  countKind?: 'danger' | 'info' | 'warning';
+  ai?: boolean;
 }
 
+interface NavGroup {
+  label?: string;
+  items: NavItem[];
+}
+
+/**
+ * هيكل التطبيق — اتجاه 1a من تصدير Nebras OS.html
+ * (شريط جانبي ثابت 240px — كثافة متوازنة)
+ */
 @Component({
   selector: 'app-dashboard-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, CommonModule, MatIconModule, MatMenuModule, MatButtonModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatMenuModule],
   template: `
-    <div class="dashboard-container" [class.dark-mode]="themeService.isDarkMode()" dir="rtl">
-      <!-- Top Header -->
-      <header class="top-nav">
-        <div class="brand">
-          <img [src]="tenantService.currentTenant()?.logoUrl || 'assets/logo.png'" alt="Logo" class="logo" />
-          <div class="brand-info">
-            <span class="app-name">{{ tenantService.currentTenant()?.nameAr || 'نبراس ERP' }}</span>
-            <span class="context-info">العام الدراسي: 2026/2027 | الفصل الأول | الفرع الرئيسي</span>
+    <div class="shell" dir="rtl">
+      <!-- الشريط الجانبي (يمين في RTL) -->
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="logo-mark">ن</div>
+          <div class="logo-title">نبراس <span>OS</span></div>
+        </div>
+
+        <nav class="sidebar-nav">
+          @for (group of navGroups; track group.label ?? 'root') {
+            @if (group.label) {
+              <div class="nav-group-label">{{ group.label }}</div>
+            }
+            @for (item of group.items; track item.label) {
+              @if (item.link) {
+                <a
+                  class="nav-item"
+                  [class.ai]="item.ai"
+                  [routerLink]="item.link"
+                  routerLinkActive="active"
+                >
+                  <span>{{ item.label }}</span>
+                  @if (item.count) {
+                    <span class="nav-count" [class]="'nav-count ' + item.countKind">{{ item.count }}</span>
+                  }
+                </a>
+              } @else {
+                <div class="nav-item">
+                  <span>{{ item.label }}</span>
+                </div>
+              }
+            }
+          }
+        </nav>
+
+        <div class="sidebar-user" [matMenuTriggerFor]="userMenu">
+          <div class="user-avatar">{{ userInitials() }}</div>
+          <div class="user-meta">
+            <span class="user-name">{{ userName() }}</span>
+            <span class="user-role">{{ userRole() }}</span>
           </div>
         </div>
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item routerLink="/platform/settings">إعدادات الحساب</button>
+          <button mat-menu-item (click)="logout()">تسجيل الخروج</button>
+        </mat-menu>
+      </aside>
 
-        <!-- Global Search Bar -->
-        <div class="search-bar-container">
-          <mat-icon>search</mat-icon>
-          <input type="text" placeholder="ابحث عن الموظفين، الطلاب، الفواتير (CTRL + K)..." [(ngModel)]="searchQuery" (keyup.enter)="onSearch()" />
-        </div>
-
-        <div class="actions">
-          <button class="icon-btn" (click)="themeService.toggleTheme()" title="تغيير المظهر">
-            <mat-icon>{{ themeService.isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
-          </button>
-          
-          <button class="icon-btn" [matMenuTriggerFor]="notifMenu">
-            <mat-icon>notifications</mat-icon>
-            <span class="badge" *ngIf="unreadCount() > 0">{{ unreadCount() }}</span>
-          </button>
-
-          <mat-menu #notifMenu="matMenu" class="notif-dropdown">
+      <!-- المنطقة الرئيسية -->
+      <div class="main">
+        <header class="topbar">
+          <div class="breadcrumb">
+            {{ tenantName() }} <span class="sep">/</span>
+            <span class="current">{{ pageTitle() }}</span>
+          </div>
+          <div class="spacer"></div>
+          <div class="search">
+            <input
+              type="text"
+              placeholder="بحث أو تنفيذ أمر…"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+              (keyup.enter)="onSearch()"
+            />
+            <span class="kbd">Ctrl K</span>
+          </div>
+          <button class="topbar-icon" [matMenuTriggerFor]="notifMenu" aria-label="الإشعارات">🔔</button>
+          <mat-menu #notifMenu="matMenu">
             <div class="notif-header">الإشعارات الواردة</div>
-            <button mat-menu-item class="notif-item">
+            <button mat-menu-item>
               <strong>طلب عطلة جديد</strong>
-              <p>قدم المعلم أحمد طلباً لعطلة طارئة.</p>
             </button>
-            <button mat-menu-item class="notif-item">
+            <button mat-menu-item>
               <strong>تحديث كشف الرواتب</strong>
-              <p>تم اعتماد مسير رواتب شهر يونيو.</p>
             </button>
           </mat-menu>
+          <div class="topbar-avatar" [matMenuTriggerFor]="userMenu">{{ userInitials() }}</div>
+        </header>
 
-          <div class="user-profile" [matMenuTriggerFor]="userMenu">
-            <div class="avatar">{{ authService.currentUser()?.firstName?.charAt(0) || 'م' }}</div>
-            <span class="username">{{ authService.currentUser()?.firstName || 'المستخدم' }}</span>
-            <mat-icon>expand_more</mat-icon>
-          </div>
-
-          <mat-menu #userMenu="matMenu">
-            <div class="menu-user-details">
-              <strong>{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</strong>
-              <p>{{ authService.currentUser()?.email }}</p>
-            </div>
-            <hr />
-            <button mat-menu-item routerLink="/platform/settings">
-              <mat-icon>settings</mat-icon>
-              <span>إعدادات الحساب</span>
-            </button>
-            <button mat-menu-item (click)="logout()">
-              <mat-icon>logout</mat-icon>
-              <span>تسجيل الخروج</span>
-            </button>
-          </mat-menu>
-        </div>
-      </header>
-
-      <div class="main-wrapper">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar" [class.collapsed]="isCollapsed()">
-          <div class="sidebar-toggle" (click)="toggleSidebar()">
-            <mat-icon>{{ isCollapsed() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
-            <span class="toggle-text" *ngIf="!isCollapsed()">طي القائمة</span>
-          </div>
-
-          <nav class="sidebar-nav">
-            <ul>
-              <li *ngFor="let item of menuItems">
-                <ng-container *ngIf="checkPermission(item)">
-                  <div class="menu-item-row" [class.active]="item.link && router.url.startsWith(item.link)" 
-                       [class.disabled]="item.disabled" (click)="toggleMenu(item)">
-                    <mat-icon class="menu-icon" *ngIf="item.icon">{{ item.icon }}</mat-icon>
-                    <span class="menu-label" *ngIf="!isCollapsed()">{{ item.label }}</span>
-                    <span class="coming-soon" *ngIf="item.disabled && !isCollapsed()">قريباً</span>
-                    <mat-icon class="arrow-icon" *ngIf="item.children && !isCollapsed()">
-                      {{ item.expanded ? 'expand_less' : 'expand_more' }}
-                    </mat-icon>
-                  </div>
-
-                  <!-- Submenu -->
-                  <ul class="submenu" *ngIf="item.children && item.expanded && !isCollapsed()">
-                    <li *ngFor="let sub of item.children">
-                      <a [routerLink]="sub.link" routerLinkActive="active" class="submenu-link" [class.disabled]="sub.disabled">
-                        <mat-icon class="submenu-icon">{{ sub.icon || 'subdirectory_arrow_left' }}</mat-icon>
-                        <span>{{ sub.label }}</span>
-                      </a>
-                    </li>
-                  </ul>
-                </ng-container>
-              </li>
-            </ul>
-          </nav>
-        </aside>
-
-        <!-- Main Content View -->
-        <main class="content-area">
+        <div class="page">
           <router-outlet></router-outlet>
-        </main>
+        </div>
       </div>
     </div>
   `,
-  styles: [`
-    .dashboard-container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      background-color: #0f172a;
-      color: #f8fafc;
-    }
-    .top-nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 1.5rem;
-      height: 64px;
-      background: #1e293b;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .logo {
-      height: 38px;
-    }
-    .brand-info {
-      display: flex;
-      flex-direction: column;
-    }
-    .app-name {
-      font-weight: bold;
-      font-size: 1.1rem;
-    }
-    .context-info {
-      font-size: 0.7rem;
-      color: #94a3b8;
-    }
-    .search-bar-container {
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 8px;
-      padding: 6px 12px;
-      width: 350px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .search-bar-container input {
-      background: transparent;
-      border: none;
-      color: white;
-      outline: none;
-      margin-right: 8px;
-      font-size: 0.85rem;
-      width: 100%;
-    }
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .icon-btn {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      cursor: pointer;
-      position: relative;
-    }
-    .icon-btn:hover {
-      color: white;
-    }
-    .badge {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: #ef4444;
-      color: white;
-      border-radius: 50%;
-      padding: 2px 6px;
-      font-size: 0.65rem;
-    }
-    .user-profile {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-    }
-    .avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: #6366f1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-    }
-    .main-wrapper {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-    .sidebar {
-      width: 260px;
-      background: #1e293b;
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      flex-direction: column;
-      transition: width 0.3s;
-    }
-    .sidebar.collapsed {
-      width: 64px;
-    }
-    .sidebar-toggle {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 1rem;
-      cursor: pointer;
-      color: #94a3b8;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .sidebar-toggle:hover {
-      color: white;
-    }
-    .sidebar-nav {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px 0;
-    }
-    .sidebar-nav ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .menu-item-row {
-      display: flex;
-      align-items: center;
-      padding: 12px 16px;
-      cursor: pointer;
-      color: #cbd5e1;
-      gap: 12px;
-      transition: background 0.2s;
-    }
-    .menu-item-row:hover {
-      background: rgba(255, 255, 255, 0.03);
-      color: white;
-    }
-    .menu-item-row.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .menu-label {
-      font-size: 0.9rem;
-      font-weight: 500;
-      flex: 1;
-    }
-    .coming-soon {
-      font-size: 0.65rem;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: #94a3b8;
-    }
-    .arrow-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-    }
-    .submenu {
-      background: rgba(15, 23, 42, 0.2);
-      padding: 4px 0;
-    }
-    .submenu-link {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 32px;
-      color: #94a3b8;
-      text-decoration: none;
-      font-size: 0.85rem;
-    }
-    .submenu-link:hover, .submenu-link.active {
-      color: #6366f1;
-      background: rgba(99, 102, 241, 0.05);
-    }
-    .content-area {
-      flex: 1;
-      padding: 1.5rem;
-      overflow-y: auto;
-      background-color: #0f172a;
-    }
-  `]
+  styles: [
+    `
+      .shell {
+        display: flex;
+        height: 100vh;
+        background: var(--nb-bg);
+        overflow: hidden;
+      }
+
+      /* ---------- الشريط الجانبي ---------- */
+      .sidebar {
+        width: var(--nb-sidebar-width);
+        flex-shrink: 0;
+        background: var(--nb-surface);
+        border-left: 1px solid var(--nb-border);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-logo {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--nb-border-soft);
+        flex-shrink: 0;
+      }
+
+      .logo-mark {
+        width: 26px;
+        height: 26px;
+        background: var(--nb-primary-600);
+        border-radius: var(--nb-radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--nb-on-primary);
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .logo-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--nb-text);
+
+        span { color: var(--nb-primary-600); }
+      }
+
+      .sidebar-nav {
+        padding: 12px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 10px;
+        border-radius: var(--nb-radius);
+        color: var(--nb-text-secondary);
+        font-size: 13px;
+        text-decoration: none;
+        cursor: pointer;
+
+        &:hover { background: var(--nb-bg); }
+
+        &.active {
+          background: var(--nb-primary-50);
+          color: var(--nb-primary-600);
+          font-weight: 600;
+        }
+
+        &.ai {
+          color: var(--nb-primary-600);
+          font-weight: 500;
+        }
+      }
+
+      .nav-group-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--nb-text-faint);
+        padding: 14px 10px 4px;
+      }
+
+      .nav-count {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 1px 7px;
+        border-radius: var(--nb-radius-round);
+
+        &.danger  { background: var(--nb-danger-bg);  color: var(--nb-danger); }
+        &.info    { background: var(--nb-info-bg);    color: var(--nb-info); }
+        &.warning { background: var(--nb-warning-bg); color: var(--nb-warning); }
+      }
+
+      .sidebar-user {
+        border-top: 1px solid var(--nb-border-soft);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .user-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--nb-primary-100);
+        color: var(--nb-primary-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      .user-meta {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .user-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--nb-text);
+      }
+
+      .user-role {
+        font-size: 11px;
+        color: var(--nb-text-muted);
+      }
+
+      /* ---------- المنطقة الرئيسية ---------- */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .topbar {
+        height: var(--nb-topbar-height);
+        background: var(--nb-surface);
+        border-bottom: 1px solid var(--nb-border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 20px;
+        flex-shrink: 0;
+      }
+
+      .breadcrumb {
+        font-size: 13px;
+        color: var(--nb-text-muted);
+        white-space: nowrap;
+
+        .sep { color: var(--nb-text-separator); }
+        .current { color: var(--nb-text); font-weight: 600; }
+      }
+
+      .spacer { flex: 1; }
+
+      .search {
+        width: 340px;
+        height: 32px;
+        background: var(--nb-bg);
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+
+        input {
+          flex: 1;
+          border: none;
+          background: transparent;
+          outline: none;
+          font-family: var(--nb-font-family);
+          font-size: 12px;
+          color: var(--nb-text);
+
+          &::placeholder { color: var(--nb-text-faint); }
+        }
+
+        .kbd {
+          background: var(--nb-surface);
+          border: 1px solid var(--nb-border);
+          border-radius: var(--nb-radius-sm);
+          padding: 1px 6px;
+          font-size: 11px;
+          color: var(--nb-text-muted);
+          white-space: nowrap;
+        }
+      }
+
+      .topbar-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--nb-radius);
+        border: 1px solid var(--nb-border);
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--nb-text-secondary);
+        font-size: 13px;
+        cursor: pointer;
+        padding: 0;
+
+        &:focus-visible {
+          outline: none;
+          box-shadow: var(--nb-focus-ring);
+        }
+      }
+
+      .topbar-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--nb-primary-100);
+        color: var(--nb-primary-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .notif-header {
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nb-text-muted);
+      }
+
+      /* ---------- منطقة الصفحة ---------- */
+      .page {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+    `,
+  ],
 })
-export class DashboardLayoutComponent implements OnInit {
-  tenantService = inject(TenantService);
-  themeService = inject(ThemeService);
-  authService = inject(AuthService);
-  router = inject(Router);
+export class DashboardLayoutComponent {
+  private readonly tenantService = inject(TenantService);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
-  isCollapsed = signal(false);
-  unreadCount = signal(2);
-  searchQuery = '';
+  readonly searchQuery = signal('');
 
-  menuItems: MenuItem[] = [
+  /* عناصر التنقل — الترتيب والتسميات والعدّادات كما في تصدير 1a حرفيًا */
+  readonly navGroups: NavGroup[] = [
     {
-      label: 'لوحة القيادة الموحدة',
-      icon: 'dashboard',
-      link: '/dashboard',
-      expanded: false,
-      children: [
-        { label: 'الإحصائيات العامة', link: '/dashboard', icon: 'bar_chart' }
-      ]
+      items: [
+        { label: 'لوحة القيادة', link: '/dashboard' },
+        { label: 'الموافقات', link: '/approvals', count: 18, countKind: 'danger' },
+        { label: 'المهام' },
+      ],
     },
     {
-      label: 'شؤون الطلاب والقبول',
-      icon: 'school',
-      expanded: false,
-      children: [
-        { label: 'سجل الطلاب', link: '/students/list', icon: 'list' },
-        { label: 'إضافة طالب جديد', link: '/students/create', icon: 'person_add' },
-        { label: 'طلبات القبول والتسجيل', link: '/admissions/applicants', icon: 'people' }
-      ]
+      label: 'الأكاديمية',
+      items: [
+        { label: 'الطلاب', link: '/students' },
+        { label: 'القبول والتسجيل', link: '/admissions', count: 342, countKind: 'info' },
+        { label: 'الشؤون الأكاديمية', link: '/academics' },
+        { label: 'الجداول الدراسية', link: '/timetable' },
+      ],
     },
     {
-      label: 'أعضاء هيئة التدريس',
-      icon: 'badge',
-      expanded: false,
-      children: [
-        { label: 'شؤون المعلمين والأكاديميين', link: '/teachers/dashboard', icon: 'co_present' }
-      ]
+      label: 'العمليات',
+      items: [
+        { label: 'المالية', link: '/finance' },
+        { label: 'الموارد البشرية', link: '/hr' },
+        { label: 'الرواتب', link: '/payroll' },
+        { label: 'المشتريات', link: '/procurement' },
+      ],
     },
     {
-      label: 'الموارد البشرية والرواتب',
-      icon: 'people_alt',
-      expanded: false,
-      children: [
-        { label: 'مسيرات الرواتب والتعويضات', link: '/payroll/dashboard', icon: 'payments' },
-        { label: 'حضور وانصراف الموظفين', link: '/attendance/dashboard', icon: 'schedule' }
-      ]
+      label: 'الخدمات',
+      items: [
+        { label: 'مكتب المساعدة', link: '/maintenance', count: 24, countKind: 'warning' },
+        { label: 'التحليلات والتقارير', link: '/reporting' },
+        { label: '✦ مساعد نبراس', link: '/ai', ai: true },
+      ],
     },
-    {
-      label: 'الاتصالات الموحدة والإشعارات',
-      icon: 'contact_mail',
-      expanded: false,
-      children: [
-        { label: 'لوحة التحكم والمنصة', link: '/communications/dashboard', icon: 'analytics' },
-      ]
-    },
-    {
-      label: 'ذكاء الأعمال والتقارير والتحليلات',
-      icon: 'analytics',
-      expanded: false,
-      children: [
-        { label: 'لوحة التحكم والتحليلات', link: '/reporting/dashboard', icon: 'trending_up' },
-      ]
-    },
-    {
-      label: 'الامتحانات والتقييم الأكاديمي',
-      icon: 'assignment',
-      expanded: false,
-      children: [
-        { label: 'لوحة التحكم والدرجات', link: '/examinations/dashboard', icon: 'grade' },
-      ]
-    },
-    {
-      label: 'نواة المنصة والإعدادات',
-      icon: 'settings_suggest',
-      expanded: false,
-      children: [
-        { label: 'صحة وصيانة النظام', link: '/platform/dashboard', icon: 'analytics' },
-        { label: 'محرك الجدولة الموحد', link: '/scheduling/dashboard', icon: 'date_range' },
-        { label: 'منصة وقواعد الأعمال', link: '/rules/dashboard', icon: 'rule' },
-        { label: 'الجدول الأكاديمي والحصص', link: '/timetable/dashboard', icon: 'calendar_today' },
-        { label: 'الإعدادات والخصائص', link: '/platform/settings', icon: 'settings' },
-        { label: 'التدقيق الأمني والملفات', link: '/platform/logs', icon: 'security' }
-      ]
-    }
   ];
 
-  ngOnInit() {}
+  private readonly pageTitles: Record<string, string> = {
+    dashboard: 'لوحة القيادة التنفيذية',
+    approvals: 'مركز الموافقات',
+    students: 'الطلاب',
+    admissions: 'القبول والتسجيل',
+    academics: 'الشؤون الأكاديمية',
+    timetable: 'الجداول الدراسية',
+    finance: 'المالية',
+    hr: 'الموارد البشرية',
+    payroll: 'الرواتب',
+    procurement: 'المشتريات',
+    maintenance: 'مكتب المساعدة',
+    reporting: 'التحليلات والتقارير',
+    ai: 'مساعد نبراس',
+  };
 
-  toggleSidebar() {
-    this.isCollapsed.update(val => !val);
-  }
+  private readonly currentUrl = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects)
+    ),
+    { initialValue: this.router.url }
+  );
 
-  toggleMenu(item: MenuItem) {
-    if (item.disabled) return;
-    if (this.isCollapsed()) {
-      this.isCollapsed.set(false);
+  readonly pageTitle = computed(() => {
+    const first = this.currentUrl().split('/').filter(Boolean)[0] ?? '';
+    return this.pageTitles[first] ?? first;
+  });
+
+  readonly tenantName = computed(
+    () => this.tenantService.currentTenant()?.nameAr || 'مجموعة مدارس النبراس الأهلية'
+  );
+
+  readonly userName = computed(() => {
+    const u = this.authService.currentUser();
+    return u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'د. عبدالله المطيري' : 'د. عبدالله المطيري';
+  });
+
+  readonly userRole = computed(() => 'المدير التنفيذي');
+
+  readonly userInitials = computed(() => {
+    const u = this.authService.currentUser();
+    if (u?.firstName) {
+      return `${u.firstName.charAt(0)}.${(u.lastName ?? '').charAt(0)}`;
     }
-    item.expanded = !item.expanded;
+    return 'ع.م';
+  });
+
+  onSearch(): void {
+    /* لوحة الأوامر Ctrl+K — تُفعَّل في مرحلة لاحقة */
   }
 
-  checkPermission(item: MenuItem): boolean {
-    return true;
-  }
-
-  logout() {
+  logout(): void {
     this.authService.logout().subscribe(() => {
       this.router.navigate(['/accounts/login']);
     });
   }
-
-  onSearch() {}
 }

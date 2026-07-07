@@ -48,53 +48,33 @@ export interface AttachmentItem {
   `,
   styles: [`
     .attachment-viewer {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1rem;
-      color: #f8fafc;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      color: var(--nb-text);
     }
     .viewer-header h3 {
-      font-size: 0.95rem;
+      font-size: 13px;
       font-weight: 700;
-      margin: 0 0 1rem;
-      color: #6366f1;
+      margin: 0 0 14px;
+      color: var(--nb-primary-600);
     }
-    .items-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .items-list { display: flex; flex-direction: column; gap: 8px; }
     .attachment-card {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: rgba(15, 23, 42, 0.4);
+      background: var(--nb-surface-raised);
       padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--nb-radius);
+      border: 1px solid var(--nb-border-soft);
     }
-    .file-icon {
-      color: #6366f1;
-    }
-    .file-info {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-    .file-name {
-      font-size: 0.85rem;
-      font-weight: bold;
-    }
-    .file-meta {
-      font-size: 0.7rem;
-      color: #94a3b8;
-    }
-    .no-data {
-      text-align: center;
-      padding: 2rem;
-      color: #94a3b8;
-    }
+    .file-icon { color: var(--nb-primary-600); }
+    .file-info { display: flex; flex-direction: column; flex: 1; }
+    .file-name { font-size: 13px; font-weight: 600; color: var(--nb-text); }
+    .file-meta { font-size: 11px; color: var(--nb-text-muted); }
+    .no-data { text-align: center; padding: 20px; color: var(--nb-text-muted); font-size: 13px; }
   `]
 })
 export class AttachmentViewerComponent {

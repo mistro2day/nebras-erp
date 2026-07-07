@@ -1,108 +1,76 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../../shared/nebras/nb-stat-card.component';
 
+/**
+ * بوابة الربط والتكامل المؤسسي — لغة تصميم Nebras OS.
+ * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-gateway-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTabsModule,
-    MatListModule,
-    MatDividerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatTabsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="portal-container" dir="rtl" style="padding: 24px; font-family: 'Outfit', 'Inter', sans-serif; background: #f8fafc; min-height: 100vh;">
-      <!-- Header -->
-      <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-        <div>
-          <h1 style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">بوابة الربط والتكامل المؤسسي</h1>
-          <p style="color: #64748b; margin-top: 4px;">شاشة مراقبة استدعاءات الـ APIs، والـ Webhooks، وحالة الأنظمة الخارجية المتصلة عبر بوابة الـ Gateway.</p>
-        </div>
-        <button mat-flat-button color="primary" style="background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); border-radius: 8px; padding: 0 20px;">
-          <mat-icon style="margin-left: 8px;">refresh</mat-icon>تحديث لوحة المراقبة
-        </button>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="بوابة الربط والتكامل المؤسسي"
+        subtitle="مراقبة استدعاءات الـ APIs، والـ Webhooks، وحالة الأنظمة الخارجية المتصلة عبر بوابة الـ Gateway."
+      >
+        <button class="nb-btn-secondary">تحديث لوحة المراقبة</button>
+      </nb-page-header>
+
+      <div class="stats-grid">
+        <nb-stat-card label="إجمالي النداءات اليوم" value="145,280" suffix="طلب" valueKind="info"></nb-stat-card>
+        <nb-stat-card label="متوسط زمن الاستجابة" value="42" suffix="مللي ثانية" valueKind="success"></nb-stat-card>
+        <nb-stat-card label="نسبة الأخطاء اليوم" value="0.04" suffix="%" valueKind="danger"></nb-stat-card>
       </div>
 
-      <!-- Quick Metrics Grid -->
-      <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px;">
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #4f46e5; margin-left: 12px;">speed</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">إجمالي النداءات اليوم</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            145,280 طلب
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #10b981; margin-left: 12px;">bolt</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">متوسط زمن الاستجابة</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #0f172a; margin-top: 8px;">
-            42 مللي ثانية
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0;">
-          <mat-card-header>
-            <mat-icon style="color: #ef4444; margin-left: 12px;">error_outline</mat-icon>
-            <mat-card-title style="font-size: 1rem; color: #64748b;">نسبة الأخطاء اليوم</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="font-size: 2rem; font-weight: 700; color: #ef4444; margin-top: 8px;">
-            0.04%
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <!-- Detail Tabs -->
-      <mat-tab-group style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-        <mat-tab label="الربط مع الأنظمة الخارجية">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a; margin-bottom: 16px;">حالة مزودي الخدمة والمتصلين</h3>
-            <mat-list>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="الربط مع الأنظمة الخارجية">
+            <div class="list">
+              <h3>حالة مزودي الخدمة والمتصلين</h3>
               @for (provider of providers(); track provider.name) {
-                <mat-list-item>
-                  <mat-icon matListItemIcon [style.color]="provider.status === 'connected' ? '#10b981' : '#ef4444'" style="margin-left: 12px;">cloud_queue</mat-icon>
-                  <span matListItemTitle style="font-weight: 500;">{{ provider.name }}</span>
-                  <span matListItemLine style="color: #64748b;">الحالة: {{ provider.status === 'connected' ? 'متصل ومفعّل' : 'فشل الاتصال' }} | آخر مزامنة: {{ provider.last_sync }}</span>
-                </mat-list-item>
-                <mat-divider></mat-divider>
+                <div class="row">
+                  <span class="nb-dot" [class.success]="provider.status === 'connected'" [class.danger]="provider.status !== 'connected'"></span>
+                  <div><strong>{{ provider.name }}</strong><span class="meta">الحالة: {{ provider.status === 'connected' ? 'متصل ومفعّل' : 'فشل الاتصال' }} | آخر مزامنة: {{ provider.last_sync }}</span></div>
+                </div>
               }
-            </mat-list>
-          </div>
-        </mat-tab>
-        <mat-tab label="سجل توصيل الويب هوكس (Webhooks)">
-          <div style="padding: 20px;">
-            <h3 style="font-weight: 600; color: #0f172a; margin-bottom: 16px;">سجل التوصيل الأخير</h3>
-            <mat-list>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #10b981; margin-left: 12px;">check_circle</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">مزامنة درجات الطلاب - Moodle</span>
-                <span matListItemLine style="color: #64748b;">توصيل ناجح (رمز 200) - 2026-07-04 10:10 ص</span>
-              </mat-list-item>
-              <mat-divider></mat-divider>
-              <mat-list-item>
-                <mat-icon matListItemIcon style="color: #f59e0b; margin-left: 12px;">replay</mat-icon>
-                <span matListItemTitle style="font-weight: 500;">إرسال تبليغ الرسوم - WhatsApp Gateway</span>
-                <span matListItemLine style="color: #ef4444;">جاري إعادة المحاولة (محاولة 2) - 2026-07-04 10:11 ص</span>
-              </mat-list-item>
-            </mat-list>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+            </div>
+          </mat-tab>
+          <mat-tab label="سجل توصيل الويب هوكس (Webhooks)">
+            <div class="list">
+              <h3>سجل التوصيل الأخير</h3>
+              <div class="row">
+                <span class="nb-dot success"></span>
+                <div><strong>مزامنة درجات الطلاب - Moodle</strong><span class="meta">توصيل ناجح (رمز 200) - 2026-07-04 10:10 ص</span></div>
+              </div>
+              <div class="row">
+                <span class="nb-dot warning"></span>
+                <div><strong>إرسال تبليغ الرسوم - WhatsApp Gateway</strong><span class="meta danger">جاري إعادة المحاولة (محاولة 2) - 2026-07-04 10:11 ص</span></div>
+              </div>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
-  `
+  `,
+  styles: [`
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .nb-tabs { padding: 4px 8px 8px; }
+    .list { padding: 16px; }
+    .list h3 { font-weight: 700; color: var(--nb-text); margin: 0 0 14px; font-size: 14px; }
+    .row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--nb-border-soft); }
+    .row:last-child { border-bottom: none; }
+    .row .nb-dot { margin-top: 5px; }
+    .row strong { display: block; font-size: 13px; color: var(--nb-text); }
+    .row .meta { font-size: 11px; color: var(--nb-text-muted); }
+    .row .meta.danger { color: var(--nb-danger); }
+  `]
 })
 export class GatewayDashboardComponent {
   providers = signal([

@@ -22,45 +22,38 @@ import { ReportingService } from './reporting.service';
       <!-- Header -->
       <header class="dashboard-header">
         <div class="header-info">
-          <h1>منصة ذكاء الأعمال والتقارير والتحليلات (BIRAP)</h1>
+          <h1>منصة ذكاء الأعمال والتقارير والتحليلات</h1>
           <p>لوحة التحكم المركزية لتوليد تقارير الموديولات وتتبع مؤشرات الأداء والتحليل الذكي</p>
         </div>
       </header>
 
-      <!-- AI Natural Language Query Box -->
-      <mat-card class="ai-card">
-        <mat-card-header>
-          <mat-card-title>
-            <mat-icon class="ai-icon">psychology</mat-icon>
-            الاستعلام الذكي باللغة الطبيعية (AI NLQ)
-          </mat-card-title>
-        </mat-card-header>
-        <mat-card-content class="ai-content">
-          <mat-form-field appearance="outline" class="query-field">
-            <mat-label>اسأل نبراس عن أي تقارير أو مؤشرات باللغة العربية...</mat-label>
-            <input matInput [(ngModel)]="aiQuestion" placeholder="مثال: ما هي نسبة حضور الطلاب هذا الشهر؟" (keyup.enter)="askAI()" />
-          </mat-form-field>
-          <button mat-flat-button color="primary" class="ask-btn" (click)="askAI()">اسأل نبراس</button>
-        </mat-card-content>
-        <div class="ai-response" *ngIf="aiResponse()">
-          <p><strong>استعلام SQL المقترح:</strong> <code>{{ aiResponse().interpreted_query }}</code></p>
-          <p><strong>الملخص الفوري:</strong> {{ aiResponse().summary }}</p>
-        </div>
-      </mat-card>
+      <!-- AI Natural Language Query Box (شريط الأمر الذكي — نمط لوحة مساعد نبراس) -->
+      <div class="ai-bar">
+        <span class="ai-mark">✦</span>
+        <input
+          class="ai-input"
+          [(ngModel)]="aiQuestion"
+          placeholder="اسأل نبراس عن أي تقارير أو مؤشرات باللغة العربية… مثال: ما هي نسبة حضور الطلاب هذا الشهر؟"
+          (keyup.enter)="askAI()"
+        />
+        <button class="nb-btn-primary" (click)="askAI()">اسأل نبراس</button>
+      </div>
+      <div class="ai-response" *ngIf="aiResponse()">
+        <p><strong>استعلام SQL المقترح:</strong> <code>{{ aiResponse().interpreted_query }}</code></p>
+        <p><strong>الملخص الفوري:</strong> {{ aiResponse().summary }}</p>
+      </div>
 
       <!-- Stats Grid / KPIs -->
       <div class="kpi-grid">
         <div class="kpi-card" *ngFor="let k of kpis()">
           <div class="kpi-header">
-            <h3>{{ k.name }}</h3>
+            <span class="kpi-label">{{ k.name }}</span>
             <span class="trend-badge" [ngClass]="k.trend">
-              <mat-icon>{{ k.trend === 'up' ? 'trending_up' : k.trend === 'down' ? 'trending_down' : 'trending_flat' }}</mat-icon>
+              {{ k.trend === 'up' ? '▲' : k.trend === 'down' ? '▼' : '▬' }}
             </span>
           </div>
-          <div class="kpi-body">
-            <span class="kpi-value">{{ k.current_value }}%</span>
-            <span class="kpi-target">المستهدف: {{ k.target_value }}%</span>
-          </div>
+          <span class="kpi-value">{{ k.current_value }}%</span>
+          <span class="kpi-target">المستهدف: {{ k.target_value }}%</span>
         </div>
       </div>
 
@@ -132,117 +125,136 @@ import { ReportingService } from './reporting.service';
   `,
   styles: [`
     .reporting-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
+      flex: 1;
+      padding: 20px;
+      min-width: 0;
+      overflow-y: auto;
+      background: var(--nb-bg);
+      color: var(--nb-text);
     }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #3b82f6, #10b981);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
+    .dashboard-header { margin-bottom: 16px; }
+    .dashboard-header h1 { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0; }
+    .dashboard-header p { color: var(--nb-text-muted); font-size: 12px; margin: 4px 0 0; }
 
-    .ai-card {
-      background: linear-gradient(135deg, #1e1b4b, #311042);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+    .ai-bar {
+      height: 40px;
+      background: var(--nb-primary-50);
+      border: 1px solid var(--nb-primary-200);
+      border-radius: var(--nb-radius-card);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      margin-bottom: 12px;
     }
-    .ai-icon { color: #c084fc; font-size: 28px; width: 28px; height: 28px; margin-left: 8px; vertical-align: middle; }
-    .ai-content { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
-    .query-field { flex: 1; }
-    .ask-btn { height: 56px; margin-bottom: 22px; }
+    .ai-mark {
+      width: 20px;
+      height: 20px;
+      background: var(--nb-primary-600);
+      border-radius: var(--nb-radius-compact);
+      color: var(--nb-on-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .ai-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-family: var(--nb-font-family);
+      font-size: 13px;
+      color: var(--nb-text);
+    }
+    .ai-input::placeholder { color: var(--nb-primary-400); }
     .ai-response {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-top: 1rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--nb-text-secondary);
     }
+    .ai-response code { color: var(--nb-primary-600); background: var(--nb-primary-50); padding: 2px 6px; border-radius: var(--nb-radius-sm); }
 
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
     .kpi-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .kpi-header { display: flex; justify-content: space-between; align-items: center; }
-    .kpi-header h3 { font-size: 0.85rem; color: #94a3b8; margin: 0; }
-    .trend-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; }
-    .trend-badge.up { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .trend-badge.down { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .trend-badge.stable { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .kpi-body { display: flex; flex-direction: column; margin-top: 8px; }
-    .kpi-value { font-size: 1.8rem; font-weight: bold; }
-    .kpi-target { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+    .kpi-label { font-size: 12px; color: var(--nb-text-muted); }
+    .trend-badge { font-size: 11px; font-weight: 700; }
+    .trend-badge.up { color: var(--nb-success); }
+    .trend-badge.down { color: var(--nb-danger); }
+    .trend-badge.stable { color: var(--nb-warning); }
+    .kpi-value { font-size: 20px; font-weight: 700; color: var(--nb-text); }
+    .kpi-target { font-size: 11px; color: var(--nb-text-faint); }
 
     .dashboard-tabs {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      margin-bottom: 2rem;
+      background: var(--nb-surface);
+      border-radius: var(--nb-radius-card);
+      border: 1px solid var(--nb-border);
+      padding: 8px 16px 16px;
+      margin-bottom: 16px;
     }
-    .tab-content { padding: 1.5rem 0; }
+    .tab-content { padding: 16px 0; }
 
-    .reporting-table, .viewer-table {
-      width: 100%;
-      background: #1e293b;
-      color: #f8fafc;
+    .reporting-table, .viewer-table { width: 100%; background: var(--nb-surface); }
+    ::ng-deep .reporting-table .mat-mdc-header-cell,
+    ::ng-deep .viewer-table .mat-mdc-header-cell {
+      color: var(--nb-text-muted) !important;
+      font-weight: 700;
+      font-size: 11px;
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft) !important;
     }
-    .mat-mdc-header-cell {
-      color: #94a3b8 !important;
-      font-weight: bold;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
-    .mat-mdc-cell {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-      color: #cbd5e1 !important;
+    ::ng-deep .reporting-table .mat-mdc-cell,
+    ::ng-deep .viewer-table .mat-mdc-cell {
+      border-bottom: 1px solid var(--nb-border-row) !important;
+      color: var(--nb-text) !important;
+      font-size: 13px;
     }
     .action-btn { margin-left: 8px; }
 
     .dashboard-grid-preview {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
+      gap: 12px;
     }
     .dashboard-preview-card {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1.5rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
       text-align: center;
     }
-    .dash-icon { font-size: 40px; width: 40px; height: 40px; color: #3b82f6; }
-    .dashboard-preview-card h3 { margin: 0; }
-    .dashboard-preview-card p { color: #94a3b8; font-size: 0.8rem; margin: 0; }
+    .dash-icon { font-size: 32px; width: 32px; height: 32px; color: var(--nb-primary-600); }
+    .dashboard-preview-card h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .dashboard-preview-card p { color: var(--nb-text-muted); font-size: 12px; margin: 0; }
 
     .data-viewer-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
     }
   `]
 })

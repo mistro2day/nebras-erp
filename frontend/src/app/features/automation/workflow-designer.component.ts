@@ -40,7 +40,7 @@ import { STUDIO_STYLES } from './studio-theme';
                 stroke="#818cf8" stroke-width="2" marker-end="url(#arrow)" />
           <g *ngFor="let n of nodes()">
             <rect [attr.x]="nodePos(n.node_key).x" [attr.y]="nodePos(n.node_key).y" rx="10" width="60" height="40"
-                  [attr.fill]="nodeColor(n.node_type)" stroke="rgba(255,255,255,.15)" />
+                  [attr.fill]="nodeColor(n.node_type)" stroke="rgba(0,0,0,.08)" />
             <text [attr.x]="nodePos(n.node_key).x + 30" [attr.y]="nodePos(n.node_key).y + 24"
                   text-anchor="middle" fill="#f8fafc" font-size="9">{{ n.label }}</text>
           </g>
@@ -69,9 +69,9 @@ import { STUDIO_STYLES } from './studio-theme';
     </div>
   `,
   styles: [STUDIO_STYLES + `
-    .canvas-wrap { margin-bottom: 1rem; }
-    svg.canvas { width: 100%; max-width: 720px; background: #1e293b; border: 1px solid rgba(255,255,255,.08);
-      border-radius: 16px; padding: 8px; }
+    .canvas-wrap { margin-bottom: 16px; }
+    svg.canvas { width: 100%; max-width: 720px; background: var(--nb-surface-raised); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 8px; }
   `],
 })
 export class WorkflowDesignerComponent implements OnInit {

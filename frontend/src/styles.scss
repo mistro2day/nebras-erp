@@ -1,13 +1,41 @@
 @use '@angular/material' as mat;
-@import './styles/design-system.scss';
+@use './styles/design-system';
 
 html {
   color-scheme: light;
-  background: var(--background-color);
-}
+  background: var(--nb-bg);
 
-html[data-theme='dark'] {
-  color-scheme: dark;
+  /* سمة Material 3 — الخط والكثافة، والألوان تُجسَّر أدناه إلى رموز نبراس OS */
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      theme-type: light,
+    ),
+    typography: (
+      plain-family: 'IBM Plex Sans Arabic',
+      brand-family: 'IBM Plex Sans Arabic',
+    ),
+    density: 0,
+  ));
+
+  /* جسر رموز النظام: Material system tokens ← رموز نبراس OS */
+  --mat-sys-primary: var(--nb-primary-600);
+  --mat-sys-on-primary: var(--nb-on-primary);
+  --mat-sys-primary-container: var(--nb-primary-50);
+  --mat-sys-on-primary-container: var(--nb-primary-900);
+  --mat-sys-error: var(--nb-danger);
+  --mat-sys-error-container: var(--nb-danger-bg);
+  --mat-sys-on-error-container: var(--nb-danger);
+  --mat-sys-surface: var(--nb-surface);
+  --mat-sys-surface-container: var(--nb-surface);
+  --mat-sys-surface-container-low: var(--nb-surface-raised);
+  --mat-sys-surface-container-high: var(--nb-surface);
+  --mat-sys-surface-container-highest: var(--nb-surface-raised);
+  --mat-sys-background: var(--nb-bg);
+  --mat-sys-on-surface: var(--nb-text);
+  --mat-sys-on-surface-variant: var(--nb-text-secondary);
+  --mat-sys-outline: var(--nb-border);
+  --mat-sys-outline-variant: var(--nb-border-soft);
 }
 
 * {

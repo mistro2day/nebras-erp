@@ -1,190 +1,110 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { AcademicsService, AcademicYear, Term, Stage, Grade } from '../academics.service';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit } from '@angular/core';
+import { AcademicsService, AcademicYear, Stage, Grade } from '../academics.service';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../../shared/nebras/nb-stat-card.component';
 
+/**
+ * اللوحة الأكاديمية — لغة تصميم Nebras OS (القسم 1d/1a).
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-academic-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="dashboard-container" dir="rtl">
-      <div class="header">
-        <h1>لوحة التحكم الأكاديمية (Academic Dashboard)</h1>
-        <p>إدارة السنوات الدراسية، الفصول الأكاديمية، الخطط والمناهج الدراسية، والمراحل التعليمية.</p>
-      </div>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="اللوحة الأكاديمية"
+        subtitle="إدارة السنوات الدراسية، الفصول الأكاديمية، الخطط والمناهج الدراسية، والمراحل التعليمية."
+      ></nb-page-header>
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="title">السنة الدراسية الحالية</div>
-          <div class="value">{{ currentYear()?.name || 'غير محددة' }}</div>
-          <div class="subtitle">الرمز: {{ currentYear()?.code || '-' }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="title">إجمالي المراحل الدراسية</div>
-          <div class="value">{{ stages().length }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="title">إجمالي الصفوف التعليمية</div>
-          <div class="value">{{ grades().length }}</div>
-        </div>
+        <nb-stat-card
+          label="السنة الدراسية الحالية"
+          [value]="currentYear()?.name || 'غير محددة'"
+          [trend]="'الرمز: ' + (currentYear()?.code || '-')"
+          trendKind="info"
+        ></nb-stat-card>
+        <nb-stat-card label="إجمالي المراحل الدراسية" [value]="stages().length"></nb-stat-card>
+        <nb-stat-card label="إجمالي الصفوف التعليمية" [value]="grades().length"></nb-stat-card>
       </div>
 
       <div class="main-sections">
-        <!-- السنوات الدراسية -->
-        <div class="section-card">
-          <h2>السنوات الدراسية المسجلة</h2>
+        <nb-panel title="السنوات الدراسية المسجلة" [flush]="true">
           <div class="list">
-            <div *ngFor="let year of years()" class="list-item" [class.current]="year.current_flag">
-              <div class="item-header">
-                <strong>{{ year.name }}</strong>
-                <span *ngIf="year.current_flag" class="badge">الحالية</span>
+            @for (year of years(); track year.id) {
+              <div class="list-item" [class.current]="year.current_flag">
+                <div class="item-header">
+                  <strong>{{ year.name }}</strong>
+                  @if (year.current_flag) {
+                    <span class="nb-badge-info">الحالية</span>
+                  }
+                </div>
+                <div class="item-dates">
+                  <span>تاريخ البدء: {{ year.start_date }}</span> ·
+                  <span>تاريخ الانتهاء: {{ year.end_date }}</span>
+                </div>
               </div>
-              <div class="item-dates">
-                <span>تاريخ البدء: {{ year.start_date }}</span> • 
-                <span>تاريخ الانتهاء: {{ year.end_date }}</span>
-              </div>
-            </div>
+            }
           </div>
-        </div>
+        </nb-panel>
 
-        <!-- المراحل والصفوف -->
-        <div class="section-card">
-          <h2>الهيكل التعليمي (المراحل والصفوف)</h2>
+        <nb-panel title="الهيكل التعليمي (المراحل والصفوف)">
           <div class="stages-list">
-            <div *ngFor="let stage of stages()" class="stage-block">
-              <h3>🎓 المرحلة: {{ stage.name }} (عمر: {{ stage.minimum_age }} - {{ stage.maximum_age }} سنة)</h3>
-              <div class="grades-tags">
-                <span *ngFor="let grade of getGradesForStage(stage.id)" class="grade-tag">
-                  {{ grade.name }}
-                </span>
+            @for (stage of stages(); track stage.id) {
+              <div class="stage-block">
+                <h3>المرحلة: {{ stage.name }} (عمر: {{ stage.minimum_age }} - {{ stage.maximum_age }} سنة)</h3>
+                <div class="grades-tags">
+                  @for (grade of getGradesForStage(stage.id); track grade.id) {
+                    <span class="grade-tag">{{ grade.name }}</span>
+                  }
+                </div>
               </div>
-            </div>
+            }
           </div>
-        </div>
+        </nb-panel>
       </div>
     </div>
   `,
   styles: [`
-    .dashboard-container {
-      padding: 24px;
-    }
-    .header {
-      margin-bottom: 32px;
-    }
-    .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #f3f4f6;
-    }
-    .header p {
-      color: #9ca3af;
-      font-size: 14px;
-      margin-top: 4px;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      margin-bottom: 32px;
-    }
-    .stat-card {
-      background-color: var(--surface-color, #1f2937);
-      border: 1px solid var(--border-color, #374151);
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .stat-card .title {
-      font-size: 13px;
-      color: #9ca3af;
-      margin-bottom: 8px;
-    }
-    .stat-card .value {
-      font-size: 26px;
-      font-weight: 700;
-      color: #f3f4f6;
-    }
-    .stat-card .subtitle {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 4px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
     .main-sections {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 16px;
     }
-    @media (max-width: 768px) {
-      .main-sections {
-        grid-template-columns: 1fr;
-      }
-    }
-    .section-card {
-      background-color: var(--surface-color, #1f2937);
-      border: 1px solid var(--border-color, #374151);
-      border-radius: 12px;
-      padding: 24px;
-    }
-    .section-card h2 {
-      font-size: 18px;
-      color: #f3f4f6;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #374151;
-      padding-bottom: 12px;
-    }
-    .list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .list-item {
-      padding: 16px;
-      background-color: #111827;
-      border: 1px solid #374151;
-      border-radius: 8px;
-    }
-    .list-item.current {
-      border-color: var(--primary-color, #2563eb);
-      background-color: rgba(37, 99, 235, 0.05);
-    }
+    @media (max-width: 768px) { .main-sections { grid-template-columns: 1fr; } }
+    .list { display: flex; flex-direction: column; }
+    .list-item { padding: 10px 16px; border-top: 1px solid var(--nb-border-soft); }
+    .list-item:first-child { border-top: none; }
+    .list-item.current { background: var(--nb-primary-50); }
     .item-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #f3f4f6;
-    }
-    .badge {
-      font-size: 11px;
-      background-color: var(--primary-color, #2563eb);
-      color: white;
-      padding: 2px 8px;
-      border-radius: 9999px;
-    }
-    .item-dates {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 8px;
-    }
-    .stage-block {
-      margin-bottom: 20px;
-    }
-    .stage-block h3 {
-      font-size: 14px;
-      color: #10b981;
-      margin-bottom: 10px;
-    }
-    .grades-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .grade-tag {
-      background-color: #111827;
-      color: #d1d5db;
-      border: 1px solid #374151;
-      padding: 4px 12px;
-      border-radius: 6px;
+      color: var(--nb-text);
       font-size: 13px;
+    }
+    .item-dates { font-size: 11px; color: var(--nb-text-muted); margin-top: 4px; }
+    .stage-block { margin-bottom: 16px; }
+    .stage-block:last-child { margin-bottom: 0; }
+    .stage-block h3 { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 0 0 10px; }
+    .grades-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .grade-tag {
+      background: var(--nb-surface-raised);
+      color: var(--nb-text-secondary);
+      border: 1px solid var(--nb-border);
+      padding: 4px 12px;
+      border-radius: var(--nb-radius);
+      font-size: 12px;
     }
   `]
 })

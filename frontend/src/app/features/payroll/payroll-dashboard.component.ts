@@ -1,126 +1,63 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { PayslipViewerComponent, PayslipInfo } from '../../shared/components/payslip-viewer/payslip-viewer.component';
 import { TenantService } from '../../core/services/tenant.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * إدارة الرواتب والتعويضات — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-payroll-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule, PayslipViewerComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DecimalPipe, PayslipViewerComponent, NbPageHeaderComponent, NbStatCardComponent],
   template: `
-    <div class="payroll-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>إدارة الرواتب والتعويضات (Payroll & Compensation)</h1>
-          <p>بوابة إدارة كشوف ومسيرات رواتب الموظفين لـ {{ ($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP' }}</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="إدارة الرواتب والتعويضات"
+        [subtitle]="'بوابة إدارة كشوف ومسيرات رواتب الموظفين لـ ' + (($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP')"
+      ></nb-page-header>
 
-      <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon cost">monetization_on</mat-icon>
-          <div class="meta">
-            <h3>إجمالي تكلفة الرواتب المعتمدة</h3>
-            <p class="value">{{ totalCost() | number:'1.2-2' }} SDG</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon loans">account_balance_wallet</mat-icon>
-          <div class="meta">
-            <h3>إجمالي القروض القائمة</h3>
-            <p class="value">450,000 SDG</p>
-          </div>
-        </div>
+        <nb-stat-card label="إجمالي تكلفة الرواتب المعتمدة" [value]="(totalCost() | number:'1.2-2') || '0'" suffix="SDG"></nb-stat-card>
+        <nb-stat-card label="إجمالي القروض القائمة" value="450,000" suffix="SDG"></nb-stat-card>
       </div>
 
-      <!-- Payslips Section -->
-      <div class="section-title">
-        <h2>قسائم رواتب الموظفين الأخيرة</h2>
-      </div>
-
-      <div class="payslips-grid">
-        <app-payslip-viewer *ngFor="let payslip of payslips()" [payslip]="payslip"></app-payslip-viewer>
-        <div class="no-data" *ngIf="payslips().length === 0">
-          <mat-icon>receipt_long</mat-icon>
-          <p>لا توجد قسائم رواتب مسجلة أو معالجة لهذه الفترة.</p>
-        </div>
+      <h2 class="section-title">قسائم رواتب الموظفين الأخيرة</h2>
+      <div class="cards-grid">
+        @for (payslip of payslips(); track payslip.id) {
+          <app-payslip-viewer [payslip]="payslip"></app-payslip-viewer>
+        }
+        @if (payslips().length === 0) {
+          <div class="no-data">لا توجد قسائم رواتب مسجلة أو معالجة لهذه الفترة.</div>
+        }
       </div>
     </div>
   `,
   styles: [`
-    .payroll-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #10b981, #f59e0b);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p {
-      color: #94a3b8;
-      margin: 4px 0 0;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-    }
-    .stat-card .icon {
-      font-size: 36px;
-      width: 36px;
-      height: 36px;
-      padding: 10px;
-      border-radius: 12px;
-    }
-    .stat-card .icon.cost { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .stat-card .icon.loans { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .stat-card h3 { font-size: 0.8rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.85rem; font-weight: bold; margin: 4px 0 0 0; }
-
-    .section-title h2 {
-      font-size: 1.25rem;
-      font-weight: bold;
-      margin-bottom: 1.5rem;
-      color: #cbd5e1;
-    }
-    .payslips-grid {
+    .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 0 0 12px; }
+    .cards-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 1.5rem;
+      gap: 12px;
     }
     .no-data {
       grid-column: 1 / -1;
       text-align: center;
-      padding: 4rem 2rem;
-      color: #94a3b8;
+      padding: 28px;
+      color: var(--nb-text-muted);
+      font-size: 13px;
     }
   `]
 })

@@ -1,245 +1,112 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTableModule } from '@angular/material/table';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { CommunicationsService } from './communications.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * منصة الاتصالات الموحدة والإشعارات — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-communications-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule, MatTableModule, MatTabsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe, SlicePipe, MatTabsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="communications-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>منصة الاتصالات الموحدة والإشعارات</h1>
-          <p>لوحة التحكم المركزية لإرسال وتتبع الرسائل (بريد إلكتروني، SMS، واتساب، إشعارات فورية)</p>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="منصة الاتصالات الموحدة والإشعارات"
+        subtitle="إرسال وتتبع الرسائل (بريد إلكتروني، SMS، واتساب، إشعارات فورية)"
+      ></nb-page-header>
+
+      @if (summary(); as s) {
+        <div class="stats-grid">
+          <nb-stat-card label="إجمالي الاتصالات اليوم" [value]="s.today_messages"></nb-stat-card>
+          <nb-stat-card label="تم تسليمها" [value]="s.delivered_today" valueKind="success"></nb-stat-card>
+          <nb-stat-card label="فشلت" [value]="s.failed_today" [valueKind]="s.failed_today ? 'danger' : 'default'"></nb-stat-card>
+          <nb-stat-card label="في الطابور" [value]="s.queued" [valueKind]="s.queued ? 'warning' : 'default'"></nb-stat-card>
         </div>
-      </header>
+      }
 
-      <!-- Stats Grid -->
-      <div class="stats-grid" *ngIf="summary()">
-        <div class="stat-card">
-          <mat-icon class="icon total">message</mat-icon>
-          <div class="meta">
-            <h3>إجمالي الاتصالات اليوم</h3>
-            <p class="value">{{ summary().today_messages }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon sent">done_all</mat-icon>
-          <div class="meta">
-            <h3>تم تسليمها</h3>
-            <p class="value">{{ summary().delivered_today }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon failed">error</mat-icon>
-          <div class="meta">
-            <h3>فشلت</h3>
-            <p class="value">{{ summary().failed_today }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon pending">hourglass_empty</mat-icon>
-          <div class="meta">
-            <h3>في الطابور</h3>
-            <p class="value">{{ summary().queued }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Main Tabs -->
-      <mat-tab-group class="dashboard-tabs">
-        <!-- Tab 1: Recent Messages -->
-        <mat-tab label="أحدث الرسائل">
-          <div class="tab-content">
-            <table mat-table [dataSource]="messages()" class="mat-elevation-z8 comm-table">
-              <ng-container matColumnDef="channel">
-                <th mat-header-cell *matHeaderCellDef>القناة</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="channel-badge" [ngClass]="element.channel_type">
-                    <mat-icon>{{ getChannelIcon(element.channel_type) }}</mat-icon>
-                    {{ element.channel_name }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="recipient">
-                <th mat-header-cell *matHeaderCellDef>المستلم</th>
-                <td mat-cell *matCellDef="let element">
-                  {{ element.recipients && element.recipients[0] ? element.recipients[0].address : 'غير محدد' }}
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="subject">
-                <th mat-header-cell *matHeaderCellDef>الموضوع / المحتوى</th>
-                <td mat-cell *matCellDef="let element">{{ element.subject || element.body | slice:0:60 }}...</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="status-badge" [ngClass]="element.status">
-                    {{ getStatusLabel(element.status) }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="time">
-                <th mat-header-cell *matHeaderCellDef>الوقت</th>
-                <td mat-cell *matCellDef="let element">{{ element.created_at | date:'short' }}</td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-            </table>
-
-            <div class="no-data" *ngIf="messages().length === 0">
-              لا توجد رسائل مرسلة مؤخراً.
-            </div>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 2: Channels & Providers -->
-        <mat-tab label="مزودي الخدمة والقنوات">
-          <div class="tab-content grid-cards">
-            <div class="channel-card" *ngFor="let p of providers()">
-              <div class="card-header">
-                <h3>{{ p.name }}</h3>
-                <span class="provider-type">{{ p.provider_type }}</span>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="أحدث الرسائل">
+            <div class="tbl">
+              <div class="tbl-head msg">
+                <span>القناة</span><span>المستلم</span><span>الموضوع / المحتوى</span><span>الحالة</span><span>الوقت</span>
               </div>
-              <div class="card-body">
-                <p><strong>القناة:</strong> {{ p.channel_name }}</p>
-                <p><strong>الحالة:</strong> 
-                  <span class="status-badge" [ngClass]="p.health_status === 'healthy' ? 'sent' : 'failed'">
-                    {{ p.health_status === 'healthy' ? 'نشط وسليم' : 'غير متصل' }}
-                  </span>
-                </p>
-              </div>
+              @for (element of messages(); track element.id) {
+                <div class="tbl-row msg">
+                  <span class="ch">{{ element.channel_name }}</span>
+                  <span>{{ element.recipients && element.recipients[0] ? element.recipients[0].address : 'غير محدد' }}</span>
+                  <span>{{ (element.subject || element.body) | slice:0:60 }}…</span>
+                  <span><span [class]="statusBadge(element.status)">{{ getStatusLabel(element.status) }}</span></span>
+                  <span>{{ element.created_at | date:'short' }}</span>
+                </div>
+              }
+              @if (messages().length === 0) { <div class="tbl-empty">لا توجد رسائل مرسلة مؤخراً.</div> }
             </div>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+          </mat-tab>
+
+          <mat-tab label="مزودي الخدمة والقنوات">
+            <div class="grid-cards">
+              @for (p of providers(); track p.id) {
+                <div class="nb-card">
+                  <div class="pc-head">
+                    <h3>{{ p.name }}</h3>
+                    <span class="nb-badge-ai">{{ p.provider_type }}</span>
+                  </div>
+                  <p><strong>القناة:</strong> {{ p.channel_name }}</p>
+                  <p><strong>الحالة:</strong>
+                    <span [class]="p.health_status === 'healthy' ? 'nb-badge-success' : 'nb-badge-danger'">
+                      {{ p.health_status === 'healthy' ? 'نشط وسليم' : 'غير متصل' }}
+                    </span>
+                  </p>
+                </div>
+              }
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
   `,
   styles: [`
-    .communications-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #6366f1, #10b981);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
-
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+    .nb-tabs { padding: 4px 8px 8px; }
+    .tbl { display: flex; flex-direction: column; padding-top: 8px; }
+    .tbl-head.msg, .tbl-row.msg { grid-template-columns: 1.2fr 1.4fr 2fr 1fr 1fr; }
+    .tbl-head, .tbl-row { display: grid; gap: 8px; padding: 9px 16px; align-items: center; }
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .stat-card .icon {
-      font-size: 32px; width: 32px; height: 32px;
-      padding: 8px; border-radius: 12px;
-    }
-    .stat-card .icon.total { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-    .stat-card .icon.sent { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .stat-card .icon.failed { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .stat-card .icon.pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .stat-card h3 { font-size: 0.75rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.6rem; font-weight: bold; margin: 2px 0 0 0; }
-
-    .dashboard-tabs {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .tab-content { padding: 1.5rem 0; }
-    
-    .comm-table {
-      width: 100%;
-      background: #1e293b;
-      color: #f8fafc;
-    }
-    .mat-mdc-header-cell {
-      color: #94a3b8 !important;
-      font-weight: bold;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
-    .mat-mdc-cell {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-      color: #cbd5e1 !important;
-    }
-
-    .channel-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
-    }
-    .channel-badge mat-icon { font-size: 16px; width: 16px; height: 16px; }
-    .channel-badge.email { color: #60a5fa; }
-    .channel-badge.whatsapp { color: #34d399; }
-    .channel-badge.sms { color: #fbbf24; }
-
-    .status-badge {
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: bold;
-    }
-    .status-badge.sent, .status-badge.delivered, .status-badge.read {
-      background: rgba(16, 185, 129, 0.15); color: #34d399;
-    }
-    .status-badge.failed, .status-badge.bounced {
-      background: rgba(239, 68, 68, 0.15); color: #f87171;
-    }
-    .status-badge.queued, .status-badge.processing {
-      background: rgba(245, 158, 11, 0.15); color: #fbbf24;
-    }
-
+    .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .ch { font-weight: 600; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
     .grid-cards {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      padding: 12px 8px 8px;
     }
-    .channel-card {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1.25rem;
-    }
-    .channel-card h3 { margin: 0; font-size: 1.1rem; }
-    .provider-type { font-size: 0.7rem; background: rgba(99, 102, 241, 0.2); padding: 2px 6px; border-radius: 4px; color: #818cf8; }
-    .no-data { text-align: center; padding: 3rem; color: #64748b; }
+    .pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .pc-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .nb-card p { font-size: 12px; color: var(--nb-text-secondary); margin: 6px 0; }
   `]
 })
 export class CommunicationsDashboardComponent implements OnInit {
@@ -298,6 +165,15 @@ export class CommunicationsDashboardComponent implements OnInit {
       case 'failed': return 'فشل';
       case 'queued': return 'في الانتظار';
       default: return status;
+    }
+  }
+
+  statusBadge(status: string): string {
+    switch (status) {
+      case 'sent': case 'delivered': case 'read': return 'nb-badge-success';
+      case 'failed': case 'bounced': return 'nb-badge-danger';
+      case 'queued': case 'processing': return 'nb-badge-warning';
+      default: return 'nb-badge-neutral';
     }
   }
 }

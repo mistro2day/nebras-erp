@@ -30,47 +30,32 @@ import { FinanceService } from './finance.service';
           <p>بوابة العمليات الحسابية المزدوجة، شجرة الحسابات، الموازنات التقديرية، والرقابة المالية للمؤسسة</p>
         </div>
         <div class="fiscal-status-badge">
-          <mat-icon>verified_user</mat-icon>
+          <span class="nb-dot success"></span>
           <span>حالة النظام: <strong>{{ stats().fiscal_status || 'مستقر ونشط' }}</strong></span>
         </div>
       </header>
 
       <!-- KPI Widgets Grid -->
       <div class="kpi-grid">
-        <div class="kpi-card assets">
-          <div class="header">
-            <h3>إجمالي الأصول</h3>
-            <mat-icon>account_balance</mat-icon>
-          </div>
-          <p class="value">{{ stats().total_assets | number:'1.2-2' }} ر.س</p>
-          <span class="subtext">السيولة النقدية + الأصول الثابتة</span>
+        <div class="kpi-card">
+          <span class="kpi-label">إجمالي الأصول</span>
+          <span class="kpi-value">{{ stats().total_assets | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
+          <span class="kpi-sub">السيولة النقدية + الأصول الثابتة</span>
         </div>
-
-        <div class="kpi-card liabilities">
-          <div class="header">
-            <h3>الالتزامات والخصوم</h3>
-            <mat-icon>trending_down</mat-icon>
-          </div>
-          <p class="value">{{ stats().total_liabilities | number:'1.2-2' }} ر.س</p>
-          <span class="subtext">المستحقات + الديون قصيرة الأجل</span>
+        <div class="kpi-card">
+          <span class="kpi-label">الالتزامات والخصوم</span>
+          <span class="kpi-value">{{ stats().total_liabilities | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
+          <span class="kpi-sub">المستحقات + الديون قصيرة الأجل</span>
         </div>
-
-        <div class="kpi-card revenue">
-          <div class="header">
-            <h3>الإيرادات الإجمالية</h3>
-            <mat-icon>trending_up</mat-icon>
-          </div>
-          <p class="value">{{ stats().revenue | number:'1.2-2' }} ر.س</p>
-          <span class="subtext">مقبوضات الرسوم والمصادر الأخرى</span>
+        <div class="kpi-card">
+          <span class="kpi-label">الإيرادات الإجمالية</span>
+          <span class="kpi-value">{{ stats().revenue | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
+          <span class="kpi-sub">مقبوضات الرسوم والمصادر الأخرى</span>
         </div>
-
-        <div class="kpi-card expenses">
-          <div class="header">
-            <h3>المصروفات التشغيلية</h3>
-            <mat-icon>payments</mat-icon>
-          </div>
-          <p class="value">{{ stats().expenses | number:'1.2-2' }} ر.س</p>
-          <span class="subtext">المرتبات والمصاريف الإدارية</span>
+        <div class="kpi-card">
+          <span class="kpi-label">المصروفات التشغيلية</span>
+          <span class="kpi-value">{{ stats().expenses | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
+          <span class="kpi-sub">المرتبات والمصاريف الإدارية</span>
         </div>
       </div>
 
@@ -98,7 +83,7 @@ import { FinanceService } from './finance.service';
           <h4>التنبيهات المالية النشطة</h4>
           <div class="alert-list">
             <div class="alert-item" *ngFor="let alert of stats().alerts" [ngClass]="alert.type">
-              <mat-icon>warning</mat-icon>
+              <span class="nb-dot" [class.warning]="alert.type === 'warning'" [class.info]="alert.type === 'info'"></span>
               <span>{{ alert.message }}</span>
             </div>
           </div>
@@ -371,7 +356,7 @@ import { FinanceService } from './finance.service';
             <h2>إدارة إغلاق الفترات المحاسبية المقفلة</h2>
             <div class="periods-grid">
               <div class="period-card" *ngFor="let p of periods()">
-                <mat-icon [ngClass]="p.status">lock</mat-icon>
+                <span class="period-lock" [ngClass]="p.status">🔒</span>
                 <div class="meta">
                   <h3>{{ p.name }}</h3>
                   <p>تاريخ البدء: {{ p.start_date }} - النهاية: {{ p.end_date }}</p>
@@ -389,237 +374,196 @@ import { FinanceService } from './finance.service';
   `,
   styles: [`
     .finance-dashboard {
-      padding: 2rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
+      flex: 1;
+      padding: 20px;
+      min-width: 0;
+      overflow-y: auto;
+      background: var(--nb-bg);
+      color: var(--nb-text);
     }
     .dashboard-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1.5rem;
+      margin-bottom: 16px;
     }
     .dashboard-header h1 {
-      font-size: 2.2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #3b82f6, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--nb-text);
       margin: 0;
     }
-    .dashboard-header p { color: #94a3b8; margin: 6px 0 0; }
+    .dashboard-header p { color: var(--nb-text-muted); margin: 4px 0 0; font-size: 12px; }
     .fiscal-status-badge {
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(59, 130, 246, 0.12);
-      color: #60a5fa;
-      padding: 8px 16px;
-      border-radius: 12px;
-      border: 1px solid rgba(59, 130, 246, 0.2);
+      background: var(--nb-surface);
+      color: var(--nb-text-secondary);
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: var(--nb-radius);
+      border: 1px solid var(--nb-border);
     }
 
     /* KPI Grid */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 1.5rem;
-      margin-bottom: 2rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
     .kpi-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
-      transition: all 0.3s ease;
-    }
-    .kpi-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
-    .kpi-card .header {
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 12px 14px;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      color: #94a3b8;
+      flex-direction: column;
+      gap: 4px;
     }
-    .kpi-card h3 { font-size: 0.85rem; margin: 0; }
-    .kpi-card .value { font-size: 1.8rem; font-weight: bold; margin: 0 0 8px 0; }
-    .kpi-card .subtext { font-size: 0.75rem; color: #64748b; }
-
-    .kpi-card.assets { border-right: 4px solid #3b82f6; }
-    .kpi-card.assets mat-icon { color: #3b82f6; }
-    .kpi-card.liabilities { border-right: 4px solid #ef4444; }
-    .kpi-card.liabilities mat-icon { color: #ef4444; }
-    .kpi-card.revenue { border-right: 4px solid #10b981; }
-    .kpi-card.revenue mat-icon { color: #10b981; }
-    .kpi-card.expenses { border-right: 4px solid #f59e0b; }
-    .kpi-card.expenses mat-icon { color: #f59e0b; }
+    .kpi-label { font-size: 12px; color: var(--nb-text-muted); }
+    .kpi-value { font-size: 20px; font-weight: 700; color: var(--nb-text); }
+    .kpi-unit { font-size: 12px; font-weight: 500; color: var(--nb-text-muted); }
+    .kpi-sub { font-size: 11px; color: var(--nb-text-faint); }
 
     /* Secondary Grid */
     .secondary-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
     .stat-box {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
     }
-    .stat-box h4 { margin: 0 0 1rem 0; font-size: 0.95rem; color: #94a3b8; }
+    .stat-box h4 { margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: var(--nb-text); }
     .progress-info {
       display: flex;
       justify-content: space-between;
-      font-size: 0.8rem;
-      color: #cbd5e1;
+      font-size: 12px;
+      color: var(--nb-text-secondary);
       margin-bottom: 8px;
     }
-    .alert-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
     .alert-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.8rem;
-      padding: 8px 12px;
-      border-radius: 8px;
+      font-size: 12px;
+      color: var(--nb-text-secondary);
     }
-    .alert-item.warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .alert-item.info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
 
     /* Tabs */
     .finance-tabs {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--nb-surface);
+      border-radius: var(--nb-radius-card);
+      border: 1px solid var(--nb-border);
+      padding: 8px 16px 16px;
     }
-    .tab-content { padding: 2rem 0 1rem 0; }
+    .tab-content { padding: 16px 0 4px; }
     .coa-controls {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 16px;
     }
-    .coa-controls h2 { margin: 0; font-size: 1.2rem; }
+    .coa-controls h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
 
-    .finance-table {
-      width: 100%;
-      background: #1e293b;
-      color: #f8fafc;
+    .finance-table { width: 100%; background: var(--nb-surface); }
+    ::ng-deep .finance-table .mat-mdc-header-cell {
+      color: var(--nb-text-muted) !important;
+      font-weight: 700;
+      font-size: 11px;
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft) !important;
     }
-    .mat-mdc-header-cell {
-      color: #94a3b8 !important;
-      font-weight: bold;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    ::ng-deep .finance-table .mat-mdc-cell {
+      border-bottom: 1px solid var(--nb-border-row) !important;
+      color: var(--nb-text) !important;
+      font-size: 13px;
+      padding: 9px 16px !important;
     }
-    .mat-mdc-cell {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-      color: #cbd5e1 !important;
-      padding: 12px 16px !important;
-    }
-    .en-name { color: #64748b; font-size: 0.85rem; margin-right: 8px; }
+    ::ng-deep .finance-table .mat-mdc-row:hover .mat-mdc-cell { background: var(--nb-surface-raised); }
+    .en-name { color: var(--nb-text-muted); font-size: 12px; margin-right: 8px; }
 
     /* Panels & Forms */
     .add-account-panel, .journal-editor-panel {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+      background: var(--nb-surface-raised);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      margin-bottom: 16px;
     }
+    .add-account-panel h3, .journal-editor-panel h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .journal-editor-panel h4 { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 12px 0 8px; }
     .form-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-    .form-actions {
-      display: flex;
       gap: 12px;
+      margin-bottom: 12px;
     }
+    .form-actions { display: flex; gap: 12px; }
 
     /* Badges */
-    .type-badge {
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
+    .type-badge, .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--nb-radius-sm);
+      font-size: 11px;
+      font-weight: 600;
     }
-    .type-badge.debit { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .type-badge.credit { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .status-badge {
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-    }
-    .status-badge.active, .status-badge.posted { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .status-badge.draft { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
-    .status-badge.approved { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .status-badge.reversed { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .type-badge.debit { background: var(--nb-info-bg); color: var(--nb-info); }
+    .type-badge.credit { background: var(--nb-success-bg); color: var(--nb-success); }
+    .status-badge.active, .status-badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
+    .status-badge.draft { background: var(--nb-bg); color: var(--nb-text-secondary); }
+    .status-badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
+    .status-badge.reversed { background: var(--nb-danger-bg); color: var(--nb-danger); }
 
     /* Journal Editor */
-    .journal-line-row {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      margin-bottom: 8px;
-    }
+    .journal-line-row { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
     .editor-actions {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 1rem;
+      margin-top: 12px;
     }
-    .balance-summary {
-      font-size: 0.9rem;
-      color: #94a3b8;
-    }
-    .balance-summary.balanced { color: #34d399; }
-    .balance-summary.unbalanced { color: #f87171; }
+    .balance-summary { font-size: 13px; color: var(--nb-text-muted); }
+    .balance-summary.balanced { color: var(--nb-success); }
+    .balance-summary.unbalanced { color: var(--nb-danger); }
 
     /* Ledger & Filters */
-    .ledger-filters {
-      display: flex;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-    .debit-text { color: #60a5fa; font-weight: 500; }
-    .credit-text { color: #34d399; font-weight: 500; }
+    .ledger-filters { display: flex; gap: 16px; margin-bottom: 16px; }
+    .debit-text { color: var(--nb-info); font-weight: 500; }
+    .credit-text { color: var(--nb-success); font-weight: 500; }
 
     /* Periods Grid */
     .periods-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
+      gap: 12px;
     }
     .period-card {
-      background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1.25rem;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 12px;
+      gap: 10px;
     }
-    .period-card mat-icon { font-size: 32px; width: 32px; height: 32px; }
-    .period-card mat-icon.open { color: #34d399; }
-    .period-card mat-icon.closed { color: #f87171; }
-    .period-card .status { font-size: 0.8rem; font-weight: bold; }
-    .period-card .status.open { color: #34d399; }
-    .period-card .status.closed { color: #f87171; }
+    .period-lock { font-size: 26px; }
+    .period-card .meta h3 { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 0; }
+    .period-card .meta p { font-size: 12px; color: var(--nb-text-muted); margin: 4px 0; }
+    .period-card .status { font-size: 12px; font-weight: 700; }
+    .period-card .status.open { color: var(--nb-success); }
+    .period-card .status.closed { color: var(--nb-danger); }
   `]
 })
 export class FinanceDashboardComponent implements OnInit {

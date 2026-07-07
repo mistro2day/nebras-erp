@@ -1,53 +1,300 @@
-/* نبرة - نظام التصميم والألوان الموحد لـ Nebras ERP */
+/* ============================================================
+   نبراس OS — نظام التصميم الموحد (Nebras OS Design System)
+   المصدر: Nebras OS.html — حزمة تسليم Claude Design (اتجاه 1a)
+   المبادئ الملزمة:
+   · RTL أولًا — لا انعكاس لاحق
+   · اللون الأساسي للتنقل والإجراءات فقط؛ الدلالي للحالات فقط
+   · ظلال بحد أدنى — الفصل بالحدود الناعمة
+   · أرقام لاتينية للبيانات المالية والمعرّفات
+   ============================================================ */
+
 :root {
-  --font-family: 'Outfit', 'Cairo', sans-serif;
-  
-  /* ألوان النظام الافتراضية - Light Mode */
-  --primary-color: #1e3a8a;
-  --secondary-color: #10b981;
-  --background-color: #f8fafc;
-  --surface-color: #ffffff;
-  --text-color: #0f172a;
-  --border-color: #e2e8f0;
-  
-  /* المساحات والحدود */
-  --border-radius-base: 8px;
-  --spacing-base: 16px;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  /* ---------- الخط ---------- */
+  --nb-font-family: 'IBM Plex Sans Arabic', sans-serif;
+  --font-family: var(--nb-font-family); /* توافق خلفي */
+
+  /* ---------- الألوان: الأساسي (Indigo) ---------- */
+  --nb-primary-900: #23294F;
+  --nb-primary-800: #2C387E;
+  --nb-primary-600: #3F51B5; /* الأساس — تنقل وإجراءات فقط */
+  --nb-primary-500: #5C6BC0;
+  --nb-primary-400: #7986CB;
+  --nb-primary-300: #9FA8DA;
+  --nb-primary-200: #C5CAE9;
+  --nb-primary-100: #E8EAF6;
+  --nb-primary-50: #EEF0FA;
+  --nb-primary-hover: #35459C;
+  --nb-on-primary: #FFFFFF; /* نص فوق الأساسي */
+
+  /* ---------- الألوان: المحايد ---------- */
+  --nb-text: #1A1D29;            /* نص أساسي */
+  --nb-text-secondary: #4A4F5E;  /* نص ثانوي */
+  --nb-text-muted: #7A8093;      /* نص خافت */
+  --nb-text-faint: #9AA0B0;      /* تسميات وأوقات */
+  --nb-text-separator: #C6CAD6;  /* فواصل مسار التنقل (Breadcrumb) */
+  --nb-border: #E3E5EC;          /* حدود */
+  --nb-border-soft: #EDEEF3;     /* فواصل داخلية */
+  --nb-border-row: #F1F2F6;      /* فواصل صفوف الجداول */
+  --nb-border-strong: #D5D8E2;   /* حدود الإطارات الخارجية */
+  --nb-bg: #F4F5F8;              /* خلفية التطبيق */
+  --nb-surface: #FFFFFF;         /* أسطح البطاقات */
+  --nb-surface-raised: #FAFBFD;  /* رؤوس الجداول وتحويم الصفوف */
+
+  /* ---------- الألوان: الدلالية — للحالات فقط ---------- */
+  --nb-success: #1E8E3E;
+  --nb-success-bg: #E6F4EA;
+  --nb-warning: #B26A00;
+  --nb-warning-bg: #FDF3E1;
+  --nb-warning-border: #F3D9B0;
+  --nb-warning-surface: #FDF9F1;
+  --nb-danger: #C5221F;
+  --nb-danger-bg: #FCE8E6;
+  --nb-danger-border: #F0C9C7;
+  --nb-danger-surface: #FFFBFB;  /* خلفية حقل الإدخال في حالة الخطأ */
+  --nb-info: #1967D2;
+  --nb-info-bg: #E8F0FE;
+
+  /* ---------- الطباعة (المقاس / الوزن / ارتفاع السطر) ---------- */
+  --nb-type-page-title: 700 24px/1.4 var(--nb-font-family);
+  --nb-type-section-title: 700 18px/1.4 var(--nb-font-family);
+  --nb-type-dialog-title: 700 15px/1.4 var(--nb-font-family);
+  --nb-type-card-title: 700 14px/1.4 var(--nb-font-family);
+  --nb-type-body: 400 13px/1.6 var(--nb-font-family);
+  --nb-type-secondary: 400 12px/1.6 var(--nb-font-family);
+  --nb-type-overline: 700 12px/1.4 var(--nb-font-family); /* مع تباعد الأحرف أدناه */
+  --nb-type-table-label: 700 11px/1.4 var(--nb-font-family);
+  --nb-type-kpi: 700 20px/1.3 var(--nb-font-family); /* أرقام لاتينية */
+  --nb-font-size-micro: 10px; /* تسميات المخططات واختصارات لوحة المفاتيح */
+  --nb-letter-spacing-label: 0.5px; /* لعناوين الأقسام Overline فقط */
+  --nb-line-height-relaxed: 1.7; /* للفقرات الوصفية الطويلة */
+
+  /* ---------- المسافات — نظام 8px ---------- */
+  --nb-space-1: 4px;
+  --nb-space-2: 8px;
+  --nb-space-3: 12px;
+  --nb-space-4: 16px;
+  --nb-space-6: 24px;
+  --nb-space-8: 32px;
+  --nb-space-12: 48px;
+
+  /* ---------- الحواف ---------- */
+  --nb-radius-bar: 2px;      /* أعمدة المخططات */
+  --nb-radius-sm: 4px;       /* شارات الحالة */
+  --nb-radius-compact: 5px;  /* أزرار الجداول المضغوطة */
+  --nb-radius: 6px;          /* أزرار وحقول */
+  --nb-radius-card: 8px;     /* بطاقات */
+  --nb-radius-frame: 10px;   /* الإطار الخارجي للتطبيق */
+  --nb-radius-round: 10px;   /* شارات العدّاد الدائرية */
+  --nb-radius-pill: 12px;    /* رقائق التصفية */
+
+  /* ---------- الظلال والتركيز ---------- */
+  --nb-shadow-card: 0 1px 3px rgba(26, 29, 41, 0.08);
+  --nb-shadow-dialog: 0 8px 24px rgba(26, 29, 41, 0.12);
+  --nb-focus-ring: 0 0 0 3px var(--nb-primary-100);
+
+  /* ---------- أبعاد الهيكل (اتجاه 1a) ---------- */
+  --nb-sidebar-width: 240px;
+  --nb-ai-panel-width: 300px;
+  --nb-topbar-height: 52px;
+  --nb-control-height: 32px;         /* زر/حقل قياسي */
+  --nb-control-height-compact: 26px; /* أزرار الجداول */
+  --nb-input-height: 34px;
+  --nb-table-row-height: 36px;
+
+  /* ---------- توافق خلفي مع الرموز القديمة ---------- */
+  --primary-color: var(--nb-primary-600);
+  --secondary-color: var(--nb-success);
+  --background-color: var(--nb-bg);
+  --surface-color: var(--nb-surface);
+  --text-color: var(--nb-text);
+  --border-color: var(--nb-border);
+  --border-radius-base: var(--nb-radius-card);
+  --spacing-base: var(--nb-space-4);
+  --shadow-sm: var(--nb-shadow-card);
+  --shadow-md: var(--nb-shadow-dialog);
 }
 
-[data-theme="dark"] {
-  --primary-color: #3b82f6;
-  --secondary-color: #34d399;
-  --background-color: #0f172a;
-  --surface-color: #1e293b;
-  --text-color: #f8fafc;
-  --border-color: #334155;
-}
+/* ملاحظة: تصدير Nebras OS.html يحدد الوضع الفاتح فقط — لا قيم داكنة مخترعة */
 
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-family);
-  background-color: var(--background-color);
-  color: var(--text-color);
-  direction: rtl; /* تفعيل اتجاه اليمين إلى اليسار تلقائياً */
+  font-family: var(--nb-font-family);
+  font-size: 13px;
+  background-color: var(--nb-bg);
+  color: var(--nb-text);
+  direction: rtl;
 }
 
-/* فئات عامة لنظام التصميم */
-.btn-primary {
-  background-color: var(--primary-color);
-  color: #ffffff;
+/* ============================================================
+   فئات الأدوات — الأزرار
+   ============================================================ */
+%nb-btn-base {
+  height: var(--nb-control-height);
+  padding: 0 var(--nb-space-4);
   border: none;
-  border-radius: var(--border-radius-base);
-  padding: 8px 16px;
+  border-radius: var(--nb-radius);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--nb-font-family);
+  font-size: 13px;
   cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s ease-in-out;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--nb-focus-ring);
+  }
 }
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+.nb-btn-primary {
+  @extend %nb-btn-base;
+  background: var(--nb-primary-600);
+  color: var(--nb-on-primary);
+  font-weight: 600;
+
+  &:hover { background: var(--nb-primary-hover); }
+}
+
+.nb-btn-secondary {
+  @extend %nb-btn-base;
+  background: var(--nb-surface);
+  border: 1px solid var(--nb-border);
+  color: var(--nb-text);
+  font-weight: 500;
+
+  &:hover { background: var(--nb-bg); }
+}
+
+.nb-btn-ghost {
+  @extend %nb-btn-base;
+  background: transparent;
+  color: var(--nb-primary-600);
+  font-weight: 600;
+
+  &:hover { background: var(--nb-primary-50); }
+}
+
+.nb-btn-danger {
+  @extend %nb-btn-base;
+  background: var(--nb-danger);
+  color: var(--nb-on-primary);
+  font-weight: 600;
+
+  &:focus-visible { box-shadow: 0 0 0 3px var(--nb-danger-bg); }
+}
+
+.nb-btn-ai {
+  @extend %nb-btn-base;
+  padding: 0 14px;
+  background: var(--nb-primary-50);
+  color: var(--nb-primary-600);
+  font-weight: 600;
+}
+
+.nb-btn-compact {
+  height: var(--nb-control-height-compact);
+  padding: 0 var(--nb-space-3);
+  border-radius: var(--nb-radius-compact);
+  font-size: 12px;
+}
+
+/* توافق خلفي */
+.btn-primary {
+  @extend .nb-btn-primary;
+}
+
+/* ============================================================
+   فئات الأدوات — شارات الحالة (دلالية فقط)
+   ============================================================ */
+%nb-badge-base {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--nb-radius-sm);
+  white-space: nowrap;
+}
+
+.nb-badge-success { @extend %nb-badge-base; background: var(--nb-success-bg); color: var(--nb-success); }
+.nb-badge-warning { @extend %nb-badge-base; background: var(--nb-warning-bg); color: var(--nb-warning); }
+.nb-badge-danger  { @extend %nb-badge-base; background: var(--nb-danger-bg);  color: var(--nb-danger); }
+.nb-badge-info    { @extend %nb-badge-base; background: var(--nb-info-bg);    color: var(--nb-info); }
+.nb-badge-neutral { @extend %nb-badge-base; background: var(--nb-bg);         color: var(--nb-text-secondary); }
+.nb-badge-ai      { @extend %nb-badge-base; background: var(--nb-primary-50); color: var(--nb-primary-600); }
+
+/* شارة عدّاد (دائرية — للتنقل والتبويبات) */
+.nb-count-danger,
+.nb-count-info,
+.nb-count-warning {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--nb-radius-round);
+}
+.nb-count-danger  { background: var(--nb-danger-bg);  color: var(--nb-danger); }
+.nb-count-info    { background: var(--nb-info-bg);    color: var(--nb-info); }
+.nb-count-warning { background: var(--nb-warning-bg); color: var(--nb-warning); }
+
+/* مؤشر حالة نقطي */
+.nb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+
+  &.success { background: var(--nb-success); }
+  &.warning { background: var(--nb-warning); }
+  &.danger  { background: var(--nb-danger); }
+  &.info    { background: var(--nb-info); }
+  &.primary { background: var(--nb-primary-600); }
+}
+
+/* ============================================================
+   فئات الأدوات — البطاقات والعناوين
+   ============================================================ */
+.nb-card {
+  background: var(--nb-surface);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius-card);
+}
+
+.nb-kpi-card {
+  @extend .nb-card;
+  padding: var(--nb-space-3) 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-1);
+
+  .nb-kpi-label { font: var(--nb-type-secondary); color: var(--nb-text-muted); }
+  .nb-kpi-value { font: var(--nb-type-kpi); color: var(--nb-text); }
+  .nb-kpi-trend { font-size: 11px; font-weight: 600; }
+  .nb-kpi-trend.up { color: var(--nb-success); }
+  .nb-kpi-trend.down { color: var(--nb-danger); }
+  .nb-kpi-trend.info { color: var(--nb-info); }
+}
+
+/* عنوان قسم علوي (Overline) */
+.nb-overline {
+  font: var(--nb-type-overline);
+  letter-spacing: var(--nb-letter-spacing-label);
+  color: var(--nb-text-muted);
+}
+
+/* تنبيه داخلي */
+.nb-alert-warning {
+  border: 1px solid var(--nb-warning-border);
+  background: var(--nb-warning-surface);
+  border-radius: var(--nb-radius-card);
+  padding: var(--nb-space-3) 14px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
 }

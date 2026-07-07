@@ -1,9 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { ApprovalDelegationService } from '../approval-delegation.service';
@@ -11,84 +7,62 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { DelegationDialogComponent, DelegationDialogResult } from '../request-detail/delegation-dialog.component';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * مركز التفويض — لغة تصميم Nebras OS.
+ * المنطق والخدمات والحوارات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-delegation-center',
   standalone: true,
-  imports: [
-    CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatTableModule, MatDialogModule,
-    LoadingSpinnerComponent, EmptyStateComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe, MatDialogModule, LoadingSpinnerComponent, EmptyStateComponent, NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="delegation-container" dir="rtl">
-      <div class="header">
-        <div class="title-section">
-          <h1>مركز التفويض</h1>
-          <p>إدارة تفويضات الاعتماد الصادرة منك أو الموجهة إليك</p>
-        </div>
-        <button mat-flat-button color="primary" (click)="createDelegation()">
-          <mat-icon>add</mat-icon> تفويض جديد
-        </button>
-      </div>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="مركز التفويض"
+        subtitle="إدارة تفويضات الاعتماد الصادرة منك أو الموجهة إليك"
+      >
+        <button class="nb-btn-primary" (click)="createDelegation()">تفويض جديد</button>
+      </nb-page-header>
 
       <app-loading-spinner [isLoading]="delegationService.loading()"></app-loading-spinner>
 
-      <mat-card class="table-card" *ngIf="delegationService.delegations().length > 0">
-        <table mat-table [dataSource]="delegationService.delegations()" class="w-full">
-          <ng-container matColumnDef="delegate_to_id">
-            <th mat-header-cell *matHeaderCellDef>مفوَّض إلى</th>
-            <td mat-cell *matCellDef="let row">{{ row.delegate_to_id }}</td>
-          </ng-container>
-          <ng-container matColumnDef="start_date">
-            <th mat-header-cell *matHeaderCellDef>البداية</th>
-            <td mat-cell *matCellDef="let row">{{ row.start_date | date:'short' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="end_date">
-            <th mat-header-cell *matHeaderCellDef>النهاية</th>
-            <td mat-cell *matCellDef="let row">{{ row.end_date | date:'short' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef>الحالة</th>
-            <td mat-cell *matCellDef="let row">
-              <span class="badge" [ngClass]="row.is_active ? 'badge-success' : 'badge-muted'">
-                {{ row.is_active ? 'نشط' : 'غير نشط' }}
-              </span>
-            </td>
-          </ng-container>
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let row">
-              <button mat-icon-button color="warn" *ngIf="row.is_active" (click)="deactivate(row.id)" title="إلغاء التفويض">
-                <mat-icon>block</mat-icon>
-              </button>
-            </td>
-          </ng-container>
-          <tr mat-header-row *matHeaderRowDef="columns"></tr>
-          <tr mat-row *matRowDef="let row; columns: columns;"></tr>
-        </table>
-      </mat-card>
+      @if (delegationService.delegations().length > 0) {
+        <nb-panel [flush]="true">
+          <div class="tbl">
+            <div class="tbl-head"><span>مفوَّض إلى</span><span>البداية</span><span>النهاية</span><span>الحالة</span><span></span></div>
+            @for (row of delegationService.delegations(); track row.id) {
+              <div class="tbl-row">
+                <span>{{ row.delegate_to_id }}</span>
+                <span>{{ row.start_date | date:'short' }}</span>
+                <span>{{ row.end_date | date:'short' }}</span>
+                <span><span [class]="row.is_active ? 'nb-badge-success' : 'nb-badge-neutral'">{{ row.is_active ? 'نشط' : 'غير نشط' }}</span></span>
+                <span>
+                  @if (row.is_active) { <button class="nb-btn-danger sm" (click)="deactivate(row.id)">إلغاء</button> }
+                </span>
+              </div>
+            }
+          </div>
+        </nb-panel>
+      }
 
-      <app-empty-state
-        *ngIf="!delegationService.loading() && delegationService.delegations().length === 0"
-        icon="forward"
-        title="لا توجد تفويضات"
-        description="لم تقم بإنشاء أي تفويض اعتماد بعد."
-      ></app-empty-state>
+      @if (!delegationService.loading() && delegationService.delegations().length === 0) {
+        <app-empty-state icon="forward" title="لا توجد تفويضات" description="لم تقم بإنشاء أي تفويض اعتماد بعد."></app-empty-state>
+      }
     </div>
   `,
   styles: [`
-    .delegation-container { padding: 2rem; background: #f8fafc; min-height: 100vh; }
-    .header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;
-    }
-    .header h1 { margin: 0; font-size: 1.75rem; color: #0f172a; font-weight: 700; }
-    .header p { margin: 0.35rem 0 0; color: #64748b; }
-    .table-card { border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-    .w-full { width: 100%; }
-    .badge { padding: 0.2rem 0.65rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-    .badge-success { background: #dcfce7; color: #15803d; }
-    .badge-muted { background: #f1f5f9; color: #64748b; }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr 0.8fr; gap: 8px; padding: 9px 16px; align-items: center; }
+    .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); padding: 8px 16px; font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
+    .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .nb-btn-danger.sm { height: 26px; padding: 0 12px; font-size: 12px; }
   `]
 })
 export class DelegationCenterComponent implements OnInit {

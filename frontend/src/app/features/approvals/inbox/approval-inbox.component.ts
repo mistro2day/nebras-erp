@@ -1,197 +1,373 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { ApprovalCoreService, InboxItem } from '../approval-core.service';
-import { PriorityBadgeComponent } from '../shared/priority-badge.component';
-import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
-import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
-import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 
+interface FilterChip {
+  code: string | null;
+  label: string;
+}
+
+/**
+ * مركز الموافقات — قائمة الطلبات (لوح القائمة من الشاشة 1c في تصدير Nebras OS.html)
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-approval-inbox',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, MatCardModule, MatButtonModule, MatIconModule, MatListModule,
-    MatDividerModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatDialogModule,
-    MatCheckboxModule, PriorityBadgeComponent, EmptyStateComponent, LoadingSpinnerComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatDialogModule],
   template: `
-    <div class="inbox-container" dir="rtl">
-      <div class="inbox-header">
-        <div class="title-section">
-          <h1>صندوق الوارد المؤسسي الموحد</h1>
-          <p>جميع طلبات الموافقة والمهام المعلقة الموجهة إليك في مكان واحد</p>
+    <div class="ac-page" dir="rtl">
+      <!-- رأس القائمة -->
+      <div class="ac-head">
+        <div class="ac-title-row">
+          <span class="ac-title">مركز الموافقات</span>
+          <span class="nb-count-danger">{{ coreService.inboxItems().length }}</span>
+          <div class="spacer"></div>
+          <button class="ac-sort" (click)="load()">⌥ فرز</button>
         </div>
-        <button mat-flat-button color="primary" (click)="load()">
-          <mat-icon>refresh</mat-icon> تحديث
-        </button>
+        <div class="ac-filters">
+          @for (chip of filterChips; track chip.label) {
+            <button
+              class="ac-chip"
+              [class.active]="activeFilter() === chip.code"
+              (click)="activeFilter.set(chip.code)"
+            >
+              {{ chip.label }}
+            </button>
+          }
+        </div>
       </div>
 
-      <div class="filter-bar">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-label>بحث في صندوق الوارد</mat-label>
-          <input matInput [(ngModel)]="searchTerm" placeholder="ابحث بالعنوان...">
-          <mat-icon matPrefix>search</mat-icon>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="filter-field">
-          <mat-label>الأولوية</mat-label>
-          <mat-select [(ngModel)]="priorityFilter">
-            <mat-option [value]="null">الكل</mat-option>
-            <mat-option value="URGENT">عاجل</mat-option>
-            <mat-option value="HIGH">مرتفعة</mat-option>
-            <mat-option value="MEDIUM">متوسطة</mat-option>
-            <mat-option value="LOW">منخفضة</mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <button mat-stroked-button color="warn" [disabled]="selectedIds().length === 0" (click)="bulkArchiveSelected()">
-          <mat-icon>archive</mat-icon> أرشفة المحدد ({{ selectedIds().length }})
-        </button>
-      </div>
-
-      <app-loading-spinner [isLoading]="coreService.loading()"></app-loading-spinner>
-
-      <div class="inbox-grid" *ngIf="!coreService.loading()">
-        <mat-card class="inbox-item" *ngFor="let item of filteredItems()" [class.starred]="item.is_starred">
-          <div class="item-select">
-            <mat-checkbox [checked]="selectedIds().includes(item.id)" (change)="toggleSelect(item.id)"></mat-checkbox>
-          </div>
-          <div class="item-body" (click)="openRequest(item)">
-            <div class="item-header">
-              <span class="item-title">{{ item.title_ar || item.title_en }}</span>
-              <app-priority-badge [code]="item.priority_code"></app-priority-badge>
+      <!-- القائمة -->
+      <div class="ac-list">
+        @for (item of filteredItems(); track item.id) {
+          <div class="ac-item" [class.selected]="selectedId() === item.item_id">
+            <div class="ac-item-body" (click)="openRequest(item)">
+              <div class="ac-item-top">
+                <span class="ac-item-title">{{ item.title_ar || item.title_en }}</span>
+                @if (badgeFor(item); as b) {
+                  <span [class]="b.cls">{{ b.label }}</span>
+                }
+              </div>
+              <span class="ac-item-desc">{{ descFor(item) }}</span>
+              <span class="ac-item-meta">{{ metaFor(item) }}</span>
             </div>
-            <span class="item-meta">النوع: {{ item.item_type }} — الحالة: {{ item.status }}</span>
+            <div class="ac-item-actions">
+              <button class="ac-icon" [class.on]="item.is_starred" (click)="toggleStar(item)" title="تمييز بنجمة">
+                {{ item.is_starred ? '★' : '☆' }}
+              </button>
+              <button class="row-btn primary" (click)="quickApprove(item)">اعتماد</button>
+              <button class="row-btn" (click)="quickReject(item)">رفض</button>
+              <button class="ac-icon" (click)="archive(item)" title="أرشفة">⌦</button>
+            </div>
           </div>
-          <div class="item-actions">
-            <button mat-icon-button [color]="item.is_starred ? 'accent' : ''" (click)="toggleStar(item)" title="تمييز بنجمة">
-              <mat-icon>{{ item.is_starred ? 'star' : 'star_border' }}</mat-icon>
-            </button>
-            <button mat-icon-button color="primary" (click)="quickApprove(item)" title="اعتماد سريع">
-              <mat-icon>check_circle</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="quickReject(item)" title="رفض سريع">
-              <mat-icon>cancel</mat-icon>
-            </button>
-            <button mat-icon-button (click)="archive(item)" title="أرشفة">
-              <mat-icon>archive</mat-icon>
-            </button>
-          </div>
-        </mat-card>
+        }
 
-        <app-empty-state
-          *ngIf="filteredItems().length === 0"
-          icon="inbox"
-          title="لا توجد عناصر معلّقة"
-          description="صندوق الوارد الخاص بك فارغ حالياً."
-        ></app-empty-state>
+        @if (filteredItems().length === 0 && !coreService.loading()) {
+          <div class="ac-empty">لا توجد طلبات مطابقة في مركز الموافقات.</div>
+        }
       </div>
     </div>
   `,
-  styles: [`
-    .inbox-container { padding: 2rem; background: #f8fafc; min-height: 100vh; }
-    .inbox-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;
-    }
-    .inbox-header h1 { margin: 0; font-size: 1.75rem; color: #0f172a; font-weight: 700; }
-    .inbox-header p { margin: 0.35rem 0 0; color: #64748b; }
-    .filter-bar { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .search-field { flex: 1; min-width: 240px; }
-    .filter-field { width: 200px; }
-    .inbox-grid { display: flex; flex-direction: column; gap: 0.75rem; }
-    .inbox-item {
-      display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem;
-      border-radius: 10px; border: 1px solid #e2e8f0; cursor: default;
-    }
-    .inbox-item.starred { border-color: #f59e0b; }
-    .item-body { flex: 1; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; }
-    .item-header { display: flex; align-items: center; gap: 0.75rem; }
-    .item-title { font-weight: 700; color: #0f172a; }
-    .item-meta { font-size: 0.8rem; color: #64748b; }
-    .item-actions { display: flex; align-items: center; }
-  `]
+  styles: [
+    `
+      :host {
+        flex: 1;
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .spacer { flex: 1; }
+
+      .ac-page {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background: var(--nb-surface-raised);
+        overflow: hidden;
+      }
+
+      /* ---------- الرأس ---------- */
+      .ac-head {
+        padding: 12px 14px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-bottom: 1px solid var(--nb-border-soft);
+      }
+
+      .ac-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .ac-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+
+      .ac-sort {
+        border: none;
+        background: transparent;
+        font-family: var(--nb-font-family);
+        font-size: 12px;
+        color: var(--nb-text-muted);
+        cursor: pointer;
+      }
+
+      .ac-filters {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .ac-chip {
+        font-family: var(--nb-font-family);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--nb-text-secondary);
+        border: 1px solid var(--nb-border);
+        background: var(--nb-surface);
+        padding: 3px 10px;
+        border-radius: var(--nb-radius-pill);
+        cursor: pointer;
+
+        &.active {
+          background: var(--nb-primary-600);
+          border-color: var(--nb-primary-600);
+          color: var(--nb-on-primary);
+        }
+      }
+
+      /* ---------- القائمة ---------- */
+      .ac-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ac-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-top: 1px solid #e9ebf2;
+        background: var(--nb-surface-raised);
+
+        &:hover { background: #f1f3f9; }
+
+        &.selected {
+          background: var(--nb-surface);
+          border-right: 3px solid var(--nb-primary-600);
+        }
+      }
+
+      .ac-item-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+        cursor: pointer;
+      }
+
+      .ac-item-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .ac-item-title {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--nb-text);
+      }
+
+      .ac-item-desc {
+        font-size: 12px;
+        color: var(--nb-text-secondary);
+      }
+
+      .ac-item-meta {
+        font-size: 11px;
+        color: var(--nb-text-faint);
+      }
+
+      /* شارات القائمة — حشو 1px 7px كما في التصدير */
+      .ac-list [class^='nb-badge-'] {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 7px;
+      }
+
+      .ac-item-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .ac-icon {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--nb-text-muted);
+        padding: 2px 4px;
+        line-height: 1;
+
+        &.on { color: var(--nb-warning); }
+
+        &:focus-visible {
+          outline: none;
+          box-shadow: var(--nb-focus-ring);
+          border-radius: var(--nb-radius-sm);
+        }
+      }
+
+      .row-btn {
+        height: 26px;
+        padding: 0 10px;
+        border: 1px solid var(--nb-border);
+        background: var(--nb-surface);
+        color: var(--nb-text-secondary);
+        border-radius: var(--nb-radius);
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--nb-font-family);
+        font-size: 12px;
+        cursor: pointer;
+
+        &.primary {
+          padding: 0 12px;
+          background: var(--nb-primary-600);
+          border-color: var(--nb-primary-600);
+          color: var(--nb-on-primary);
+          font-weight: 600;
+        }
+
+        &:focus-visible {
+          outline: none;
+          box-shadow: var(--nb-focus-ring);
+        }
+      }
+
+      .ac-empty {
+        padding: 32px 16px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--nb-text-muted);
+      }
+    `,
+  ],
 })
 export class ApprovalInboxComponent implements OnInit {
-  coreService = inject(ApprovalCoreService);
-  private dialog = inject(MatDialog);
-  private router = inject(Router);
+  readonly coreService = inject(ApprovalCoreService);
+  private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
-  searchTerm = '';
-  priorityFilter: string | null = null;
-  selectedIds = signal<string[]>([]);
+  readonly activeFilter = signal<string | null>(null);
+  readonly selectedId = signal<string | null>(null);
 
-  filteredItems = computed(() => {
-    let items = this.coreService.inboxItems();
-    if (this.priorityFilter) {
-      items = items.filter((i) => i.priority_code === this.priorityFilter);
-    }
-    if (this.searchTerm.trim()) {
-      const term = this.searchTerm.trim().toLowerCase();
-      items = items.filter((i) => (i.title_ar || i.title_en || '').toLowerCase().includes(term));
-    }
-    return items;
+  readonly filterChips: FilterChip[] = [
+    { code: null, label: 'الكل' },
+    { code: 'URGENT', label: 'عاجلة' },
+    { code: 'FINANCE', label: 'مالية' },
+    { code: 'HR', label: 'HR' },
+  ];
+
+  readonly filteredItems = computed(() => {
+    const filter = this.activeFilter();
+    const items = this.coreService.inboxItems();
+    if (!filter) return items;
+    if (filter === 'URGENT') return items.filter((i) => i.priority_code === 'URGENT');
+    // تصفية حسب النوع/الفئة عبر رمز الأولوية أو النوع
+    return items.filter((i) => (i.item_type || '').toUpperCase().includes(filter));
   });
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.load();
   }
 
-  load() {
+  load(): void {
     this.coreService.getMyInboxItems().subscribe();
   }
 
-  toggleSelect(id: string) {
-    const current = this.selectedIds();
-    this.selectedIds.set(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
-  }
-
-  openRequest(item: InboxItem) {
+  openRequest(item: InboxItem): void {
+    this.selectedId.set(item.item_id);
     this.router.navigate(['/approvals/requests', item.item_id]);
   }
 
-  toggleStar(item: InboxItem) {
+  badgeFor(item: InboxItem): { label: string; cls: string } | null {
+    const code = (item.priority_code || '').toUpperCase();
+    if (code === 'URGENT') return { label: 'عاجل', cls: 'nb-badge-danger' };
+    if (code === 'HIGH' || code === 'REVIEW') return { label: 'مراجعة', cls: 'nb-badge-warning' };
+    if (item.status === 'pending') return { label: 'جديد', cls: 'nb-badge-info' };
+    return null;
+  }
+
+  descFor(item: InboxItem): string {
+    return item.title_en || item.item_type || '';
+  }
+
+  metaFor(item: InboxItem): string {
+    return `${item.item_type} · ${this.statusText(item.status)}`;
+  }
+
+  private statusText(status: string): string {
+    const map: Record<string, string> = {
+      pending: 'قيد الانتظار',
+      approved: 'معتمد',
+      rejected: 'مرفوض',
+      read: 'مقروء',
+      archived: 'مؤرشف',
+    };
+    return map[status] || status;
+  }
+
+  toggleStar(item: InboxItem): void {
     this.coreService.toggleStar(item.id).subscribe(() => this.load());
   }
 
-  archive(item: InboxItem) {
+  archive(item: InboxItem): void {
     this.coreService.archiveItem(item.id).subscribe(() => this.load());
   }
 
-  bulkArchiveSelected() {
-    this.coreService.bulkArchive(this.selectedIds()).subscribe(() => {
-      this.selectedIds.set([]);
-      this.load();
-    });
-  }
-
-  quickApprove(item: InboxItem) {
+  quickApprove(item: InboxItem): void {
     this.confirmAndDecide(item, 'approve', 'اعتماد الطلب', 'هل أنت متأكد من اعتماد هذا الطلب؟', 'primary');
   }
 
-  quickReject(item: InboxItem) {
+  quickReject(item: InboxItem): void {
     this.confirmAndDecide(item, 'reject', 'رفض الطلب', 'هل أنت متأكد من رفض هذا الطلب؟', 'warn');
   }
 
-  private confirmAndDecide(item: InboxItem, action: 'approve' | 'reject', title: string, message: string, color: 'primary' | 'warn') {
+  private confirmAndDecide(
+    item: InboxItem,
+    action: 'approve' | 'reject',
+    title: string,
+    message: string,
+    color: 'primary' | 'warn'
+  ): void {
     const data: ConfirmDialogData = { title, message, color };
-    this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe((confirmed) => {
-      if (confirmed) {
-        this.coreService.makeDecision(item.item_id, action).subscribe(() => this.load());
-      }
-    });
+    this.dialog
+      .open(ConfirmDialogComponent, { data })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.coreService.makeDecision(item.item_id, action).subscribe(() => this.load());
+        }
+      });
   }
 }

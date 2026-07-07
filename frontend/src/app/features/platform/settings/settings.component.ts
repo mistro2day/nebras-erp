@@ -1,170 +1,81 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { PlatformService } from '../platform.service';
 import { FormsModule } from '@angular/forms';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * إعدادات النظام والـ Feature Flags — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-platform-settings',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSlideToggleModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, MatSlideToggleModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="platform-settings" dir="rtl">
-      <header class="settings-header animate-fade-in">
-        <div class="header-info">
-          <h1>إعدادات النظام والـ Feature Flags</h1>
-          <p>تعديل الإعدادات والتحكم بالميزات المفعلة للمستأجرين وتغيير بارامترات النظام</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="إعدادات النظام والـ Feature Flags"
+        subtitle="تعديل الإعدادات والتحكم بالميزات المفعلة للمستأجرين وتغيير بارامترات النظام"
+      ></nb-page-header>
 
-      <div class="settings-grid animate-slide-up">
-        <!-- System Configuration -->
-        <mat-card class="settings-card">
-          <mat-card-header>
-            <mat-card-title>إعدادات النظام الأساسية</mat-card-title>
-          </mat-card-header>
-          <mat-card-content class="form-container">
-            <div class="form-group">
-              <mat-form-field appearance="outline">
-                <mat-label>اسم المنصة الرئيسي</mat-label>
-                <input matInput [(ngModel)]="platformName">
-              </mat-form-field>
+      <div class="settings-grid">
+        <nb-panel title="إعدادات النظام الأساسية">
+          <div class="form-container">
+            <div class="field">
+              <label>اسم المنصة الرئيسي</label>
+              <input [(ngModel)]="platformName" />
             </div>
-            
-            <div class="form-group">
-              <mat-form-field appearance="outline">
-                <mat-label>حجم الملف الأقصى المسموح برَفعه (MB)</mat-label>
-                <input matInput type="number" [(ngModel)]="maxFileSize">
-              </mat-form-field>
+            <div class="field">
+              <label>حجم الملف الأقصى المسموح برَفعه (MB)</label>
+              <input type="number" [(ngModel)]="maxFileSize" />
             </div>
+            <button class="nb-btn-primary" (click)="saveSettings()">حفظ الإعدادات</button>
+          </div>
+        </nb-panel>
 
-            <button mat-flat-button color="primary" (click)="saveSettings()">
-              حفظ الإعدادات
-            </button>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Feature Flags -->
-        <mat-card class="settings-card">
-          <mat-card-header>
-            <mat-card-title>إدارة الـ Feature Flags</mat-card-title>
-          </mat-card-header>
-          <mat-card-content class="flags-list">
-            <div class="flag-item" *ngFor="let flag of flags()">
-              <div class="flag-info">
-                <strong>{{ flag.flag_name }}</strong>
-                <span class="flag-rollout">التوزيع: {{ flag.rollout_percentage }}%</span>
+        <nb-panel title="إدارة الـ Feature Flags">
+          <div class="flags-list">
+            @for (flag of flags(); track $index) {
+              <div class="flag-item">
+                <div class="flag-info">
+                  <strong>{{ flag.flag_name }}</strong>
+                  <span class="flag-rollout">التوزيع: {{ flag.rollout_percentage }}%</span>
+                </div>
+                <mat-slide-toggle [checked]="flag.is_enabled" color="primary"></mat-slide-toggle>
               </div>
-              <mat-slide-toggle [checked]="flag.is_enabled" color="primary"></mat-slide-toggle>
-            </div>
-            <div class="no-data" *ngIf="flags().length === 0">
-              <p>لا يوجد Feature Flags مسجلة في هذا القسم.</p>
-            </div>
-          </mat-card-content>
-        </mat-card>
+            }
+            @if (flags().length === 0) { <div class="no-data">لا يوجد Feature Flags مسجلة في هذا القسم.</div> }
+          </div>
+        </nb-panel>
       </div>
     </div>
   `,
   styles: [`
-    .platform-settings {
-      padding: 2rem;
-      background: linear-gradient(135deg, #0b0f19 0%, #151829 100%);
-      color: #f8fafc;
-      min-height: 100vh;
-      font-family: 'Cairo', 'Outfit', sans-serif;
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .settings-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .settings-grid { grid-template-columns: 1fr; } }
+    .form-container { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+    .field { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 360px; }
+    .field label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
+    .field input {
+      height: 34px;
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      padding: 0 10px;
+      font-family: var(--nb-font-family);
+      font-size: 13px;
+      color: var(--nb-text);
+      background: var(--nb-surface);
+      outline: none;
     }
-
-    .settings-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1.5rem;
-    }
-
-    .settings-header h1 {
-      font-size: 2.25rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #6366f1, #a855f7);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-
-    .settings-header p {
-      color: #94a3b8;
-      margin: 0.5rem 0 0 0;
-    }
-
-    .settings-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 2rem;
-    }
-
-    .settings-card {
-      background: rgba(30, 41, 59, 0.3) !important;
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.05) !important;
-      border-radius: 16px !important;
-      color: #f8fafc !important;
-      padding: 1.5rem;
-    }
-
-    .form-container {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    .flags-list {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .flag-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(15, 23, 42, 0.4);
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.03);
-    }
-
-    .flag-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .flag-rollout {
-      font-size: 0.75rem;
-      color: #94a3b8;
-    }
-
-    .no-data {
-      text-align: center;
-      padding: 2rem;
-      color: #94a3b8;
-    }
-
-    /* Animations */
-    .animate-fade-in { animation: fadeIn 0.8s ease-out; }
-    .animate-slide-up { animation: slideUp 0.8s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-    @media (max-width: 768px) {
-      .settings-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .flags-list { display: flex; flex-direction: column; gap: 10px; }
+    .flag-item { display: flex; justify-content: space-between; align-items: center; background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); padding: 12px 14px; border-radius: var(--nb-radius); }
+    .flag-info { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--nb-text); }
+    .flag-rollout { font-size: 11px; color: var(--nb-text-muted); }
+    .no-data { text-align: center; padding: 20px; color: var(--nb-text-muted); font-size: 13px; }
   `]
 })
 export class PlatformSettingsComponent implements OnInit {

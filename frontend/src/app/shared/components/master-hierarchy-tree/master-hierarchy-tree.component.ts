@@ -58,67 +58,48 @@ export interface MasterTreeItem {
   `,
   styles: [`
     .hierarchy-tree-container {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1.25rem;
-      color: #f8fafc;
-      font-family: 'Cairo', sans-serif;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      color: var(--nb-text);
+      font-family: var(--nb-font-family);
     }
     .tree-header h3 {
-      font-size: 0.95rem;
+      font-size: 13px;
       font-weight: 700;
-      margin: 0 0 1.25rem;
-      color: #6366f1;
+      margin: 0 0 14px;
+      color: var(--nb-primary-600);
     }
-    .node-list {
-      list-style: none;
-      padding-right: 16px;
-      padding-left: 0;
-      margin: 0;
-    }
-    .node-item {
-      margin: 8px 0;
-    }
+    .node-list { list-style: none; padding-right: 16px; padding-left: 0; margin: 0; }
+    .node-item { margin: 8px 0; }
     .node-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      background: rgba(15, 23, 42, 0.4);
+      background: var(--nb-surface-raised);
       padding: 8px 12px;
-      border-radius: 6px;
-      border-right: 4px solid #6366f1;
-      border-top: 1px solid rgba(255, 255, 255, 0.02);
+      border-radius: var(--nb-radius-sm);
+      border-right: 4px solid var(--nb-primary-600);
+      border-top: 1px solid var(--nb-border-soft);
     }
-    .item-icon {
-      color: #cbd5e1;
-    }
-    .node-content {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-    }
-    .value-ar {
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
+    .item-icon { color: var(--nb-text-secondary); }
+    .node-content { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .value-ar { font-size: 13px; font-weight: 600; color: var(--nb-text); }
     .code-badge {
-      font-size: 0.65rem;
-      background: rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border-soft);
       padding: 2px 6px;
-      border-radius: 4px;
-      color: #94a3b8;
+      border-radius: var(--nb-radius-sm);
+      color: var(--nb-text-muted);
     }
     .child-nodes {
       margin-top: 4px;
-      border-right: 1px dashed rgba(255, 255, 255, 0.1);
+      border-right: 1px dashed var(--nb-border);
       padding-right: 10px;
     }
-    .row-actions {
-      display: flex;
-      gap: 4px;
-    }
+    .row-actions { display: flex; gap: 4px; }
   `]
 })
 export class MasterHierarchyTreeComponent {

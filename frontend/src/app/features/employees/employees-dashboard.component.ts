@@ -1,10 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { TenantService } from '../../core/services/tenant.service';
+import { HttpClient } from '@angular/common/http';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
 export interface EmployeeInfo {
   id: string;
@@ -16,166 +15,89 @@ export interface EmployeeInfo {
   status: string;
 }
 
+/**
+ * بوابة الموارد البشرية — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-employees-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="employees-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>بوابة الموارد البشرية وإدارة الموظفين</h1>
-          <p>لوحة تعقب الموظفين والإداريين الموحدة لـ {{ ($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP' }}</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="بوابة الموارد البشرية وإدارة الموظفين"
+        [subtitle]="'لوحة تعقب الموظفين والإداريين الموحدة لـ ' + (($any(tenantService).currentTenant())?.nameAr || 'نبراس ERP')"
+      ></nb-page-header>
 
-      <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon active">people</mat-icon>
-          <div class="meta">
-            <h3>إجمالي الموظفين</h3>
-            <p class="value">{{ employees().length }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon dept">domain</mat-icon>
-          <div class="meta">
-            <h3>الأقسام النشطة</h3>
-            <p class="value">5</p>
-          </div>
-        </div>
+        <nb-stat-card label="إجمالي الموظفين" [value]="employees().length"></nb-stat-card>
+        <nb-stat-card label="الأقسام النشطة" [value]="5"></nb-stat-card>
       </div>
 
-      <!-- Employees List Table -->
-      <div class="section-title">
-        <h2>سجل الموظفين الموحد</h2>
-      </div>
-
-      <div class="employees-list-container">
-        <table class="employees-table">
-          <thead>
-            <tr>
-              <th>الرقم الوظيفي</th>
-              <th>الاسم الكامل</th>
-              <th>القسم</th>
-              <th>المسمى الوظيفي</th>
-              <th>نوع التوظيف</th>
-              <th>الحالة</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let emp of employees()">
-              <td>{{ emp.employee_number }}</td>
-              <td><strong>{{ emp.full_name_ar }}</strong></td>
-              <td>{{ emp.department }}</td>
-              <td>{{ emp.position }}</td>
-              <td>{{ emp.employment_type }}</td>
-              <td>
-                <span class="status-badge" [ngClass]="emp.status">{{ emp.status === 'active' ? 'نشط' : emp.status }}</span>
-              </td>
-            </tr>
-            <tr *ngIf="employees().length === 0">
-              <td colspan="6" class="no-data">لا يوجد موظفين مسجلين حالياً.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <nb-panel title="سجل الموظفين الموحد" [flush]="true">
+        <div class="tbl">
+          <div class="tbl-head">
+            <span>الرقم الوظيفي</span>
+            <span>الاسم الكامل</span>
+            <span>القسم</span>
+            <span>المسمى الوظيفي</span>
+            <span>نوع التوظيف</span>
+            <span>الحالة</span>
+          </div>
+          @for (emp of employees(); track emp.id) {
+            <div class="tbl-row">
+              <span>{{ emp.employee_number }}</span>
+              <span class="strong">{{ emp.full_name_ar }}</span>
+              <span>{{ emp.department }}</span>
+              <span>{{ emp.position }}</span>
+              <span>{{ emp.employment_type }}</span>
+              <span>
+                <span [class]="emp.status === 'active' ? 'nb-badge-success' : 'nb-badge-neutral'">{{ emp.status === 'active' ? 'نشط' : emp.status }}</span>
+              </span>
+            </div>
+          }
+          @if (employees().length === 0) {
+            <div class="tbl-empty">لا يوجد موظفين مسجلين حالياً.</div>
+          }
+        </div>
+      </nb-panel>
     </div>
   `,
   styles: [`
-    .employees-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #10b981, #3b82f6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p {
-      color: #94a3b8;
-      margin: 4px 0 0;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
-      display: flex;
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head, .tbl-row {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr 1fr 1.2fr 1fr 0.9fr;
+      gap: 8px;
+      padding: 9px 16px;
       align-items: center;
-      gap: 1.25rem;
     }
-    .stat-card .icon {
-      font-size: 36px;
-      width: 36px;
-      height: 36px;
-      padding: 10px;
-      border-radius: 12px;
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .stat-card .icon.active { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .stat-card .icon.dept { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .stat-card h3 { font-size: 0.8rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.85rem; font-weight: bold; margin: 4px 0 0 0; }
-
-    .section-title h2 {
-      font-size: 1.25rem;
-      font-weight: bold;
-      margin-bottom: 1.5rem;
-      color: #cbd5e1;
+    .tbl-row {
+      border-bottom: 1px solid var(--nb-border-row);
+      font-size: 13px;
+      color: var(--nb-text);
     }
-    .employees-list-container {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-    .employees-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: right;
-    }
-    .employees-table th {
-      background: rgba(15, 23, 42, 0.4);
-      padding: 14px 16px;
-      font-size: 0.85rem;
-      color: #94a3b8;
-    }
-    .employees-table td {
-      padding: 14px 16px;
-      font-size: 0.85rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    .status-badge {
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .status-badge.active { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .no-data {
-      text-align: center;
-      padding: 3rem !important;
-      color: #94a3b8;
-    }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class EmployeesDashboardComponent implements OnInit {

@@ -1,253 +1,110 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
 import { InventoryService } from './inventory.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * منصة المستودعات والمخزون — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-inventory-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatProgressSpinnerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CurrencyPipe, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="dashboard-container" dir="rtl">
-      <!-- Header -->
-      <div class="dashboard-header">
-        <div class="title-section">
-          <h1>منصة إدارة المستودعات والتحكم في المخزون</h1>
-          <p>لوحة التحكم الفورية بالأرصدة، مستويات إعادة الطلب، عمليات الصرف والاستلام، والتقييم المخزني</p>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="منصة إدارة المستودعات والتحكم في المخزون"
+        subtitle="التحكم الفوري بالأرصدة، مستويات إعادة الطلب، عمليات الصرف والاستلام، والتقييم المخزني"
+      >
+        <button class="nb-btn-secondary" (click)="loadDashboard()">تحديث البيانات</button>
+      </nb-page-header>
+
+      @if (inventoryService.stats(); as stats) {
+        <div class="stats-grid">
+          <nb-stat-card label="إجمالي الأصناف" [value]="stats.total_items" suffix="صنف"></nb-stat-card>
+          <nb-stat-card label="أصناف تحت حد الطلب" [value]="stats.low_stock" suffix="صنف" [valueKind]="stats.low_stock ? 'warning' : 'default'"></nb-stat-card>
+          <nb-stat-card label="أصناف منتهية" [value]="stats.out_of_stock" suffix="صنف" [valueKind]="stats.out_of_stock ? 'danger' : 'default'"></nb-stat-card>
+          <nb-stat-card label="إجمالي قيمة المخزون" [value]="(stats.total_value | currency:'SAR ':'symbol':'1.2-2') || '—'" valueKind="success"></nb-stat-card>
         </div>
-        <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon> تحديث البيانات
-        </button>
-      </div>
+      }
 
-      <!-- Loading State -->
-      <div class="spinner-container" *ngIf="inventoryService.loading()">
-        <mat-progress-spinner mode="indeterminate" diameter="50"></mat-progress-spinner>
-      </div>
-
-      <!-- Stats Cards Grid -->
-      <div class="stats-grid" *ngIf="inventoryService.stats() as stats">
-        <!-- Total Items -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper blue">
-              <mat-icon>category</mat-icon>
-            </div>
-            <mat-card-title>إجمالي الأصناف</mat-card-title>
-            <mat-card-subtitle>الأصناف المسجلة بالنظام</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value">
-            {{ stats.total_items }} صنف
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Low Stock -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper orange">
-              <mat-icon>warning</mat-icon>
-            </div>
-            <mat-card-title>أصناف تحت حد الطلب</mat-card-title>
-            <mat-card-subtitle>تتطلب إعادة تموين عاجلة</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value alert-orange">
-            {{ stats.low_stock }} صنف
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Out of Stock -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper red">
-              <mat-icon>dangerous</mat-icon>
-            </div>
-            <mat-card-title>أصناف منتهية</mat-card-title>
-            <mat-card-subtitle>رصيد صفري بالمستودعات</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value alert-red">
-            {{ stats.out_of_stock }} صنف
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Total Value -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper green">
-              <mat-icon>monetization_on</mat-icon>
-            </div>
-            <mat-card-title>إجمالي قيمة المخزون</mat-card-title>
-            <mat-card-subtitle>التقييم المخزني بالمتوسط المرجح</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value text-green">
-            {{ stats.total_value | currency:'SAR ':'symbol':'1.2-2' }}
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <!-- Main Section: Items & Warehouses -->
       <div class="tables-section">
-        <!-- Items Table -->
-        <div class="table-container">
-          <h2>الأصناف والبنود المخزنية</h2>
-          <mat-card class="table-card">
-            <table mat-table [dataSource]="items" class="w-full">
-              <ng-container matColumnDef="sku">
-                <th mat-header-cell *matHeaderCellDef>رمز الصنف (SKU)</th>
-                <td mat-cell *matCellDef="let row">{{ row.sku }}</td>
-              </ng-container>
+        <nb-panel title="الأصناف والبنود المخزنية" [flush]="true">
+          <div class="tbl">
+            <div class="tbl-head it"><span>رمز الصنف (SKU)</span><span>اسم الصنف</span><span>النوع</span></div>
+            @for (row of items; track row.id) {
+              <div class="tbl-row it">
+                <span>{{ row.sku }}</span>
+                <span class="strong">{{ row.name_ar }}</span>
+                <span><span class="nb-badge-info">{{ getTypeText(row.item_type) }}</span></span>
+              </div>
+            }
+            @if (items.length === 0) { <div class="tbl-empty">لا توجد أصناف.</div> }
+          </div>
+        </nb-panel>
 
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>اسم الصنف</th>
-                <td mat-cell *matCellDef="let row" class="bold">{{ row.name_ar }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="type">
-                <th mat-header-cell *matHeaderCellDef>النوع</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="badge badge-info">{{ getTypeText(row.item_type) }}</span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="itemColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: itemColumns;"></tr>
-            </table>
-          </mat-card>
-        </div>
-
-        <!-- Warehouses Table -->
-        <div class="table-container">
-          <h2>المستودعات والمخازن</h2>
-          <mat-card class="table-card">
-            <table mat-table [dataSource]="warehouses" class="w-full">
-              <ng-container matColumnDef="code">
-                <th mat-header-cell *matHeaderCellDef>رمز المستودع</th>
-                <td mat-cell *matCellDef="let row">{{ row.code }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>اسم المستودع</th>
-                <td mat-cell *matCellDef="let row" class="bold">{{ row.name_ar }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>النوع</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="badge badge-success" *ngIf="!row.is_virtual">مستودع فعلي</span>
-                  <span class="badge badge-warning" *ngIf="row.is_virtual">افتراضي/عبور</span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="whColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: whColumns;"></tr>
-            </table>
-          </mat-card>
-        </div>
+        <nb-panel title="المستودعات والمخازن" [flush]="true">
+          <div class="tbl">
+            <div class="tbl-head wh"><span>رمز المستودع</span><span>اسم المستودع</span><span>النوع</span></div>
+            @for (row of warehouses; track row.id) {
+              <div class="tbl-row wh">
+                <span>{{ row.code }}</span>
+                <span class="strong">{{ row.name_ar }}</span>
+                <span>
+                  @if (!row.is_virtual) { <span class="nb-badge-success">مستودع فعلي</span> }
+                  @else { <span class="nb-badge-warning">افتراضي/عبور</span> }
+                </span>
+              </div>
+            }
+            @if (warehouses.length === 0) { <div class="tbl-empty">لا توجد مستودعات.</div> }
+          </div>
+        </nb-panel>
       </div>
     </div>
   `,
   styles: [`
-    .dashboard-container {
-      padding: 2rem;
-      background: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      margin: 0;
-      font-size: 2rem;
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .dashboard-header p {
-      margin: 0.5rem 0 0 0;
-      color: #64748b;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      padding: 1rem;
-    }
-    .icon-wrapper {
-      padding: 0.75rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-    }
-    .icon-wrapper.blue { background: #eff6ff; color: #3b82f6; }
-    .icon-wrapper.orange { background: #fff7ed; color: #f97316; }
-    .icon-wrapper.red { background: #fef2f2; color: #ef4444; }
-    .icon-wrapper.green { background: #f0fdf4; color: #22c55e; }
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #1e293b;
-      margin-top: 1rem;
-    }
-    .alert-orange { color: #f97316; }
-    .alert-red { color: #ef4444; }
-    .text-green { color: #16a34a; }
     .tables-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 2rem;
+      gap: 16px;
     }
-    @media (max-width: 960px) {
-      .tables-section {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 960px) { .tables-section { grid-template-columns: 1fr; } }
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head, .tbl-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1.8fr 1fr;
+      gap: 8px;
+      padding: 9px 16px;
+      align-items: center;
     }
-    .table-container h2 {
-      font-size: 1.5rem;
-      color: #0f172a;
-      margin-bottom: 1rem;
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .table-card {
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      overflow: hidden;
+    .tbl-row {
+      border-bottom: 1px solid var(--nb-border-row);
+      font-size: 13px;
+      color: var(--nb-text);
     }
-    .w-full { width: 100%; }
-    .bold { font-weight: 600; color: #0f172a; }
-    .badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-    .badge-success { background: #dcfce7; color: #15803d; }
-    .badge-warning { background: #fef3c7; color: #d97706; }
-    .badge-info { background: #e0f2fe; color: #0369a1; }
-    .spinner-container {
-      display: flex;
-      justify-content: center;
-      padding: 3rem;
-    }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class InventoryDashboardComponent implements OnInit {

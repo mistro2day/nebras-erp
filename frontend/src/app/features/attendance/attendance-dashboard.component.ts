@@ -1,165 +1,93 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { TenantService } from '../../core/services/tenant.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * الحضور والغياب وتتبع الوقت — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-attendance-dashboard',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatIconModule, MatButtonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="attendance-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>إدارة الحضور والغياب وتتبع الوقت</h1>
-          <p>لوحة تعقب انضباط الموظفين والمعلمين لـ {{ tenantService.currentTenant()?.nameAr || 'نبراس ERP' }}</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="إدارة الحضور والغياب وتتبع الوقت"
+        [subtitle]="'لوحة تعقب انضباط الموظفين والمعلمين لـ ' + (tenantService.currentTenant()?.nameAr || 'نبراس ERP')"
+      ></nb-page-header>
 
-      <!-- Stats Grid -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon present">check_circle</mat-icon>
-          <div class="meta">
-            <h3>الحضور اليوم</h3>
-            <p class="value">{{ presentCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon absent">cancel</mat-icon>
-          <div class="meta">
-            <h3>الغياب اليوم</h3>
-            <p class="value">{{ absentCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon late">schedule</mat-icon>
-          <div class="meta">
-            <h3>التأخير اليوم</h3>
-            <p class="value">{{ lateCount() }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon corrections">edit_note</mat-icon>
-          <div class="meta">
-            <h3>طلبات التعديل المعلقة</h3>
-            <p class="value">{{ pendingCorrections() }}</p>
-          </div>
-        </div>
+        <nb-stat-card label="الحضور اليوم" [value]="presentCount()" valueKind="success"></nb-stat-card>
+        <nb-stat-card label="الغياب اليوم" [value]="absentCount()" [valueKind]="absentCount() ? 'danger' : 'default'"></nb-stat-card>
+        <nb-stat-card label="التأخير اليوم" [value]="lateCount()" [valueKind]="lateCount() ? 'warning' : 'default'"></nb-stat-card>
+        <nb-stat-card label="طلبات التعديل المعلقة" [value]="pendingCorrections()"></nb-stat-card>
       </div>
 
-      <!-- Attendance Table -->
-      <div class="section-title">
-        <h2>سجل الحضور اليومي</h2>
-      </div>
-
-      <div class="attendance-table-container">
-        <table class="attendance-table">
-          <thead>
-            <tr>
-              <th>اسم الموظف</th>
-              <th>التاريخ</th>
-              <th>تسجيل الحضور</th>
-              <th>تسجيل الانصراف</th>
-              <th>التأخير (دقائق)</th>
-              <th>الحالة</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let rec of records()">
-              <td><strong>{{ rec.employee_name }}</strong></td>
-              <td>{{ rec.date }}</td>
-              <td>{{ rec.check_in || '—' }}</td>
-              <td>{{ rec.check_out || '—' }}</td>
-              <td>{{ rec.late_minutes }}</td>
-              <td>
-                <span class="status-badge" [ngClass]="rec.status">{{ getStatusText(rec.status) }}</span>
-              </td>
-            </tr>
-            <tr *ngIf="records().length === 0">
-              <td colspan="6" class="no-data">لا توجد سجلات حضور لهذا اليوم بعد.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <nb-panel title="سجل الحضور اليومي" [flush]="true">
+        <div class="tbl">
+          <div class="tbl-head">
+            <span>اسم الموظف</span>
+            <span>التاريخ</span>
+            <span>تسجيل الحضور</span>
+            <span>تسجيل الانصراف</span>
+            <span>التأخير (دقائق)</span>
+            <span>الحالة</span>
+          </div>
+          @for (rec of records(); track $index) {
+            <div class="tbl-row">
+              <span class="strong">{{ rec.employee_name }}</span>
+              <span>{{ rec.date }}</span>
+              <span>{{ rec.check_in || '—' }}</span>
+              <span>{{ rec.check_out || '—' }}</span>
+              <span>{{ rec.late_minutes }}</span>
+              <span><span [class]="statusBadge(rec.status)">{{ getStatusText(rec.status) }}</span></span>
+            </div>
+          }
+          @if (records().length === 0) {
+            <div class="tbl-empty">لا توجد سجلات حضور لهذا اليوم بعد.</div>
+          }
+        </div>
+      </nb-panel>
     </div>
   `,
   styles: [`
-    .attendance-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #f59e0b, #ef4444);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
-      display: flex;
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head, .tbl-row {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr 0.9fr;
+      gap: 8px;
+      padding: 9px 16px;
       align-items: center;
-      gap: 1rem;
     }
-    .stat-card .icon {
-      font-size: 32px; width: 32px; height: 32px;
-      padding: 8px; border-radius: 12px;
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .stat-card .icon.present { background: rgba(16,185,129,0.15); color: #34d399; }
-    .stat-card .icon.absent { background: rgba(239,68,68,0.15); color: #f87171; }
-    .stat-card .icon.late { background: rgba(245,158,11,0.15); color: #fbbf24; }
-    .stat-card .icon.corrections { background: rgba(99,102,241,0.15); color: #818cf8; }
-    .stat-card h3 { font-size: 0.75rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.6rem; font-weight: bold; margin: 2px 0 0 0; }
-
-    .section-title h2 { font-size: 1.25rem; font-weight: bold; margin-bottom: 1.5rem; color: #cbd5e1; }
-    .attendance-table-container {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      overflow: hidden;
+    .tbl-row {
+      border-bottom: 1px solid var(--nb-border-row);
+      font-size: 13px;
+      color: var(--nb-text);
     }
-    .attendance-table { width: 100%; border-collapse: collapse; text-align: right; }
-    .attendance-table th {
-      background: rgba(15,23,42,0.4); padding: 14px 16px;
-      font-size: 0.85rem; color: #94a3b8;
-    }
-    .attendance-table td {
-      padding: 14px 16px; font-size: 0.85rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    .status-badge {
-      font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;
-    }
-    .status-badge.present { background: rgba(16,185,129,0.2); color: #34d399; }
-    .status-badge.absent { background: rgba(239,68,68,0.2); color: #f87171; }
-    .status-badge.late { background: rgba(245,158,11,0.2); color: #fbbf24; }
-    .status-badge.leave { background: rgba(99,102,241,0.2); color: #818cf8; }
-    .no-data { text-align: center; padding: 3rem !important; color: #94a3b8; }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class AttendanceDashboardComponent implements OnInit {
@@ -193,5 +121,15 @@ export class AttendanceDashboardComponent implements OnInit {
       present: 'حاضر', absent: 'غائب', late: 'متأخر', leave: 'إجازة'
     };
     return map[status] || status;
+  }
+
+  statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      present: 'nb-badge-success',
+      absent: 'nb-badge-danger',
+      late: 'nb-badge-warning',
+      leave: 'nb-badge-info',
+    };
+    return map[status] || 'nb-badge-neutral';
   }
 }

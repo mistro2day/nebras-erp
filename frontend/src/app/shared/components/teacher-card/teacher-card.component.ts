@@ -29,7 +29,7 @@ export interface TeacherInfo {
           <h3>{{ teacher().full_name_ar }}</h3>
           <span class="position">{{ teacher().current_position }}</span>
         </div>
-        <span class="status-badge" [ngClass]="teacher().status">{{ getStatusText(teacher().status) }}</span>
+        <span [class]="statusBadge(teacher().status)">{{ getStatusText(teacher().status) }}</span>
       </div>
 
       <mat-card-content class="card-details">
@@ -48,85 +48,77 @@ export interface TeacherInfo {
       </mat-card-content>
 
       <mat-card-actions class="card-footer">
-        <button mat-flat-button color="primary">عرض الملف الكامل</button>
+        <button class="nb-btn-secondary" style="width:100%">عرض الملف الكامل</button>
       </mat-card-actions>
     </mat-card>
   `,
   styles: [`
     .teacher-card {
-      background: #1e293b !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
-      border-radius: 16px !important;
-      color: #f8fafc !important;
-      padding: 1.25rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      font-family: 'Cairo', sans-serif;
+      background: var(--nb-surface) !important;
+      border: 1px solid var(--nb-border) !important;
+      border-radius: var(--nb-radius-card) !important;
+      color: var(--nb-text) !important;
+      padding: 16px;
+      box-shadow: var(--nb-shadow-card);
+      font-family: var(--nb-font-family);
     }
     .card-header {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 1.25rem;
+      margin-bottom: 16px;
       position: relative;
     }
     .avatar-placeholder {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
       color: white;
-      font-size: 1.2rem;
+      font-size: 18px;
+      flex-shrink: 0;
     }
     .header-meta h3 {
-      font-size: 0.95rem;
+      font-size: 14px;
       font-weight: 700;
       margin: 0;
+      color: var(--nb-text);
     }
     .header-meta .position {
-      font-size: 0.75rem;
-      color: #94a3b8;
+      font-size: 12px;
+      color: var(--nb-text-muted);
     }
-    .status-badge {
+    .card-header > span:last-child {
       position: absolute;
       left: 0;
       top: 0;
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: bold;
     }
-    .status-badge.approved, .status-badge.active { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .status-badge.pending_review { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-    
     .card-details {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 1.25rem;
+      margin-bottom: 16px;
     }
     .detail-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.8rem;
-      color: #cbd5e1;
+      font-size: 12px;
+      color: var(--nb-text-secondary);
     }
     .detail-row mat-icon {
       font-size: 16px;
       width: 16px;
       height: 16px;
-      color: #6366f1;
+      color: var(--nb-primary-600);
     }
     .card-footer {
       display: flex;
       justify-content: flex-end;
       padding: 0;
-    }
-    .card-footer button {
-      width: 100%;
     }
   `]
 })
@@ -148,5 +140,16 @@ export class TeacherCardComponent {
       suspended: 'موقوف'
     };
     return states[status] || status;
+  }
+
+  statusBadge(status: string): string {
+    const map: Record<string, string> = {
+      approved: 'nb-badge-success',
+      active: 'nb-badge-success',
+      pending_review: 'nb-badge-warning',
+      draft: 'nb-badge-neutral',
+      suspended: 'nb-badge-danger',
+    };
+    return map[status] || 'nb-badge-neutral';
   }
 }

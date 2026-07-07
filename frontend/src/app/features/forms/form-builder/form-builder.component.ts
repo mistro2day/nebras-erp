@@ -1,101 +1,70 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatListModule } from '@angular/material/list';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
+/**
+ * منصة مطور النماذج والاستمارات الذكية — لغة تصميم Nebras OS.
+ * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-form-builder',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTabsModule,
-    MatListModule,
-    MatDividerModule,
-    MatFormFieldModule,
-    MatInputModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="portal-container" dir="rtl" style="padding: 24px; font-family: 'Outfit', 'Inter', sans-serif; background: #f8fafc; min-height: 100vh;">
-      <!-- Header -->
-      <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
-        <div>
-          <h1 style="font-size: 2rem; font-weight: 700; color: #0f172a; margin: 0;">منصة مطور النماذج والاستمارات الذكية</h1>
-          <p style="color: #64748b; margin-top: 4px;">تصميم وبناء النماذج الإلكترونية ديناميكياً وتحديد قواعد التحقق والموافقة بصرياً.</p>
-        </div>
-        <div style="display: flex; gap: 12px;">
-          <button mat-stroked-button style="border-radius: 8px;">
-            <mat-icon style="margin-left: 6px;">visibility</mat-icon>معاينة النموذج
-          </button>
-          <button mat-flat-button color="primary" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border-radius: 8px; padding: 0 20px;">
-            <mat-icon style="margin-left: 6px;">save</mat-icon>حفظ المخطط (Schema)
-          </button>
-        </div>
-      </div>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="منصة مطور النماذج والاستمارات الذكية"
+        subtitle="تصميم وبناء النماذج الإلكترونية ديناميكياً وتحديد قواعد التحقق والموافقة بصرياً."
+      >
+        <button class="nb-btn-secondary">معاينة النموذج</button>
+        <button class="nb-btn-primary">حفظ المخطط (Schema)</button>
+      </nb-page-header>
 
-      <!-- Layout Grid -->
-      <div style="display: grid; grid-template-columns: 280px 1fr 300px; gap: 24px;">
-        <!-- Left Palette: Field Picker -->
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; height: fit-content;">
-          <mat-card-header>
-            <mat-card-title style="font-size: 1.1rem; font-weight: 600; color: #0f172a;">لوحة العناصر</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="padding: 12px 0 0 0;">
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              @for (field of paletteFields(); track field.label) {
-                <div style="display: flex; align-items: center; padding: 10px 14px; background: #f1f5f9; border-radius: 8px; cursor: pointer; border: 1px dashed #cbd5e1; font-weight: 500; color: #334155;">
-                  <mat-icon style="margin-left: 10px; color: #64748b;">{{ field.icon }}</mat-icon>
-                  {{ field.label }}
-                </div>
-              }
-            </div>
-          </mat-card-content>
-        </mat-card>
+      <div class="builder-grid">
+        <nb-panel title="لوحة العناصر">
+          <div class="palette">
+            @for (field of paletteFields(); track field.label) {
+              <div class="palette-item">{{ field.label }}</div>
+            }
+          </div>
+        </nb-panel>
 
-        <!-- Center: Form Canvas -->
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; min-height: 500px; background: #ffffff;">
-          <mat-card-header>
-            <mat-card-title style="font-size: 1.2rem; font-weight: 600; color: #0f172a;">مساحة التصميم (Canvas)</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="padding-top: 16px;">
-            <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 40px; text-align: center; color: #94a3b8;" *ngIf="canvasFields().length === 0">
-              <mat-icon style="font-size: 48px; width: 48px; height: 48px; margin-bottom: 12px; color: #cbd5e1;">drag_indicator</mat-icon>
-              <p style="margin: 0; font-size: 1.1rem;">اسحب الحقول من لوحة العناصر وأفلتها هنا للبدء بالتصميم.</p>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px;" *ngIf="canvasFields().length > 0">
+        <nb-panel title="مساحة التصميم (Canvas)">
+          @if (canvasFields().length === 0) {
+            <div class="canvas-empty">اسحب الحقول من لوحة العناصر وأفلتها هنا للبدء بالتصميم.</div>
+          } @else {
+            <div class="canvas-fields">
               @for (field of canvasFields(); track field.name) {
-                <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; position: relative;">
-                  <span style="font-weight: 600; color: #334155; display: block; margin-bottom: 8px;">{{ field.label }}</span>
-                  <mat-form-field appearance="outline" style="width: 100%;">
-                    <input matInput [placeholder]="field.placeholder" disabled>
-                  </mat-form-field>
+                <div class="canvas-field">
+                  <span class="cf-label">{{ field.label }}</span>
+                  <input [placeholder]="field.placeholder" disabled />
                 </div>
               }
             </div>
-          </mat-card-content>
-        </mat-card>
+          }
+        </nb-panel>
 
-        <!-- Right Properties: Inspector -->
-        <mat-card style="border-radius: 16px; border: 1px solid #e2e8f0; height: fit-content;">
-          <mat-card-header>
-            <mat-card-title style="font-size: 1.1rem; font-weight: 600; color: #0f172a;">مفتش الخصائص</mat-card-title>
-          </mat-card-header>
-          <mat-card-content style="padding-top: 16px;">
-            <p style="color: #64748b; font-size: 0.95rem;">اختر حقولاً من لوحة مساحة التصميم لتعديل خصائصها، شروط العرض، وقواعد التحقق.</p>
-          </mat-card-content>
-        </mat-card>
+        <nb-panel title="مفتش الخصائص">
+          <p class="inspector-hint">اختر حقولاً من لوحة مساحة التصميم لتعديل خصائصها، شروط العرض، وقواعد التحقق.</p>
+        </nb-panel>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .builder-grid { display: grid; grid-template-columns: 280px 1fr 300px; gap: 16px; }
+    @media (max-width: 1100px) { .builder-grid { grid-template-columns: 1fr; } }
+    .palette { display: flex; flex-direction: column; gap: 8px; }
+    .palette-item { padding: 10px 14px; background: var(--nb-surface-raised); border-radius: var(--nb-radius); cursor: pointer; border: 1px dashed var(--nb-border); font-weight: 500; color: var(--nb-text-secondary); font-size: 13px; }
+    .palette-item:hover { border-color: var(--nb-primary-400); }
+    .canvas-empty { border: 2px dashed var(--nb-border); border-radius: var(--nb-radius); padding: 40px; text-align: center; color: var(--nb-text-muted); font-size: 13px; }
+    .canvas-fields { display: flex; flex-direction: column; gap: 12px; }
+    .canvas-field { padding: 14px; border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); background: var(--nb-surface-raised); }
+    .cf-label { font-weight: 600; color: var(--nb-text); display: block; margin-bottom: 8px; font-size: 13px; }
+    .canvas-field input { width: 100%; height: 34px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; background: var(--nb-surface); color: var(--nb-text-muted); }
+    .inspector-hint { color: var(--nb-text-muted); font-size: 13px; margin: 0; line-height: 1.6; }
+  `]
 })
 export class FormBuilderComponent {
   paletteFields = signal([

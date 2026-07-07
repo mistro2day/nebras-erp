@@ -1,284 +1,133 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { ExaminationsService } from './examinations.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * إدارة الامتحانات والتقييم الأكاديمي — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-exam-dashboard',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, MatCardModule, MatIconModule, MatButtonModule,
-    MatTableModule, MatTabsModule, MatFormFieldModule, MatInputModule, MatDialogModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [SlicePipe, FormsModule, MatTabsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="exam-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>إدارة الامتحانات والتقييم الأكاديمي</h1>
-          <p>بوابة إدارة الامتحانات المدرسية، بنك الأسئلة، كشوف رصد الدرجات، ومعالجة التظلمات</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="إدارة الامتحانات والتقييم الأكاديمي"
+        subtitle="الامتحانات المدرسية، بنك الأسئلة، كشوف رصد الدرجات، ومعالجة التظلمات"
+      ></nb-page-header>
 
-      <!-- Stats Grid / KPI Cards -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <mat-icon class="icon exams">assignment</mat-icon>
-          <div class="meta">
-            <h3>الامتحانات المجدولة</h3>
-            <p class="value">{{ exams().length }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon sessions">schedule</mat-icon>
-          <div class="meta">
-            <h3>الدورات النشطة</h3>
-            <p class="value">{{ sessions().length }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon rooms">room</mat-icon>
-          <div class="meta">
-            <h3>قاعات اللجان</h3>
-            <p class="value">{{ rooms().length }}</p>
-          </div>
-        </div>
-        <div class="stat-card">
-          <mat-icon class="icon appeals">gavel</mat-icon>
-          <div class="meta">
-            <h3>تظلمات معلقة</h3>
-            <p class="value">{{ pendingAppealsCount() }}</p>
-          </div>
-        </div>
+        <nb-stat-card label="الامتحانات المجدولة" [value]="exams().length"></nb-stat-card>
+        <nb-stat-card label="الدورات النشطة" [value]="sessions().length" valueKind="info"></nb-stat-card>
+        <nb-stat-card label="قاعات اللجان" [value]="rooms().length"></nb-stat-card>
+        <nb-stat-card label="تظلمات معلقة" [value]="pendingAppealsCount()" [valueKind]="pendingAppealsCount() ? 'warning' : 'default'"></nb-stat-card>
       </div>
 
-      <!-- Main Tabs -->
-      <mat-tab-group class="dashboard-tabs">
-        <!-- Tab 1: Scheduled Exams -->
-        <mat-tab label="جدول الامتحانات">
-          <div class="tab-content">
-            <table mat-table [dataSource]="exams()" class="mat-elevation-z8 exam-table">
-              <ng-container matColumnDef="code">
-                <th mat-header-cell *matHeaderCellDef>رمز الامتحان</th>
-                <td mat-cell *matCellDef="let element">{{ element.code }}</td>
-              </ng-container>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="جدول الامتحانات">
+            <div class="tbl">
+              <div class="tbl-head ex"><span>رمز الامتحان</span><span>الامتحان</span><span>العام / الفصل</span><span>الكبرى / النجاح</span><span>الحالة</span></div>
+              @for (element of exams(); track element.id) {
+                <div class="tbl-row ex">
+                  <span>{{ element.code }}</span>
+                  <span class="strong">{{ element.name }}</span>
+                  <span>{{ element.academic_year }} - {{ element.term }}</span>
+                  <span>{{ element.max_marks }} / {{ element.pass_marks }}</span>
+                  <span><span [class]="statusBadge(element.status)">{{ getStatusLabel(element.status) }}</span></span>
+                </div>
+              }
+              @if (exams().length === 0) { <div class="tbl-empty">لا توجد امتحانات مجدولة.</div> }
+            </div>
+          </mat-tab>
 
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>الامتحان</th>
-                <td mat-cell *matCellDef="let element"><strong>{{ element.name }}</strong></td>
-              </ng-container>
+          <mat-tab label="كشف رصد الدرجات">
+            <div class="tbl">
+              <div class="tbl-head mk"><span>رقم الطالب / المقعد</span><span>اللجنة / القاعة</span><span>الدرجة المرصودة</span><span>إجراءات</span></div>
+              @for (element of studentExams(); track element.id) {
+                <div class="tbl-row mk">
+                  <span>{{ element.student_id | slice:0:8 }}… / {{ element.seat_number }}</span>
+                  <span>{{ element.room_id | slice:0:8 }}…</span>
+                  <span><input type="number" [(ngModel)]="element.tempMark" class="mark-input" placeholder="رصد الدرجة" /></span>
+                  <span><button class="nb-btn-primary sm" (click)="saveMark(element)">حفظ الدرجة</button></span>
+                </div>
+              }
+              @if (studentExams().length === 0) { <div class="tbl-empty">لا يوجد طلاب للرصد.</div> }
+            </div>
+          </mat-tab>
 
-              <ng-container matColumnDef="year">
-                <th mat-header-cell *matHeaderCellDef>العام الدراسي / الفصل</th>
-                <td mat-cell *matCellDef="let element">{{ element.academic_year }} - {{ element.term }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="marks">
-                <th mat-header-cell *matHeaderCellDef>الدرجة الكبرى / النجاح</th>
-                <td mat-cell *matCellDef="let element">{{ element.max_marks }} / {{ element.pass_marks }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="status-badge" [ngClass]="element.status">
-                    {{ getStatusLabel(element.status) }}
+          <mat-tab label="طلبات التظلم والاستئناف">
+            <div class="tbl">
+              <div class="tbl-head ap"><span>اللجنة / الطالب</span><span>سبب التظلم</span><span>الدرجة السابقة</span><span>حالة الطلب</span><span>إجراءات</span></div>
+              @for (element of appeals(); track element.id) {
+                <div class="tbl-row ap">
+                  <span>{{ element.student_exam | slice:0:8 }}…</span>
+                  <span>{{ element.reason }}</span>
+                  <span>{{ element.old_marks }}</span>
+                  <span><span [class]="statusBadge(element.status)">{{ getAppealStatusLabel(element.status) }}</span></span>
+                  <span class="actions">
+                    @if (element.status === 'submitted') {
+                      <button class="nb-btn-secondary sm" (click)="resolveAppeal(element.id, 85.0)">تعديل لـ 85</button>
+                      <button class="nb-btn-danger sm" (click)="resolveAppeal(element.id, null)">رفض</button>
+                    }
                   </span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 2: Mark Entry Grid -->
-        <mat-tab label="كشف رصد الدرجات">
-          <div class="tab-content">
-            <table mat-table [dataSource]="studentExams()" class="mat-elevation-z8 exam-table">
-              <ng-container matColumnDef="student">
-                <th mat-header-cell *matHeaderCellDef>رقم الطالب / المقعد</th>
-                <td mat-cell *matCellDef="let element">{{ element.student_id | slice:0:8 }}... / {{ element.seat_number }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="room">
-                <th mat-header-cell *matHeaderCellDef>اللجنة / القاعة</th>
-                <td mat-cell *matCellDef="let element">{{ element.room_id | slice:0:8 }}...</td>
-              </ng-container>
-
-              <ng-container matColumnDef="marks">
-                <th mat-header-cell *matHeaderCellDef>الدرجة المرصودة</th>
-                <td mat-cell *matCellDef="let element">
-                  <input type="number" [(ngModel)]="element.tempMark" class="mark-input" placeholder="رصد الدرجة" />
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>إجراءات</th>
-                <td mat-cell *matCellDef="let element">
-                  <button mat-flat-button color="primary" (click)="saveMark(element)">حفظ الدرجة</button>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="markColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: markColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 3: Appeals / Re-marking -->
-        <mat-tab label="طلبات التظلم والاستئناف">
-          <div class="tab-content">
-            <table mat-table [dataSource]="appeals()" class="mat-elevation-z8 exam-table">
-              <ng-container matColumnDef="student">
-                <th mat-header-cell *matHeaderCellDef>اللجنة / الطالب</th>
-                <td mat-cell *matCellDef="let element">{{ element.student_exam | slice:0:8 }}...</td>
-              </ng-container>
-
-              <ng-container matColumnDef="reason">
-                <th mat-header-cell *matHeaderCellDef>سبب التظلم</th>
-                <td mat-cell *matCellDef="let element">{{ element.reason }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="oldMark">
-                <th mat-header-cell *matHeaderCellDef>الدرجة السابقة</th>
-                <td mat-cell *matCellDef="let element">{{ element.old_marks }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>حالة الطلب</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="status-badge" [ngClass]="element.status">
-                    {{ getAppealStatusLabel(element.status) }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>إجراءات</th>
-                <td mat-cell *matCellDef="let element">
-                  <div *ngIf="element.status === 'submitted'">
-                    <button mat-flat-button color="accent" class="action-btn" (click)="resolveAppeal(element.id, 85.0)">تعديل لـ 85</button>
-                    <button mat-stroked-button color="warn" class="action-btn" (click)="resolveAppeal(element.id, null)">رفض</button>
-                  </div>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="appealColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: appealColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+                </div>
+              }
+              @if (appeals().length === 0) { <div class="tbl-empty">لا توجد تظلمات.</div> }
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
   `,
   styles: [`
-    .exam-dashboard {
-      padding: 1.5rem;
-      font-family: 'Cairo', sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      margin-bottom: 2rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      background: linear-gradient(to left, #ec4899, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin: 0;
-    }
-    .dashboard-header p { color: #94a3b8; margin: 4px 0 0; }
-
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+    .nb-tabs { padding: 4px 8px 8px; }
+    .tbl { display: flex; flex-direction: column; padding-top: 8px; }
+    .tbl-head, .tbl-row { display: grid; gap: 8px; padding: 9px 16px; align-items: center; }
+    .tbl-head.ex, .tbl-row.ex { grid-template-columns: 1fr 1.6fr 1.4fr 1.2fr 1fr; }
+    .tbl-head.mk, .tbl-row.mk { grid-template-columns: 1.6fr 1.4fr 1.2fr 1fr; }
+    .tbl-head.ap, .tbl-row.ap { grid-template-columns: 1.2fr 1.6fr 1fr 1.2fr 1.4fr; }
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .stat-card .icon {
-      font-size: 32px; width: 32px; height: 32px;
-      padding: 8px; border-radius: 12px;
-    }
-    .stat-card .icon.exams { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
-    .stat-card .icon.sessions { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
-    .stat-card .icon.rooms { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-    .stat-card .icon.appeals { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .stat-card h3 { font-size: 0.75rem; color: #94a3b8; margin: 0; }
-    .stat-card .value { font-size: 1.6rem; font-weight: bold; margin: 2px 0 0 0; }
-
-    .dashboard-tabs {
-      background: #1e293b;
-      border-radius: 16px;
-      padding: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .tab-content { padding: 1.5rem 0; }
-
-    .exam-table {
-      width: 100%;
-      background: #1e293b;
-      color: #f8fafc;
-    }
-    .mat-mdc-header-cell {
-      color: #94a3b8 !important;
-      font-weight: bold;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
-    .mat-mdc-cell {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-      color: #cbd5e1 !important;
-    }
-
-    .status-badge {
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: bold;
-    }
-    .status-badge.published, .status-badge.approved, .status-badge.resolved_changed {
-      background: rgba(16, 185, 129, 0.15); color: #34d399;
-    }
-    .status-badge.draft, .status-badge.submitted {
-      background: rgba(245, 158, 11, 0.15); color: #fbbf24;
-    }
-    .status-badge.locked, .status-badge.under_review {
-      background: rgba(59, 130, 246, 0.15); color: #60a5fa;
-    }
-
+    .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .actions { display: flex; gap: 6px; }
+    .nb-btn-primary.sm, .nb-btn-secondary.sm, .nb-btn-danger.sm { height: 26px; padding: 0 12px; font-size: 12px; }
     .mark-input {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
-      color: white;
-      padding: 6px 12px;
+      height: 30px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      color: var(--nb-text);
+      padding: 0 10px;
       width: 120px;
       outline: none;
+      font-family: var(--nb-font-family);
+      font-size: 13px;
     }
-    .action-btn { margin-left: 8px; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class ExamDashboardComponent implements OnInit {
@@ -370,6 +219,16 @@ export class ExamDashboardComponent implements OnInit {
       case 'resolved_changed': return 'تم التعديل';
       case 'resolved_unchanged': return 'مرفوض/دون تغيير';
       default: return status;
+    }
+  }
+
+  statusBadge(status: string): string {
+    switch (status) {
+      case 'published': case 'approved': case 'resolved_changed': return 'nb-badge-success';
+      case 'draft': case 'submitted': return 'nb-badge-warning';
+      case 'locked': case 'under_review': return 'nb-badge-info';
+      case 'resolved_unchanged': return 'nb-badge-danger';
+      default: return 'nb-badge-neutral';
     }
   }
 }

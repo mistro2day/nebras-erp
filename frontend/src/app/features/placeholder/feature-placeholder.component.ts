@@ -15,13 +15,17 @@ import { Component, input } from '@angular/core';
   styles: [
     `
       .placeholder {
+        flex: 1;
         display: grid;
         min-height: 320px;
         place-items: center;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        background: var(--surface-color);
+        margin: 20px;
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius-card);
+        background: var(--nb-surface);
+        box-shadow: var(--nb-shadow-card);
         padding: 32px;
+        font-family: var(--nb-font-family);
       }
 
       div {
@@ -30,18 +34,23 @@ import { Component, input } from '@angular/core';
       }
 
       p {
-        color: var(--secondary-color);
-        font-weight: 800;
+        color: var(--nb-primary-600);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.5px;
         margin: 0 0 8px;
       }
 
       h1 {
         margin: 0 0 12px;
-        font-size: 28px;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--nb-text);
       }
 
       span {
-        color: color-mix(in srgb, var(--text-color) 72%, transparent);
+        color: var(--nb-text-secondary);
+        font-size: 13px;
         line-height: 1.8;
       }
     `,

@@ -13,10 +13,10 @@ import { CommonModule } from '@angular/common';
     <div class="login-wrapper" dir="rtl">
       <div class="login-card">
         <div class="header">
-          <img [src]="tenantService.currentTenant()?.logoUrl || 'assets/logo.png'" alt="Logo" class="logo" />
+          <div class="brand-mark">ن</div>
           <h2>تسجيل الدخول إلى {{ tenantService.currentTenant()?.nameAr || 'نبراس ERP' }}</h2>
         </div>
-        
+
         <form (ngSubmit)="onSubmit()">
           <div class="form-group">
             <label for="email">البريد الإلكتروني</label>
@@ -28,12 +28,12 @@ import { CommonModule } from '@angular/common';
             <input type="password" id="password" [(ngModel)]="password" name="password" required class="form-control" />
           </div>
 
-          <button type="submit" class="btn-primary w-100" [disabled]="isLoading()">
+          <button type="submit" class="nb-btn-primary w-100" [disabled]="isLoading()">
             {{ isLoading() ? 'جاري التحقق...' : 'دخول' }}
           </button>
         </form>
 
-        <p *ngIf="errorMessage()" class="error-msg">{{ errorMessage() }}</p>
+        @if (errorMessage()) { <p class="error-msg">{{ errorMessage() }}</p> }
       </div>
     </div>
   `,
@@ -42,45 +42,44 @@ import { CommonModule } from '@angular/common';
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background-color: var(--background-color);
+      min-height: 100vh;
+      background: var(--nb-bg);
+      font-family: var(--nb-font-family);
     }
     .login-card {
       width: 100%;
       max-width: 400px;
       padding: 32px;
-      background-color: var(--surface-color);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius-base);
-      box-shadow: var(--shadow-md);
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      box-shadow: var(--nb-shadow-dialog);
     }
-    .header {
-      text-align: center;
-      margin-bottom: 24px;
+    .header { text-align: center; margin-bottom: 24px; }
+    .brand-mark {
+      width: 48px; height: 48px; margin: 0 auto 12px;
+      background: var(--nb-primary-600); color: var(--nb-on-primary);
+      border-radius: var(--nb-radius); display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 700;
     }
-    .logo {
-      height: 64px;
-      margin-bottom: 12px;
-    }
-    .form-group {
-      margin-bottom: 16px;
-    }
+    .header h2 { font-size: 16px; font-weight: 700; color: var(--nb-text); margin: 0; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--nb-text); margin-bottom: 5px; }
     .form-control {
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius-base);
-      background-color: var(--background-color);
-      color: var(--text-color);
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      background: var(--nb-surface);
+      color: var(--nb-text);
+      font-family: var(--nb-font-family);
+      font-size: 13px;
+      outline: none;
     }
-    .w-100 {
-      width: 100%;
-    }
-    .error-msg {
-      color: #ef4444;
-      margin-top: 16px;
-      text-align: center;
-    }
+    .form-control:focus { border-color: var(--nb-primary-400); box-shadow: var(--nb-focus-ring); }
+    .w-100 { width: 100%; }
+    .error-msg { color: var(--nb-danger); margin-top: 16px; text-align: center; font-size: 13px; }
   `]
 })
 export class LoginComponent {

@@ -1,304 +1,118 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 import { TransportService } from './transport.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * نظام النقل والأسطول المدرسي — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-transport-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatProgressSpinnerModule,
-    MatTabsModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatTabsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="dashboard-container" dir="rtl">
-      <!-- Header -->
-      <div class="dashboard-header">
-        <div class="title-section">
-          <h1>نظام إدارة النقل والأسطول المدرسي</h1>
-          <p>لوحة مراقبة وإدارة مسارات الحافلات، حالة الأسطول، تموين الوقود، وحضور وغياب ركاب الرحلات اليومية</p>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="نظام إدارة النقل والأسطول المدرسي"
+        subtitle="مراقبة مسارات الحافلات، حالة الأسطول، تموين الوقود، وحضور ركاب الرحلات اليومية"
+      >
+        <button class="nb-btn-secondary" (click)="loadDashboard()">تحديث البيانات</button>
+      </nb-page-header>
+
+      @if (transportService.stats(); as stats) {
+        <div class="stats-grid">
+          <nb-stat-card label="إجمالي الحافلات" [value]="stats.total_vehicles" suffix="حافلة"></nb-stat-card>
+          <nb-stat-card label="الرحلات النشطة" [value]="stats.active_trips" suffix="جارية" valueKind="success"></nb-stat-card>
+          <nb-stat-card label="إجمالي السائقين" [value]="stats.total_drivers" suffix="سائق"></nb-stat-card>
+          <nb-stat-card label="فحص السلامة التالف" [value]="stats.failed_inspections" suffix="اليوم" [valueKind]="stats.failed_inspections ? 'danger' : 'default'"></nb-stat-card>
         </div>
-        <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon> تحديث البيانات
-        </button>
-      </div>
+      }
 
-      <!-- Loading State -->
-      <div class="spinner-container" *ngIf="transportService.loading()">
-        <mat-progress-spinner mode="indeterminate" diameter="50"></mat-progress-spinner>
-      </div>
-
-      <!-- Stats Cards Grid -->
-      <div class="stats-grid" *ngIf="transportService.stats() as stats">
-        <!-- Total Vehicles -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper blue">
-              <mat-icon>directions_bus</mat-icon>
+      <nb-panel [flush]="true">
+        <mat-tab-group class="nb-tabs">
+          <mat-tab label="الرحلات والتشغيل الميداني">
+            <div class="tbl">
+              <div class="tbl-head tr"><span>المسار</span><span>الحافلة</span><span>الحالة</span><span>الإجراءات</span></div>
+              @for (row of trips; track row.id) {
+                <div class="tbl-row tr">
+                  <span class="strong">{{ row.route_name || 'مسار مدرسي افتراضي' }}</span>
+                  <span>{{ row.vehicle_plate || 'لوحة حافلة رقم 1234' }}</span>
+                  <span><span [class]="tripBadge(row.status)">{{ getTripStatusText(row.status) }}</span></span>
+                  <span>
+                    @if (row.status === 'scheduled') { <button class="nb-btn-primary sm" (click)="startTrip(row.id)">انطلاق</button> }
+                    @if (row.status === 'running') { <button class="nb-btn-secondary sm" (click)="completeTrip(row.id)">إكمال</button> }
+                  </span>
+                </div>
+              }
+              @if (trips.length === 0) { <div class="tbl-empty">لا توجد رحلات مجدولة.</div> }
             </div>
-            <mat-card-title>إجمالي الحافلات</mat-card-title>
-            <mat-card-subtitle>حافلات الأسطول المتاحة</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value text-blue">
-            {{ stats.total_vehicles }} حافلة
-          </mat-card-content>
-        </mat-card>
+          </mat-tab>
 
-        <!-- Active Trips -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper green">
-              <mat-icon>explore</mat-icon>
+          <mat-tab label="الأسطول وفحص الأمان">
+            <div class="tbl">
+              <div class="tbl-head vh"><span>رقم الحافلة</span><span>رقم اللوحة</span><span>السعة</span><span>الحالة</span><span>فحص الأمان اليومي</span></div>
+              @for (row of vehicles; track row.id) {
+                <div class="tbl-row vh">
+                  <span class="strong">{{ row.vehicle_number }}</span>
+                  <span>{{ row.plate_number }}</span>
+                  <span>{{ row.capacity }} راكب</span>
+                  <span><span [class]="vehicleBadge(row.status)">{{ getVehicleStatusText(row.status) }}</span></span>
+                  <span class="actions">
+                    <button class="nb-btn-ghost sm" (click)="inspectVehicle(row.id, 'passed')">اجتاز</button>
+                    <button class="nb-btn-danger sm" (click)="inspectVehicle(row.id, 'failed')">بلاغ عطل</button>
+                  </span>
+                </div>
+              }
+              @if (vehicles.length === 0) { <div class="tbl-empty">لا توجد مركبات.</div> }
             </div>
-            <mat-card-title>الرحلات النشطة</mat-card-title>
-            <mat-card-subtitle>الرحلات الجارية الآن في الميدان</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value text-green">
-            {{ stats.active_trips }} رحلة جارية
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Total Drivers -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper purple">
-              <mat-icon>badge</mat-icon>
-            </div>
-            <mat-card-title>إجمالي السائقين</mat-card-title>
-            <mat-card-subtitle>سائقين ومسؤولين مسجلين</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value text-purple">
-            {{ stats.total_drivers }} سائق
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Failed Inspections -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper red">
-              <mat-icon>report_problem</mat-icon>
-            </div>
-            <mat-card-title>فحص السلامة التالف</mat-card-title>
-            <mat-card-subtitle>حافلات لم تجتز فحص الأمان اليومي</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value alert-red">
-            {{ stats.failed_inspections }} أعطال اليوم
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <!-- Main Tabs Section -->
-      <mat-tab-group class="dashboard-tabs">
-        <mat-tab label="الرحلات والتشغيل الميداني">
-          <div class="tab-content">
-            <div class="header-row">
-              <h3>الرحلات المجدولة والنشطة</h3>
-            </div>
-            <div class="table-container">
-              <table mat-table [dataSource]="trips" class="w-full">
-                <ng-container matColumnDef="route">
-                  <th mat-header-cell *matHeaderCellDef>المسار</th>
-                  <td mat-cell *matCellDef="let row" class="bold text-blue">{{ row.route_name || 'مسار مدرسي افتراضي' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="vehicle">
-                  <th mat-header-cell *matHeaderCellDef>الحافلة</th>
-                  <td mat-cell *matCellDef="let row">{{ row.vehicle_plate || 'لوحة حافلة رقم 1234' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                  <td mat-cell *matCellDef="let row">
-                    <span class="badge" [ngClass]="getTripStatusClass(row.status)">{{ getTripStatusText(row.status) }}</span>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>الإجراءات</th>
-                  <td mat-cell *matCellDef="let row">
-                    <button mat-flat-button color="primary" *ngIf="row.status === 'scheduled'" (click)="startTrip(row.id)">
-                      <mat-icon>play_arrow</mat-icon> انطلاق
-                    </button>
-                    <button mat-flat-button color="accent" *ngIf="row.status === 'running'" (click)="completeTrip(row.id)">
-                      <mat-icon>check_circle</mat-icon> إكمال
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="tripColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: tripColumns;"></tr>
-              </table>
-            </div>
-          </div>
-        </mat-tab>
-
-        <mat-tab label="الأسطول وفحص الأمان">
-          <div class="tab-content">
-            <div class="header-row">
-              <h3>حالة أسطول المركبات</h3>
-            </div>
-            <div class="table-container">
-              <table mat-table [dataSource]="vehicles" class="w-full">
-                <ng-container matColumnDef="number">
-                  <th mat-header-cell *matHeaderCellDef>رقم الحافلة</th>
-                  <td mat-cell *matCellDef="let row" class="bold">{{ row.vehicle_number }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="plate">
-                  <th mat-header-cell *matHeaderCellDef>رقم اللوحة</th>
-                  <td mat-cell *matCellDef="let row">{{ row.plate_number }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="capacity">
-                  <th mat-header-cell *matHeaderCellDef>السعة المقعدية</th>
-                  <td mat-cell *matCellDef="let row">{{ row.capacity }} راكب</td>
-                </ng-container>
-
-                <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                  <td mat-cell *matCellDef="let row">
-                    <span class="badge" [ngClass]="getVehicleStatusClass(row.status)">{{ getVehicleStatusText(row.status) }}</span>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>فحص الأمان اليومي</th>
-                  <td mat-cell *matCellDef="let row">
-                    <button mat-stroked-button color="primary" (click)="inspectVehicle(row.id, 'passed')">
-                      <mat-icon>verified</mat-icon> اجتاز
-                    </button>
-                    &nbsp;
-                    <button mat-stroked-button color="warn" (click)="inspectVehicle(row.id, 'failed')">
-                      <mat-icon>dangerous</mat-icon> بلاغ عطل
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="vehicleColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: vehicleColumns;"></tr>
-              </table>
-            </div>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+          </mat-tab>
+        </mat-tab-group>
+      </nb-panel>
     </div>
   `,
   styles: [`
-    .dashboard-container {
-      padding: 2rem;
-      background: #f8fafc;
-      min-height: 100vh;
-      font-family: 'Outfit', sans-serif;
-    }
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      margin: 0;
-      font-size: 2rem;
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .dashboard-header p {
-      margin: 0.5rem 0 0 0;
-      color: #64748b;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      border: none;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      background: #fff;
-    }
-    .icon-wrapper {
-      padding: 10px;
-      border-radius: 8px;
-      display: flex;
+    .nb-tabs { padding: 4px 8px 8px; }
+    .tbl { display: flex; flex-direction: column; padding-top: 8px; }
+    .tbl-head, .tbl-row {
+      display: grid;
+      gap: 8px;
+      padding: 9px 16px;
       align-items: center;
-      justify-content: center;
-      margin-left: 12px;
     }
-    .icon-wrapper.blue { background: #eff6ff; color: #3b82f6; }
-    .icon-wrapper.green { background: #f0fdf4; color: #22c55e; }
-    .icon-wrapper.purple { background: #faf5ff; color: #a855f7; }
-    .icon-wrapper.red { background: #fef2f2; color: #ef4444; }
-
-    .stat-value {
-      font-size: 1.75rem;
+    .tbl-head.tr, .tbl-row.tr { grid-template-columns: 1.4fr 1.2fr 1.2fr 1fr; }
+    .tbl-head.vh, .tbl-row.vh { grid-template-columns: 1fr 1fr 1fr 1.3fr 1.4fr; }
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 1rem;
-      text-align: right;
+      color: var(--nb-text-muted);
     }
-    .text-blue { color: #2563eb; }
-    .text-green { color: #16a34a; }
-    .text-purple { color: #7c3aed; }
-    .alert-red { color: #dc2626; }
-
-    .dashboard-tabs {
-      background: #fff;
-      border-radius: 12px;
-      padding: 1rem;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    .tbl-row {
+      border-bottom: 1px solid var(--nb-border-row);
+      font-size: 13px;
+      color: var(--nb-text);
     }
-    .tab-content {
-      padding: 1.5rem 0;
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .actions { display: flex; gap: 6px; }
+    .nb-btn-primary.sm, .nb-btn-secondary.sm, .nb-btn-ghost.sm, .nb-btn-danger.sm {
+      height: 26px; padding: 0 12px; font-size: 12px;
     }
-    .header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    .table-container {
-      overflow-x: auto;
-    }
-    .w-full {
-      width: 100%;
-    }
-    .bold {
-      font-weight: 600;
-    }
-    .badge {
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-    .badge.scheduled { background: #f1f5f9; color: #475569; }
-    .badge.running { background: #f0fdf4; color: #16a34a; }
-    .badge.completed { background: #eff6ff; color: #2563eb; }
-    .badge.cancelled { background: #fef2f2; color: #dc2626; }
-    .badge.available { background: #ecfdf5; color: #047857; }
-    .badge.on_trip { background: #eff6ff; color: #1d4ed8; }
-    .badge.maintenance { background: #fffbeb; color: #b45309; }
-    .badge.out_of_service { background: #fef2f2; color: #b91c1c; }
-
-    .spinner-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 200px;
-    }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class TransportDashboardComponent implements OnInit {
@@ -349,8 +163,14 @@ export class TransportDashboardComponent implements OnInit {
     }
   }
 
-  getTripStatusClass(status: string): string {
-    return status;
+  tripBadge(status: string): string {
+    const map: Record<string, string> = {
+      scheduled: 'nb-badge-neutral',
+      running: 'nb-badge-success',
+      completed: 'nb-badge-info',
+      cancelled: 'nb-badge-danger',
+    };
+    return map[status] || 'nb-badge-neutral';
   }
 
   getVehicleStatusText(status: string): string {
@@ -363,7 +183,13 @@ export class TransportDashboardComponent implements OnInit {
     }
   }
 
-  getVehicleStatusClass(status: string): string {
-    return status;
+  vehicleBadge(status: string): string {
+    const map: Record<string, string> = {
+      available: 'nb-badge-success',
+      on_trip: 'nb-badge-info',
+      maintenance: 'nb-badge-warning',
+      out_of_service: 'nb-badge-danger',
+    };
+    return map[status] || 'nb-badge-neutral';
   }
 }

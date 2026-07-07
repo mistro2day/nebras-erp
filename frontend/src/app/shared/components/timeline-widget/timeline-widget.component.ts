@@ -43,80 +43,56 @@ export interface TimelineEvent {
   `,
   styles: [`
     .timeline-widget {
-      background: #1e293b;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 1rem;
-      color: #f8fafc;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      color: var(--nb-text);
     }
     .widget-header h3 {
-      font-size: 0.95rem;
+      font-size: 13px;
       font-weight: 700;
-      margin: 0 0 1.5rem;
-      color: #6366f1;
+      margin: 0 0 16px;
+      color: var(--nb-primary-600);
     }
     .timeline-container {
       position: relative;
       padding-right: 24px;
-      border-right: 2px solid rgba(255, 255, 255, 0.06);
+      border-right: 2px solid var(--nb-border);
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
     }
-    .timeline-item {
-      position: relative;
-    }
+    .timeline-item { position: relative; }
     .timeline-badge {
       position: absolute;
-      right: -37px;
+      right: -35px;
       top: 4px;
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
-      background: #475569;
+      background: var(--nb-text-faint);
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 3px solid #1e293b;
+      border: 3px solid var(--nb-surface);
     }
-    .timeline-badge.create { background: #10b981; }
-    .timeline-badge.update { background: #eab308; }
-    .timeline-badge.delete { background: #ef4444; }
-    .timeline-badge mat-icon {
-      font-size: 14px;
-      width: 14px;
-      height: 14px;
-    }
+    .timeline-badge.create { background: var(--nb-success); }
+    .timeline-badge.update { background: var(--nb-warning); }
+    .timeline-badge.delete { background: var(--nb-danger); }
+    .timeline-badge mat-icon { font-size: 12px; width: 12px; height: 12px; }
     .timeline-card {
-      background: rgba(15, 23, 42, 0.4);
-      border-radius: 8px;
+      background: var(--nb-surface-raised);
+      border-radius: var(--nb-radius);
       padding: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--nb-border-soft);
     }
-    .card-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      font-size: 0.75rem;
-    }
-    .actor {
-      font-weight: bold;
-      color: #cbd5e1;
-    }
-    .date {
-      color: #94a3b8;
-    }
-    .description {
-      font-size: 0.85rem;
-      margin: 0;
-      color: #94a3b8;
-    }
-    .no-data {
-      text-align: center;
-      padding: 2rem;
-      color: #94a3b8;
-    }
+    .card-meta { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; }
+    .actor { font-weight: 700; color: var(--nb-text-secondary); }
+    .date { color: var(--nb-text-muted); }
+    .description { font-size: 13px; margin: 0; color: var(--nb-text-secondary); }
+    .no-data { text-align: center; padding: 20px; color: var(--nb-text-muted); font-size: 13px; }
   `]
 })
 export class TimelineWidgetComponent {

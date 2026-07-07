@@ -1,277 +1,122 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
 import { ProcurementService } from './procurement.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
 
+/**
+ * منصة المشتريات والتعاقدات — لغة تصميم Nebras OS.
+ * المنطق والخدمات كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-procurement-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatProgressSpinnerModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CurrencyPipe, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent],
   template: `
-    <div class="dashboard-container" dir="rtl">
-      <!-- Header -->
-      <div class="dashboard-header">
-        <div class="title-section">
-          <h1>منصة إدارة المشتريات والتعاقدات (Source-to-Pay)</h1>
-          <p>لوحة التحكم بالطلبات، عروض الأسعار، العقود المعتمدة، وتقييم الموردين</p>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="منصة إدارة المشتريات والتعاقدات"
+        subtitle="لوحة التحكم بالطلبات، عروض الأسعار، العقود المعتمدة، وتقييم الموردين"
+      >
+        <button class="nb-btn-secondary" (click)="loadDashboard()">تحديث البيانات</button>
+      </nb-page-header>
+
+      @if (procurementService.stats(); as stats) {
+        <div class="stats-grid">
+          <nb-stat-card label="طلبات الشراء المفتوحة" [value]="stats.open_requests"></nb-stat-card>
+          <nb-stat-card label="الموافقات المعلقة" [value]="stats.pending_approvals" [valueKind]="stats.pending_approvals ? 'warning' : 'default'"></nb-stat-card>
+          <nb-stat-card label="إجمالي الإنفاق" [value]="(stats.total_spent | currency:'SAR ':'symbol':'1.2-2') || '—'"></nb-stat-card>
+          <nb-stat-card label="الوفورات المحققة" [value]="(stats.savings | currency:'SAR ':'symbol':'1.2-2') || '—'" valueKind="success"></nb-stat-card>
         </div>
-        <button mat-flat-button color="primary" (click)="loadDashboard()">
-          <mat-icon>refresh</mat-icon> تحديث البيانات
-        </button>
-      </div>
+      }
 
-      <!-- Loading State -->
-      <div class="spinner-container" *ngIf="procurementService.loading()">
-        <mat-progress-spinner mode="indeterminate" diameter="50"></mat-progress-spinner>
-      </div>
-
-      <!-- Stats Cards Grid -->
-      <div class="stats-grid" *ngIf="procurementService.stats() as stats">
-        <!-- Open Requests -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper blue">
-              <mat-icon>shopping_cart</mat-icon>
-            </div>
-            <mat-card-title>طلبات الشراء المفتوحة</mat-card-title>
-            <mat-card-subtitle>الطلبات قيد المراجعة</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value">
-            {{ stats.open_requests }}
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Pending Approvals -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper orange">
-              <mat-icon>rate_review</mat-icon>
-            </div>
-            <mat-card-title>الموافقات المعلقة</mat-card-title>
-            <mat-card-subtitle>طلبات تتطلب الموافقة</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value alert-orange">
-            {{ stats.pending_approvals }}
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Total Spent -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper green">
-              <mat-icon>payments</mat-icon>
-            </div>
-            <mat-card-title>إجمالي الإنفاق</mat-card-title>
-            <mat-card-subtitle>المبالغ المصروفة عبر أوامر الشراء</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value">
-            {{ stats.total_spent | currency:'SAR ':'symbol':'1.2-2' }}
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Savings -->
-        <mat-card class="stat-card">
-          <mat-card-header>
-            <div class="icon-wrapper purple">
-              <mat-icon>savings</mat-icon>
-            </div>
-            <mat-card-title>الوفورات المحققة</mat-card-title>
-            <mat-card-subtitle>الفرق بين السعر التقديري والترسية</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content class="stat-value text-green">
-            {{ stats.savings | currency:'SAR ':'symbol':'1.2-2' }}
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <!-- Main Section: PRs & Vendors -->
       <div class="tables-section">
-        <!-- PR Table -->
-        <div class="table-container">
-          <h2>طلبات الشراء الأخيرة</h2>
-          <mat-card class="table-card">
-            <table mat-table [dataSource]="requests" class="w-full">
-              <ng-container matColumnDef="reqNumber">
-                <th mat-header-cell *matHeaderCellDef>رقم الطلب</th>
-                <td mat-cell *matCellDef="let row">{{ row.request_number }}</td>
-              </ng-container>
+        <nb-panel title="طلبات الشراء الأخيرة" [flush]="true">
+          <div class="tbl">
+            <div class="tbl-head pr">
+              <span>رقم الطلب</span><span>التاريخ</span><span>إجمالي تقديري</span><span>الحالة</span>
+            </div>
+            @for (row of requests; track row.id) {
+              <div class="tbl-row pr">
+                <span>{{ row.request_number }}</span>
+                <span>{{ row.date }}</span>
+                <span class="strong">{{ row.total_estimated_amount | currency:'SAR ' }}</span>
+                <span><span [class]="getBadgeClass(row.status)">{{ getStatusText(row.status) }}</span></span>
+              </div>
+            }
+            @if (requests.length === 0) {
+              <div class="tbl-empty">لا توجد طلبات شراء.</div>
+            }
+          </div>
+        </nb-panel>
 
-              <ng-container matColumnDef="date">
-                <th mat-header-cell *matHeaderCellDef>التاريخ</th>
-                <td mat-cell *matCellDef="let row">{{ row.date }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="amount">
-                <th mat-header-cell *matHeaderCellDef>إجمالي تقديري</th>
-                <td mat-cell *matCellDef="let row" class="bold">{{ row.total_estimated_amount | currency:'SAR ' }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="badge" [ngClass]="getBadgeClass(row.status)">
-                    {{ getStatusText(row.status) }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="prColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: prColumns;"></tr>
-            </table>
-          </mat-card>
-        </div>
-
-        <!-- Vendor Table -->
-        <div class="table-container">
-          <h2>الموردين المعتمدين</h2>
-          <mat-card class="table-card">
-            <table mat-table [dataSource]="vendors" class="w-full">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>اسم المورد</th>
-                <td mat-cell *matCellDef="let row">{{ row.name_ar }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="rating">
-                <th mat-header-cell *matHeaderCellDef>التقييم</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="rating-badge">
-                    <mat-icon class="star-icon">star</mat-icon> {{ row.rating }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="badge badge-success" *ngIf="row.status === 'approved'">معتمد ونشط</span>
-                  <span class="badge badge-danger" *ngIf="row.status === 'blacklisted'">قائمة سوداء</span>
-                  <span class="badge badge-warning" *ngIf="row.status === 'pending'">تحت الاعتماد</span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="vendorColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: vendorColumns;"></tr>
-            </table>
-          </mat-card>
-        </div>
+        <nb-panel title="الموردين المعتمدين" [flush]="true">
+          <div class="tbl">
+            <div class="tbl-head vn">
+              <span>اسم المورد</span><span>التقييم</span><span>الحالة</span>
+            </div>
+            @for (row of vendors; track row.id) {
+              <div class="tbl-row vn">
+                <span>{{ row.name_ar }}</span>
+                <span class="rating">★ {{ row.rating }}</span>
+                <span>
+                  @if (row.status === 'approved') { <span class="nb-badge-success">معتمد ونشط</span> }
+                  @else if (row.status === 'blacklisted') { <span class="nb-badge-danger">قائمة سوداء</span> }
+                  @else if (row.status === 'pending') { <span class="nb-badge-warning">تحت الاعتماد</span> }
+                </span>
+              </div>
+            }
+            @if (vendors.length === 0) {
+              <div class="tbl-empty">لا يوجد موردين.</div>
+            }
+          </div>
+        </nb-panel>
       </div>
     </div>
   `,
   styles: [`
-    .dashboard-container {
-      padding: 2rem;
-      background: #f8fafc;
-      min-height: 100vh;
-    }
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 1rem;
-    }
-    .dashboard-header h1 {
-      margin: 0;
-      font-size: 2rem;
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .dashboard-header p {
-      margin: 0.5rem 0 0 0;
-      color: #64748b;
-    }
+    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2.5rem;
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .stat-card {
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      padding: 1rem;
-    }
-    .icon-wrapper {
-      padding: 0.75rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-    }
-    .icon-wrapper.blue { background: #eff6ff; color: #3b82f6; }
-    .icon-wrapper.orange { background: #fff7ed; color: #f97316; }
-    .icon-wrapper.green { background: #f0fdf4; color: #22c55e; }
-    .icon-wrapper.purple { background: #faf5ff; color: #a855f7; }
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #1e293b;
-      margin-top: 1rem;
-    }
-    .alert-orange { color: #f97316; }
-    .text-green { color: #16a34a; }
     .tables-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-top: 2rem;
+      gap: 16px;
     }
-    @media (max-width: 960px) {
-      .tables-section {
-        grid-template-columns: 1fr;
-      }
-    }
-    .table-container h2 {
-      font-size: 1.5rem;
-      color: #0f172a;
-      margin-bottom: 1rem;
-    }
-    .table-card {
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      overflow: hidden;
-    }
-    .w-full { width: 100%; }
-    .bold { font-weight: 600; color: #0f172a; }
-    .badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-    }
-    .badge-success { background: #dcfce7; color: #15803d; }
-    .badge-danger { background: #fee2e2; color: #b91c1c; }
-    .badge-warning { background: #fef3c7; color: #d97706; }
-    .badge-info { background: #e0f2fe; color: #0369a1; }
-    .rating-badge {
-      display: flex;
+    @media (max-width: 960px) { .tables-section { grid-template-columns: 1fr; } }
+    .tbl { display: flex; flex-direction: column; }
+    .tbl-head, .tbl-row {
+      display: grid;
+      gap: 8px;
+      padding: 9px 16px;
       align-items: center;
-      gap: 0.25rem;
-      font-weight: 600;
-      color: #eab308;
     }
-    .star-icon {
-      font-size: 1.2rem;
-      width: 1.2rem;
-      height: 1.2rem;
+    .tbl-head.pr, .tbl-row.pr { grid-template-columns: 1.2fr 1fr 1.2fr 1fr; }
+    .tbl-head.vn, .tbl-row.vn { grid-template-columns: 1.8fr 1fr 1.2fr; }
+    .tbl-head {
+      background: var(--nb-surface-raised);
+      border-bottom: 1px solid var(--nb-border-soft);
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted);
     }
-    .spinner-container {
-      display: flex;
-      justify-content: center;
-      padding: 3rem;
+    .tbl-row {
+      border-bottom: 1px solid var(--nb-border-row);
+      font-size: 13px;
+      color: var(--nb-text);
     }
+    .tbl-row:last-child { border-bottom: none; }
+    .tbl-row:hover { background: var(--nb-surface-raised); }
+    .strong { font-weight: 600; }
+    .rating { color: var(--nb-warning); font-weight: 600; }
+    .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class ProcurementDashboardComponent implements OnInit {
@@ -297,11 +142,11 @@ export class ProcurementDashboardComponent implements OnInit {
 
   getBadgeClass(status: string): string {
     switch (status) {
-      case 'completed': return 'badge-success';
-      case 'rejected': return 'badge-danger';
-      case 'pending_approval': return 'badge-warning';
-      case 'approved': return 'badge-info';
-      default: return 'badge-warning';
+      case 'completed': return 'nb-badge-success';
+      case 'rejected': return 'nb-badge-danger';
+      case 'pending_approval': return 'nb-badge-warning';
+      case 'approved': return 'nb-badge-info';
+      default: return 'nb-badge-warning';
     }
   }
 
