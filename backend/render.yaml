@@ -25,7 +25,5 @@ services:
         value: "https://nebras-erp.vercel.app,https://*.vercel.app,http://localhost:4200"
       - key: CELERY_TASK_ALWAYS_EAGER
         value: "True"
-      - key: SKIP_COLLECTSTATIC
-        value: "True"
       - key: DATABASE_PATH
         value: /var/lib/nebras-erp/db.sqlite3
