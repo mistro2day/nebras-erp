@@ -1,10 +1,3 @@
-databases:
-  - name: nebras-erp-db
-    plan: free
-    databaseName: nebras_erp
-    user: nebras_user
-    region: oregon
-
 services:
   - type: web
     name: nebras-erp-api
@@ -15,13 +8,13 @@ services:
     startCommand: cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     region: oregon
     healthCheckPath: /api/v1/admissions/applicants/public-config/
+    disk:
+      name: nebras-erp-data
+      mountPath: /var/lib/nebras-erp
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: DATABASE_URL
-        fromDatabase:
-          name: nebras-erp-db
-          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
@@ -34,3 +27,5 @@ services:
         value: "True"
       - key: SKIP_COLLECTSTATIC
         value: "True"
+      - key: DATABASE_PATH
+        value: /var/lib/nebras-erp/db.sqlite3

@@ -116,7 +116,13 @@ DATABASES = {
     }
 }
 
-if os.environ.get('DATABASE_URL'):
+db_path = os.environ.get('DATABASE_PATH')
+if db_path:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': db_path,
+    }
+elif os.environ.get('DATABASE_URL'):
     import dj_database_url
     DATABASES['default'] = dj_database_url.config(conn_max_age=600, ssl_require=os.environ.get('DATABASE_SSL') == 'True')
 
