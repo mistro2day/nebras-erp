@@ -111,6 +111,33 @@ class Interview(CombinedBaseModel):
         db_table = 'admission_interviews'
 
 
+class AdmissionSettings(CombinedBaseModel):
+    """
+    إعدادات فتح/إغلاق باب القبول والتسجيل (سجل واحد لكل مستأجر).
+    يتحكم بها مدير النظام: يفتح التسجيل ويحدد السنة الدراسية والشروط والمستندات
+    المطلوبة والفترة المتاحة — بما يوافق ممارسات المدارس السودانية.
+    """
+    is_open = models.BooleanField(default=False, db_index=True)  # هل باب التسجيل مفتوح؟
+    academic_year_id = models.UUIDField(null=True, blank=True)   # السنة الدراسية للتسجيل
+    registration_start = models.DateField(null=True, blank=True)  # بداية فترة التقديم
+    registration_end = models.DateField(null=True, blank=True)    # نهاية فترة التقديم
+    allowed_grade_ids = models.JSONField(default=list, blank=True)  # الصفوف المتاحة (فارغ = الكل)
+    terms = models.TextField(blank=True, null=True)              # شروط وأحكام التقديم
+    required_documents = models.JSONField(default=list, blank=True)  # المستندات المطلوبة (قائمة نصوص)
+    min_age = models.IntegerField(null=True, blank=True)        # الحد الأدنى للعمر (سنوات)
+    max_age = models.IntegerField(null=True, blank=True)        # الحد الأقصى للعمر (سنوات)
+    application_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # رسوم التقديم
+    closed_message = models.TextField(blank=True, null=True)     # رسالة تُعرض عند إغلاق التسجيل
+    contact_phone = models.CharField(max_length=50, blank=True, null=True)
+    contact_email = models.EmailField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'admission_settings'
+
+    def __str__(self):
+        return f"AdmissionSettings(tenant={self.tenant_id}, open={self.is_open})"
+
+
 class PlacementTest(CombinedBaseModel):
     """
     امتحانات تحديد المستوى للمتقدمين

@@ -12,6 +12,10 @@ interface NavItem {
   count?: number;
   countKind?: 'danger' | 'info' | 'warning';
   ai?: boolean;
+  /** مسار الجذر للتفعيل (اختياري): يُستخدم لإبراز الأب عند فتح أي صفحة فرعية */
+  match?: string;
+  /** عناصر فرعية — تُعرض كقائمة متفرعة قابلة للطي في الشريط الجانبي */
+  children?: NavItem[];
 }
 
 interface NavGroup {
@@ -43,7 +47,34 @@ interface NavGroup {
               <div class="nav-group-label">{{ group.label }}</div>
             }
             @for (item of group.items; track item.label) {
-              @if (item.link) {
+              @if (item.children && item.children.length) {
+                <!-- عنصر أب بقائمة فرعية قابلة للطي -->
+                <button
+                  type="button"
+                  class="nav-item nav-parent"
+                  [class.active]="isBranchActive(item)"
+                  (click)="toggleGroup(item.label)"
+                >
+                  <span>{{ item.label }}</span>
+                  <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                </button>
+                @if (isExpanded(item)) {
+                  <div class="submenu">
+                    @for (child of item.children; track child.label) {
+                      <a
+                        class="nav-item nav-child"
+                        [routerLink]="child.link"
+                        routerLinkActive="active"
+                      >
+                        <span>{{ child.label }}</span>
+                        @if (child.count) {
+                          <span class="nav-count" [class]="'nav-count ' + child.countKind">{{ child.count }}</span>
+                        }
+                      </a>
+                    }
+                  </div>
+                }
+              } @else if (item.link) {
                 <a
                   class="nav-item"
                   [class.ai]="item.ai"
@@ -203,6 +234,45 @@ interface NavGroup {
         font-weight: 700;
         color: var(--nb-text-faint);
         padding: 14px 10px 4px;
+      }
+
+      /* ---------- القوائم الفرعية المتفرعة ---------- */
+      .nav-parent {
+        width: 100%;
+        border: none;
+        background: transparent;
+        font-family: var(--nb-font-family);
+        text-align: inherit;
+      }
+
+      .chevron {
+        font-size: 15px;
+        line-height: 1;
+        color: var(--nb-text-faint);
+        transition: transform 0.15s ease;
+        transform: rotate(-90deg); /* يشير للأسفل في RTL عند الإغلاق */
+      }
+      .chevron.open { transform: rotate(-270deg); }
+
+      .submenu {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin: 2px 6px 4px;
+        padding-right: 8px;
+        border-right: 1px solid var(--nb-border-soft);
+      }
+
+      .nav-child {
+        font-size: 12.5px;
+        padding: 6px 10px;
+        color: var(--nb-text-muted);
+
+        &.active {
+          background: var(--nb-primary-50);
+          color: var(--nb-primary-600);
+          font-weight: 600;
+        }
       }
 
       .nav-count {
@@ -377,38 +447,139 @@ export class DashboardLayoutComponent {
 
   readonly searchQuery = signal('');
 
+  /** القوائم الفرعية المفتوحة يدويًا (بالإضافة إلى الفرع النشط الذي يُفتح تلقائيًا) */
+  private readonly manuallyToggled = signal<Record<string, boolean>>({});
+
+  /** هل الفرع (الأب) يحتوي المسار الحالي؟ يُستخدم للإبراز والفتح التلقائي. */
+  isBranchActive(item: NavItem): boolean {
+    const url = this.currentUrl();
+    if (item.match && (url === item.match || url.startsWith(item.match + '/'))) return true;
+    return (item.children ?? []).some((c) => c.link && (url === c.link || url.startsWith(c.link + '/')));
+  }
+
+  /** الفرع مفتوح إذا كان نشطًا (تلقائيًا) أو فتحه المستخدم يدويًا (مع احترام الإغلاق اليدوي). */
+  isExpanded(item: NavItem): boolean {
+    const manual = this.manuallyToggled()[item.label];
+    if (manual !== undefined) return manual;
+    return this.isBranchActive(item);
+  }
+
+  toggleGroup(label: string): void {
+    const current = this.manuallyToggled();
+    const item = this.navGroups.flatMap((g) => g.items).find((i) => i.label === label);
+    const currentlyOpen = item ? this.isExpanded(item) : false;
+    this.manuallyToggled.set({ ...current, [label]: !currentlyOpen });
+  }
+
   /* عناصر التنقل — الترتيب والتسميات والعدّادات كما في تصدير 1a حرفيًا */
+  // القائمة الجانبية مبنية من مسارات Angular الحقيقية فقط (app.routes.ts).
+  // كل عنصر ينتقل إلى مسار موجود فعلاً — لا مسارات وهمية، ولا شارات أعداد مُختلقة.
   readonly navGroups: NavGroup[] = [
     {
       items: [
         { label: 'لوحة القيادة', link: '/dashboard' },
-        { label: 'الموافقات', link: '/approvals', count: 18, countKind: 'danger' },
-        { label: 'المهام' },
+        { label: 'الموافقات', link: '/approvals' },
       ],
     },
     {
       label: 'الأكاديمية',
       items: [
-        { label: 'الطلاب', link: '/students' },
-        { label: 'القبول والتسجيل', link: '/admissions', count: 342, countKind: 'info' },
+        {
+          label: 'الطلاب',
+          match: '/students',
+          children: [
+            { label: 'قائمة الطلاب', link: '/students/list' },
+            { label: 'لوحة شؤون الطلاب', link: '/students/dashboard' },
+            { label: 'تسجيل طالب جديد', link: '/students/create' },
+          ],
+        },
+        {
+          label: 'القبول والتسجيل',
+          match: '/admissions',
+          children: [
+            { label: 'قائمة طلبات الالتحاق', link: '/admissions/applications' },
+            { label: 'تسجيل طلب جديد', link: '/admissions/applications/new' },
+            { label: 'المراجعة', link: '/admissions/review' },
+            { label: 'المقابلات', link: '/admissions/interviews' },
+            { label: 'المستندات', link: '/admissions/documents' },
+            { label: 'قرارات القبول', link: '/admissions/acceptance' },
+            { label: 'التسجيل النهائي', link: '/admissions/enrollment' },
+            { label: 'قائمة الانتظار', link: '/admissions/waiting-list' },
+            { label: 'المنح الدراسية', link: '/admissions/scholarships' },
+            { label: 'لوحة القبول', link: '/admissions/dashboard' },
+            { label: 'إعدادات القبول', link: '/admissions/settings' },
+          ],
+        },
         { label: 'الشؤون الأكاديمية', link: '/academics' },
         { label: 'الجداول الدراسية', link: '/timetable' },
+        { label: 'الجدولة', link: '/scheduling' },
+        { label: 'الامتحانات', link: '/examinations' },
+        { label: 'شؤون المعلمين', link: '/teachers' },
       ],
     },
     {
-      label: 'العمليات',
+      label: 'الموارد البشرية',
       items: [
-        { label: 'المالية', link: '/finance' },
         { label: 'الموارد البشرية', link: '/hr' },
         { label: 'الرواتب', link: '/payroll' },
+        { label: 'الحضور والانصراف', link: '/attendance' },
+      ],
+    },
+    {
+      label: 'المالية والمشتريات',
+      items: [
+        { label: 'المالية', link: '/finance' },
+        {
+          label: 'حسابات الطلاب المالية',
+          match: '/student-finance',
+          children: [
+            { label: 'حسابات الطلاب', link: '/student-finance/accounts' },
+            { label: 'فواتير الطلاب', link: '/student-finance/invoices' },
+            { label: 'سندات القبض والمدفوعات', link: '/student-finance/receipts' },
+            { label: 'الأرصدة المستحقة', link: '/student-finance/outstanding' },
+          ],
+        },
         { label: 'المشتريات', link: '/procurement' },
       ],
     },
     {
-      label: 'الخدمات',
+      label: 'سلسلة الإمداد والخدمات',
       items: [
-        { label: 'مكتب المساعدة', link: '/maintenance', count: 24, countKind: 'warning' },
-        { label: 'التحليلات والتقارير', link: '/reporting' },
+        { label: 'المخزون', link: '/inventory' },
+        { label: 'الأصول', link: '/assets' },
+        { label: 'النقل', link: '/transport' },
+        { label: 'المكتبة', link: '/library' },
+        { label: 'العيادة', link: '/clinic' },
+        { label: 'الصيانة', link: '/maintenance' },
+      ],
+    },
+    {
+      label: 'العلاقات والاتصال',
+      items: [
+        { label: 'إدارة علاقات العملاء', link: '/crm' },
+        { label: 'الاتصالات', link: '/communications' },
+        { label: 'البوابات', link: '/portal' },
+      ],
+    },
+    {
+      label: 'المعرفة والأتمتة',
+      items: [
+        { label: 'التقارير والتحليلات', link: '/reporting' },
+        { label: 'إدارة المستندات', link: '/documents' },
+        { label: 'النماذج', link: '/forms' },
+        { label: 'الأتمتة', link: '/automation' },
+        { label: 'محرك القواعد', link: '/rules' },
+      ],
+    },
+    {
+      label: 'النظام والإدارة',
+      items: [
+        { label: 'منصة النظام', link: '/platform' },
+        { label: 'الإعدادات والميزات', link: '/config' },
+        { label: 'التكامل', link: '/integration' },
+        { label: 'التخصيص', link: '/personalization' },
+        { label: 'لوحة الأوامر', link: '/command' },
+        { label: 'الهيكل التنظيمي', link: '/organization' },
         { label: '✦ مساعد نبراس', link: '/ai', ai: true },
       ],
     },
@@ -422,6 +593,7 @@ export class DashboardLayoutComponent {
     academics: 'الشؤون الأكاديمية',
     timetable: 'الجداول الدراسية',
     finance: 'المالية',
+    'student-finance': 'حسابات الطلاب المالية',
     hr: 'الموارد البشرية',
     payroll: 'الرواتب',
     procurement: 'المشتريات',

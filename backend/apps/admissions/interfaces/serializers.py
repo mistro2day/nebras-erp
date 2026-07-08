@@ -1,5 +1,14 @@
 from rest_framework import serializers
-from apps.admissions.domain.models import Applicant, Guardian, RequiredDocument, Interview, PlacementTest
+from apps.admissions.domain.models import (
+    Applicant, Guardian, RequiredDocument, Interview, PlacementTest, AdmissionSettings,
+)
+
+
+class AdmissionSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdmissionSettings
+        fields = '__all__'
+        read_only_fields = ['id', 'tenant_id', 'created_at', 'updated_at', 'deleted_at']
 
 class RequiredDocumentSerializer(serializers.ModelSerializer):
     class Meta:

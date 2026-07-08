@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { ApiClientService } from '../../core/services/api-client.service';
 
 export interface DashboardStats {
   outstanding_receivables: number;
@@ -12,12 +13,51 @@ export interface DashboardStats {
   due_installments: number;
 }
 
+/** استجابة القوائم الموحّدة من الخادم (StandardPagination) */
+export interface PagedResponse<T> {
+  success: boolean;
+  metadata: {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    current_page: number;
+    total_pages: number;
+  };
+  data: T[];
+}
+
+/** معاملات القوائم الخادمية (page / page_size / search / ordering) */
+export type ListParams = Record<string, string | number | undefined>;
+
 @Injectable({
   providedIn: 'root'
 })
 export class StudentFinanceService {
   private http = inject(HttpClient);
+  /** عميل الـ API الموحّد (يمرّ عبر معترض المصادقة والمستأجر — نفس نمط وحدة الطلاب) */
+  private api = inject(ApiClientService);
   private apiUrl = '/api/v1/student-finance';
+
+  // ---- قوائم تشغيلية مُرقّمة خادميًا (تُستخدم في الصفحات العاملة) ----
+  listBillingAccounts(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/billing-accounts/', params);
+  }
+
+  listInvoices(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/invoices/', params);
+  }
+
+  listReceipts(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/receipts/', params);
+  }
+
+  listReceivables(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/receivables/', params);
+  }
+
+  listScholarships(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/scholarships/', params);
+  }
 
   // Signals for state management
   stats = signal<DashboardStats | null>(null);

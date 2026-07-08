@@ -121,12 +121,12 @@ export class StudentCreateComponent implements OnInit {
 
     this.studentsService.createStudentFromApplicant(applicant.id).subscribe(res => {
       if (res && res.success) {
-        this.router.navigate([`/features/students/details/${res.data.id}`]);
+        this.router.navigate(['/students/details', res.data.id]);
       }
     });
   }
 
   cancel() {
-    this.router.navigate(['/features/students/list']);
+    this.router.navigate(['/students/list']);
   }
 }

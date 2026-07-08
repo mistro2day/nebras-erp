@@ -19,6 +19,10 @@ export const STUDENT_ROUTES: Routes = [
     loadComponent: () => import('./create/create.component').then(m => m.StudentCreateComponent)
   },
   {
+    path: 'edit/:id',
+    loadComponent: () => import('./edit/edit.component').then(m => m.StudentEditComponent)
+  },
+  {
     path: 'details/:id',
     loadComponent: () => import('./details/details.component').then(m => m.StudentDetailsComponent)
   }

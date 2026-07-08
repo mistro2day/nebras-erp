@@ -1,14 +1,28 @@
 import { Routes } from '@angular/router';
 import { DashboardLayoutComponent } from './layouts/dashboard-layout/dashboard-layout.component';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
     path: 'accounts',
     loadChildren: () => import('./features/accounts/accounts.routes').then((m) => m.ACCOUNTS_ROUTES),
   },
+  // البوابة العامة لتسجيل الطلاب — عامة بلا مصادقة ولا شريط جانبي.
+  {
+    path: 'apply',
+    loadComponent: () =>
+      import('./features/admissions/public/public-apply.component').then((m) => m.PublicApplyComponent),
+  },
+  {
+    path: 'apply/track',
+    loadComponent: () =>
+      import('./features/admissions/public/public-track.component').then((m) => m.PublicTrackComponent),
+  },
   {
     path: '',
     component: DashboardLayoutComponent,
+    // بوابة الدخول: لا تُعرض لوحة التحكم قبل المصادقة — يُعاد التوجيه إلى /accounts/login.
+    canActivate: [authGuard],
     children: [
       {
         path: 'dashboard',

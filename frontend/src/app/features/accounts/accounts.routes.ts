@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from '../../core/guards/auth.guard';
 
 export const ACCOUNTS_ROUTES: Routes = [
   {
@@ -22,6 +23,7 @@ export const ACCOUNTS_ROUTES: Routes = [
   },
   {
     path: 'security',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./security-dashboard/security-dashboard.component').then(
         (m) => m.SecurityDashboardComponent
@@ -29,6 +31,7 @@ export const ACCOUNTS_ROUTES: Routes = [
   },
   {
     path: 'permissions',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./permissions-matrix/permissions-matrix.component').then(
         (m) => m.PermissionsMatrixComponent

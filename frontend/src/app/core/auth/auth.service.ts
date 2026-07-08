@@ -2,6 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface AuthResponse {
   access: string;
@@ -32,7 +33,7 @@ export class AuthService {
   isSuperuser = computed(() => this.currentUser()?.is_superuser || false);
 
   login(credentials: any): Observable<any> {
-    return this.http.post<any>('/api/v1/identity/login/', credentials).pipe(
+    return this.http.post<any>(`${environment.apiUrl}identity/login/`, credentials).pipe(
       tap(response => {
         if (response.success) {
           const authData: AuthResponse = response.data;
@@ -52,7 +53,7 @@ export class AuthService {
 
   logout(): Observable<any> {
     const refresh = localStorage.getItem('refresh_token');
-    return this.http.post<any>('/api/v1/identity/logout/', { refresh }).pipe(
+    return this.http.post<any>(`${environment.apiUrl}identity/logout/`, { refresh }).pipe(
       tap(() => {
         this.clearSession();
       })

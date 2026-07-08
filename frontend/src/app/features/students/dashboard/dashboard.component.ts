@@ -97,10 +97,10 @@ export class StudentsDashboardComponent implements OnInit {
   }
 
   navigateToList() {
-    this.router.navigate(['/features/students/list']);
+    this.router.navigate(['/students/list']);
   }
 
   navigateToCreate() {
-    this.router.navigate(['/features/students/create']);
+    this.router.navigate(['/students/create']);
   }
 }

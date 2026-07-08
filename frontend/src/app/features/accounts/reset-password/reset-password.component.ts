@@ -1,92 +1,50 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { ApiClientService } from '../../../core/services/api-client.service';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AuthLayoutComponent } from '../shared/auth-layout.component';
 
+/**
+ * تعيين كلمة مرور جديدة — لغة تصميم Nebras OS عبر الغلاف المشترك AuthLayoutComponent.
+ * منطق الخدمة والتحقق (تطابق كلمتي المرور) والتوجيه كما هي — استُبدلت طبقة العرض فقط.
+ */
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [FormsModule, ReactiveFormsModule, CommonModule, RouterModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReactiveFormsModule, RouterModule, AuthLayoutComponent],
   template: `
-    <div class="auth-wrapper" dir="rtl">
-      <div class="auth-card">
-        <div class="header">
-          <h2>تعيين كلمة مرور جديدة</h2>
-          <p>أدخل كلمة المرور الجديدة لحسابك.</p>
+    <app-auth-layout
+      title="تعيين كلمة مرور جديدة"
+      subtitle="أدخل كلمة المرور الجديدة لحسابك."
+    >
+      <form [formGroup]="resetForm" (ngSubmit)="onSubmit()">
+        <div class="auth-field">
+          <label for="password">كلمة المرور الجديدة</label>
+          <input class="auth-input" type="password" id="password" formControlName="password" placeholder="••••••••" />
         </div>
 
-        <form [formGroup]="resetForm" (ngSubmit)="onSubmit()">
-          <div class="form-group">
-            <label for="password">كلمة المرور الجديدة</label>
-            <input 
-              type="password" 
-              id="password" 
-              formControlName="password" 
-              class="form-control" 
-              placeholder="••••••••" 
-            />
-          </div>
+        <div class="auth-field">
+          <label for="confirmPassword">تأكيد كلمة المرور</label>
+          <input class="auth-input" type="password" id="confirmPassword" formControlName="confirmPassword" placeholder="••••••••" />
+          @if (resetForm.errors?.['mismatch'] && resetForm.get('confirmPassword')?.touched) {
+            <div class="auth-hint">كلمات المرور غير متطابقة.</div>
+          }
+        </div>
 
-          <div class="form-group">
-            <label for="confirmPassword">تأكيد كلمة المرور</label>
-            <input 
-              type="password" 
-              id="confirmPassword" 
-              formControlName="confirmPassword" 
-              class="form-control" 
-              placeholder="••••••••" 
-            />
-            <div *ngIf="resetForm.errors?.['mismatch'] && resetForm.get('confirmPassword')?.touched" class="validation-msg">
-              كلمات المرور غير متطابقة.
-            </div>
-          </div>
+        <button type="submit" class="nb-btn-primary auth-submit" [disabled]="isLoading() || resetForm.invalid">
+          {{ isLoading() ? 'جاري التحديث...' : 'حفظ كلمة المرور الجديدة' }}
+        </button>
+      </form>
 
-          <button type="submit" class="nb-btn-primary w-100" [disabled]="isLoading() || resetForm.invalid">
-            {{ isLoading() ? 'جاري التحديث...' : 'حفظ كلمة المرور الجديدة' }}
-          </button>
-        </form>
-
-        <div *ngIf="successMessage()" class="success-msg">{{ successMessage() }}</div>
-        <div *ngIf="errorMessage()" class="error-msg">{{ errorMessage() }}</div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .auth-wrapper {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      background: var(--nb-bg);
-      font-family: var(--nb-font-family);
-    }
-    .auth-card {
-      width: 100%;
-      max-width: 420px;
-      padding: 32px;
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      box-shadow: var(--nb-shadow-dialog);
-    }
-    .header { text-align: center; margin-bottom: 24px; }
-    .header h2 { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0 0 8px; }
-    .header p { font-size: 13px; color: var(--nb-text-muted); margin: 0; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; margin-bottom: 5px; color: var(--nb-text); font-size: 12px; font-weight: 600; }
-    .form-control {
-      width: 100%; height: 34px; padding: 0 12px;
-      border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
-      background: var(--nb-surface); color: var(--nb-text);
-      font-family: var(--nb-font-family); font-size: 13px; outline: none;
-    }
-    .form-control:focus { border-color: var(--nb-primary-400); box-shadow: var(--nb-focus-ring); }
-    .w-100 { width: 100%; }
-    .success-msg { color: var(--nb-success); margin-top: 16px; text-align: center; font-size: 13px; }
-    .error-msg { color: var(--nb-danger); margin-top: 16px; text-align: center; font-size: 13px; }
-    .validation-msg { color: var(--nb-danger); font-size: 11px; margin-top: 4px; }
-  `]
+      @if (successMessage()) {
+        <div class="auth-success">{{ successMessage() }}</div>
+      }
+      @if (errorMessage()) {
+        <div class="auth-error">{{ errorMessage() }}</div>
+      }
+    </app-auth-layout>
+  `
 })
 export class ResetPasswordComponent {
   private fb = inject(FormBuilder);

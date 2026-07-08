@@ -60,3 +60,20 @@ a {
 .mat-mdc-snack-bar-container {
   direction: rtl;
 }
+
+/*
+ * إصلاح جذري لهيكل التطبيق:
+ * المكوّنات المُوجَّهة داخل <router-outlet> تُدرَج كعناصر شقيقة داخل ".page"،
+ * لكن عنصر المضيف (host) لمكوّن Angular هو inline افتراضيًا — فلا ينمو ليملأ
+ * العرض، ما يترك فراغًا كبيرًا على الجانب. القاعدة التالية تجعل كل مكوّن مُوجَّه
+ * عنصرًا مرنًا يملأ العرض والارتفاع المتاحين (نمط .page{flex:1} الداخلي الموحّد).
+ * تُطبَّق عالميًا (خارج تغليف المكوّن) لأن المضيف يُدرَج ديناميكيًا ولا تصله
+ * الأنماط المُغلَّفة الخاصة بمكوّن التخطيط.
+ */
+app-dashboard-layout > .shell > .main > .page > *:not(router-outlet):not(script):not(style) {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

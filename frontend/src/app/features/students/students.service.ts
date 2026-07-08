@@ -1,5 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { ApiClientService } from '../../core/services/api-client.service';
+import { environment } from '../../../environments/environment';
 import { Observable, tap } from 'rxjs';
 
 export interface Student {
@@ -79,6 +81,7 @@ function normalizeStudent(student: Partial<Student>): Student {
 })
 export class StudentsService {
   private apiClient = inject(ApiClientService);
+  private http = inject(HttpClient);
 
   // Angular Signals for State Management
   students = signal<Student[]>([]);
@@ -170,5 +173,13 @@ export class StudentsService {
     const formData = new FormData();
     formData.append('file', file);
     return this.apiClient.post('students/students/bulk-import/', formData);
+  }
+
+  /** تصدير قائمة الطلاب CSV (نقطة نهاية حقيقية bulk-export؛ المصادقة والمستأجر يُحقنان عبر الـ interceptor) */
+  bulkExport(params?: Record<string, string>): Observable<Blob> {
+    return this.http.get(`${environment.apiUrl}students/students/bulk-export/`, {
+      params: params ?? {},
+      responseType: 'blob',
+    });
   }
 }

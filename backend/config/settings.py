@@ -158,6 +158,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+# السماح برأس المستأجر المخصص في طلبات الواجهة عبر المصادر (CORS preflight)
+from corsheaders.defaults import default_headers  # noqa: E402
+CORS_ALLOW_HEADERS = list(default_headers) + ['x-tenant-id']
+
 # ---------------------------------------------------------------------------
 # R19: Celery configuration (production integration for the Automation Platform)
 # ---------------------------------------------------------------------------
