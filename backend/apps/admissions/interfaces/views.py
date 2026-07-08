@@ -168,10 +168,23 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
         from apps.academics.domain.models import AcademicYear, Grade
         tenant = getattr(request, 'tenant', None)
         if not tenant:
-            return Response(
-                {'success': False, 'message': 'تعذّر تحديد المدرسة (المستأجر).'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({
+                'success': True,
+                'data': {
+                    'tenant_name': '',
+                    'is_open': False,
+                    'terms': '',
+                    'required_documents': [],
+                    'closed_message': '',
+                    'application_fee': '0',
+                    'registration_start': None,
+                    'registration_end': None,
+                    'contact_phone': '',
+                    'contact_email': '',
+                    'academic_years': [],
+                    'grades': [],
+                },
+            })
 
         settings_obj = _get_admission_settings(tenant.id)
 

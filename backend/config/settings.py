@@ -1,6 +1,13 @@
 import os
 import sys
 
+# Load environment variables from a local, git-ignored `.env` file (local dev).
+# Real environment variables (e.g. on Render) take precedence because
+# load_dotenv() does not override existing variables by default.
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Settings for Nebras ERP
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -109,20 +116,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
+# Database: Neon PostgreSQL only. SQLite support has been removed.
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL or not str(DATABASE_URL).strip():
+    from django.core.exceptions import ImproperlyConfigured
 
-database_url = os.environ.get('DATABASE_URL')
-if database_url and str(database_url).strip():
-    import dj_database_url
-    DATABASES['default'] = dj_database_url.config(
-        conn_max_age=600,
-        ssl_require=True
+    raise ImproperlyConfigured(
+        "DATABASE_URL environment variable is required and must point to the "
+        "Neon PostgreSQL database. SQLite is no longer supported."
     )
+import dj_database_url
+
+DATABASES = {
+    'default': dj_database_url.config(
+        conn_max_age=600,
+        ssl_require=True,
+    )
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
