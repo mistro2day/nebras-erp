@@ -5,11 +5,11 @@
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "angular",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" },
     {
       "source": "/api/v1/(.*)",
       "destination": "https://nebras-erp-api-85v9.onrender.com/api/v1/$1"
-    }
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
