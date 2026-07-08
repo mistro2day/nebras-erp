@@ -89,8 +89,14 @@ export class AdmissionsService {
   }
 
   // ---- إجراءات المراجعة (Review Actions) ----
+  /** الخادم يعرّف set-status كـ PATCH — استخدام POST يعيد 405. */
   setApplicantStatus(id: string, status: string): Observable<any> {
-    return this.apiClient.post(`admissions/applicants/${id}/set-status/`, { status });
+    return this.apiClient.patch(`admissions/applicants/${id}/set-status/`, { status });
+  }
+
+  /** تحويل المتقدم المقبول إلى طالب مُسجّل (وحدة الطلاب). */
+  enrollApplicantAsStudent(applicantId: string): Observable<any> {
+    return this.apiClient.post('students/students/create-from-applicant/', { applicant_id: applicantId });
   }
 
   scheduleInterview(id: string, body: { scheduled_at: string; evaluation_score?: number; recommendation?: string }): Observable<any> {

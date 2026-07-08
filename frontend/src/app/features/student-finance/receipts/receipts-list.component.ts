@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
@@ -15,7 +16,7 @@ import { downloadCsv } from '../accounts/accounts-list.component';
   selector: 'app-sf-receipts-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -24,7 +25,38 @@ import { downloadCsv } from '../accounts/accounts-list.component';
       >
         <button class="nb-btn-secondary" (click)="exportCsv()" [disabled]="filtered().length === 0">تصدير CSV</button>
         <button class="nb-btn-secondary" (click)="reload()">تحديث</button>
+        <button class="nb-btn-primary" (click)="toggleCreate()">{{ creating() ? 'إغلاق' : 'استلام دفعة' }}</button>
       </nb-page-header>
+
+      @if (creating()) {
+        <div class="create-panel">
+          <div class="cp-grid">
+            <div class="cfld req"><label>حساب الطالب</label>
+              <select [(ngModel)]="pf.billing_account_id">
+                <option value="">اختر الحساب…</option>
+                @for (a of accounts(); track a.id) {
+                  <option [value]="a.id">{{ a.account_number }} — مستحق: {{ a.outstanding_balance | number:'1.2-2' }}</option>
+                }
+              </select>
+            </div>
+            <div class="cfld req"><label>المبلغ (ر.س)</label>
+              <input type="number" min="0" step="0.01" [(ngModel)]="pf.amount" />
+            </div>
+            <div class="cfld req"><label>طريقة الدفع</label>
+              <select [(ngModel)]="pf.payment_method_id">
+                <option value="">اختر…</option>
+                @for (m of methods(); track m.id) { <option [value]="m.id">{{ m.name_ar }}</option> }
+              </select>
+            </div>
+            <button class="nb-btn-primary" (click)="receive()" [disabled]="payBusy() || !pf.billing_account_id || !pf.amount || !pf.payment_method_id">
+              {{ payBusy() ? 'جارٍ الاستلام…' : 'استلام وتوليد سند' }}
+            </button>
+          </div>
+          @if (methods().length === 0 && lookupsLoaded()) {
+            <p class="cp-hint">لا توجد طرق دفع معرّفة — أنشئها من وحدة المالية (طرق الدفع) أولًا.</p>
+          }
+        </div>
+      }
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">عدد السندات المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
@@ -95,6 +127,17 @@ import { downloadCsv } from '../accounts/accounts-list.component';
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .create-panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 14px; animation: paneIn 220ms cubic-bezier(0.2,0,0,1); }
+    @keyframes paneIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .create-panel { animation: none; } }
+    .cp-grid { display: grid; grid-template-columns: 1.8fr 1fr 1.2fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 860px) { .cp-grid { grid-template-columns: 1fr; } }
+    .cfld { display: flex; flex-direction: column; gap: 5px; }
+    .cfld label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
+    .cfld.req label::after { content: ' *'; color: var(--nb-danger); }
+    .cfld input, .cfld select { height: 36px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
+    .cfld input:focus, .cfld select:focus { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); }
+    .cp-hint { font-size: 12px; color: var(--nb-text-muted); margin: 10px 0 0; }
     .stat-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .mini { display: flex; flex-direction: column; gap: 3px; background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 10px 14px; min-width: 170px; }
     .mini-label { font-size: 11px; color: var(--nb-text-muted); }
@@ -125,6 +168,45 @@ import { downloadCsv } from '../accounts/accounts-list.component';
 })
 export class SfReceiptsListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
+  private readonly snack = inject(MatSnackBar);
+
+  // ---- استلام دفعة (دورة: فاتورة ← سند قبض) ----
+  readonly creating = signal(false);
+  readonly payBusy = signal(false);
+  readonly lookupsLoaded = signal(false);
+  readonly accounts = signal<any[]>([]);
+  readonly methods = signal<any[]>([]);
+  pf = { billing_account_id: '', amount: 0, payment_method_id: '' };
+
+  toggleCreate(): void {
+    this.creating.update((v) => !v);
+    if (this.creating() && !this.lookupsLoaded()) {
+      this.svc.listBillingAccounts({ page_size: 100 }).subscribe((res) => this.accounts.set(res?.data ?? []));
+      this.svc.listPaymentMethods().subscribe({
+        next: (res) => { this.methods.set(res?.data ?? []); this.lookupsLoaded.set(true); },
+        error: () => this.lookupsLoaded.set(true),
+      });
+    }
+  }
+
+  receive(): void {
+    if (this.payBusy()) return;
+    this.payBusy.set(true);
+    this.svc.receiveStudentPayment({ ...this.pf, amount: +this.pf.amount }).subscribe({
+      next: (res) => {
+        this.payBusy.set(false);
+        this.creating.set(false);
+        const num = res?.receipt_number || res?.data?.receipt_number || '';
+        this.snack.open(num ? `تم استلام الدفعة — سند رقم ${num}.` : 'تم استلام الدفعة وتوليد السند.', 'إغلاق', { duration: 5000 });
+        this.pf = { billing_account_id: '', amount: 0, payment_method_id: '' };
+        this.reload();
+      },
+      error: (e) => {
+        this.payBusy.set(false);
+        this.snack.open(e?.error?.message || e?.error?.error || 'تعذّر استلام الدفعة.', 'إغلاق', { duration: 5000 });
+      },
+    });
+  }
 
   readonly loading = signal(false);
   readonly rows = signal<any[]>([]);

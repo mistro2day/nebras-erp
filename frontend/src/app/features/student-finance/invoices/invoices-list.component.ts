@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { downloadCsv } from '../accounts/accounts-list.component';
 
 /**
@@ -15,7 +17,7 @@ import { downloadCsv } from '../accounts/accounts-list.component';
   selector: 'app-sf-invoices-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -24,7 +26,39 @@ import { downloadCsv } from '../accounts/accounts-list.component';
       >
         <button class="nb-btn-secondary" (click)="exportCsv()" [disabled]="filtered().length === 0">تصدير CSV</button>
         <button class="nb-btn-secondary" (click)="reload()">تحديث</button>
+        <button class="nb-btn-primary" (click)="toggleCreate()">{{ creating() ? 'إغلاق' : 'إنشاء فاتورة' }}</button>
       </nb-page-header>
+
+      @if (creating()) {
+        <div class="create-panel">
+          <div class="cp-grid">
+            <div class="cfld req"><label>حساب الطالب</label>
+              <select [(ngModel)]="gf.billing_account_id">
+                <option value="">اختر الحساب…</option>
+                @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.account_number }}</option> }
+              </select>
+            </div>
+            <div class="cfld req"><label>تاريخ الاستحقاق</label>
+              <nb-datepicker [(value)]="gf.due_date" ariaLabel="تاريخ الاستحقاق"></nb-datepicker>
+            </div>
+            <button class="nb-btn-primary" (click)="generate()" [disabled]="genBusy() || !gf.billing_account_id || !gf.due_date || selectedFees().length === 0">
+              {{ genBusy() ? 'جارٍ الإنشاء…' : 'توليد الفاتورة' }}
+            </button>
+          </div>
+          <div class="cp-label">هياكل الرسوم <span>(اختر بندًا واحدًا على الأقل)</span></div>
+          <div class="chips">
+            @for (fs of feeStructures(); track fs.id) {
+              <label class="chip" [class.sel]="isFeeSelected(fs.id)">
+                <input type="checkbox" [checked]="isFeeSelected(fs.id)" (change)="toggleFee(fs.id)" />
+                {{ fs.name }} — {{ fs.amount | number:'1.2-2' }} ر.س
+              </label>
+            }
+            @if (feeStructures().length === 0 && lookupsLoaded()) {
+              <span class="cp-hint">لا توجد هياكل رسوم معرّفة بعد — أنشئها من إعدادات الرسوم في الخادم.</span>
+            }
+          </div>
+        </div>
+      }
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">إجمالي الفواتير المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
@@ -103,6 +137,22 @@ import { downloadCsv } from '../accounts/accounts-list.component';
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .create-panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 14px; animation: paneIn 220ms cubic-bezier(0.2,0,0,1); }
+    @keyframes paneIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .create-panel { animation: none; } }
+    .cp-grid { display: grid; grid-template-columns: 1.6fr 1.2fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 760px) { .cp-grid { grid-template-columns: 1fr; } }
+    .cfld { display: flex; flex-direction: column; gap: 5px; }
+    .cfld label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
+    .cfld.req label::after { content: ' *'; color: var(--nb-danger); }
+    .cfld select { height: 36px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
+    .cp-label { font-size: 12px; font-weight: 600; color: var(--nb-text); margin: 14px 0 8px; }
+    .cp-label span { font-weight: 400; color: var(--nb-text-muted); font-size: 11px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 12px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-pill); cursor: pointer; color: var(--nb-text-secondary); transition: background 150ms ease, border-color 150ms ease; }
+    .chip.sel { background: var(--nb-primary-50); border-color: var(--nb-primary-600); color: var(--nb-primary-600); font-weight: 600; }
+    .chip input { display: none; }
+    .cp-hint { font-size: 12px; color: var(--nb-text-muted); }
     .stat-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .mini { display: flex; flex-direction: column; gap: 3px; background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 10px 14px; min-width: 160px; }
     .mini-label { font-size: 11px; color: var(--nb-text-muted); }
@@ -133,6 +183,56 @@ import { downloadCsv } from '../accounts/accounts-list.component';
 })
 export class SfInvoicesListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
+  private readonly snack = inject(MatSnackBar);
+
+  // ---- توليد فاتورة (دورة: حساب ← فاتورة) ----
+  readonly creating = signal(false);
+  readonly genBusy = signal(false);
+  readonly lookupsLoaded = signal(false);
+  readonly accounts = signal<any[]>([]);
+  readonly feeStructures = signal<any[]>([]);
+  readonly selectedFees = signal<string[]>([]);
+  gf = { billing_account_id: '', due_date: '' };
+
+  isFeeSelected(id: string): boolean { return this.selectedFees().includes(id); }
+  toggleFee(id: string): void {
+    this.selectedFees.update((l) => l.includes(id) ? l.filter((x) => x !== id) : [...l, id]);
+  }
+
+  toggleCreate(): void {
+    this.creating.update((v) => !v);
+    if (this.creating() && !this.lookupsLoaded()) {
+      this.svc.listBillingAccounts({ page_size: 100 }).subscribe((res) => this.accounts.set(res?.data ?? []));
+      this.svc.listFeeStructures().subscribe({
+        next: (res) => { this.feeStructures.set(res?.data ?? []); this.lookupsLoaded.set(true); },
+        error: () => this.lookupsLoaded.set(true),
+      });
+    }
+  }
+
+  generate(): void {
+    if (this.genBusy()) return;
+    this.genBusy.set(true);
+    this.svc.generateStudentInvoice({
+      billing_account_id: this.gf.billing_account_id,
+      fee_structure_ids: this.selectedFees(),
+      due_date: this.gf.due_date,
+    }).subscribe({
+      next: (res) => {
+        this.genBusy.set(false);
+        this.creating.set(false);
+        const num = res?.invoice_number || res?.data?.invoice_number || '';
+        this.snack.open(num ? `تم توليد الفاتورة ${num} بنجاح.` : 'تم توليد الفاتورة بنجاح.', 'إغلاق', { duration: 4000 });
+        this.gf = { billing_account_id: '', due_date: '' };
+        this.selectedFees.set([]);
+        this.reload();
+      },
+      error: (e) => {
+        this.genBusy.set(false);
+        this.snack.open(e?.error?.message || e?.error?.error || 'تعذّر توليد الفاتورة.', 'إغلاق', { duration: 5000 });
+      },
+    });
+  }
 
   readonly loading = signal(false);
   readonly rows = signal<any[]>([]);

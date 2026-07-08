@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
+import { StudentsService } from '../../students/students.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
@@ -16,7 +18,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
   selector: 'app-sf-accounts-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -25,7 +27,35 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
       >
         <button class="nb-btn-secondary" (click)="exportCsv()" [disabled]="filtered().length === 0">تصدير CSV</button>
         <button class="nb-btn-secondary" (click)="reload()">تحديث</button>
+        <button class="nb-btn-primary" (click)="toggleCreate()">{{ creating() ? 'إغلاق' : 'فتح حساب لطالب' }}</button>
       </nb-page-header>
+
+      @if (creating()) {
+        <div class="create-panel">
+          <div class="cp-grid">
+            <div class="cfld req"><label>الطالب</label>
+              <select [(ngModel)]="cf.student_id">
+                <option value="">اختر الطالب…</option>
+                @for (s of studentsWithoutAccount(); track s.id) {
+                  <option [value]="s.id">{{ s.profile?.arabic_name || s.student_number }} — {{ s.student_number }}</option>
+                }
+              </select>
+            </div>
+            <div class="cfld req"><label>رقم الحساب</label>
+              <input [(ngModel)]="cf.account_number" placeholder="SF-2026-0001" />
+            </div>
+            <div class="cfld"><label>الرصيد الافتتاحي</label>
+              <input type="number" [(ngModel)]="cf.opening_balance" />
+            </div>
+            <button class="nb-btn-primary" (click)="createAccount()" [disabled]="createBusy() || !cf.student_id || !cf.account_number">
+              {{ createBusy() ? 'جارٍ الفتح…' : 'فتح الحساب' }}
+            </button>
+          </div>
+          @if (studentsWithoutAccount().length === 0 && studentsLoaded()) {
+            <p class="cp-hint">كل الطلاب المسجّلين لديهم حسابات فوترة بالفعل.</p>
+          }
+        </div>
+      }
 
       <div class="filter-bar">
         <div class="search">
@@ -100,6 +130,17 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .create-panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 14px; animation: paneIn 220ms cubic-bezier(0.2,0,0,1); }
+    @keyframes paneIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .create-panel { animation: none; } }
+    .cp-grid { display: grid; grid-template-columns: 2fr 1.4fr 1fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 860px) { .cp-grid { grid-template-columns: 1fr; } }
+    .cfld { display: flex; flex-direction: column; gap: 5px; }
+    .cfld label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
+    .cfld.req label::after { content: ' *'; color: var(--nb-danger); }
+    .cfld input, .cfld select { height: 36px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
+    .cfld input:focus, .cfld select:focus { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); }
+    .cp-hint { font-size: 12px; color: var(--nb-text-muted); margin: 10px 0 0; }
     .filter-bar { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
     .search { flex: 1; min-width: 260px; height: 34px; background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); display: flex; align-items: center; padding: 0 12px; }
     .search input { flex: 1; border: none; background: transparent; outline: none; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); }
@@ -126,7 +167,52 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 })
 export class SfAccountsListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
+  private readonly studentsSvc = inject(StudentsService);
+  private readonly snack = inject(MatSnackBar);
   private readonly route = inject(ActivatedRoute);
+
+  // ---- فتح حساب فوترة لطالب (دورة: طالب ← حساب) ----
+  readonly creating = signal(false);
+  readonly createBusy = signal(false);
+  readonly studentsLoaded = signal(false);
+  private readonly allStudents = signal<any[]>([]);
+  cf = { student_id: '', account_number: '', opening_balance: 0 };
+
+  /** الطلاب الذين لا يملكون حساب فوترة بعد. */
+  readonly studentsWithoutAccount = computed(() => {
+    const linked = new Set(this.rows().map((a) => a.student_id));
+    return this.allStudents().filter((s) => !linked.has(s.id));
+  });
+
+  toggleCreate(): void {
+    this.creating.update((v) => !v);
+    if (this.creating() && !this.studentsLoaded()) {
+      this.studentsSvc.getStudents().subscribe({
+        next: () => { this.allStudents.set(this.studentsSvc.students()); this.studentsLoaded.set(true); },
+        error: () => this.studentsLoaded.set(true),
+      });
+      // اقتراح رقم حساب تلقائي
+      this.cf.account_number = `SF-${new Date().getFullYear()}-${String(this.total() + 1).padStart(4, '0')}`;
+    }
+  }
+
+  createAccount(): void {
+    if (this.createBusy() || !this.cf.student_id || !this.cf.account_number) return;
+    this.createBusy.set(true);
+    this.svc.createBillingAccount({ ...this.cf }).subscribe({
+      next: (res) => {
+        this.createBusy.set(false);
+        this.creating.set(false);
+        this.snack.open(res?.message || 'تم فتح حساب الفوترة بنجاح.', 'إغلاق', { duration: 4000 });
+        this.cf = { student_id: '', account_number: '', opening_balance: 0 };
+        this.reload();
+      },
+      error: (e) => {
+        this.createBusy.set(false);
+        this.snack.open(e?.error?.message || 'تعذّر فتح الحساب (تحقق من تفرّد رقم الحساب).', 'إغلاق', { duration: 5000 });
+      },
+    });
+  }
 
   readonly loading = signal(false);
   readonly rows = signal<any[]>([]);

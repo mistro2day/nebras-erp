@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApplicantQueueComponent } from '../shared/applicant-queue.component';
 import { QueueAction } from '../shared/admissions.shared';
 import { AdmissionsService } from '../admissions.service';
@@ -15,7 +16,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   selector: 'app-admissions-review',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, ApplicantQueueComponent],
+  imports: [FormsModule, MatDialogModule, MatSnackBarModule, ApplicantQueueComponent],
   template: `
     <app-applicant-queue
       title="مراجعة طلبات الالتحاق"
@@ -29,7 +30,10 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 })
 export class AdmissionsReviewComponent {
   private readonly dialog = inject(MatDialog);
+  private readonly snack = inject(MatSnackBar);
   private readonly svc = inject(AdmissionsService);
+
+  @ViewChild(ApplicantQueueComponent) queue?: ApplicantQueueComponent;
 
   statuses = ['submitted', 'under_review'];
   actions: QueueAction[] = [
@@ -65,8 +69,8 @@ export class AdmissionsReviewComponent {
     ref.afterClosed().subscribe((res: InterviewScheduleResult | null) => {
       if (!res) return;
       this.svc.scheduleInterview(row['id'], res).subscribe({
-        next: () => {},
-        error: () => {},
+        next: (r) => { this.snack.open(r?.message || 'تم جدولة المقابلة.', 'إغلاق', { duration: 4000 }); this.queue?.load(); },
+        error: (e) => this.snack.open(e?.error?.message || 'تعذّر جدولة المقابلة.', 'إغلاق', { duration: 5000 }),
       });
     });
   }
@@ -99,6 +103,9 @@ export class AdmissionsReviewComponent {
     else if (s === 'interview_scheduled') obs = this.svc.setApplicantStatus(id, s);
     else obs = this.svc.setApplicantStatus(id, s);
 
-    obs?.subscribe({ next: () => {}, error: () => {} });
+    obs?.subscribe({
+      next: (res: any) => { this.snack.open(res?.message || 'تم تنفيذ الإجراء.', 'إغلاق', { duration: 4000 }); this.queue?.load(); },
+      error: (e: any) => this.snack.open(e?.error?.message || 'تعذّر تنفيذ الإجراء.', 'إغلاق', { duration: 5000 }),
+    });
   }
 }

@@ -59,6 +59,32 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/scholarships/', params);
   }
 
+  // ---- دورة الفوترة: طالب ← حساب ← فاتورة ← سند قبض ----
+  /** فتح حساب فوترة لطالب (student_id + رقم حساب فريد). */
+  createBillingAccount(body: { student_id: string; account_number: string; opening_balance?: number }): Observable<any> {
+    return this.api.post('student-finance/billing-accounts/', body);
+  }
+
+  /** هياكل الرسوم المتاحة (لتوليد الفواتير). */
+  listFeeStructures(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/fee-structures/', { page_size: 100, ...(params ?? {}) });
+  }
+
+  /** طرق الدفع من وحدة المالية العامة. */
+  listPaymentMethods(): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('finance/payment-methods/', { page_size: 100 });
+  }
+
+  /** توليد فاتورة لحساب طالب من هياكل رسوم (خدمة الفوترة الخلفية). */
+  generateStudentInvoice(body: { billing_account_id: string; fee_structure_ids: string[]; due_date: string }): Observable<any> {
+    return this.api.post('student-finance/invoices/generate-invoice/', body);
+  }
+
+  /** استلام دفعة وتوليد سند قبض (يُخصَّص على المستحقات تلقائيًا). */
+  receiveStudentPayment(body: { billing_account_id: string; amount: number; payment_method_id: string; bank_account_id?: string; cash_box_id?: string }): Observable<any> {
+    return this.api.post('student-finance/receipts/receive-payment/', body);
+  }
+
   // Signals for state management
   stats = signal<DashboardStats | null>(null);
   loading = signal<boolean>(false);

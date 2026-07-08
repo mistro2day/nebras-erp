@@ -105,7 +105,11 @@ class StudentApplicationService:
                     created_by=user_id
                 )
                 
-        # 7. نشر حدث النطاق
+        # 7. تحديث حالة طلب التقديم إلى "مُسجّل" (ذرّي ضمن نفس المعاملة)
+        applicant.status = 'enrolled'
+        applicant.save(update_fields=['status', 'updated_at'])
+
+        # 8. نشر حدث النطاق
         DomainEventPublisher.publish("StudentCreated", {
             "student_id": str(student.id),
             "student_number": student_number,

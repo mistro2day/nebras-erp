@@ -158,8 +158,6 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
     # ==========================================================
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-config')
-
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-config')
     def public_config(self, request):
         """
         يزوّد بوابة التسجيل العامة بحالة فتح التسجيل وشروطه والسنوات والصفوف المتاحة.

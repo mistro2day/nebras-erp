@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApplicantQueueComponent } from '../shared/applicant-queue.component';
 import { QueueAction } from '../shared/admissions.shared';
 import { AdmissionsService } from '../admissions.service';
@@ -10,7 +11,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   selector: 'app-admissions-waiting-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, MatDialogModule, ApplicantQueueComponent],
+  imports: [FormsModule, MatDialogModule, MatSnackBarModule, ApplicantQueueComponent],
   template: `
     <app-applicant-queue
       title="قائمة الانتظار"
@@ -24,7 +25,10 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 })
 export class AdmissionsWaitingListComponent {
   private readonly dialog = inject(MatDialog);
+  private readonly snack = inject(MatSnackBar);
   private readonly svc = inject(AdmissionsService);
+
+  @ViewChild(ApplicantQueueComponent) queue?: ApplicantQueueComponent;
 
   statuses = ['waitlist'];
   actions: QueueAction[] = [
@@ -50,8 +54,11 @@ export class AdmissionsWaitingListComponent {
 
     ref.afterClosed().subscribe((ok: boolean) => {
       if (!ok) return;
-      if (action.toStatus === 'accepted') this.svc.acceptApplicant(row['id']).subscribe();
-      else if (action.toStatus === 'rejected') this.svc.rejectApplicant(row['id']).subscribe();
+      const obs = action.toStatus === 'accepted' ? this.svc.acceptApplicant(row['id']) : this.svc.rejectApplicant(row['id']);
+      obs.subscribe({
+        next: (res) => { this.snack.open(res?.message || 'تم تنفيذ الإجراء.', 'إغلاق', { duration: 4000 }); this.queue?.load(); },
+        error: (e) => this.snack.open(e?.error?.message || 'تعذّر تنفيذ الإجراء.', 'إغلاق', { duration: 5000 }),
+      });
     });
   }
 }

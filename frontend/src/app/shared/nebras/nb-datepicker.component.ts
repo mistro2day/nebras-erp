@@ -1,6 +1,6 @@
 import {
   ChangeDetectionStrategy, Component, ElementRef, EventEmitter, HostListener,
-  Input, Output, computed, inject, signal,
+  Input, OnDestroy, Output, computed, inject, signal,
 } from '@angular/core';
 
 interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; selected: boolean; disabled: boolean; }
@@ -118,7 +118,7 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
     .foot-btn:hover { background: var(--nb-primary-50); }
   `],
 })
-export class NbDatepickerComponent {
+export class NbDatepickerComponent implements OnDestroy {
   private readonly host = inject(ElementRef<HTMLElement>);
 
   /** الحالة الداخلية للقيمة (signal) — تُبقي العرض متزامنًا. */
@@ -199,11 +199,39 @@ export class NbDatepickerComponent {
 
   private syncPosition(): void {
     const btn = this.host.nativeElement.querySelector('.dp-field') as HTMLElement;
-    if (btn) {
-      const r = btn.getBoundingClientRect();
-      this._posTop.set(r.bottom + 6);
-      this._posLeft.set(r.left);
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const POP_W = 288;
+    const POP_H = 360; // ارتفاع تقريبي للوحة
+    // تثبيت أفقي داخل حدود الشاشة (RTL: نبدأ من حافة الحقل اليسرى ونتراجع عند الحاجة)
+    let left = r.left;
+    if (left + POP_W > window.innerWidth - 8) left = Math.max(8, window.innerWidth - POP_W - 8);
+    if (left < 8) left = 8;
+    // عمودي: افتح للأعلى إذا لا تتسع للأسفل
+    let top = r.bottom + 6;
+    if (top + POP_H > window.innerHeight - 8 && r.top - POP_H - 6 > 8) {
+      top = r.top - POP_H - 6;
     }
+    this._posTop.set(top);
+    this._posLeft.set(left);
+  }
+
+  /**
+   * إعادة التموضع عند التمرير/تغيير الحجم كي لا تنفصل اللوحة عن الحقل (position: fixed).
+   * الاستماع بالتقاط (capture) لأن حدث scroll لا يفقع من الحاويات الداخلية (.page).
+   */
+  private readonly onViewportChange = (): void => {
+    if (this.open()) this.syncPosition();
+  };
+
+  constructor() {
+    document.addEventListener('scroll', this.onViewportChange, true);
+    window.addEventListener('resize', this.onViewportChange);
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('scroll', this.onViewportChange, true);
+    window.removeEventListener('resize', this.onViewportChange);
   }
 
   private syncView(): void {
