@@ -1,0 +1,33 @@
+databases:
+  - name: nebras-erp-db
+    plan: starter
+    databaseName: nebras_erp
+    user: nebras_user
+    region: oregon
+
+services:
+  - type: web
+    name: nebras-erp-api
+    plan: starter
+    env: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    region: oregon
+    healthCheckPath: /api/v1/admissions/applicants/public-config/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nebras-erp-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://nebras-erp.vercel.app,https://*.vercel.app,http://localhost:4200"
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "True"
