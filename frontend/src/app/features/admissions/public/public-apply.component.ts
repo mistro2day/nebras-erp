@@ -36,10 +36,10 @@ interface PublicGuardianForm {
   template: `
     <div class="portal" dir="rtl">
       <header class="portal-top">
-        <div class="brand">
+        <a class="brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
           <div class="logo-mark">ن</div>
           <div class="brand-title">{{ tenantName() || 'نبراس' }} <span>· بوابة القبول</span></div>
-        </div>
+        </a>
         <a routerLink="/apply/track" class="track-link">تتبّع طلب سابق ←</a>
       </header>
 
@@ -206,7 +206,7 @@ interface PublicGuardianForm {
     :host { display: block; min-height: 100vh; background: var(--nb-bg); }
     .portal { min-height: 100vh; display: flex; flex-direction: column; }
     .portal-top { height: 60px; background: var(--nb-surface); border-bottom: 1px solid var(--nb-border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
-    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; }
     .logo-mark { width: 30px; height: 30px; background: var(--nb-primary-600); border-radius: var(--nb-radius); display: flex; align-items: center; justify-content: center; color: var(--nb-on-primary); font-weight: 700; }
     .brand-title { font-size: 15px; font-weight: 700; color: var(--nb-text); }
     .brand-title span { color: var(--nb-primary-600); font-weight: 600; }

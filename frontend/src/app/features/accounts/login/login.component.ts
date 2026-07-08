@@ -62,7 +62,15 @@ export class LoginComponent {
       },
       error: (err: any) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err.error?.error?.message || 'فشل تسجيل الدخول. يرجى التحقق من الاتصال.');
+        // تمييز نوع الخطأ: انقطاع شبكة (status 0) ≠ بيانات خاطئة ≠ خطأ خادم
+        const serverMsg = err?.error?.error?.message || err?.error?.message;
+        if (err?.status === 0) {
+          this.errorMessage.set('تعذّر الوصول إلى الخادم — تأكد من تشغيل الخادم الخلفي وأن العنوان http://localhost:4200 (وليس 127.0.0.1).');
+        } else if (err?.status >= 500) {
+          this.errorMessage.set(serverMsg || 'خطأ في الخادم. حاول لاحقًا أو راجع سجلات الخادم.');
+        } else {
+          this.errorMessage.set(serverMsg || 'فشل تسجيل الدخول. تحقق من البريد وكلمة المرور.');
+        }
       }
     });
   }

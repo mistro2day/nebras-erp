@@ -36,10 +36,10 @@ interface NavGroup {
     <div class="shell" dir="rtl">
       <!-- الشريط الجانبي (يمين في RTL) -->
       <aside class="sidebar">
-        <div class="sidebar-logo">
+        <a class="sidebar-logo" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
           <div class="logo-mark">ن</div>
           <div class="logo-title">نبراس <span>OS</span></div>
-        </div>
+        </a>
 
         <nav class="sidebar-nav">
           @for (group of navGroups; track group.label ?? 'root') {
@@ -172,7 +172,11 @@ interface NavGroup {
         padding: 0 16px;
         border-bottom: 1px solid var(--nb-border-soft);
         flex-shrink: 0;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 150ms ease;
       }
+      .sidebar-logo:hover { background: var(--nb-bg); }
 
       .logo-mark {
         width: 26px;

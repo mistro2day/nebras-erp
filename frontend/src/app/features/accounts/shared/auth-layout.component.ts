@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 /**
  * مكوّن الغلاف الموحّد لشاشات الحساب (تسجيل الدخول/الاستعادة/إعادة التعيين) — لغة تصميم Nebras OS.
@@ -14,12 +15,13 @@ import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation } from '@a
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
+  imports: [RouterLink],
   template: `
     <div class="auth-wrapper" dir="rtl">
       <div class="auth-card">
         <div class="auth-head">
           @if (brand) {
-            <div class="auth-brand">ن</div>
+            <a class="auth-brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">ن</a>
           }
           <h2 class="auth-title">{{ title }}</h2>
           @if (subtitle) {
@@ -57,7 +59,10 @@ import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation } from '@a
       border-radius: var(--nb-radius);
       display: flex; align-items: center; justify-content: center;
       font-size: 24px; font-weight: 700;
+      text-decoration: none; cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease;
     }
+    .auth-brand:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(16,24,40,0.18); }
     .auth-title { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0 0 6px; }
     .auth-subtitle { font-size: 13px; color: var(--nb-text-muted); margin: 0; line-height: 1.6; }
 

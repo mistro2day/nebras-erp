@@ -16,7 +16,7 @@ import { applicantStatusText } from '../shared/admissions.shared';
   template: `
     <div class="portal" dir="rtl">
       <header class="portal-top">
-        <a routerLink="/apply" class="brand">
+        <a routerLink="/welcome" class="brand" aria-label="الصفحة الرئيسية للموقع">
           <div class="logo-mark">ن</div>
           <div class="brand-title">بوابة القبول</div>
         </a>

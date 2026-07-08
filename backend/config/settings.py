@@ -231,3 +231,23 @@ try:
 except Exception:  # noqa: BLE001
     CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
     DJANGO_CELERY_BEAT_AVAILABLE = False
+
+# ==========================================================
+# تسجيل الأخطاء: طباعة تفاصيل أي استثناء (500) في الكونسول دائماً
+# حتى مع DEBUG=False — لتشخيص أعطال الإنتاج/التطوير بسهولة.
+# ==========================================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {'format': '[{levelname}] {asctime} {name} — {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
+    },
+    'loggers': {
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+        'apps': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+}

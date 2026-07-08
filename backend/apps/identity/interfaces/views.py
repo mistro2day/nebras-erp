@@ -81,21 +81,30 @@ class LoginView(APIView):
         # تسجيل الجلسة والجهاز الفعال
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         
-        # إنهاء الجلسات السابقة لنفس المتصفح والجهاز إذا لزم الأمر
-        UserSession.objects.create(
-            user=user,
-            tenant_id=tenant_id,
-            device_id=device_id,
-            device_name=device_name,
-            browser=browser,
-            operating_system=operating_system,
-            ip_address=request.META.get('REMOTE_ADDR', '127.0.0.1'),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            is_active=True
-        )
+        # خطوات ثانوية: فشلها لا يجب أن يُفشل الدخول بعد نجاح المصادقة (لا 500)
+        import logging
+        _log = logging.getLogger(__name__)
+        try:
+            UserSession.objects.create(
+                user=user,
+                tenant_id=tenant_id,
+                device_id=device_id,
+                device_name=device_name,
+                browser=browser,
+                operating_system=operating_system,
+                ip_address=request.META.get('REMOTE_ADDR', '127.0.0.1'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                is_active=True
+            )
+        except Exception:
+            _log.exception('login: UserSession create failed')
 
         # جلب الصلاحيات الفعالة
-        user_perms = PermissionCacheService.get_user_permissions(user, tenant_id)
+        try:
+            user_perms = PermissionCacheService.get_user_permissions(user, tenant_id)
+        except Exception:
+            _log.exception('login: permissions fetch failed')
+            user_perms = []
 
         return StandardResponse({
             'access': str(refresh.access_token),

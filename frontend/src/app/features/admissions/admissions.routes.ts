@@ -2,8 +2,9 @@ import { Routes } from '@angular/router';
 
 export const ADMISSIONS_ROUTES: Routes = [
   {
+    // الصفحة الرئيسية لوحدة القبول = قائمة طلبات الالتحاق (وحدة العمل الفعلية)
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'applications',
     pathMatch: 'full',
   },
   {

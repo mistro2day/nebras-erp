@@ -38,6 +38,21 @@ interface WorkflowLink {
         <nb-stat-card label="المقبولون" [value]="getCountByStatus('accepted') + getCountByStatus('enrolled')" valueKind="success"></nb-stat-card>
       </div>
 
+      <!-- قمع دورة القبول: أعداد حقيقية لكل مرحلة بشرائح متناسبة -->
+      <nb-panel title="قمع دورة القبول" subtitle="توزيع الطلبات على مراحل الدورة — من التقديم حتى التسجيل.">
+        <div class="funnel" role="img" [attr.aria-label]="'قمع القبول: ' + applicants().length + ' طلب'">
+          @for (st of funnelStages; track st.key) {
+            <a class="fseg" [routerLink]="st.link"
+               [style.--w.%]="segWidth(st.key)"
+               [class.empty]="getCountByStatus(st.key) === 0">
+              <span class="fseg-bar" [class]="'fseg-bar ' + st.tone"></span>
+              <span class="fseg-count">{{ getCountByStatus(st.key) }}</span>
+              <span class="fseg-label">{{ st.label }}</span>
+            </a>
+          }
+        </div>
+      </nb-panel>
+
       <nb-panel title="مسار القبول والتسجيل" subtitle="انتقل إلى أي مرحلة من مراحل معالجة الطلبات.">
         <nav class="wf-grid" aria-label="مراحل سير عمل القبول">
           @for (link of workflow; track link.path) {
@@ -123,6 +138,23 @@ interface WorkflowLink {
     .item-header strong { font-weight: 600; }
     .item-info { font-size: 11px; color: var(--nb-text-muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
     .no-data { color: var(--nb-text-muted); text-align: center; padding: 28px; font-size: 13px; }
+    /* ---- قمع دورة القبول ---- */
+    .funnel { display: flex; gap: 6px; align-items: stretch; }
+    .fseg { flex: var(--w, 10) 1 0; min-width: 72px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; padding: 4px 2px; border-radius: var(--nb-radius); transition: background 150ms ease; }
+    .fseg:hover { background: var(--nb-surface-raised); }
+    .fseg-bar { height: 10px; border-radius: 999px; background: var(--nb-border); transform-origin: right; animation: grow 500ms cubic-bezier(0.2,0,0,1) both; }
+    .fseg-bar.info { background: var(--nb-info); }
+    .fseg-bar.warning { background: var(--nb-warning); }
+    .fseg-bar.primary { background: var(--nb-primary-600); }
+    .fseg-bar.success { background: var(--nb-success); }
+    .fseg-bar.ai { background: var(--nb-primary-300, var(--nb-primary-600)); }
+    .fseg.empty .fseg-bar { background: var(--nb-border-soft); }
+    .fseg-count { font-size: 16px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+    .fseg.empty .fseg-count { color: var(--nb-text-faint); }
+    .fseg-label { font-size: 11px; font-weight: 600; color: var(--nb-text-muted); }
+    @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @media (prefers-reduced-motion: reduce) { .fseg-bar { animation: none; } }
+    @media (max-width: 700px) { .funnel { flex-wrap: wrap; } .fseg { min-width: 100px; } }
   `]
 })
 export class AdmissionsDashboardComponent implements OnInit {
@@ -145,6 +177,22 @@ export class AdmissionsDashboardComponent implements OnInit {
   ];
 
   recent = signal<Applicant[]>([]);
+
+  /** مراحل القمع بترتيب الدورة — كل شريحة تنقل لصفحتها. */
+  readonly funnelStages = [
+    { key: 'submitted', label: 'مُقدّم', tone: 'info', link: '/admissions/review' },
+    { key: 'under_review', label: 'قيد المراجعة', tone: 'warning', link: '/admissions/review' },
+    { key: 'interview_scheduled', label: 'مقابلة', tone: 'primary', link: '/admissions/interviews' },
+    { key: 'accepted', label: 'مقبول', tone: 'success', link: '/admissions/enrollment' },
+    { key: 'waitlist', label: 'انتظار', tone: 'ai', link: '/admissions/waiting-list' },
+    { key: 'enrolled', label: 'مُسجّل', tone: 'success', link: '/students/list' },
+  ];
+
+  /** عرض الشريحة نسبيًا (حد أدنى 8 كي تبقى قابلة للنقر حتى وهي صفر). */
+  segWidth(key: string): number {
+    const total = this.applicants().length || 1;
+    return Math.max(8, (this.getCountByStatus(key) / total) * 100);
+  }
 
   ngOnInit() {
     this.loadApplicants();

@@ -7,6 +7,11 @@ export const routes: Routes = [
     path: 'accounts',
     loadChildren: () => import('./features/accounts/accounts.routes').then((m) => m.ACCOUNTS_ROUTES),
   },
+  // بوابة الهبوط العامة — أول ما يراه الزائر (تقديم / تتبّع / دخول الإدارة).
+  {
+    path: 'welcome',
+    loadComponent: () => import('./features/public/landing.component').then((m) => m.LandingComponent),
+  },
   // البوابة العامة لتسجيل الطلاب — عامة بلا مصادقة ولا شريط جانبي.
   {
     path: 'apply',

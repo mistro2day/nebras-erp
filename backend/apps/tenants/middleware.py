@@ -44,6 +44,14 @@ class TenantMiddleware(MiddlewareMixin):
                 except Tenant.DoesNotExist:
                     raise Http404("المدرسة المطلوبة غير موجودة أو تم تعطيلها.")
 
+        # 3. نشر المدرسة الواحدة (Single-Tenant Fallback):
+        # إن لم يُحل المستأجر عبر الترويسة أو النطاق الفرعي (كما في النشر على Vercel
+        # بدون نطاقات فرعية)، وكان هناك مستأجر نشط واحد فقط، يُعتمد تلقائياً.
+        if not tenant:
+            active = list(Tenant.objects.filter(is_active=True)[:2])
+            if len(active) == 1:
+                tenant = active[0]
+
         if tenant:
             request.tenant = tenant
             set_current_tenant_id(tenant.id)
