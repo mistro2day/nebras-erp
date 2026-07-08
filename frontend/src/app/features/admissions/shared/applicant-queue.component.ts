@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdmissionsService, Applicant } from '../admissions.service';
@@ -70,7 +70,7 @@ import {
                 <span class="row-actions">
                   <button class="nb-btn-ghost sm" (click)="open(row); $event.stopPropagation()">عرض</button>
                   @for (a of actions; track a.toStatus) {
-                    <button [class]="'nb-btn-' + a.kind + ' sm'" (click)="transition(row, a); $event.stopPropagation()">{{ a.label }}</button>
+                    <button [class]="'nb-btn-' + a.kind + ' sm'" (click)="onAction(row, a); $event.stopPropagation()">{{ a.label }}</button>
                   }
                 </span>
               }
@@ -97,6 +97,7 @@ export class ApplicantQueueComponent implements OnInit {
   @Input() showStats = true;
   /** عند تمريره يظهر زر «تسجيل طلب جديد» ويوجّه إلى هذا المسار (تسجيل يدوي من المشرف) */
   @Input() createLink?: string;
+  @Output() actioned = new EventEmitter<{ row: Record<string, any>; action: QueueAction }>();
 
   readonly applicants = signal<Applicant[]>([]);
   search = '';
@@ -155,5 +156,9 @@ export class ApplicantQueueComponent implements OnInit {
 
   transition(row: Record<string, any>, action: QueueAction): void {
     this.service.updateApplicant(row['id'], { status: action.toStatus }).subscribe(() => this.load());
+  }
+
+  onAction(row: Record<string, any>, action: QueueAction): void {
+    this.actioned.emit({ row, action });
   }
 }

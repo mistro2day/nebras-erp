@@ -31,8 +31,8 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
         }
       </button>
 
-      @if (open()) {
-        <div class="dp-pop" role="dialog" aria-label="تقويم" (click)="$event.stopPropagation()">
+    @if (open()) {
+         <div class="dp-pop" role="dialog" aria-label="تقويم" (click)="$event.stopPropagation()" [style.top.px]="posTop()" [style.left.px]="posLeft()">
           <div class="dp-head">
             <button type="button" class="nav" (click)="prevMonth()" aria-label="الشهر السابق">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
@@ -87,7 +87,7 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
     .dp-clear { display: inline-flex; color: var(--nb-text-muted); border-radius: 50%; padding: 2px; }
     .dp-clear:hover { background: var(--nb-surface-raised); color: var(--nb-danger); }
 
-    .dp-pop { position: absolute; z-index: 60; top: calc(100% + 6px); inset-inline-start: 0; width: 288px;
+    .dp-pop { position: fixed; z-index: 9999; width: 288px;
       background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
       box-shadow: 0 12px 32px rgba(16,24,40,0.16); padding: 12px; transform-origin: top;
       animation: dpIn 160ms cubic-bezier(0.2, 0, 0, 1); }
@@ -142,6 +142,10 @@ export class NbDatepickerComponent {
   private readonly today = new Date();
   readonly viewYear = signal(this.today.getFullYear());
   readonly viewMonth = signal(this.today.getMonth());
+  private readonly _posTop = signal<number | null>(null);
+  private readonly _posLeft = signal<number | null>(null);
+  readonly posTop = this._posTop.asReadonly();
+  readonly posLeft = this._posLeft.asReadonly();
 
   readonly yearRange = computed(() => {
     const base = this.viewYear();
@@ -189,9 +193,18 @@ export class NbDatepickerComponent {
     if (this.disabled) return;
     const willOpen = !this.open();
     this.open.set(willOpen);
-    if (willOpen) this.syncView();
+    if (willOpen) { this.syncView(); this.syncPosition(); }
   }
   close(): void { this.open.set(false); }
+
+  private syncPosition(): void {
+    const btn = this.host.nativeElement.querySelector('.dp-field') as HTMLElement;
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      this._posTop.set(r.bottom + 6);
+      this._posLeft.set(r.left);
+    }
+  }
 
   private syncView(): void {
     const v = this.val();

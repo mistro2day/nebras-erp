@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
   AdmissionsService, Applicant, Guardian, RequiredDocument, Interview, PlacementTest,
 } from '../admissions.service';
@@ -11,6 +12,8 @@ import {
   ADM_PAGE_STYLES, DOC_STATUS_TEXT, INTERVIEW_STATUS_TEXT,
   applicantStatusKind, applicantStatusText, docStatusKind, interviewStatusKind, pickList,
 } from '../shared/admissions.shared';
+import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { InterviewScheduleDialogComponent, InterviewScheduleResult } from '../../../shared/components/interview-schedule-dialog/interview-schedule-dialog.component';
 
 const RELATION_TEXT: Record<string, string> = {
   father: 'أب', mother: 'أم', guardian: 'ولي أمر', sponsor: 'كفيل',
@@ -24,12 +27,13 @@ const RELATION_TEXT: Record<string, string> = {
   selector: 'app-application-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, NbPageHeaderComponent, NbPanelComponent, NbDataTableComponent],
+  imports: [DatePipe, MatDialogModule, NbPageHeaderComponent, NbPanelComponent, NbDataTableComponent],
   template: `
     @if (applicant(); as a) {
       <div class="page" dir="rtl">
         <nb-page-header [title]="a.arabic_full_name" [subtitle]="'رقم الطلب: ' + a.application_number">
           <button class="nb-btn-ghost" (click)="back()">عودة للقائمة</button>
+          <button class="nb-btn-primary" (click)="scheduleInterview()">جدولة مقابلة</button>
           <button class="nb-btn-primary" (click)="setStatus('accepted')">قبول</button>
           <button class="nb-btn-secondary" (click)="setStatus('waitlist')">قائمة الانتظار</button>
           <button class="nb-btn-danger" (click)="setStatus('rejected')">رفض</button>
@@ -132,6 +136,7 @@ export class ApplicationDetailsComponent implements OnInit {
   private readonly service = inject(AdmissionsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
 
   readonly applicant = signal<Applicant | null>(null);
   readonly guardians = signal<Guardian[]>([]);
@@ -182,7 +187,6 @@ export class ApplicationDetailsComponent implements OnInit {
 
   private loadAll(): void {
     this.service.getApplicant(this.id).subscribe((res) => this.applicant.set(res?.data ?? res ?? null));
-    // نقاط النهاية تُرجع القوائم كاملة — تُرشّح حسب المتقدم على العميل (متوافق مع ترشيح خادمي مستقبلي).
     this.service.getGuardians().subscribe((res) => this.guardians.set(pickList<Guardian>(res).filter((g) => g.applicant === this.id)));
     this.service.getDocuments().subscribe((res) => this.documents.set(pickList<RequiredDocument>(res).filter((d) => d.applicant === this.id)));
     this.service.getInterviews().subscribe((res) => this.interviews.set(pickList<Interview>(res).filter((i) => i.applicant === this.id)));
@@ -190,9 +194,50 @@ export class ApplicationDetailsComponent implements OnInit {
   }
 
   setStatus(status: string): void {
-    this.service.updateApplicant(this.id, { status }).subscribe((res) =>
-      this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status })
-    );
+    const name = this.applicant()?.arabic_full_name || '';
+    const actionLabel = status === 'accepted' ? 'قبول' : status === 'rejected' ? 'رفض' : status === 'waitlist' ? 'قائمة انتظار' : status;
+
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'تأكيد الإجراء',
+        message: `تغيير حالة الطلب إلى <strong>${actionLabel}</strong>؟`,
+        confirmText: actionLabel,
+        color: status === 'rejected' ? 'warn' : 'primary',
+      },
+    });
+
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+
+      let obs;
+      if (status === 'accepted') obs = this.service.acceptApplicant(this.id);
+      else if (status === 'rejected') obs = this.service.rejectApplicant(this.id);
+      else if (status === 'waitlist') obs = this.service.setWaitlist(this.id);
+      else if (status === 'under_review') obs = this.service.setUnderReview(this.id);
+      else if (status === 'interview_scheduled') obs = this.service.setApplicantStatus(this.id, status);
+      else obs = this.service.setApplicantStatus(this.id, status);
+
+      obs?.subscribe((res) => {
+        const d = res?.data ?? { ...(this.applicant() as Applicant), status };
+        this.applicant.set(d);
+      });
+    });
+  }
+
+  scheduleInterview(): void {
+    const name = this.applicant()?.arabic_full_name || '';
+    const ref = this.dialog.open(InterviewScheduleDialogComponent, {
+      width: '480px',
+      data: { applicantName: name },
+    });
+
+    ref.afterClosed().subscribe((res: InterviewScheduleResult | null) => {
+      if (!res) return;
+      this.service.scheduleInterview(this.id, res).subscribe((data) => {
+        this.loadAll();
+      });
+    });
   }
 
   back(): void {

@@ -49,6 +49,7 @@ import { ADM_PAGE_STYLES, INTERVIEW_STATUS_TEXT, interviewStatusKind, pickList }
           <ng-template #cell let-row let-col="col" let-value="value">
             @switch (col.key) {
               @case ('applicant') { <span class="strong">{{ applicantName(row.applicant) }}</span> }
+              @case ('interviewer_name') { {{ row.interviewer_name || 'المستخدم الحالي' }} }
               @case ('scheduled_at') { {{ row.scheduled_at | date:'yyyy-MM-dd HH:mm' }} }
               @case ('evaluation_score') {
                 <input class="score-input" type="number" min="0" max="100" [(ngModel)]="row.evaluation_score"
@@ -94,7 +95,8 @@ export class AdmissionsInterviewsComponent implements OnInit {
   private readonly filterTick = signal(0);
 
   readonly columns: NbColumn[] = [
-    { key: 'applicant', label: 'المتقدم', fr: 1.6 },
+    { key: 'applicant', label: 'المتقدم', fr: 1.4 },
+    { key: 'interviewer_name', label: 'المُقابل', fr: 1.2 },
     { key: 'scheduled_at', label: 'موعد المقابلة', fr: 1.3 },
     { key: 'evaluation_score', label: 'درجة التقييم', fr: 1 },
     { key: 'status', label: 'الحالة', fr: 0.9 },

@@ -31,14 +31,24 @@ class ApplicantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Applicant
         fields = '__all__'
-        read_only_fields = ['id', 'tenant_id', 'application_number', 'status']
+        read_only_fields = ['id', 'tenant_id', 'application_number']
 
 
 class InterviewSerializer(serializers.ModelSerializer):
+    interviewer_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Interview
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id']
+
+    def get_interviewer_name(self, obj):
+        try:
+            from apps.identity.domain.models import User
+            user = User.objects.filter(id=obj.interviewer_id).first()
+            return user.get_full_name() if user else None
+        except Exception:
+            return None
 
 
 class PlacementTestSerializer(serializers.ModelSerializer):

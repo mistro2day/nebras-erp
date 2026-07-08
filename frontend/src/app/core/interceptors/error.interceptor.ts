@@ -14,10 +14,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         errorMessage = 'غير مصرح لك بإجراء هذه العملية.';
       } else if (error.status === 404) {
         errorMessage = 'العنصر المطلوب غير موجود.';
-      } else if (error.status === 422) {
-        errorMessage = error.error?.message || 'خطأ في البيانات المرسلة.';
-      } else if (error.status >= 500) {
-        errorMessage = 'خطأ داخلي في الخادم. يرجى المحاولة لاحقاً.';
+      } else {
+        const backendMessage = error.error?.error?.message || error.error?.message;
+        if (backendMessage) errorMessage = backendMessage;
+        else if (error.status === 422) errorMessage = 'خطأ في البيانات المرسلة.';
+        else if (error.status >= 500) errorMessage = 'خطأ داخلي في الخادم. يرجى المحاولة لاحقاً.';
       }
 
       console.error(`[HTTP Error ${error.status}]`, errorMessage, error);

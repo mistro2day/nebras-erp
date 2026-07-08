@@ -12,6 +12,8 @@ from apps.admissions.interfaces.serializers import (
 )
 from apps.common.responses import StandardResponse, StandardPagination
 import random
+import uuid
+from datetime import date
 
 def _get_admission_settings(tenant_id):
     """يرجع سجل إعدادات القبول للمستأجر (ينشئه معطّلاً إن لم يوجد)."""
@@ -46,10 +48,116 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
         tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
         serializer.save(tenant_id=tenant_id, application_number=app_num)
 
+    @action(detail=True, methods=['patch'], url_path='set-status')
+    def set_status(self, request, pk=None):
+        """
+        PATCH applicants/:id/set-status/ { status, reason? }
+        يغيّر حالة الطالب مع تسجيل اختياري للسبب.
+        """
+        applicant = self.get_object()
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'success': False, 'message': 'الحالة مطلوبة.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        allowed = {'under_review', 'interview_scheduled', 'accepted', 'rejected', 'waitlist', 'enrolled'}
+        if new_status not in allowed:
+            return Response({'success': False, 'message': f'الحالة "{new_status}" غير مسموحة.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        applicant.status = new_status
+        applicant.save(update_fields=['status', 'updated_at'])
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم تحديث حالة الطلب.')
+
+    @action(detail=True, methods=['post'], url_path='schedule-interview')
+    def schedule_interview(self, request, pk=None):
+        """
+        POST applicants/:id/schedule-interview/
+        ينشئ سجل مقابلة ويغيّر حالة الطالب إلى مقابلة مجدولة.
+        البيانات: scheduled_at, evaluation_score (اختياري), recommendation
+        interviewer_id يُملأ تلقائياً بالمستخدم الحالي إن لم يُرسل.
+        """
+        applicant = self.get_object()
+        interviewer_id = request.data.get('interviewer_id')
+        scheduled_at = request.data.get('scheduled_at')
+        evaluation_score = request.data.get('evaluation_score')
+        recommendation = request.data.get('recommendation', '')
+
+        if not scheduled_at:
+            return Response({'success': False, 'message': 'تاريخ المقابلة مطلوب.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if not interviewer_id:
+            interviewer_id = getattr(getattr(request, 'user', None), 'id', None)
+        if not interviewer_id:
+            return Response({'success': False, 'message': 'تعذّر تحديد المُقابل (المستخدم الحالي).'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uuid.UUID(str(interviewer_id))
+        except ValueError:
+            return Response({'success': False, 'message': 'معرّف المُقابل غير صالح.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            Interview.objects.create(
+                tenant_id=applicant.tenant_id,
+                applicant=applicant,
+                interviewer_id=interviewer_id,
+                scheduled_at=scheduled_at,
+                evaluation_score=evaluation_score,
+                recommendation=recommendation,
+                status='scheduled',
+            )
+            applicant.status = 'interview_scheduled'
+            applicant.save(update_fields=['status', 'updated_at'])
+
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم جدولة المقابلة بنجاح.')
+
+    @action(detail=True, methods=['post'], url_path='accept')
+    def accept_applicant(self, request, pk=None):
+        """قبول الطالب."""
+        applicant = self.get_object()
+        applicant.status = 'accepted'
+        applicant.save(update_fields=['status', 'updated_at'])
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم قبول الطالب.')
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_applicant(self, request, pk=None):
+        """رفض الطالب."""
+        applicant = self.get_object()
+        applicant.status = 'rejected'
+        applicant.save(update_fields=['status', 'updated_at'])
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم رفض الطالب.')
+
+    @action(detail=True, methods=['post'], url_path='set-under-review')
+    def set_under_review(self, request, pk=None):
+        """إعادة الطلب إلى قيد المراجعة."""
+        applicant = self.get_object()
+        applicant.status = 'under_review'
+        applicant.save(update_fields=['status', 'updated_at'])
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم إعادة الطلب إلى قيد المراجعة.')
+
+    @action(detail=True, methods=['post'], url_path='set-waitlist')
+    def set_waitlist(self, request, pk=None):
+        """نقل الطالب إلى قائمة الانتظار."""
+        applicant = self.get_object()
+        applicant.status = 'waitlist'
+        applicant.save(update_fields=['status', 'updated_at'])
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم نقل الطالب إلى قائمة الانتظار.')
+
     # ==========================================================
     # نقاط النهاية العامة (بوابة التسجيل الإلكتروني — بدون مصادقة)
     # المستأجر يُحل عبر النطاق الفرعي أو ترويسة X-Tenant-ID (TenantMiddleware).
     # ==========================================================
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-config')
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-config')
     def public_config(self, request):

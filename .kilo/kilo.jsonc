@@ -1,0 +1,6 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "commit_message": {
+    "prompt": "على سبيل المثال: قم بإنشاء commit messages باللغة العربية باتباع تنسيق conventional commits. أرجع الـ commit message فقط.\n"
+  }
+}

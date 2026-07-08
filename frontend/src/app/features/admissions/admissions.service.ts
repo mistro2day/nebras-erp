@@ -88,6 +88,31 @@ export class AdmissionsService {
     return this.apiClient.get<any>('admissions/applicants/public-track/', { application_number: applicationNumber });
   }
 
+  // ---- إجراءات المراجعة (Review Actions) ----
+  setApplicantStatus(id: string, status: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/set-status/`, { status });
+  }
+
+  scheduleInterview(id: string, body: { scheduled_at: string; evaluation_score?: number; recommendation?: string }): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/schedule-interview/`, body);
+  }
+
+  acceptApplicant(id: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/accept/`, {});
+  }
+
+  rejectApplicant(id: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/reject/`, {});
+  }
+
+  setUnderReview(id: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/set-under-review/`, {});
+  }
+
+  setWaitlist(id: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/set-waitlist/`, {});
+  }
+
   // ---- إعدادات القبول (فتح/إغلاق باب التسجيل — لمدير النظام) ----
   getAdmissionSettings(): Observable<any> {
     return this.apiClient.get<any>('admissions/settings/');

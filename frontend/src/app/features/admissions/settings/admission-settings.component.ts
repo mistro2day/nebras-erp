@@ -219,7 +219,7 @@ export class AdmissionSettingsComponent implements OnInit {
         if (d) this.s = { ...this.s, ...d, allowed_grade_ids: d.allowed_grade_ids ?? this.s['allowed_grade_ids'] };
         setTimeout(() => this.saved.set(false), 3000);
       },
-      error: (e) => { this.saving.set(false); this.error.set(e?.error?.message || 'تعذّر حفظ الإعدادات.'); },
+      error: (e) => { this.saving.set(false); this.error.set(e?.message || 'تعذّر حفظ الإعدادات.'); },
     });
   }
 }
