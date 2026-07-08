@@ -1,21 +1,25 @@
 import os
-import sys
 import django
-from io import StringIO
-from collections import defaultdict, deque
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "neon_transfer_settings")
 django.setup()
 
 from django.apps import apps
 from django.db import connection
-from django.db.models import ForeignKey, OneToOneField
-from django.core import serializers
-from django.db.utils import IntegrityError
+from django.db.models import ForeignKey, OneToOneField, ManyToManyField
+from django.core.management import call_command
 
 LEGACY = "legacy"
 DEFAULT = "default"
+LOGPATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transfer_log.txt")
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_dump.json")
+
+logf = open(LOGPATH, "w", encoding="utf-8", buffering=1)
+
+
+def L(msg):
+    print(msg, file=logf, flush=True)
+
 
 models = [
     m
@@ -28,17 +32,18 @@ model_set = set(models)
 with connection.cursor() as cur:
     cur.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
     all_tables = [r[0] for r in cur.fetchall()]
-print(f"Truncating {len(all_tables)} tables...")
+L(f"Truncating {len(all_tables)} tables...")
 with connection.cursor() as cur:
     cur.execute(
         "TRUNCATE TABLE {} RESTART IDENTITY CASCADE".format(
             ", ".join('"%s"' % t for t in all_tables)
         )
     )
+L("Truncated.")
 
 # --- dependency order (parents before children) ---
 indeg = {m: 0 for m in models}
-adj = defaultdict(list)
+adj = {m: [] for m in models}
 for m in models:
     for f in m._meta.get_fields():
         if isinstance(f, (ForeignKey, OneToOneField)):
@@ -46,6 +51,8 @@ for m in models:
             if rel in model_set and rel is not m:
                 adj[rel].append(m)
                 indeg[m] += 1
+from collections import deque
+
 q = deque([m for m in models if indeg[m] == 0])
 ordered = []
 while q:
@@ -55,59 +62,41 @@ while q:
         indeg[child] -= 1
         if indeg[child] == 0:
             q.appendleft(child)
-for m in models:  # append any left (cycles)
+for m in models:
     if m not in ordered:
         ordered.append(m)
 
-# --- collect instances from legacy, in order ---
-instances = []
-counts = {}
+# --- copy main tables via bulk_create (preserves PKs) ---
+total = 0
 for m in ordered:
     objs = list(m.objects.using(LEGACY).all())
-    instances.extend(objs)
-    counts[m._meta.label] = len(objs)
-total = sum(counts.values())
-print(f"Collected {total} objects from {len(models)} models.")
+    if not objs:
+        continue
+    m.objects.using(DEFAULT).bulk_create(objs, batch_size=200)
+    total += len(objs)
+    L(f"[main] {m._meta.label}: {len(objs)}")
 
-# --- serialize (utf-8) ---
-data = serializers.serialize("json", instances, use_natural_foreign_keys=False)
-with open(FIXTURE, "w", encoding="utf-8") as fh:
-    fh.write(data)
-print(f"Wrote fixture to {FIXTURE}")
+# --- copy implicit M2M through tables ---
+m2m_done = 0
+for m in models:
+    for f in m._meta.get_fields():
+        if isinstance(f, ManyToManyField) and f.m2m_db_table():
+            through = f.through
+            if through in model_set:
+                continue  # already copied as a normal model
+            rows = list(through.objects.using(LEGACY).all())
+            if rows:
+                through.objects.using(DEFAULT).bulk_create(rows, batch_size=200)
+                m2m_done += len(rows)
+                L(f"[m2m] {through._meta.label}: {len(rows)}")
 
-# --- deserialize + save into Neon ---
-with open(FIXTURE, "r", encoding="utf-8") as fh:
-    objs = list(serializers.deserialize("json", fh))
-
-pending = list(objs)
-saved = 0
-retries = 0
-while pending:
-    still = []
-    progressed = False
-    for dobj in pending:
-        try:
-            dobj.object.save(using=DEFAULT)
-            saved += 1
-            progressed = True
-        except IntegrityError:
-            still.append(dobj)
-    if not progressed:
-        # remaining failures: surface one to avoid infinite loop
-        retries += 1
-        if retries > 1:
-            print("UNRESOLVED FK errors:", len(still))
-            for dobj in still[:5]:
-                print("  ", dobj.object._meta.label, dobj.object.pk)
-            break
-    pending = still
-
-print(f"Saved {saved} objects into Neon.")
+L(f"Copied {total} main rows and {m2m_done} m2m rows.")
 
 # --- reset sequences ---
 labels = [cfg.label for cfg in apps.get_app_configs() if cfg.models_module]
+from io import StringIO
+
 out = StringIO()
-from django.core.management import call_command
 call_command("sqlsequencereset", *labels, stdout=out)
 sql = out.getvalue()
 if sql.strip():
@@ -116,6 +105,7 @@ if sql.strip():
             s = stmt.strip()
             if s:
                 cur.execute(s)
-    print("Sequences reset.")
+    L("Sequences reset.")
 
-print("DONE")
+L("DONE")
+logf.close()
