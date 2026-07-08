@@ -7,13 +7,11 @@ services:
     startCommand: cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     region: oregon
     healthCheckPath: /api/v1/admissions/applicants/public-config/
-    disk:
-      name: nebras-erp-data
-      mountPath: /var/lib/nebras-erp
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_Sl7eDaUjC8wH@ep-long-water-atrwd2fn-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
@@ -24,5 +22,5 @@ services:
         value: "https://nebras-erp.vercel.app,https://*.vercel.app,http://localhost:4200"
       - key: CELERY_TASK_ALWAYS_EAGER
         value: "True"
-      - key: DATABASE_PATH
-        value: /var/lib/nebras-erp/db.sqlite3
+      - key: SKIP_COLLECTSTATIC
+        value: "True"
