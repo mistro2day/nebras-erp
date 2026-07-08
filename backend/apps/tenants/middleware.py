@@ -1,7 +1,19 @@
+from django.conf import settings
 from django.http import Http404
 from django.utils.deprecation import MiddlewareMixin
 from apps.tenants.domain.models import Tenant
 from apps.tenants.context import set_current_tenant_id, clear_current_tenant
+
+# النطاقات التي تمثّل منصة الـ API نفسها (وليس مدرسة فرعية).
+# تُعرَّف عبر الإعداد، وتتخلف إلى نطاق Render التجريبي.
+PLATFORM_HOST_SUFFIXES = getattr(
+    settings, 'TENANT_PLATFORM_HOST_SUFFIXES', ['.onrender.com']
+)
+
+
+def _is_platform_host(host):
+    return any(host.endswith(suffix) for suffix in PLATFORM_HOST_SUFFIXES)
+
 
 class TenantMiddleware(MiddlewareMixin):
     """
@@ -22,7 +34,9 @@ class TenantMiddleware(MiddlewareMixin):
                 pass
 
         # 2. التعرف عبر النطاق الفرعي (Subdomain resolution)
-        if not tenant and len(parts) > 2:
+        #    لا نُطبّق ذلك على نطاق منصة الـ API نفسه (مثل *.onrender.com)
+        #    بل نعتمد على ترويسة X-Tenant-ID لتمرير المستأجر.
+        if not tenant and not _is_platform_host(host) and len(parts) > 2:
             subdomain = parts[0]
             if subdomain not in ('www', 'api', 'admin'):
                 try:

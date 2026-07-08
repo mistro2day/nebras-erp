@@ -1,7 +1,15 @@
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 
+
+def health_check(request):
+    """نقطة نهاية بسيطة للتحقق من حياة الخدمة دون الحاجة لمستأجر."""
+    return JsonResponse({'status': 'ok'})
+
+
 urlpatterns = [
+    path('api/v1/health/', health_check, name='health-check'),
     path('admin/', admin.site.urls),
     path('api/v1/tenants/', include('apps.tenants.interfaces.urls')),
     path('api/v1/identity/', include('apps.identity.interfaces.urls')),
