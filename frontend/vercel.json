@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm install --legacy-peer-deps && npm run build:prod",
-  "outputDirectory": "dist/nebras-erp",
+  "outputDirectory": "dist/nebras-erp/browser",
   "devCommand": "npm run serve",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "angular",
