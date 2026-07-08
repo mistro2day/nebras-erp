@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { StudentsService } from '../students.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 
 interface ProfileForm {
   arabic_name: string; english_name: string; gender: string; date_of_birth: string;
@@ -20,7 +21,7 @@ interface ProfileForm {
   selector: 'app-student-edit',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -45,7 +46,7 @@ interface ProfileForm {
                 <option value="female">أنثى</option>
               </select>
             </div>
-            <div class="field"><label>تاريخ الميلاد</label><input type="date" [(ngModel)]="model.date_of_birth" /></div>
+            <div class="field"><label>تاريخ الميلاد</label><nb-datepicker [(value)]="model.date_of_birth" ariaLabel="تاريخ الميلاد"></nb-datepicker></div>
             <div class="field"><label>الجنسية</label><input [(ngModel)]="model.nationality" /></div>
             <div class="field"><label>الهوية الوطنية / الإقامة</label><input [(ngModel)]="model.national_id" /></div>
             <div class="field"><label>رقم الجواز</label><input [(ngModel)]="model.passport" /></div>

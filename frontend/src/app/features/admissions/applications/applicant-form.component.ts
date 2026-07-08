@@ -5,6 +5,7 @@ import { AdmissionsService } from '../admissions.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { pickList } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
@@ -32,7 +33,7 @@ interface GuardianForm {
   selector: 'app-applicant-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbStepperComponent],
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbStepperComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -56,7 +57,7 @@ interface GuardianForm {
               <div class="fld req"><label>الجنس</label>
                 <select [(ngModel)]="a.gender"><option value="">اختر…</option><option value="male">ذكر</option><option value="female">أنثى</option></select>
               </div>
-              <div class="fld req"><label>تاريخ الميلاد</label><input type="date" [(ngModel)]="a.date_of_birth" /></div>
+              <div class="fld req"><label>تاريخ الميلاد</label><nb-datepicker [(value)]="a.date_of_birth" ariaLabel="تاريخ الميلاد"></nb-datepicker></div>
               <div class="fld req"><label>الجنسية</label><input [(ngModel)]="a.nationality" placeholder="سوداني" /></div>
               <div class="fld req"><label>الرقم الوطني</label><input inputmode="numeric" [(ngModel)]="a.national_id" placeholder="للطلاب السودانيين" /></div>
               <div class="fld"><label>رقم الجواز</label><input [(ngModel)]="a.passport_number" placeholder="لغير السودانيين" /></div>

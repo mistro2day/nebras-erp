@@ -44,29 +44,70 @@ export interface Grade {
   max_capacity: number;
 }
 
-@Injectable({
-  providedIn: 'root'
-})
+export interface Section {
+  id: string;
+  grade: string;
+  name: string;
+  code: string;
+  capacity: number;
+  gender: string;
+  academic_shift: string;
+  status: boolean;
+}
+
+export interface Subject {
+  id: string;
+  code: string;
+  arabic_name: string;
+  english_name?: string;
+  credit_hours: number;
+  weekly_periods: number;
+  passing_mark: number;
+  maximum_mark: number;
+  status: boolean;
+}
+
+/**
+ * خدمة الشؤون الأكاديمية — CRUD حقيقي على نقاط نهاية academics/*.
+ * تُستخدم في الصفحات العاملة (السنوات، الفصول، المراحل، الصفوف، الشعب، المواد).
+ */
+@Injectable({ providedIn: 'root' })
 export class AcademicsService {
   private apiClient = inject(ApiClientService);
 
-  getAcademicYears(): Observable<any> {
-    return this.apiClient.get<AcademicYear[]>('academics/academic-years/');
-  }
+  // ---------- السنوات الدراسية ----------
+  getAcademicYears(params?: any): Observable<any> { return this.apiClient.get('academics/academic-years/', { page_size: 100, ...(params ?? {}) }); }
+  createAcademicYear(body: Partial<AcademicYear>): Observable<any> { return this.apiClient.post('academics/academic-years/', body); }
+  updateAcademicYear(id: string, body: Partial<AcademicYear>): Observable<any> { return this.apiClient.patch(`academics/academic-years/${id}/`, body); }
+  deleteAcademicYear(id: string): Observable<any> { return this.apiClient.delete(`academics/academic-years/${id}/`); }
 
-  createAcademicYear(year: Partial<AcademicYear>): Observable<any> {
-    return this.apiClient.post('academics/academic-years/', year);
-  }
+  // ---------- الفصول الدراسية ----------
+  getTerms(params?: any): Observable<any> { return this.apiClient.get('academics/terms/', { page_size: 100, ...(params ?? {}) }); }
+  createTerm(body: Partial<Term>): Observable<any> { return this.apiClient.post('academics/terms/', body); }
+  updateTerm(id: string, body: Partial<Term>): Observable<any> { return this.apiClient.patch(`academics/terms/${id}/`, body); }
+  deleteTerm(id: string): Observable<any> { return this.apiClient.delete(`academics/terms/${id}/`); }
 
-  getTerms(): Observable<any> {
-    return this.apiClient.get<Term[]>('academics/terms/');
-  }
+  // ---------- المراحل التعليمية ----------
+  getStages(params?: any): Observable<any> { return this.apiClient.get('academics/stages/', { page_size: 100, ...(params ?? {}) }); }
+  createStage(body: Partial<Stage>): Observable<any> { return this.apiClient.post('academics/stages/', body); }
+  updateStage(id: string, body: Partial<Stage>): Observable<any> { return this.apiClient.patch(`academics/stages/${id}/`, body); }
+  deleteStage(id: string): Observable<any> { return this.apiClient.delete(`academics/stages/${id}/`); }
 
-  getStages(): Observable<any> {
-    return this.apiClient.get<Stage[]>('academics/stages/');
-  }
+  // ---------- الصفوف ----------
+  getGrades(params?: any): Observable<any> { return this.apiClient.get('academics/grades/', { page_size: 100, ...(params ?? {}) }); }
+  createGrade(body: Partial<Grade>): Observable<any> { return this.apiClient.post('academics/grades/', body); }
+  updateGrade(id: string, body: Partial<Grade>): Observable<any> { return this.apiClient.patch(`academics/grades/${id}/`, body); }
+  deleteGrade(id: string): Observable<any> { return this.apiClient.delete(`academics/grades/${id}/`); }
 
-  getGrades(): Observable<any> {
-    return this.apiClient.get<Grade[]>('academics/grades/');
-  }
+  // ---------- الشعب ----------
+  getSections(params?: any): Observable<any> { return this.apiClient.get('academics/sections/', { page_size: 100, ...(params ?? {}) }); }
+  createSection(body: Partial<Section>): Observable<any> { return this.apiClient.post('academics/sections/', body); }
+  updateSection(id: string, body: Partial<Section>): Observable<any> { return this.apiClient.patch(`academics/sections/${id}/`, body); }
+  deleteSection(id: string): Observable<any> { return this.apiClient.delete(`academics/sections/${id}/`); }
+
+  // ---------- المواد الدراسية ----------
+  getSubjects(params?: any): Observable<any> { return this.apiClient.get('academics/subjects/', { page_size: 100, ...(params ?? {}) }); }
+  createSubject(body: Partial<Subject>): Observable<any> { return this.apiClient.post('academics/subjects/', body); }
+  updateSubject(id: string, body: Partial<Subject>): Observable<any> { return this.apiClient.patch(`academics/subjects/${id}/`, body); }
+  deleteSubject(id: string): Observable<any> { return this.apiClient.delete(`academics/subjects/${id}/`); }
 }

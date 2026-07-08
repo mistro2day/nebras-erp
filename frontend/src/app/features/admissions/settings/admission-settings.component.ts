@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { AdmissionsService } from '../admissions.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { pickList } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
@@ -34,7 +35,7 @@ interface SettingsForm {
   selector: 'app-admission-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -76,8 +77,8 @@ interface SettingsForm {
                 @for (y of years(); track y.id) { <option [ngValue]="y.id">{{ y.name }}</option> }
               </select>
             </div>
-            <div class="fld"><label>بداية التقديم</label><input type="date" [(ngModel)]="s.registration_start" /></div>
-            <div class="fld"><label>نهاية التقديم</label><input type="date" [(ngModel)]="s.registration_end" /></div>
+            <div class="fld"><label>بداية التقديم</label><nb-datepicker [(value)]="s.registration_start" ariaLabel="بداية التقديم"></nb-datepicker></div>
+            <div class="fld"><label>نهاية التقديم</label><nb-datepicker [(value)]="s.registration_end" ariaLabel="نهاية التقديم"></nb-datepicker></div>
             <div class="fld"><label>رسوم التقديم</label><input type="number" min="0" [(ngModel)]="s.application_fee" /></div>
             <div class="fld"><label>أدنى عمر (سنوات)</label><input type="number" min="0" [(ngModel)]="s.min_age" /></div>
             <div class="fld"><label>أقصى عمر (سنوات)</label><input type="number" min="0" [(ngModel)]="s.max_age" /></div>
