@@ -255,7 +255,7 @@ import { pickList } from '../shared/academics.shared';
     .metric-card.success .m-icon { background: rgba(52,199,89,.12); color: var(--nb-success); }
     .metric-card.warn .m-icon { background: rgba(255,159,10,.14); color: var(--nb-warning); }
     .m-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .metric-card .label { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 500; }
+    .metric-card .label { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 700; }
     .metric-card .value { font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--nb-text); font-variant-numeric: tabular-nums; }
     .metric-card .value.info { color: var(--nb-info); } .metric-card .value.success { color: var(--nb-success); }
     .metric-card .value.purple { color: #7d26cd; } .metric-card .value.warn { color: var(--nb-warning); }

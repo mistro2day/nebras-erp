@@ -197,7 +197,7 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
     .metric-card.success .m-icon { background: rgba(52,199,89,.12); color: var(--nb-success); }
     .metric-card.purple .m-icon { background: rgba(175,82,222,.12); color: #7d26cd; }
     .m-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .metric-card .label { font-size: 11px; color: var(--nb-text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .metric-card .label { font-size: 11px; color: var(--nb-text-muted); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .metric-card .value { font-size: 20px; font-weight: 800; line-height: 1.15; color: var(--nb-text); font-variant-numeric: tabular-nums; }
     .metric-card .value.warn { color: var(--nb-warning); } .metric-card .value.info { color: var(--nb-info); }
     .metric-card .value.success { color: var(--nb-success); } .metric-card .value.purple { color: #7d26cd; }

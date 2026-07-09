@@ -176,7 +176,7 @@ import { ACADEMIC_PAGE_STYLES, pickList } from '../shared/academics.shared';
     .metric-card.info .m-icon    { background: rgba(0,122,255,.12); color: var(--nb-info); }
     .metric-card.neutral .m-icon { background: var(--nb-surface-raised); color: var(--nb-text-muted); }
     .m-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .metric-card .label { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 500; }
+    .metric-card .label { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 700; }
     .metric-card .value { font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--nb-text); font-variant-numeric: tabular-nums; }
     .metric-card .value.success { color: var(--nb-success); }
     .metric-card .value.info { color: var(--nb-info); }
