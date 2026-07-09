@@ -1,9 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.academics.interfaces.views import (
-    AcademicYearViewSet, TermViewSet, AcademicCalendarEventViewSet, 
-    StageViewSet, GradeViewSet, SectionViewSet, SubjectGroupViewSet, 
-    SubjectCategoryViewSet, SubjectViewSet, CurriculumViewSet, CurriculumVersionViewSet
+    AcademicYearViewSet, TermViewSet, AcademicCalendarEventViewSet,
+    StageViewSet, GradeViewSet, SectionViewSet, SubjectGroupViewSet,
+    SubjectCategoryViewSet, SubjectViewSet, CurriculumViewSet, CurriculumVersionViewSet,
+    AcademicDashboardStatsView
 )
 
 router = DefaultRouter()
@@ -20,5 +21,6 @@ router.register('curriculums', CurriculumViewSet, basename='curriculum')
 router.register('curriculum-versions', CurriculumVersionViewSet, basename='curriculum-version')
 
 urlpatterns = [
+    path('dashboard-stats/', AcademicDashboardStatsView.as_view(), name='academic-dashboard-stats'),
     path('', include(router.urls)),
 ]

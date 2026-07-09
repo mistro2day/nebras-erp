@@ -215,4 +215,8 @@ export class StudentsService {
   activateGuardianPortal(studentId: string, relationId: string): Observable<any> {
     return this.apiClient.post(`students/students/${studentId}/activate-guardian/`, { relation_id: relationId });
   }
+
+  getBranding(): Observable<any> {
+    return this.apiClient.get('tenants/branding/current/');
+  }
 }

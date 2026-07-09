@@ -160,6 +160,21 @@ class Section(CombinedBaseModel):
     def __str__(self):
         return f"{self.name} - {self.grade.name}"
 
+    @property
+    def occupied_seats(self):
+        """عدد المقاعد المشغولة = الطلاب المسكَّنون فعليًا في هذه الشعبة (تسجيل نشط)."""
+        from apps.students.domain.models import StudentEnrollment
+        return (
+            StudentEnrollment.objects
+            .filter(section_id=self.id, status='active', deleted_at__isnull=True)
+            .values('student_id').distinct().count()
+        )
+
+    @property
+    def available_seats(self):
+        """المقاعد المتاحة = السعة الكلية − المشغولة (لا تقل عن صفر)."""
+        return max(0, self.capacity - self.occupied_seats)
+
 
 class SchoolShift(CombinedBaseModel):
     """

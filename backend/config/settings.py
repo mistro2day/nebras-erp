@@ -163,6 +163,15 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'apps.common.exceptions.custom_exception_handler',
 }
 
+# إعدادات JWT: عمر رمز الوصول الافتراضي 5 دقائق قصير جدًا ويسبب انتهاء الجلسة
+# وظهور القوائم فارغة؛ نرفعه إلى ساعة مع رمز تجديد يدوم أسبوعًا. تجديد الرمز
+# يتم تلقائيًا من الواجهة عند 401 (error.interceptor).
+from datetime import timedelta  # noqa: E402
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
+
 LANGUAGE_CODE = 'ar'
 TIME_ZONE = 'Africa/Khartoum'
 USE_I18N = True

@@ -42,6 +42,9 @@ class GradeSerializer(serializers.ModelSerializer):
 
 
 class SectionSerializer(serializers.ModelSerializer):
+    occupied_seats = serializers.IntegerField(read_only=True)
+    available_seats = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Section
         fields = '__all__'

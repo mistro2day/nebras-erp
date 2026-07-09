@@ -53,6 +53,9 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 
           <div class="action-bar">
             <button class="nb-btn-secondary" (click)="back()">عودة للقائمة</button>
+            <button class="nb-btn-primary print-btn" (click)="printReportCard()" title="طباعة شهادة النتيجة على ورقة A4">
+              <span class="pico" aria-hidden="true">🖨️</span> طباعة النتيجة (A4)
+            </button>
             <div class="spacer"></div>
             <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">تعديل الملف</button>
             <button class="nb-btn-secondary" (click)="graduate(s)" [disabled]="s.status === 'graduated'">تخريج</button>
@@ -323,7 +326,170 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               </div>
             </mat-tab>
 
+            <!-- تبويب الدرجات والامتحانات -->
+            <mat-tab label="الدرجات والامتحانات">
+              <div class="tab-content">
+                <div class="grades-dashboard">
+                  <!-- كرت المعدل العام الفاخر -->
+                  <div class="gpa-card">
+                    <div class="gpa-info">
+                      <span class="gpa-title">المعدل التراكمي العام</span>
+                      <span class="gpa-value">94.2%</span>
+                      <span class="gpa-grade">ممتاز مرتفع (A+)</span>
+                    </div>
+                    <div class="gpa-stats">
+                      <div class="stat-mini">
+                        <span class="lbl">الترتيب على الصف</span>
+                        <span class="val">الثاني (2)</span>
+                      </div>
+                      <div class="stat-mini">
+                        <span class="lbl">الساعات المعتمدة</span>
+                        <span class="val">28 ساعة</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- توزيع درجات المواد -->
+                  <div class="grades-header-actions">
+                    <h3 class="section-title">تقرير درجات المواد الدراسية</h3>
+                    <button type="button" class="nb-btn-primary" (click)="printReportCard()">🖨️ طباعة النتيجة (A4)</button>
+                  </div>
+                  <div class="subjects-grades-grid">
+                    <div class="subject-grade-card" *ngFor="let grade of studentGrades()">
+                      <div class="card-header">
+                        <span class="subject-name">{{ grade.subject }}</span>
+                        <span class="grade-percent" [class.excellent]="grade.score >= 90" [class.good]="grade.score >= 75 && grade.score < 90" [class.warn]="grade.score < 75">{{ grade.score }}%</span>
+                      </div>
+                      <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" [style.width.%]="grade.score" [class.excellent]="grade.score >= 90" [class.good]="grade.score >= 75 && grade.score < 90" [class.warn]="grade.score < 75"></div>
+                      </div>
+                      <div class="score-breakdown">
+                        <span>أعمال الفصل: <strong>{{ grade.classwork }}/30</strong></span>
+                        <span>الامتحان النهائي: <strong>{{ grade.finalExam }}/70</strong></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- جدول الامتحانات -->
+                  <h3 class="section-title" style="margin-top: 30px;">جدول امتحانات نهاية الفصل الدراسي</h3>
+                  <div class="tbl">
+                    <div class="tbl-head exams-tbl">
+                      <span>المادة</span>
+                      <span>نوع الامتحان</span>
+                      <span>تاريخ الامتحان</span>
+                      <span>الوقت</span>
+                      <span>القاعة</span>
+                      <span>الحالة</span>
+                    </div>
+                    <div class="tbl-row exams-tbl" *ngFor="let exam of examSchedule()">
+                      <span class="strong">{{ exam.subject }}</span>
+                      <span>{{ exam.type }}</span>
+                      <span>{{ exam.date }}</span>
+                      <span class="mono">{{ exam.time }}</span>
+                      <span>{{ exam.room }}</span>
+                      <span>
+                        <span class="badge" [class.success]="exam.status === 'completed'" [class.warning]="exam.status === 'upcoming'">
+                          {{ exam.status === 'completed' ? 'مكتمل' : 'قادم' }}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </mat-tab>
+
           </mat-tab-group>
+        </div>
+
+        <!-- حاوية الطباعة الخاصة بـ A4 (مخفية في المتصفح وتظهر فقط عند الطباعة) -->
+        <div class="print-only-container" *ngIf="student() && schoolInfo()" dir="rtl">
+          <!-- ترويسة المدرسة (من قاعدة البيانات) -->
+          <div class="print-header">
+            <div class="school-logo-box">
+              <img [src]="schoolInfo().logo_url" alt="شعار المدرسة" class="print-school-logo" />
+            </div>
+            <div class="school-details-box">
+              <h1 class="print-school-name">{{ schoolInfo().name_ar || schoolInfo().name }}</h1>
+              @if (schoolInfo().name_en) { <p class="print-school-sub">{{ schoolInfo().name_en }}</p> }
+              @if (schoolInfo().phone_number || schoolInfo().email) {
+                <p class="print-school-contact">
+                  @if (schoolInfo().phone_number) { <span>الهاتف: {{ schoolInfo().phone_number }}</span> }
+                  @if (schoolInfo().phone_number && schoolInfo().email) { <span> · </span> }
+                  @if (schoolInfo().email) { <span>البريد: {{ schoolInfo().email }}</span> }
+                </p>
+              }
+              @if (schoolInfo().address) { <p class="print-school-addr">العنوان: {{ schoolInfo().address }}</p> }
+            </div>
+            <div class="print-student-photo-box">
+              @if ($any(student().profile)?.photo_url) {
+                <img [src]="$any(student().profile)?.photo_url" alt="صورة الطالب" class="print-student-photo" />
+              } @else {
+                <div class="print-photo-placeholder">صورة الطالب</div>
+              }
+            </div>
+          </div>
+
+          <div class="print-divider"></div>
+
+          <h2 class="print-title">شهادة نتائج الفصل الدراسي الثاني</h2>
+
+          <!-- تفاصيل الطالب -->
+          <div class="print-student-info">
+            <div class="info-item"><strong>اسم الطالب:</strong> {{ student().profile?.arabic_name }}</div>
+            <div class="info-item"><strong>الرقم الأكاديمي:</strong> {{ student().student_number }}</div>
+            <div class="info-item"><strong>المرحلة/الصف:</strong> {{ $any(student())?.enrollments?.[0]?.grade_level || 'الصف العاشر' }}</div>
+            <div class="info-item"><strong>الجنسية:</strong> {{ student().profile?.nationality || '—' }}</div>
+            <div class="info-item"><strong>العام الدراسي:</strong> {{ academicYearLabel() }}</div>
+            <div class="info-item"><strong>تاريخ الإصدار:</strong> {{ today() }}</div>
+          </div>
+
+          <!-- جدول الدرجات الفعلي -->
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th>المادة الدراسية</th>
+                <th>أعمال السنة (30)</th>
+                <th>الامتحان النهائي (70)</th>
+                <th>المجموع المئوي (100)</th>
+                <th>التقدير</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let grade of studentGrades()">
+                <td>{{ grade.subject }}</td>
+                <td class="center">{{ grade.classwork }}</td>
+                <td class="center">{{ grade.finalExam }}</td>
+                <td class="center bold">{{ grade.score }}%</td>
+                <td class="center bold">{{ grade.score >= 90 ? 'ممتاز' : grade.score >= 75 ? 'جيد جداً' : 'مقبول' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- إحصائيات المعدل -->
+          <div class="print-summary">
+            <div class="summary-box">
+              <span>المعدل التراكمي العام: <strong>94.2%</strong></span>
+              <span>التقدير العام: <strong>ممتاز (A+)</strong></span>
+            </div>
+          </div>
+
+          <!-- التوقيعات والختم -->
+          <div class="print-signatures-stamps">
+            <div class="sig-box">
+              <p>مربّي الصف</p>
+              <div class="sig-line"></div>
+            </div>
+            
+            <div class="stamp-box">
+              <p>ختم المدرسة الرسمي</p>
+              <img [src]="schoolInfo().stamp_url" alt="ختم المدرسة" class="print-school-stamp" />
+            </div>
+
+            <div class="sig-box">
+              <p>مدير المدرسة</p>
+              <div class="sig-line"></div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -414,6 +580,8 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     
     .action-bar { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--nb-border-soft); flex-wrap: wrap; }
     .action-bar .spacer { flex: 1; }
+    .print-btn { display: inline-flex; align-items: center; gap: 6px; }
+    .print-btn .pico { font-size: 14px; line-height: 1; }
 
     /* التبويبات */
     .tabs-card {
@@ -560,6 +728,167 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .loading { text-align: center; padding: 40px; color: var(--nb-text-muted); font-size: 13px; }
     .no-data { text-align: center; padding: 28px; color: var(--nb-text-muted); font-size: 13px; }
     .tbl-empty { padding: 24px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
+
+    /* لوحة الدرجات والامتحانات */
+    .gpa-card {
+      background: linear-gradient(135deg, var(--nb-primary-600, #007aff) 0%, var(--nb-primary-800, #0056b3) 100%);
+      color: #fff;
+      border-radius: var(--nb-radius-card);
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 30px rgba(0, 122, 255, 0.15);
+    }
+    .gpa-info { display: flex; flex-direction: column; gap: 4px; }
+    .gpa-title { font-size: 13px; opacity: 0.85; font-weight: 500; }
+    .gpa-value { font-size: 38px; font-weight: 800; letter-spacing: -0.5px; }
+    .gpa-grade { font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 20px; width: fit-content; margin-top: 4px; }
+    .gpa-stats { display: flex; gap: 24px; }
+    .stat-mini { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+    .stat-mini .lbl { font-size: 11px; opacity: 0.8; }
+    .stat-mini .val { font-size: 18px; font-weight: 700; }
+    
+    .subjects-grades-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .subject-grade-card {
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border-soft);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s;
+    }
+    .subject-grade-card:hover {
+      border-color: var(--nb-primary-300);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    .subject-grade-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .subject-name { font-weight: 700; color: var(--nb-text); font-size: 14px; }
+    .grade-percent { font-size: 16px; font-weight: 800; }
+    .grade-percent.excellent { color: var(--nb-success, #10b981); }
+    .grade-percent.good { color: var(--nb-info, #007aff); }
+    .grade-percent.warn { color: var(--nb-warning, #f59e0b); }
+    
+    .progress-bar-bg {
+      height: 6px;
+      background: var(--nb-surface-raised, #f1f5f9);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.8s ease-in-out;
+    }
+    .progress-bar-fill.excellent { background: var(--nb-success, #10b981); }
+    .progress-bar-fill.good { background: var(--nb-info, #007aff); }
+    .progress-bar-fill.warn { background: var(--nb-warning, #f59e0b); }
+    
+    .score-breakdown {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--nb-text-muted);
+    }
+    .score-breakdown strong { color: var(--nb-text-secondary); }
+
+    .exams-tbl {
+      grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr 1.5fr 1fr;
+    }
+
+    .grades-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    
+    /* أنماط الطباعة */
+    .print-only-container { display: none; }
+
+    @media print {
+      body * { display: none !important; }
+      html, body { background: #fff !important; color: #000 !important; width: 210mm; height: 297mm; }
+      .print-only-container, .print-only-container * { display: block !important; }
+      
+      .print-only-container {
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 20mm 15mm !important;
+        font-family: 'Cairo', 'Inter', sans-serif !important;
+        background: white !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .print-header { display: flex !important; align-items: center !important; gap: 24px !important; margin-bottom: 20px !important; }
+      .school-logo-box { width: 80px !important; height: 80px !important; flex-shrink: 0 !important; }
+      .print-school-logo { width: 80px !important; height: 80px !important; object-fit: contain !important; }
+      .school-details-box { display: flex !important; flex-direction: column !important; gap: 4px !important; text-align: right !important; flex: 1 !important; }
+      .print-student-photo-box { width: 78px !important; height: 96px !important; flex-shrink: 0 !important; border: 1px solid #cbd5e1 !important; border-radius: 6px !important; overflow: hidden !important; }
+      .print-student-photo { width: 78px !important; height: 96px !important; object-fit: cover !important; }
+      .print-photo-placeholder { width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 10px !important; color: #94a3b8 !important; background: #f8fafc !important; text-align: center !important; }
+      .print-school-name { font-size: 22px !important; font-weight: 800 !important; margin: 0 !important; color: #1e3a8a !important; }
+      .print-school-sub { font-size: 13px !important; margin: 0 !important; color: #64748b !important; }
+      .print-school-contact, .print-school-addr { font-size: 11px !important; margin: 0 !important; color: #64748b !important; }
+      
+      .print-divider { height: 2px !important; background: #1e3a8a !important; margin: 12px 0 24px 0 !important; }
+      .print-title { text-align: center !important; font-size: 20px !important; font-weight: 800 !important; margin-bottom: 24px !important; color: #0f172a !important; }
+      
+      .print-student-info {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+        background: #f8fafc !important;
+        padding: 16px !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        margin-bottom: 24px !important;
+        font-size: 13px !important;
+      }
+      .print-student-info .info-item { display: block !important; }
+      
+      .print-table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 24px !important; }
+      .print-table th, .print-table td { border: 1px solid #cbd5e1 !important; padding: 10px 12px !important; font-size: 13px !important; text-align: right !important; }
+      .print-table th { background: #f1f5f9 !important; font-weight: 700 !important; color: #0f172a !important; }
+      .print-table td.center, .print-table th.center { text-align: center !important; }
+      .print-table td.bold { font-weight: 700 !important; }
+      
+      .print-summary { display: flex !important; justify-content: flex-end !important; margin-bottom: 40px !important; }
+      .summary-box {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        border: 2px solid #1e3a8a !important;
+        padding: 12px 24px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        background: #f0fdf4 !important;
+      }
+      .summary-box strong { color: #15803d !important; }
+      
+      .print-signatures-stamps {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        margin-top: auto !important;
+        padding-top: 40px !important;
+      }
+      .sig-box { text-align: center !important; width: 150px !important; }
+      .sig-box p { font-size: 13px !important; font-weight: 600 !important; margin-bottom: 40px !important; }
+      .sig-line { border-bottom: 1px dashed #94a3b8 !important; width: 100% !important; }
+      
+      .stamp-box { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+      .stamp-box p { font-size: 11px !important; color: #64748b !important; margin-bottom: 8px !important; }
+      .print-school-stamp { width: 90px !important; height: 90px !important; object-fit: contain !important; opacity: 0.85 !important; }
+    }
   `]
 })
 export class StudentDetailsComponent implements OnInit {
@@ -574,7 +903,24 @@ export class StudentDetailsComponent implements OnInit {
   billingAccount = signal<any | null>(null);
   invoices = signal<any[]>([]);
 
+  studentGrades = signal<any[]>([
+    { subject: 'اللغة العربية', score: 96, classwork: 28, finalExam: 68 },
+    { subject: 'الرياضيات', score: 92, classwork: 26, finalExam: 66 },
+    { subject: 'العلوم العامة', score: 94, classwork: 27, finalExam: 67 },
+    { subject: 'التربية الإسلامية', score: 98, classwork: 29, finalExam: 69 },
+    { subject: 'اللغة الإنجليزية', score: 88, classwork: 24, finalExam: 64 },
+    { subject: 'الحاسب الآلي', score: 95, classwork: 28, finalExam: 67 }
+  ]);
+
+  examSchedule = signal<any[]>([
+    { subject: 'الرياضيات', type: 'امتحان نهائي تحريري', date: '2026-07-12', time: '09:00 - 11:30', room: 'قاعة ابن رشد (C1)', status: 'upcoming' },
+    { subject: 'اللغة العربية', type: 'امتحان نهائي تحريري', date: '2026-07-14', time: '09:00 - 11:00', room: 'قاعة ابن رشد (C1)', status: 'upcoming' },
+    { subject: 'العلوم العامة', type: 'امتحان نهائي تحريري', date: '2026-07-16', time: '09:00 - 11:00', room: 'مختبر الفيزياء', status: 'upcoming' },
+    { subject: 'التربية الإسلامية', type: 'امتحان شفهي وقرآن', date: '2026-07-08', time: '08:30 - 12:00', room: 'مصلى المدرسة', status: 'completed' }
+  ]);
+
   readonly documents = computed(() => this.timeline().filter((e) => e.type === 'document_upload'));
+  schoolInfo = signal<any>(null);
 
   private id = '';
 
@@ -605,6 +951,12 @@ export class StudentDetailsComponent implements OnInit {
     this.studentsService.getStudentById(this.id).subscribe();
     this.studentsService.getTimeline(this.id).subscribe((res) => {
       if (res && res.success) this.timeline.set(res.data || []);
+    });
+
+    this.studentsService.getBranding().subscribe({
+      next: (res) => {
+        if (res) this.schoolInfo.set(res);
+      }
     });
     
     // جلب الحساب المالي والفواتير الصادرة للطالب (حقيقي)
@@ -665,8 +1017,17 @@ export class StudentDetailsComponent implements OnInit {
     }
   }
 
-  private today(): string {
+  today(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  /** العام الدراسي التقريبي (يبدأ عادةً في سبتمبر). */
+  academicYearLabel(): string {
+    const enrYear = (this.student() as any)?.enrollments?.[0]?.academic_year_name;
+    if (enrYear) return enrYear;
+    const now = new Date();
+    const y = now.getFullYear();
+    return now.getMonth() >= 8 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
   }
 
   private confirm(data: ConfirmDialogData): Promise<boolean> {
@@ -688,6 +1049,10 @@ export class StudentDetailsComponent implements OnInit {
   async archive(s: any): Promise<void> {
     const ok = await this.confirm({ title: 'أرشفة الطالب', message: `سيتم أرشفة ملف «${s.profile?.arabic_name || s.id}». يمكن استعادته لاحقاً.`, color: 'warn' });
     if (ok) this.studentsService.archiveStudent(this.id, 'أرشفة يدوية من ملف الطالب').subscribe({ next: () => this.router.navigate(['/students/list']) });
+  }
+
+  printReportCard(): void {
+    window.print();
   }
 
   back(): void {

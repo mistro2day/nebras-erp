@@ -104,8 +104,11 @@ interface PublicGuardianForm {
                   </div>
                   <div class="fld req"><label>الصف المتقدَّم له</label>
                     <select [(ngModel)]="a.applying_grade_id"><option value="">اختر…</option>
-                      @for (g of grades(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
+                      @for (g of grades(); track g.id) {
+                        <option [value]="g.id" [disabled]="g.is_full">{{ g.name }}{{ g.is_full ? ' — مكتمل' : (g.remaining != null ? ' — متبقٍ ' + g.remaining + ' مقعد' : '') }}</option>
+                      }
                     </select>
+                    @if (selectedGradeFull()) { <p class="hint" style="color:var(--nb-danger)">اكتمل العدد لهذا الصف، يُرجى اختيار صف آخر.</p> }
                   </div>
                 </div>
                 <p class="hint">يكفي إدخال الرقم الوطني للطلاب السودانيين، أو رقم الجواز لغير السودانيين.</p>
@@ -281,7 +284,9 @@ export class PublicApplyComponent implements OnInit {
   readonly contactPhone = signal('');
   readonly contactEmail = signal('');
   readonly years = signal<Option[]>([]);
-  readonly grades = signal<Option[]>([]);
+  readonly grades = signal<any[]>([]);
+
+  readonly selectedGradeFull = () => !!this.grades().find((g) => g.id === this.a.applying_grade_id)?.is_full;
 
   agreed = false;
 
@@ -306,7 +311,7 @@ export class PublicApplyComponent implements OnInit {
         this.contactPhone.set(d.contact_phone ?? '');
         this.contactEmail.set(d.contact_email ?? '');
         this.years.set((d.academic_years ?? []).map((y: any) => ({ id: y.id, name: y.name })));
-        this.grades.set((d.grades ?? []).map((g: any) => ({ id: g.id, name: g.name })));
+        this.grades.set((d.grades ?? []).map((g: any) => ({ id: g.id, name: g.name, is_full: !!g.is_full, remaining: g.remaining ?? null, seats: g.seats ?? 0 })));
         const current = (d.academic_years ?? []).find((y: any) => y.current);
         if (current) this.a.academic_year_id = current.id;
         else if ((d.academic_years ?? []).length === 1) this.a.academic_year_id = d.academic_years[0].id;
@@ -320,7 +325,7 @@ export class PublicApplyComponent implements OnInit {
     switch (this.step()) {
       case 1:
         return ['arabic_full_name', 'gender', 'date_of_birth', 'nationality', 'academic_year_id', 'applying_grade_id']
-          .every((k) => !!this.a[k]) && (!!this.a.national_id || !!this.a.passport_number);
+          .every((k) => !!this.a[k]) && (!!this.a.national_id || !!this.a.passport_number) && !this.selectedGradeFull();
       case 2:
         return !!this.g.relationship && !!this.g.full_name && !!this.g.phone;
       case 4:

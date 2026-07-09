@@ -16,6 +16,8 @@ interface SettingsForm {
   registration_start: string | null;
   registration_end: string | null;
   allowed_grade_ids: string[];
+  grade_seats: Record<string, number>;
+  auto_close_when_full: boolean;
   terms: string;
   required_documents: string[];
   min_age: number | null;
@@ -25,6 +27,27 @@ interface SettingsForm {
   contact_phone: string;
   contact_email: string;
 }
+
+/** قالب افتراضي لشروط ومستندات القبول في المدارس السودانية (قابل للتعديل). */
+const SUDAN_DEFAULT_DOCS = [
+  'شهادة الميلاد (الأصل + صورة)',
+  'الرقم الوطني للطالب وولي الأمر',
+  'صورة من جواز السفر والإقامة (لغير السودانيين)',
+  'شهادة نقل / إخلاء طرف من المدرسة السابقة',
+  'كشف الدرجات أو آخر شهادة دراسية معتمدة',
+  'عدد (4) صور شخصية حديثة بخلفية بيضاء',
+  'شهادة التطعيمات / البطاقة الصحية',
+  'إيصال سداد رسوم التقديم',
+];
+
+const SUDAN_DEFAULT_TERMS = `شروط وأحكام القبول والتسجيل:
+١. أن يكون عمر الطالب مناسبًا للصف المتقدَّم له وفق لائحة وزارة التربية والتعليم.
+٢. اجتياز مقابلة القبول و/أو اختبار تحديد المستوى بنجاح.
+٣. استكمال جميع المستندات المطلوبة قبل اعتماد التسجيل.
+٤. سداد رسوم التسجيل خلال المدة المحددة، وإلا يُلغى الحجز.
+٥. القبول مشروط بتوفّر المقاعد الشاغرة، والأولوية حسب تاريخ التقديم واستيفاء الشروط.
+٦. الالتزام بلائحة المدرسة والزيّ المدرسي الرسمي وأنظمة الحضور والانضباط.
+٧. صحة جميع البيانات والمستندات المقدَّمة مسؤولية ولي الأمر، وأي بيانات غير صحيحة تُلغي القبول.`;
 
 /**
  * إعدادات القبول — فتح/إغلاق باب التسجيل (لمدير النظام).
@@ -84,22 +107,58 @@ interface SettingsForm {
             <div class="fld"><label>أقصى عمر (سنوات)</label><input type="number" min="0" [(ngModel)]="s.max_age" /></div>
           </div>
 
-          <div class="sub-label">الصفوف المتاحة للتقديم <span>(دون تحديد = كل الصفوف)</span></div>
-          <div class="chips">
-            @for (g of grades(); track g.id) {
-              <label class="chip" [class.sel]="isGradeSelected(g.id)">
-                <input type="checkbox" [checked]="isGradeSelected(g.id)" (change)="toggleGrade(g.id)" />
-                {{ g.name }}
-              </label>
-            }
-            @if (grades().length === 0) { <span class="muted">لا توجد صفوف معرّفة في الشؤون الأكاديمية.</span> }
+        </nb-panel>
+
+        <!-- المقاعد لكل صف + الإغلاق التلقائي -->
+        <nb-panel title="المقاعد المتاحة لكل صف" subtitle="حدّد الصفوف المتاحة للتقديم وعدد المقاعد لكل صف. عند اكتمال العدد يُغلق قبول الصف تلقائيًا." style="margin-top:16px">
+          <div class="toggle-row" style="margin-bottom:14px">
+            <div>
+              <div class="toggle-title">الإغلاق التلقائي عند اكتمال المقاعد</div>
+              <div class="toggle-sub">عند التفعيل، يتوقف استقبال الطلبات للصف فور بلوغ عدد المقاعد المحدّد.</div>
+            </div>
+            <button type="button" class="switch" [class.on]="s.auto_close_when_full" (click)="s.auto_close_when_full = !s.auto_close_when_full"
+                    [attr.aria-pressed]="s.auto_close_when_full" aria-label="الإغلاق التلقائي عند الاكتمال">
+              <span class="knob"></span>
+            </button>
+            <span class="state" [class.open]="s.auto_close_when_full">{{ s.auto_close_when_full ? 'مُفعّل' : 'مُعطّل' }}</span>
           </div>
+
+          @if (grades().length === 0) {
+            <span class="muted">لا توجد صفوف معرّفة في الشؤون الأكاديمية.</span>
+          } @else {
+            <div class="seats-tbl">
+              <div class="st-head">
+                <span>متاح للتقديم</span><span>الصف</span><span>عدد المقاعد</span>
+              </div>
+              @for (g of grades(); track g.id) {
+                <div class="st-row" [class.on]="isGradeSelected(g.id)">
+                  <span>
+                    <button type="button" class="mini-switch" [class.on]="isGradeSelected(g.id)" (click)="toggleGrade(g.id)"
+                            [attr.aria-pressed]="isGradeSelected(g.id)" [attr.aria-label]="'إتاحة ' + g.name">
+                      <span class="knob"></span>
+                    </button>
+                  </span>
+                  <span class="st-name">{{ g.name }}</span>
+                  <span>
+                    <input type="number" min="0" class="seats-input" [disabled]="!isGradeSelected(g.id)"
+                           [ngModel]="seatsOf(g.id)" (ngModelChange)="setSeats(g.id, $event)"
+                           placeholder="بلا حد" [attr.aria-label]="'مقاعد ' + g.name" />
+                  </span>
+                </div>
+              }
+            </div>
+            <p class="hint">اترك خانة المقاعد فارغة أو صفرًا لجعل التقديم بلا حدّ لذلك الصف.</p>
+          }
         </nb-panel>
 
         <!-- الشروط والمستندات -->
-        <nb-panel title="الشروط والمستندات المطلوبة" style="margin-top:16px">
+        <nb-panel title="الشروط والمستندات المطلوبة" subtitle="تُعرض هذه الشروط والمستندات للمتقدم أثناء التقديم." style="margin-top:16px">
+          <div class="defaults-bar">
+            <button type="button" class="nb-btn-secondary sm" (click)="applySudanDefaults()">تحميل القالب  الافتراضي</button>
+            <span class="muted">يملأ الشروط والمستندات بقيم افتراضية شائعة في المدارس السودانية — قابلة للتعديل.</span>
+          </div>
           <div class="fld"><label>شروط وأحكام التقديم</label>
-            <textarea rows="4" [(ngModel)]="s.terms" placeholder="اكتب شروط القبول والتسجيل التي ستظهر للمتقدم…"></textarea>
+            <textarea rows="6" [(ngModel)]="s.terms" placeholder="اكتب شروط القبول والتسجيل التي ستظهر للمتقدم…"></textarea>
           </div>
           <div class="fld" style="margin-top:14px"><label>المستندات المطلوبة <span class="lbl-note">(مستند في كل سطر)</span></label>
             <textarea rows="6" [(ngModel)]="documentsText"
@@ -153,6 +212,23 @@ interface SettingsForm {
     .chip.sel { background: var(--nb-primary-50); border-color: var(--nb-primary-600); color: var(--nb-primary-600); font-weight: 600; }
     .chip input { display: none; }
     .muted { font-size: 12px; color: var(--nb-text-muted); }
+    /* جدول المقاعد لكل صف */
+    .seats-tbl { border: 1px solid var(--nb-border); border-radius: var(--nb-radius); overflow: hidden; }
+    .st-head, .st-row { display: grid; grid-template-columns: 120px 1fr 140px; align-items: center; gap: 10px; padding: 10px 14px; }
+    .st-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); font-size: 11.5px; font-weight: 700; color: var(--nb-text-muted); }
+    .st-row { border-bottom: 1px solid var(--nb-border-row); }
+    .st-row:last-child { border-bottom: none; }
+    .st-row.on { background: var(--nb-primary-50); }
+    .st-name { font-size: 13px; font-weight: 600; color: var(--nb-text); }
+    .seats-input { width: 120px; height: 34px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; text-align: center; }
+    .seats-input:disabled { background: var(--nb-surface-raised); color: var(--nb-text-faint); cursor: not-allowed; }
+    .seats-input:focus { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); }
+    .mini-switch { width: 42px; height: 24px; border-radius: 999px; background: var(--nb-border); border: none; position: relative; cursor: pointer; transition: background 200ms ease; padding: 0; }
+    .mini-switch.on { background: var(--nb-primary-600); }
+    .mini-switch .knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: inset-inline-start 200ms ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+    .mini-switch.on .knob { inset-inline-start: 21px; }
+    .defaults-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 12px; background: var(--nb-surface-raised); border: 1px dashed var(--nb-border); border-radius: var(--nb-radius); }
+    .nb-btn-secondary.sm { height: 30px; padding: 0 14px; font-size: 12px; }
     .footer-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
     .alert { font-size: 12px; border-radius: var(--nb-radius); padding: 10px 14px; margin-bottom: 14px; }
     .alert.ok { background: var(--nb-success-bg, var(--nb-primary-50)); color: var(--nb-success); border: 1px solid var(--nb-success); }
@@ -171,7 +247,8 @@ export class AdmissionSettingsComponent implements OnInit {
 
   s: SettingsForm = {
     is_open: false, academic_year_id: null, registration_start: null, registration_end: null,
-    allowed_grade_ids: [], terms: '', required_documents: [], min_age: null, max_age: null,
+    allowed_grade_ids: [], grade_seats: {}, auto_close_when_full: true,
+    terms: '', required_documents: [], min_age: null, max_age: null,
     application_fee: 0, closed_message: '', contact_phone: '', contact_email: '',
   };
   documentsText = '';
@@ -186,7 +263,12 @@ export class AdmissionSettingsComponent implements OnInit {
       next: (res) => {
         const d = res?.data ?? res;
         if (d) {
-          this.s = { ...this.s, ...d, allowed_grade_ids: d.allowed_grade_ids ?? [] };
+          this.s = {
+            ...this.s, ...d,
+            allowed_grade_ids: d.allowed_grade_ids ?? [],
+            grade_seats: d.grade_seats ?? {},
+            auto_close_when_full: d.auto_close_when_full ?? true,
+          };
           this.documentsText = (d.required_documents ?? []).join('\n');
         }
         this.loading.set(false);
@@ -199,6 +281,21 @@ export class AdmissionSettingsComponent implements OnInit {
   toggleGrade(id: string): void {
     const list: string[] = this.s['allowed_grade_ids'] ?? [];
     this.s['allowed_grade_ids'] = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+  }
+
+  seatsOf(id: string): number | null {
+    const v = this.s['grade_seats']?.[id];
+    return v ? Number(v) : null;
+  }
+  setSeats(id: string, value: any): void {
+    const n = Number(value);
+    this.s['grade_seats'] = { ...(this.s['grade_seats'] ?? {}), [id]: isNaN(n) || n <= 0 ? 0 : n };
+  }
+
+  applySudanDefaults(): void {
+    if (!this.s.terms?.trim()) this.s.terms = SUDAN_DEFAULT_TERMS;
+    else this.s.terms = SUDAN_DEFAULT_TERMS;
+    this.documentsText = SUDAN_DEFAULT_DOCS.join('\n');
   }
 
   save(): void {

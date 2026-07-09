@@ -31,6 +31,10 @@ export const ACADEMICS_ROUTES: Routes = [
     loadComponent: () => import('./sections/sections.component').then((m) => m.AcademicSectionsComponent),
   },
   {
+    path: 'distribution',
+    loadComponent: () => import('./distribution/distribution.component').then((m) => m.AcademicDistributionComponent),
+  },
+  {
     path: 'subjects',
     loadComponent: () => import('./subjects/subjects.component').then((m) => m.AcademicSubjectsComponent),
   },

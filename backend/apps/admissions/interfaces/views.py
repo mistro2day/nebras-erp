@@ -23,6 +23,30 @@ def _get_admission_settings(tenant_id):
     return obj
 
 
+# الحالات التي تشغل مقعدًا فعليًا في الصف (تُستثنى المسودة والمرفوض).
+_SEAT_TAKING_STATUSES = ('submitted', 'under_review', 'interview_scheduled', 'accepted', 'enrolled')
+
+
+def _grade_taken_count(tenant_id, grade_id, academic_year_id=None):
+    """عدد الطلبات التي تشغل مقاعد في صف معيّن (اختياريًا ضمن سنة دراسية)."""
+    qs = Applicant.objects.filter(
+        tenant_id=tenant_id, deleted_at__isnull=True,
+        applying_grade_id=grade_id, status__in=_SEAT_TAKING_STATUSES,
+    )
+    if academic_year_id:
+        qs = qs.filter(academic_year_id=academic_year_id)
+    return qs.count()
+
+
+def _grade_seat_info(settings_obj, tenant_id, grade_id, academic_year_id=None):
+    """معلومات مقاعد صف: السعة، المشغول، المتبقّي، والاكتمال."""
+    seats = int((settings_obj.grade_seats or {}).get(str(grade_id), 0) or 0)
+    taken = _grade_taken_count(tenant_id, grade_id, academic_year_id)
+    remaining = max(0, seats - taken) if seats > 0 else None
+    is_full = bool(settings_obj.auto_close_when_full and seats > 0 and taken >= seats)
+    return {'seats': seats, 'taken': taken, 'remaining': remaining, 'is_full': is_full}
+
+
 class AdmissionsBaseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
@@ -215,7 +239,14 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
                     {'id': str(y.id), 'name': y.name, 'code': y.code, 'current': y.current_flag}
                     for y in years_qs
                 ],
-                'grades': [{'id': str(g.id), 'name': g.name, 'code': g.code} for g in grades_qs],
+                'auto_close_when_full': settings_obj.auto_close_when_full,
+                'grades': [
+                    {
+                        'id': str(g.id), 'name': g.name, 'code': g.code,
+                        **_grade_seat_info(settings_obj, tenant.id, g.id, settings_obj.academic_year_id),
+                    }
+                    for g in grades_qs
+                ],
             },
         })
 
@@ -251,6 +282,18 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
             return Response(
                 {'success': False, 'message': f"حقول مطلوبة ناقصة: {', '.join(missing)}"},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # التحقّق من توفّر مقعد في الصف المطلوب (الإغلاق التلقائي عند الاكتمال).
+        seat_info = _grade_seat_info(
+            settings_obj, tenant.id,
+            applicant_data.get('applying_grade_id'),
+            applicant_data.get('academic_year_id'),
+        )
+        if seat_info['is_full']:
+            return Response(
+                {'success': False, 'message': 'اكتمل العدد المتاح للصف المطلوب. يمكنك اختيار صف آخر أو التقديم لاحقًا.'},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         allowed_applicant = {

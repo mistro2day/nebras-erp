@@ -545,6 +545,7 @@ export class DashboardLayoutComponent {
             { label: 'المراحل التعليمية', link: '/academics/stages' },
             { label: 'الصفوف الدراسية', link: '/academics/grades' },
             { label: 'الشعب الدراسية', link: '/academics/sections' },
+            { label: 'توزيع الطلاب على الشعب', link: '/academics/distribution' },
             { label: 'المواد الدراسية', link: '/academics/subjects' },
           ],
         },

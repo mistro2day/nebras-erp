@@ -122,6 +122,8 @@ class AdmissionSettings(CombinedBaseModel):
     registration_start = models.DateField(null=True, blank=True)  # بداية فترة التقديم
     registration_end = models.DateField(null=True, blank=True)    # نهاية فترة التقديم
     allowed_grade_ids = models.JSONField(default=list, blank=True)  # الصفوف المتاحة (فارغ = الكل)
+    grade_seats = models.JSONField(default=dict, blank=True)      # مقاعد كل صف {grade_id: seats}؛ 0/غياب = بلا حد
+    auto_close_when_full = models.BooleanField(default=True)      # إغلاق قبول الصف تلقائيًا عند اكتمال مقاعده
     terms = models.TextField(blank=True, null=True)              # شروط وأحكام التقديم
     required_documents = models.JSONField(default=list, blank=True)  # المستندات المطلوبة (قائمة نصوص)
     min_age = models.IntegerField(null=True, blank=True)        # الحد الأدنى للعمر (سنوات)

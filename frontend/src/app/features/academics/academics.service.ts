@@ -110,4 +110,30 @@ export class AcademicsService {
   createSubject(body: Partial<Subject>): Observable<any> { return this.apiClient.post('academics/subjects/', body); }
   updateSubject(id: string, body: Partial<Subject>): Observable<any> { return this.apiClient.patch(`academics/subjects/${id}/`, body); }
   deleteSubject(id: string): Observable<any> { return this.apiClient.delete(`academics/subjects/${id}/`); }
+
+  // ---------- مؤشرات اللوحة الأكاديمية (مربوطة بالطلاب) ----------
+  getDashboardStats(params?: any): Observable<any> { return this.apiClient.get('academics/dashboard-stats/', params); }
+
+  // ---------- توزيع الطلاب على الشعب (يعتمد نقاط نهاية الطلاب) ----------
+  /** جلب طلاب صف معيّن مع تسجيلاتهم (enrollments) لتحديد شعبة كل طالب. */
+  getStudentsByGrade(gradeId: string): Observable<any> {
+    return this.apiClient.get('students/students/', { grade_id: gradeId, page_size: 500 });
+  }
+  /** جلب الطلاب القابلين للتوزيع (المسجّلون/النشطون) مع تسجيلاتهم لتحديد الصف والشعبة. */
+  getStudentsForDistribution(params?: any): Observable<any> {
+    return this.apiClient.get('students/students/', { page_size: 100, ...(params ?? {}) });
+  }
+  /** تسكين/تعيين طالب في شعبة داخل صف وسنة دراسية (يسجّل وضعًا جديدًا). */
+  assignStudentSection(studentId: string, body: {
+    academic_year_id: string; grade_id: string; section_id: string;
+    term_id?: string | null; enrollment_type?: string;
+  }): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/enroll/`, body);
+  }
+  /** ترقية/تخطّي صف لطالب متميّز. */
+  promoteStudent(studentId: string, body: {
+    from_grade_id: string; to_grade_id: string; academic_year_id: string;
+  }): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/promote/`, body);
+  }
 }
