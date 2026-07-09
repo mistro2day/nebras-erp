@@ -30,19 +30,18 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
       @if (loading()) {
         <nb-loading message="جارٍ تحميل بيانات القبول…"></nb-loading>
       } @else {
-        <!-- Hero: ملخص دورة القبول ونسبة القبول -->
+        <!-- Hero نحيف: ملخص الدورة ونسبة القبول -->
         <div class="hero" (click)="go('/admissions/applications')">
           <div class="hero-glow"></div>
           <div class="hero-main">
             <span class="hero-badge">دورة القبول الحالية</span>
-            <h2 class="hero-title">{{ total() }} <span class="hero-unit">طلب التحاق</span></h2>
-            <span class="hero-code">{{ pending() }} بانتظار المعالجة · {{ accepted() }} مقبول</span>
+            <span class="hero-line"><b>{{ total() }}</b> طلب التحاق · {{ pending() }} بانتظار المعالجة · {{ accepted() }} مقبول</span>
           </div>
           <div class="hero-dates">
             <div class="hero-ring" [style.background]="rateRingBg()">
               <div class="hero-ring-in"><span class="hr-pct">{{ acceptanceRate() }}%</span><span class="hr-lbl">قبول</span></div>
             </div>
-            <div class="hero-date"><span class="hd-label">تم تسجيلهم</span><span class="hd-val">{{ count('enrolled') }}</span></div>
+            <div class="hero-date"><span class="hd-label">مُسجّل</span><span class="hd-val">{{ count('enrolled') }}</span></div>
             <div class="hero-date"><span class="hd-label">مرفوض</span><span class="hd-val">{{ count('rejected') }}</span></div>
           </div>
         </div>
@@ -75,38 +74,49 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
           </div>
         </div>
 
-        <!-- قمع دورة القبول -->
-        <nb-panel title="قمع دورة القبول" subtitle="توزيع الطلبات على مراحل الدورة — من التقديم حتى التسجيل.">
-          <div class="funnel" role="img" [attr.aria-label]="'قمع القبول: ' + total() + ' طلب'">
+        <!-- مسار العمل: صف مضغوط من الاختصارات -->
+        <div class="wf-strip">
+          @for (link of workflow; track link.path) {
+            <a class="wf-chip" [routerLink]="link.path" [title]="link.desc">
+              <span class="wf-mark">{{ link.mark }}</span>
+              <span class="wf-t">{{ link.title }}</span>
+            </a>
+          }
+        </div>
+
+        <!-- مسار الطلبات عبر المراحل -->
+        <nb-panel title="مسار الطلبات عبر المراحل" [flush]="true">
+          <div class="funnel" role="img" [attr.aria-label]="'مسار الطلبات: ' + total() + ' طلب'">
             @for (st of funnelStages; track st.key) {
-              <a class="fseg" [routerLink]="st.link" [style.--w.%]="segWidth(st.key)" [class.empty]="count(st.key) === 0">
+              <a class="fseg" [routerLink]="st.link" [style.--w.%]="segWidth(st.statuses)" [class.empty]="segCount(st.statuses) === 0">
                 <span class="fseg-bar" [class]="'fseg-bar ' + st.tone"></span>
-                <span class="fseg-count">{{ count(st.key) }}</span>
+                <span class="fseg-count">{{ segCount(st.statuses) }}</span>
                 <span class="fseg-label">{{ st.label }}</span>
               </a>
             }
           </div>
         </nb-panel>
 
-        <!-- تحليلات: توزيع الحالات + النوع + الجنسيات -->
-        <div class="analytics">
-          <nb-panel title="توزيع الطلبات حسب الحالة">
-            @if (total() === 0) { <p class="hint">لا توجد طلبات بعد.</p> }
-            @else {
-              <div class="hbars">
-                @for (s of statusOrder; track s) {
-                  <div class="hbar-row">
-                    <span class="hbar-name">{{ statusText(s) }}</span>
-                    <span class="hbar-track"><span class="hbar-fill" [class]="'hbar-fill ' + statusKind(s)" [class.zero]="count(s) === 0" [style.width.%]="statusBarPct(s)"></span></span>
-                    <span class="hbar-val mono">{{ count(s) }}</span>
-                  </div>
-                }
-              </div>
-            }
+        <!-- صف بينتو: مؤشرات التحويل + النوع + أحدث الطلبات -->
+        <div class="bento">
+          <!-- بطاقة أكثر فائدة: مؤشرات التحويل عبر مراحل القبول -->
+          <nb-panel title="مؤشرات التحويل" [flush]="true">
+            <div class="conv">
+              @for (c of conversion(); track c.label) {
+                <a class="conv-row" [routerLink]="c.link">
+                  <span class="conv-top">
+                    <span class="conv-label">{{ c.label }}</span>
+                    <span class="conv-pct" [class]="c.tone">{{ c.pct }}%</span>
+                  </span>
+                  <span class="conv-track"><span class="conv-fill" [class]="c.tone" [style.width.%]="c.pct"></span></span>
+                  <span class="conv-sub">{{ c.num }} من {{ c.den }}</span>
+                </a>
+              }
+            </div>
           </nb-panel>
 
+          <!-- النوع والجنسيات -->
           <nb-panel title="النوع والجنسيات">
-            <div class="mc-label">توزيع المتقدمين حسب النوع</div>
             <div class="gender-bar">
               <span class="gb male" [style.flex]="genderCount('male') || 0.001"></span>
               <span class="gb female" [style.flex]="genderCount('female') || 0.001"></span>
@@ -116,79 +126,62 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
               <span><i class="lg female"></i>بنات {{ genderCount('female') }}</span>
             </div>
             <div class="nat-list">
-              <div class="mc-label" style="margin-top:12px">أبرز الجنسيات</div>
+              <div class="mc-label">أبرز الجنسيات</div>
               @for (n of topNationalities(); track n.name) {
                 <div class="nat-row"><span>{{ n.name }}</span><span class="mono">{{ n.count }}</span></div>
               }
               @if (topNationalities().length === 0) { <span class="hint">لا بيانات.</span> }
             </div>
           </nb-panel>
-        </div>
 
-        <!-- مسار العمل -->
-        <nb-panel title="مسار القبول والتسجيل" subtitle="انتقل إلى أي مرحلة من مراحل معالجة الطلبات.">
-          <nav class="wf-grid" aria-label="مراحل سير عمل القبول">
-            @for (link of workflow; track link.path) {
-              <a class="wf-card" [routerLink]="link.path">
-                <span class="wf-mark">{{ link.mark }}</span>
-                <span class="wf-body"><strong>{{ link.title }}</strong><span class="wf-desc">{{ link.desc }}</span></span>
-              </a>
-            }
-          </nav>
-        </nb-panel>
-
-        <!-- أحدث الطلبات -->
-        <nb-panel title="أحدث طلبات التقديم" [flush]="true">
-          <div class="list">
-            @for (applicant of recent(); track applicant.id) {
-              <a class="list-item" [routerLink]="['/admissions/applications', applicant.id]">
-                <div class="item-header">
-                  <strong>{{ applicant.arabic_full_name }}</strong>
-                  <span class="nb-badge-info">{{ applicant.application_number }}</span>
-                </div>
-                <div class="item-info">
-                  <span>الجنسية: {{ applicant.nationality }}</span> ·
+          <!-- أحدث الطلبات -->
+          <nb-panel title="أحدث الطلبات" [flush]="true">
+            <div class="list">
+              @for (applicant of recent5(); track applicant.id) {
+                <a class="list-item" [routerLink]="['/admissions/applications', applicant.id]">
+                  <span class="li-name">{{ applicant.arabic_full_name }}</span>
                   <span [class]="'nb-badge-' + statusKind(applicant.status)">{{ statusText(applicant.status) }}</span>
-                </div>
-              </a>
-            }
-            @if (total() === 0) { <div class="no-data">لا توجد طلبات تقديم حالياً.</div> }
-          </div>
-        </nb-panel>
+                </a>
+              }
+              @if (total() === 0) { <div class="no-data">لا توجد طلبات حالياً.</div> }
+            </div>
+          </nb-panel>
+        </div>
       }
     </div>
   `,
   styles: [`
-    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
-    .hint { font-size: 13px; color: var(--nb-text-muted); margin: 0; }
-    nb-panel { margin-bottom: 16px; display: block; }
+    .page { flex: 1; padding: 14px 16px; overflow-y: auto; min-width: 0; }
+    .hint { font-size: 12.5px; color: var(--nb-text-muted); margin: 0; }
+    nb-panel { margin-bottom: 12px; display: block; }
 
-    /* Hero */
+    /* Hero نحيف */
     .hero { position: relative; overflow: hidden; cursor: pointer; background: linear-gradient(135deg, var(--nb-primary-600), var(--nb-primary-500));
-      border-radius: var(--nb-radius-card); padding: 20px 22px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;
-      gap: 20px; flex-wrap: wrap; box-shadow: 0 8px 24px rgba(0,0,0,.10); transition: transform .2s, box-shadow .2s; }
-    .hero:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
-    .hero-glow { position: absolute; inset-inline-start: -60px; top: -60px; width: 200px; height: 200px; background: rgba(255,255,255,.14); border-radius: 50%; filter: blur(8px); }
-    .hero-main { position: relative; display: flex; flex-direction: column; gap: 4px; color: #fff; }
-    .hero-badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.22); padding: 3px 10px; border-radius: 999px; width: fit-content; }
-    .hero-title { margin: 4px 0 0; font-size: 30px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
-    .hero-unit { font-size: 15px; font-weight: 600; opacity: .85; }
-    .hero-code { font-size: 12px; color: rgba(255,255,255,.85); }
-    .hero-dates { position: relative; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    .hero-ring { width: 78px; height: 78px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .hero-ring-in { width: 60px; height: 60px; border-radius: 50%; background: var(--nb-primary-600); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; }
-    .hr-pct { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .hr-lbl { font-size: 9.5px; opacity: .85; }
-    .hero-date { display: flex; flex-direction: column; gap: 3px; background: rgba(255,255,255,.14); padding: 8px 14px; border-radius: 10px; }
-    .hd-label { font-size: 10.5px; color: rgba(255,255,255,.82); }
-    .hd-val { font-size: 15px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+      border-radius: var(--nb-radius-card); padding: 12px 18px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; box-shadow: 0 4px 14px rgba(0,0,0,.10); transition: transform .2s, box-shadow .2s; }
+    .hero:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+    .hero-glow { position: absolute; inset-inline-start: -60px; top: -80px; width: 180px; height: 180px; background: rgba(255,255,255,.13); border-radius: 50%; filter: blur(8px); }
+    .hero-main { position: relative; display: flex; align-items: center; gap: 12px; color: #fff; flex-wrap: wrap; }
+    .hero-badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.22); padding: 3px 10px; border-radius: 999px; }
+    .hero-line { font-size: 13px; color: rgba(255,255,255,.92); }
+    .hero-line b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .hero-dates { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .hero-ring { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .hero-ring-in { width: 42px; height: 42px; border-radius: 50%; background: var(--nb-primary-600); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; }
+    .hr-pct { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .hr-lbl { font-size: 8px; opacity: .85; }
+    .hero-date { display: flex; flex-direction: column; gap: 1px; background: rgba(255,255,255,.14); padding: 5px 12px; border-radius: 8px; }
+    .hd-label { font-size: 10px; color: rgba(255,255,255,.82); }
+    .hd-val { font-size: 14px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 
-    /* KPI cards */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px; }
+    /* KPI cards مضغوطة */
+    .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 12px; }
+    @media (max-width: 1100px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 620px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
     .metric-card { position: relative; overflow: hidden; cursor: pointer; background: var(--nb-surface); border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card); padding: 16px 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      border-radius: var(--nb-radius-card); padding: 11px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
       transition: transform .2s cubic-bezier(0.4,0,0.2,1), box-shadow .2s; }
-    .metric-card:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.08); }
+    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.08); }
     .metric-card::before { content: ''; position: absolute; inset-block-start: 0; inset-inline: 0; height: 3px; background: var(--nb-text-faint); }
     .metric-card.total::before { background: var(--nb-primary-500); }
     .metric-card.warn::before { background: var(--nb-warning); }
@@ -196,22 +189,22 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
     .metric-card.success::before { background: var(--nb-success); }
     .metric-card.purple::before { background: #af52de; }
     .metric-card.neutral::before { background: var(--nb-text-muted); }
-    .m-icon { flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--nb-surface-raised); color: var(--nb-text-muted); }
-    .m-icon svg { width: 22px; height: 22px; }
+    .m-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--nb-surface-raised); color: var(--nb-text-muted); }
+    .m-icon svg { width: 18px; height: 18px; }
     .metric-card.total .m-icon { background: var(--nb-primary-50); color: var(--nb-primary-600); }
     .metric-card.warn .m-icon { background: rgba(255,159,10,.14); color: var(--nb-warning); }
     .metric-card.info .m-icon { background: rgba(0,122,255,.12); color: var(--nb-info); }
     .metric-card.success .m-icon { background: rgba(52,199,89,.12); color: var(--nb-success); }
     .metric-card.purple .m-icon { background: rgba(175,82,222,.12); color: #7d26cd; }
-    .m-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .metric-card .label { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 500; }
-    .metric-card .value { font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+    .m-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .metric-card .label { font-size: 11px; color: var(--nb-text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .metric-card .value { font-size: 20px; font-weight: 800; line-height: 1.15; color: var(--nb-text); font-variant-numeric: tabular-nums; }
     .metric-card .value.warn { color: var(--nb-warning); } .metric-card .value.info { color: var(--nb-info); }
     .metric-card .value.success { color: var(--nb-success); } .metric-card .value.purple { color: #7d26cd; }
-    .v-sub { font-size: 14px; font-weight: 600; color: var(--nb-text-muted); }
+    .v-sub { font-size: 12px; font-weight: 600; color: var(--nb-text-muted); }
 
     /* Funnel */
-    .funnel { display: flex; gap: 6px; align-items: stretch; }
+    .funnel { display: flex; gap: 6px; align-items: stretch; padding: 12px 14px; }
     .fseg { flex: var(--w, 10) 1 0; min-width: 76px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; padding: 4px 2px; border-radius: var(--nb-radius); transition: background 150ms ease; }
     .fseg:hover { background: var(--nb-surface-raised); }
     .fseg-bar { height: 14px; border-radius: 999px; background: var(--nb-border); transform-origin: right; animation: grow 500ms cubic-bezier(0.2,0,0,1) both;
@@ -222,6 +215,7 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
     .fseg-bar.primary { background: linear-gradient(90deg, var(--nb-primary-700, #0056b3), var(--nb-primary-500)); }
     .fseg-bar.success { background: linear-gradient(90deg, #2a9d54, var(--nb-success)); }
     .fseg-bar.ai { background: linear-gradient(90deg, #7d26cd, #af52de); }
+    .fseg-bar.danger { background: linear-gradient(90deg, #c02d24, var(--nb-danger)); }
     .fseg.empty .fseg-bar { background: var(--nb-border-soft); box-shadow: none; }
     .fseg.empty .fseg-bar::after { display: none; }
     .fseg-count { font-size: 16px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
@@ -231,26 +225,30 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
     @media (prefers-reduced-motion: reduce) { .fseg-bar { animation: none; } }
     @media (max-width: 700px) { .funnel { flex-wrap: wrap; } .fseg { min-width: 100px; } }
 
-    /* Analytics */
-    .analytics { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
-    @media (max-width: 860px) { .analytics { grid-template-columns: 1fr; } }
-    .analytics nb-panel { margin-bottom: 0; }
-    .mc-label { font-size: 12px; color: var(--nb-text-muted); margin-bottom: 10px; }
-    .hbars { display: flex; flex-direction: column; gap: 12px; }
-    .hbar-row { display: grid; grid-template-columns: 108px 1fr 30px; align-items: center; gap: 10px; }
-    .hbar-name { font-size: 12.5px; color: var(--nb-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .hbar-track { position: relative; height: 14px; background: var(--nb-surface-raised); border-radius: 7px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--nb-border-soft); }
-    .hbar-fill { display: block; height: 100%; min-width: 0; border-radius: 7px; background: linear-gradient(90deg, var(--nb-primary-600), var(--nb-primary-400));
-      transition: width .7s cubic-bezier(0.34,1.2,0.44,1); position: relative; }
-    /* لمعة خفيفة أعلى الشريط لإحساس واقعي */
-    .hbar-fill::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 45%; border-radius: 7px 7px 0 0; background: linear-gradient(180deg, rgba(255,255,255,.28), transparent); }
-    .hbar-fill.success { background: linear-gradient(90deg, #2a9d54, var(--nb-success)); }
-    .hbar-fill.warning { background: linear-gradient(90deg, #d98413, var(--nb-warning)); }
-    .hbar-fill.info { background: linear-gradient(90deg, #0056b3, var(--nb-info)); }
-    .hbar-fill.danger { background: linear-gradient(90deg, #c02d24, var(--nb-danger)); }
-    .hbar-fill.ai { background: linear-gradient(90deg, #7d26cd, #af52de); }
-    .hbar-fill.zero { background: transparent; box-shadow: none; }
-    .hbar-val { font-size: 12.5px; font-weight: 800; color: var(--nb-text); text-align: end; font-variant-numeric: tabular-nums; }
+    /* بينتو: 3 أعمدة مضغوطة */
+    .bento { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+    @media (max-width: 960px) { .bento { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 620px) { .bento { grid-template-columns: 1fr; } }
+    .bento nb-panel { margin-bottom: 0; }
+    .mc-label { font-size: 11.5px; color: var(--nb-text-muted); margin-bottom: 8px; font-weight: 600; }
+
+    /* مؤشرات التحويل */
+    .conv { display: flex; flex-direction: column; }
+    .conv-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 9px 14px; border-top: 1px solid var(--nb-border-soft); text-decoration: none; transition: background .15s; }
+    .conv-row:first-child { border-top: none; }
+    .conv-row:hover { background: var(--nb-surface-raised); }
+    .conv-top { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
+    .conv-label { font-size: 12px; color: var(--nb-text-secondary); }
+    .conv-pct { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--nb-text); }
+    .conv-pct.success { color: var(--nb-success); } .conv-pct.info { color: var(--nb-info); }
+    .conv-pct.primary { color: var(--nb-primary-600); } .conv-pct.warn { color: var(--nb-warning); }
+    .conv-track { grid-column: 1 / -1; height: 7px; background: var(--nb-surface-raised); border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--nb-border-soft); }
+    .conv-fill { display: block; height: 100%; border-radius: 4px; background: var(--nb-primary-500); transition: width .7s cubic-bezier(0.34,1.2,0.44,1); }
+    .conv-fill.success { background: linear-gradient(90deg, #2a9d54, var(--nb-success)); }
+    .conv-fill.info { background: linear-gradient(90deg, #0056b3, var(--nb-info)); }
+    .conv-fill.primary { background: linear-gradient(90deg, var(--nb-primary-700, #0056b3), var(--nb-primary-500)); }
+    .conv-fill.warn { background: linear-gradient(90deg, #d98413, var(--nb-warning)); }
+    .conv-sub { grid-column: 1 / -1; font-size: 10.5px; color: var(--nb-text-muted); font-variant-numeric: tabular-nums; }
 
     .gender-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 3px; margin-bottom: 10px; box-shadow: inset 0 0 0 1px var(--nb-border-soft); }
     .gb { transition: flex .7s cubic-bezier(0.34,1.2,0.44,1); }
@@ -258,31 +256,34 @@ interface WorkflowLink { title: string; desc: string; path: string; mark: string
     .gender-legend { display: flex; gap: 14px; font-size: 11px; color: var(--nb-text-secondary); }
     .gender-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 5px; }
     .lg.male { background: #007aff; } .lg.female { background: #af52de; }
-    .nat-list { border-top: 1px dashed var(--nb-border-soft); margin-top: 12px; padding-top: 4px; }
-    .nat-row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--nb-text); padding: 5px 0; border-bottom: 1px solid var(--nb-border-row); }
+    .nat-list { border-top: 1px dashed var(--nb-border-soft); margin-top: 10px; padding-top: 6px; }
+    .nat-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--nb-text); padding: 4px 0; border-bottom: 1px solid var(--nb-border-row); }
     .nat-row:last-child { border-bottom: none; }
 
-    /* Workflow */
-    .wf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-    .wf-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius);
-      background: var(--nb-surface-raised); text-decoration: none; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
-    .wf-card:hover { border-color: var(--nb-primary-300); box-shadow: var(--nb-shadow-card); transform: translateY(-2px); }
-    .wf-card:focus-visible { outline: none; box-shadow: var(--nb-focus-ring); }
-    .wf-mark { width: 34px; height: 34px; flex-shrink: 0; background: var(--nb-primary-50); color: var(--nb-primary-600); border-radius: var(--nb-radius); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
-    .wf-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .wf-body strong { font-size: 13px; font-weight: 700; color: var(--nb-text); }
-    .wf-desc { font-size: 11px; color: var(--nb-text-muted); }
+    /* شريط مسار العمل — مسار مترابط أنيق ومضغوط */
+    .wf-strip { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 8px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+    .wf-chip { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 6px; border-radius: 999px;
+      background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); text-decoration: none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .wf-chip::after { content: ''; width: 10px; height: 1.5px; background: var(--nb-border); margin-inline-start: 1px; border-radius: 2px; opacity: .8; }
+    .wf-chip:last-child::after { display: none; }
+    .wf-chip:hover { background: var(--nb-primary-50); border-color: var(--nb-primary-300); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.06); }
+    .wf-chip:focus-visible { outline: none; box-shadow: var(--nb-focus-ring); }
+    .wf-mark { width: 22px; height: 22px; flex-shrink: 0; background: linear-gradient(135deg, var(--nb-primary-600), var(--nb-primary-400)); color: #fff;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+    .wf-chip:hover .wf-mark { transform: scale(1.06); }
+    .wf-t { font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); white-space: nowrap; transition: color .15s ease; }
+    .wf-chip:hover .wf-t { color: var(--nb-primary-700, var(--nb-primary-600)); }
 
-    /* Recent list */
+    /* قائمة أحدث الطلبات المضغوطة */
     .list { display: flex; flex-direction: column; }
-    .list-item { display: block; padding: 10px 16px; border-top: 1px solid var(--nb-border-soft); text-decoration: none; }
+    .list-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--nb-border-soft); text-decoration: none; }
     .list-item:first-child { border-top: none; }
     .list-item:hover { background: var(--nb-surface-raised); }
     .list-item:focus-visible { outline: none; box-shadow: var(--nb-focus-ring); }
-    .item-header { display: flex; justify-content: space-between; align-items: center; color: var(--nb-text); font-size: 13px; }
-    .item-header strong { font-weight: 600; }
-    .item-info { font-size: 11px; color: var(--nb-text-muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
-    .no-data { color: var(--nb-text-muted); text-align: center; padding: 28px; font-size: 13px; }
+    .li-name { font-size: 12.5px; font-weight: 600; color: var(--nb-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .no-data { color: var(--nb-text-muted); text-align: center; padding: 22px; font-size: 12.5px; }
   `]
 })
 export class AdmissionsDashboardComponent implements OnInit {
@@ -310,13 +311,14 @@ export class AdmissionsDashboardComponent implements OnInit {
     { title: 'المنح والإعفاءات', desc: 'المنح المالية للمتقدمين', path: '/admissions/scholarships', mark: '٨' },
   ];
 
+  /** مراحل القمع مطابقة لطوابير الصفحات الفعلية (كل شريحة قد تجمع أكثر من حالة). */
   readonly funnelStages = [
-    { key: 'submitted', label: 'مُقدّم', tone: 'info', link: '/admissions/review' },
-    { key: 'under_review', label: 'قيد المراجعة', tone: 'warning', link: '/admissions/review' },
-    { key: 'interview_scheduled', label: 'مقابلة', tone: 'primary', link: '/admissions/interviews' },
-    { key: 'accepted', label: 'مقبول', tone: 'success', link: '/admissions/enrollment' },
-    { key: 'waitlist', label: 'انتظار', tone: 'ai', link: '/admissions/waiting-list' },
-    { key: 'enrolled', label: 'مُسجّل', tone: 'success', link: '/students/list' },
+    { key: 'review', statuses: ['submitted', 'under_review'], label: 'قيد المراجعة', tone: 'warning', link: '/admissions/review' },
+    { key: 'interview', statuses: ['interview_scheduled'], label: 'مقابلة', tone: 'primary', link: '/admissions/interviews' },
+    { key: 'accepted', statuses: ['accepted'], label: 'مقبول', tone: 'success', link: '/admissions/acceptance' },
+    { key: 'waitlist', statuses: ['waitlist'], label: 'قائمة الانتظار', tone: 'ai', link: '/admissions/waiting-list' },
+    { key: 'enrolled', statuses: ['enrolled'], label: 'مُسجّل', tone: 'success', link: '/admissions/enrollment' },
+    { key: 'rejected', statuses: ['rejected'], label: 'مرفوض', tone: 'danger', link: '/admissions/applications' },
   ];
 
   readonly recent = computed(() => this.applicants().slice(0, 8));
@@ -331,6 +333,22 @@ export class AdmissionsDashboardComponent implements OnInit {
     const m = new Map<string, number>();
     for (const a of this.applicants()) { const n = a.nationality || 'غير محدّد'; m.set(n, (m.get(n) || 0) + 1); }
     return [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+  });
+
+  readonly recent5 = computed(() => this.applicants().slice(0, 5));
+
+  /** مؤشرات التحويل عبر مراحل القبول (أكثر فائدة من مجرد عدّ الحالات). */
+  readonly conversion = computed(() => {
+    const t = this.total();
+    const reachedInterview = this.count('interview_scheduled') + this.count('accepted') + this.count('enrolled');
+    const docsTotal = this.documents().length;
+    const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
+    return [
+      { label: 'نسبة القبول', num: this.accepted(), den: t, pct: pct(this.accepted(), t), tone: 'success', link: '/admissions/acceptance' },
+      { label: 'وصلوا لمرحلة المقابلة', num: reachedInterview, den: t, pct: pct(reachedInterview, t), tone: 'info', link: '/admissions/interviews' },
+      { label: 'اكتمال التسجيل النهائي', num: this.count('enrolled'), den: this.accepted(), pct: pct(this.count('enrolled'), this.accepted()), tone: 'primary', link: '/admissions/enrollment' },
+      { label: 'مستندات مُتحقّق منها', num: this.docsVerified(), den: docsTotal, pct: pct(this.docsVerified(), docsTotal), tone: 'warn', link: '/admissions/documents' },
+    ];
   });
 
   ngOnInit(): void { this.load(); }
@@ -356,9 +374,14 @@ export class AdmissionsDashboardComponent implements OnInit {
   count(status: string): number { return this.applicants().filter((a) => a.status === status).length; }
   genderCount(g: string): number { return this.applicants().filter((a) => a.gender === g).length; }
 
-  segWidth(key: string): number {
+  /** مجموع عدد الطلبات في حالات شريحة القمع. */
+  segCount(statuses: string[]): number {
+    return this.applicants().filter((a) => statuses.includes(a.status)).length;
+  }
+
+  segWidth(statuses: string[]): number {
     const total = this.total() || 1;
-    return Math.max(8, (this.count(key) / total) * 100);
+    return Math.max(8, (this.segCount(statuses) / total) * 100);
   }
 
   /** عرض شريط الحالة نسبيًا لأكبر قيمة، مع حد أدنى مرئي عند وجود قيمة. */
