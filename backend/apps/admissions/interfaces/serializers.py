@@ -11,6 +11,9 @@ class AdmissionSettingsSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'tenant_id', 'created_at', 'updated_at', 'deleted_at']
 
 class RequiredDocumentSerializer(serializers.ModelSerializer):
+    applicant_name = serializers.ReadOnlyField(source='applicant.arabic_full_name')
+    application_number = serializers.ReadOnlyField(source='applicant.application_number')
+
     class Meta:
         model = RequiredDocument
         fields = '__all__'

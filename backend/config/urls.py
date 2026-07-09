@@ -50,3 +50,9 @@ urlpatterns = [
     path('api/v1/approvals/', include('apps.approval_center.interfaces.urls')),
     path('api/v1/automation/', include('apps.automation_platform.interfaces.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

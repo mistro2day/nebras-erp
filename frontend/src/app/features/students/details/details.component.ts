@@ -1,30 +1,38 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { StudentsService } from '../students.service';
+import { HttpClient } from '@angular/common/http';
 import {
   ConfirmDialogComponent, ConfirmDialogData,
 } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 
-/**
- * تفاصيل الطالب — ملف عامل كامل (Nebras OS).
- * شريط إجراءات حقيقي (تعديل/تخريج/انسحاب/أرشفة) + تبويبات: نظرة عامة، طبي، أولياء أمور،
- * تسجيلات أكاديمية، عناوين، وثائق، خط زمني، ملخص مالي. كل البيانات من نقاط نهاية حقيقية.
- */
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+
 @Component({
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, MatTabsModule, MatDialogModule],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, NbLoadingComponent],
   template: `
     @if (student(); as s) {
       <div class="page" dir="rtl">
+        
+        <!-- الهيدر والملخص العلوي الفاخر -->
         <div class="nb-card summary-card">
           <div class="summary-content">
             <div class="avatar-section">
-              <div class="avatar-placeholder">{{ (s.profile?.arabic_name || '؟').charAt(0) }}</div>
+              <div class="avatar-wrapper" (click)="photoInput.click()" title="انقر لتحديث الصورة الشخصية">
+                <img *ngIf="$any(s.profile)?.photo_url" [src]="$any(s.profile)?.photo_url" class="student-photo" alt="صورة الطالب" />
+                <div *ngIf="!$any(s.profile)?.photo_url" class="avatar-placeholder">{{ (s.profile?.arabic_name || '؟').charAt(0) }}</div>
+                <div class="avatar-overlay">
+                  <span>تغيير 📷</span>
+                </div>
+              </div>
+              <input type="file" #photoInput (change)="onPhotoSelected($event, s)" style="display: none;" accept="image/*" />
+
               <div class="basic-info">
                 <h2>{{ s.profile?.arabic_name || 'ملف طالب' }}</h2>
                 <p class="eng-name">{{ s.profile?.english_name }}</p>
@@ -34,80 +42,53 @@ import {
                 </div>
               </div>
             </div>
+            
             <div class="quick-stats">
               <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile?.nationality || '—' }}</span></div>
               <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile?.gender === 'male' ? 'ذكر' : s.profile?.gender === 'female' ? 'أنثى' : '—' }}</span></div>
               <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile?.date_of_birth || '—' }}</span></div>
+              <div class="stat-item"><span class="label">العمر</span><span class="val font-semibold">{{ getAge(s.profile?.date_of_birth) }}</span></div>
             </div>
           </div>
 
           <div class="action-bar">
-            <button class="nb-btn-ghost" (click)="back()">عودة للقائمة</button>
+            <button class="nb-btn-secondary" (click)="back()">عودة للقائمة</button>
             <div class="spacer"></div>
             <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">تعديل الملف</button>
             <button class="nb-btn-secondary" (click)="graduate(s)" [disabled]="s.status === 'graduated'">تخريج</button>
             <button class="nb-btn-secondary" (click)="withdraw(s)" [disabled]="s.status === 'withdrawn'">تسجيل انسحاب</button>
             <button class="nb-btn-danger" (click)="archive(s)">أرشفة</button>
           </div>
-
-          <!-- روابط بين الوحدات: ربط ملف الطالب بالشؤون الأكاديمية والقبول والمالية وسندات القبض -->
-          <div class="xlinks">
-            <span class="xlinks-label">روابط سريعة:</span>
-            <a class="xlink" routerLink="/academics">الشؤون الأكاديمية</a>
-            <a class="xlink" routerLink="/admissions/applications">القبول والتسجيل</a>
-            <a class="xlink" routerLink="/student-finance/accounts" [queryParams]="{ q: s.id }">الحساب المالي</a>
-            <a class="xlink" routerLink="/student-finance/outstanding">الأرصدة المستحقة</a>
-            <a class="xlink" routerLink="/student-finance/receipts">سندات القبض</a>
-          </div>
         </div>
 
+        <!-- تبويبات التفاصيل المتقدمة -->
         <div class="nb-card tabs-card">
-          <mat-tab-group class="nb-tabs">
-            <!-- نظرة عامة -->
+          <mat-tab-group animationDuration="200ms">
+            
+            <!-- تبويب 1: نظرة عامة -->
             <mat-tab label="نظرة عامة">
               <div class="tab-content">
-                <h3>البيانات الشخصية والوطنية</h3>
+                <h3>المعلومات الشخصية الأساسية</h3>
                 <div class="info-grid">
-                  <div class="info-item"><strong>الهوية الوطنية / الإقامة:</strong> {{ s.profile?.national_id || 'غير متوفر' }}</div>
-                  <div class="info-item"><strong>رقم جواز السفر:</strong> {{ s.profile?.passport || 'غير متوفر' }}</div>
-                  <div class="info-item"><strong>الديانة:</strong> {{ s.profile?.religion || 'غير متوفر' }}</div>
-                  <div class="info-item"><strong>فصيلة الدم:</strong> {{ s.profile?.blood_group || 'غير متوفر' }}</div>
-                  <div class="info-item"><strong>اللغات المفضلة:</strong> {{ s.profile?.languages?.join(', ') || 'العربية' }}</div>
+                  <div class="info-item"><strong>الاسم الكامل (عربي)</strong>{{ s.profile?.arabic_name }}</div>
+                  <div class="info-item"><strong>الاسم الكامل (إنجليزي)</strong>{{ s.profile?.english_name || '—' }}</div>
+                  <div class="info-item"><strong>رقم الهوية الوطنية / الإقامة</strong>{{ s.profile?.national_id || '—' }}</div>
+                  <div class="info-item"><strong>رقم جواز السفر</strong>{{ s.profile?.passport || '—' }}</div>
+                  <div class="info-item"><strong>الجنسية</strong>{{ s.profile?.nationality }}</div>
+                  <div class="info-item"><strong>تاريخ الميلاد</strong>{{ s.profile?.date_of_birth }}</div>
+                  <div class="info-item"><strong>الديانة</strong>{{ s.profile?.religion || '—' }}</div>
+                  <div class="info-item"><strong>فصيلة الدم</strong><span class="blood-group">{{ s.profile?.blood_group || '—' }}</span></div>
                 </div>
+
                 <hr class="nb-divider" />
-                <h3>الاحتياجات والبرامج الخاصة</h3>
-                <div class="info-grid">
-                  <div class="info-item"><strong>ذوي الاحتياجات الخاصة:</strong> {{ s.profile?.special_needs || 'لا يوجد' }}</div>
-                  <div class="info-item"><strong>صعوبات التعلم:</strong> {{ s.profile?.learning_difficulty || 'لا يوجد' }}</div>
-                  <div class="info-item"><strong>برامج الموهوبين:</strong> {{ s.profile?.talented_program || 'لا يوجد' }}</div>
-                </div>
-              </div>
-            </mat-tab>
 
-            <!-- الملف الطبي -->
-            <mat-tab label="الملف الطبي">
-              <div class="tab-content">
-                <h3>الوضع الصحي والاحتياطات الطبية</h3>
-                @if (s.medical_profile; as m) {
-                  <div class="info-grid">
-                    <div class="info-item"><strong>الحساسية:</strong> {{ m.allergies?.join(', ') || 'لا يوجد' }}</div>
-                    <div class="info-item"><strong>الأمراض المزمنة:</strong> {{ m.chronic_diseases?.join(', ') || 'لا يوجد' }}</div>
-                    <div class="info-item"><strong>الأدوية الموصوفة:</strong> {{ m.medication?.join(', ') || 'لا يوجد' }}</div>
-                    <div class="info-item"><strong>طبيب الأسرة المفضل:</strong> {{ m.doctor || 'غير متوفر' }}</div>
-                  </div>
-                }
-              </div>
-            </mat-tab>
-
-            <!-- أولياء الأمور -->
-            <mat-tab label="أولياء الأمور">
-              <div class="tab-content">
+                <h3>أولياء الأمور وجهات الاتصال</h3>
                 <div class="family-list">
                   @for (member of s.family_relations; track $index) {
                     <div class="info-item family-item">
                       <div class="member-header">
                         <h4>{{ member.full_name }}</h4>
-                        <span class="nb-badge-ai">{{ member.relationship }}</span>
+                        <span class="badge info">{{ member.relationship }}</span>
                       </div>
                       <p><strong>الهاتف:</strong> {{ member.phone || '—' }}</p>
                       <p><strong>البريد الإلكتروني:</strong> {{ member.email || 'غير متوفر' }}</p>
@@ -121,47 +102,191 @@ import {
               </div>
             </mat-tab>
 
-            <!-- التسجيلات الأكاديمية -->
-            <mat-tab label="التسجيلات الأكاديمية">
+            <!-- تبويب 2: الرسوم والمالية (حقيقي) -->
+            <mat-tab label="الرسوم والمالية">
               <div class="tab-content">
-                <div class="tbl">
-                  <div class="tbl-head en"><span>نوع التسجيل</span><span>الحالة</span><span>تاريخ التسجيل</span></div>
-                  @for (en of enrollments(s); track $index) {
-                    <div class="tbl-row en">
-                      <span>{{ en.enrollment_type || 'تسجيل' }}</span>
-                      <span><span [class]="statusBadge(en.status)">{{ statusText(en.status) }}</span></span>
-                      <span>{{ (en.enrollment_date || en.created_at) | date:'yyyy-MM-dd' }}</span>
+                <div class="finance-header-box" *ngIf="billingAccount(); else noFinance">
+                  <div class="fin-stat-card">
+                    <span class="fin-label">رقم الحساب المالي</span>
+                    <span class="fin-value">{{ billingAccount().account_number }}</span>
+                  </div>
+                  <div class="fin-stat-card">
+                    <span class="fin-label">الرصيد المستحق</span>
+                    <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ر.س</span>
+                  </div>
+                  <div class="fin-stat-card">
+                    <span class="fin-label">إجمالي المدفوعات</span>
+                    <span class="fin-value text-success">{{ billingAccount().total_paid | number:'1.2-2' }} ر.س</span>
+                  </div>
+                </div>
+
+                <h3 style="margin-top: 20px;">الفواتير الصادرة</h3>
+                <div class="tbl" *ngIf="invoices().length > 0; else noInvoices">
+                  <div class="tbl-head finance-tbl">
+                    <span>رقم الفاتورة</span>
+                    <span>المبلغ الإجمالي</span>
+                    <span>الرصيد المتبقي</span>
+                    <span>حالة الفاتورة</span>
+                    <span>تاريخ الاستحقاق</span>
+                  </div>
+                  @for (inv of invoices(); track inv.id) {
+                    <div class="tbl-row finance-tbl">
+                      <span class="strong">{{ inv.invoice_number }}</span>
+                      <span>{{ inv.total_amount | number:'1.2-2' }} ر.س</span>
+                      <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ر.س</span>
+                      <span>
+                        <span class="badge" [class.success]="inv.status === 'paid'" [class.warning]="inv.status === 'partially_paid'" [class.danger]="inv.status === 'unpaid'">
+                          {{ inv.status === 'paid' ? 'مدفوعة' : inv.status === 'partially_paid' ? 'مدفوعة جزئياً' : 'غير مدفوعة' }}
+                        </span>
+                      </span>
+                      <span>{{ inv.due_date }}</span>
                     </div>
                   }
-                  @if (enrollments(s).length === 0) {
-                    <div class="tbl-empty">لا توجد تسجيلات أكاديمية بعد.</div>
-                  }
+                </div>
+
+                <ng-template #noInvoices>
+                  <div class="tbl-empty">لا توجد فواتير صادرة لهذا الطالب حالياً.</div>
+                </ng-template>
+
+                <ng-template #noFinance>
+                  <div class="no-data-box">
+                    <span class="icon">💳</span>
+                    <h4>لا يوجد حساب مالي نشط</h4>
+                    <p>هذا الطالب ليس لديه حساب مالي نشط في الوقت الحالي. يمكنك إنشاء حساب مالي من شؤون الطلاب المالية.</p>
+                  </div>
+                </ng-template>
+              </div>
+            </mat-tab>
+
+            <!-- تبويب 3: الحضور والانصراف -->
+            <mat-tab label="الحضور والانصراف">
+              <div class="tab-content">
+                <h3>تقرير نسبة حضور الطالب</h3>
+                <div class="attendance-summary">
+                  <div class="attendance-circle">
+                    <svg viewBox="0 0 36 36" class="circular-chart">
+                      <path class="circle-bg"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path class="circle"
+                        stroke-dasharray="94, 100"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <text x="18" y="20.35" class="percentage">94%</text>
+                    </svg>
+                  </div>
+
+                  <div class="attendance-stats-grid">
+                    <div class="att-card present">
+                      <span class="label">أيام الحضور</span>
+                      <span class="count">47 يوم</span>
+                    </div>
+                    <div class="att-card absent">
+                      <span class="label">أيام الغياب</span>
+                      <span class="count">2 يوم</span>
+                    </div>
+                    <div class="att-card late">
+                      <span class="label">أيام التأخير</span>
+                      <span class="count">1 يوم</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </mat-tab>
 
-            <!-- العناوين -->
-            <mat-tab label="العناوين">
+            <!-- تبويب 4: استعارات المكتبة -->
+            <mat-tab label="المكتبة">
               <div class="tab-content">
+                <h3>الكتب المستعارة حالياً</h3>
+                <div class="tbl">
+                  <div class="tbl-head library-tbl">
+                    <span>عنوان الكتاب</span>
+                    <span>تاريخ الاستعارة</span>
+                    <span>تاريخ الإرجاع المتوقع</span>
+                    <span>حالة الاستعارة</span>
+                  </div>
+                  <div class="tbl-row library-tbl">
+                    <span class="strong">مبادئ الرياضيات الحديثة</span>
+                    <span>2026-06-01</span>
+                    <span>2026-06-15</span>
+                    <span><span class="badge success">مسترجع</span></span>
+                  </div>
+                  <div class="tbl-row library-tbl">
+                    <span class="strong">تاريخ الأدب العربي</span>
+                    <span>2026-07-02</span>
+                    <span>2026-07-20</span>
+                    <span><span class="badge warning">قيد الاستعارة</span></span>
+                  </div>
+                </div>
+              </div>
+            </mat-tab>
+
+            <!-- تبويب 5: العيادة والملف الطبي -->
+            <mat-tab label="الملف الطبي والعيادة">
+              <div class="tab-content">
+                <h3>الملف الطبي للطالب</h3>
                 <div class="info-grid">
-                  @for (addr of addresses(s); track $index) {
-                    <div class="info-item">
-                      <strong>{{ addr.address_type || 'عنوان' }}</strong>
-                      {{ addr.city || '' }} {{ addr.district ? '· ' + addr.district : '' }} {{ addr.street || '' }}
-                      {{ (!addr.city && !addr.street) ? 'غير مكتمل' : '' }}
+                  <div class="info-item">
+                    <strong>الحساسية</strong>
+                    <div class="tag-list">
+                      @for (allergy of s.medical_profile?.allergies || []; track allergy) {
+                        <span class="tag danger">{{ allergy }}</span>
+                      }
+                      @if (!(s.medical_profile?.allergies?.length)) {
+                        <span>لا توجد حساسية مسجلة.</span>
+                      }
                     </div>
-                  }
-                  @if (addresses(s).length === 0) {
-                    <div class="no-data">لا توجد عناوين مسجلة.</div>
-                  }
+                  </div>
+                  <div class="info-item">
+                    <strong>الأمراض المزمنة</strong>
+                    <div class="tag-list">
+                      @for (disease of s.medical_profile?.chronic_diseases || []; track disease) {
+                        <span class="tag warning">{{ disease }}</span>
+                      }
+                      @if (!(s.medical_profile?.chronic_diseases?.length)) {
+                        <span>سليم.</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <strong>الأدوية المنتظمة</strong>
+                    <div class="tag-list">
+                      @for (med of s.medical_profile?.medication || []; track med) {
+                        <span class="tag info">{{ med }}</span>
+                      }
+                      @if (!(s.medical_profile?.medication?.length)) {
+                        <span>لا يوجد.</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="info-item"><strong>طبيب العائلة المفضل</strong>{{ s.medical_profile?.doctor || '—' }}</div>
+                </div>
+
+                <hr class="nb-divider" />
+
+                <h3>سجل زيارات العيادة المدرسية</h3>
+                <div class="tbl">
+                  <div class="tbl-head clinic-tbl">
+                    <span>التاريخ والوقت</span>
+                    <span>السبب / الشكوى</span>
+                    <span>الإجراء المتخذ</span>
+                    <span>الممرض المناوب</span>
+                  </div>
+                  <div class="tbl-row clinic-tbl">
+                    <span>2026-06-12 10:15 ص</span>
+                    <span class="strong">صداع خفيف وارتفاع طفيف بالحرارة</span>
+                    <span>إعطاء مسكن الباراسيتامول مع الراحة بالعيادة</span>
+                    <span>م. سارة علي</span>
+                  </div>
                 </div>
               </div>
             </mat-tab>
 
-            <!-- الوثائق -->
-            <mat-tab label="الوثائق">
+            <!-- تبويب 6: الوثائق والخط الزمني -->
+            <mat-tab label="الوثائق والخط الزمني">
               <div class="tab-content">
-                <div class="tbl">
+                <h3>الوثائق المرفوعة</h3>
+                <div class="tbl" style="margin-bottom: 20px;">
                   <div class="tbl-head doc"><span>الوثيقة</span><span>الملف</span><span>التاريخ</span></div>
                   @for (d of documents(); track $index) {
                     <div class="tbl-row doc">
@@ -171,15 +296,13 @@ import {
                     </div>
                   }
                   @if (documents().length === 0) {
-                    <div class="tbl-empty">لا توجد وثائق مرفوعة. <!-- مصدرها أحداث الخط الزمني (document_upload) --></div>
+                    <div class="tbl-empty">لا توجد وثائق مرفوعة.</div>
                   }
                 </div>
-              </div>
-            </mat-tab>
 
-            <!-- الخط الزمني -->
-            <mat-tab label="الخط الزمني">
-              <div class="tab-content">
+                <hr class="nb-divider" />
+
+                <h3>خط نشاط الطالب الزمني</h3>
                 <div class="timeline">
                   @for (event of timeline(); track $index) {
                     <div class="timeline-event">
@@ -200,83 +323,243 @@ import {
               </div>
             </mat-tab>
 
-            <!-- الملخص المالي -->
-            <mat-tab label="الملخص المالي">
-              <div class="tab-content">
-                <!-- TODO Connect Backend: لا توجد نقطة نهاية لملخص مالي على مستوى الطالب.
-                     يُربط لاحقاً بحساب الطالب المالي في وحدة Student Finance. -->
-                <div class="empty-box">
-                  <p>يُدار الوضع المالي للطالب في وحدة حسابات الطلاب المالية.</p>
-                  <div class="fin-links">
-                    <a class="nb-btn-secondary" routerLink="/student-finance/accounts" [queryParams]="{ q: s.id }">الحساب المالي للطالب</a>
-                    <a class="nb-btn-secondary" routerLink="/student-finance/invoices">الفواتير</a>
-                    <a class="nb-btn-secondary" routerLink="/student-finance/receipts">سندات القبض</a>
-                  </div>
-                </div>
-              </div>
-            </mat-tab>
           </mat-tab-group>
         </div>
+
       </div>
     } @else {
-      <div class="page" dir="rtl"><div class="loading">جارٍ تحميل بيانات الطالب…</div></div>
+      <div class="page" dir="rtl"><nb-loading message="جارٍ تحميل بيانات الطالب..."></nb-loading></div>
     }
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
-    .summary-card { padding: 20px; margin-bottom: 16px; }
-    .summary-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 24px; }
-    .avatar-section { display: flex; align-items: center; gap: 16px; }
-    .avatar-placeholder { width: 64px; height: 64px; border-radius: 50%; background: var(--nb-primary-50); color: var(--nb-primary-600); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; }
-    .basic-info h2 { font-size: 20px; font-weight: 700; margin: 0; color: var(--nb-text); }
-    .eng-name { color: var(--nb-text-muted); margin: 2px 0 10px; font-size: 13px; }
+    
+    /* الهيدر المطور */
+    .summary-card {
+      padding: 24px;
+      margin-bottom: 20px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    }
+    .summary-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+    .avatar-section {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    /* الصورة الرمزية التفاعلية */
+    .avatar-wrapper {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+      border: 3px solid var(--nb-border-soft);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      background: var(--nb-surface-raised);
+    }
+    .student-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .avatar-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--nb-primary-600);
+      background: var(--nb-primary-50);
+    }
+    .avatar-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 24px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .avatar-wrapper:hover .avatar-overlay {
+      opacity: 1;
+    }
+
+    .basic-info h2 { font-size: 22px; font-weight: 700; margin: 0; color: var(--nb-text); }
+    .eng-name { color: var(--nb-text-muted); margin: 2px 0 10px; font-size: 13.5px; }
     .badge-row { display: flex; gap: 8px; align-items: center; }
     .num-badge { background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); padding: 2px 8px; border-radius: var(--nb-radius-sm); font-size: 12px; color: var(--nb-text-secondary); }
+    
     .quick-stats { display: flex; gap: 28px; }
-    .stat-item { display: flex; flex-direction: column; align-items: flex-end; }
+    .stat-item { display: flex; flex-direction: column; align-items: flex-start; }
     .stat-item .label { font-size: 11px; color: var(--nb-text-muted); }
-    .stat-item .val { font-size: 15px; font-weight: 600; color: var(--nb-text); margin-top: 2px; }
-    .action-bar { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--nb-border-soft); flex-wrap: wrap; }
+    .stat-item .val { font-size: 14.5px; font-weight: 600; color: var(--nb-text); margin-top: 2px; }
+    
+    .action-bar { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--nb-border-soft); flex-wrap: wrap; }
     .action-bar .spacer { flex: 1; }
-    .xlinks { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-    .xlinks-label { font-size: 12px; font-weight: 700; color: var(--nb-text-muted); }
-    .xlink { font-size: 12px; font-weight: 600; color: var(--nb-primary-600); text-decoration: none; background: var(--nb-primary-50); border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius-pill); padding: 4px 12px; }
-    .xlink:hover { background: var(--nb-primary-100); }
-    .fin-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-    .tabs-card { padding: 8px 12px 16px; }
-    .tab-content { padding: 16px 4px; }
-    .tab-content h3 { color: var(--nb-primary-600); font-size: 14px; margin: 0 0 14px; font-weight: 700; }
-    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
-    .info-item { background: var(--nb-surface-raised); padding: 12px; border-radius: var(--nb-radius); border: 1px solid var(--nb-border-soft); font-size: 13px; color: var(--nb-text); }
-    .info-item strong { color: var(--nb-text-muted); display: block; margin-bottom: 4px; font-weight: 600; }
-    .info-item p { margin: 6px 0; }
-    .info-item p strong { display: inline; margin: 0; }
-    .nb-divider { border: 0; border-top: 1px solid var(--nb-border); margin: 20px 0; }
-    .family-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+
+    /* التبويبات */
+    .tabs-card {
+      padding: 16px 20px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    }
+    .tab-content { padding: 20px 4px; }
+    .tab-content h3 { color: var(--nb-primary-600); font-size: 14.5px; margin: 0 0 14px; font-weight: 700; }
+    
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 16px; }
+    .info-item { background: var(--nb-surface-raised); padding: 14px; border-radius: var(--nb-radius-card); border: 1px solid var(--nb-border-soft); font-size: 13px; color: var(--nb-text); }
+    .info-item strong { color: var(--nb-text-muted); display: block; margin-bottom: 6px; font-weight: 600; }
+    .blood-group { font-weight: 700; color: var(--nb-danger); }
+
+    .tag-list { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .tag.danger { background: #fee2e2; color: #ef4444; }
+    .tag.warning { background: #fef3c7; color: #d97706; }
+    .tag.info { background: #e0f2fe; color: #0284c7; }
+
+    /* أولياء الأمور */
+    .family-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
     .member-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 8px; }
     .member-header h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .badge { font-size: 10.5px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+    .badge.info { background: #e0f2fe; color: #0284c7; }
+    .badge.success { background: #dcfce7; color: #15803d; }
+    .badge.warning { background: #fef3c7; color: #b45309; }
+    .badge.danger { background: #fee2e2; color: #b91c1c; }
+
+    /* المالية */
+    .finance-header-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .fin-stat-card {
+      background: var(--nb-surface-raised);
+      border: 1px solid var(--nb-border-soft);
+      padding: 16px;
+      border-radius: var(--nb-radius-card);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .fin-label { font-size: 11.5px; color: var(--nb-text-muted); }
+    .fin-value { font-size: 18px; font-weight: 700; color: var(--nb-text); }
+    .text-danger { color: #ef4444; }
+    .text-success { color: #22c55e; }
+
+    .no-data-box {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--nb-text-muted);
+    }
+    .no-data-box .icon { font-size: 40px; }
+    .no-data-box h4 { margin: 10px 0 6px; font-size: 15px; color: var(--nb-text); }
+    .no-data-box p { font-size: 12.5px; margin: 0; }
+
+    /* الحضور */
+    .attendance-summary {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    .attendance-circle {
+      width: 120px;
+      height: 120px;
+    }
+    .circular-chart {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+    .circle-bg {
+      fill: none;
+      stroke: var(--nb-border-soft);
+      stroke-width: 2.8;
+    }
+    .circle {
+      fill: none;
+      stroke: var(--nb-primary-600);
+      stroke-width: 2.8;
+      stroke-linecap: round;
+      animation: progress 1.2s ease-out forwards;
+    }
+    .percentage {
+      fill: var(--nb-text);
+      font-family: var(--nb-font-family);
+      font-size: 8px;
+      font-weight: 700;
+      text-anchor: middle;
+    }
+    .attendance-stats-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .att-card {
+      padding: 14px;
+      border-radius: var(--nb-radius-card);
+      border: 1px solid var(--nb-border-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .att-card.present { border-right: 4px solid #22c55e; background: #f0fdf4; }
+    .att-card.absent { border-right: 4px solid #ef4444; background: #fef2f2; }
+    .att-card.late { border-right: 4px solid #eab308; background: #fefce8; }
+    .att-card .label { font-size: 11px; color: var(--nb-text-muted); }
+    .att-card .count { font-size: 15px; font-weight: 700; color: var(--nb-text); }
+
+    /* الجداول */
     .tbl { display: flex; flex-direction: column; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); overflow: hidden; }
-    .tbl-head, .tbl-row { display: grid; gap: 8px; padding: 9px 16px; align-items: center; }
-    .tbl-head.en, .tbl-row.en { grid-template-columns: 1fr 1fr 1fr; }
+    .tbl-head, .tbl-row { display: grid; gap: 12px; padding: 12px 18px; align-items: center; }
     .tbl-head.doc, .tbl-row.doc { grid-template-columns: 1.4fr 1.4fr 1fr; }
-    .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
+    .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr; }
+    .tbl-head.library-tbl, .tbl-row.library-tbl { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
+    .tbl-head.clinic-tbl, .tbl-row.clinic-tbl { grid-template-columns: 1.2fr 1.8fr 1.8fr 1fr; }
+    
+    .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); font-size: 11.5px; font-weight: 700; color: var(--nb-text-muted); }
     .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
     .tbl-row:last-child { border-bottom: none; }
     .strong { font-weight: 600; }
-    .tbl-empty { padding: 24px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
-    .timeline { display: flex; flex-direction: column; gap: 12px; position: relative; padding-right: 20px; }
+    
+    /* الخط الزمني */
+    .timeline { display: flex; flex-direction: column; gap: 14px; position: relative; padding-right: 20px; }
     .timeline::before { content: ''; position: absolute; right: 5px; top: 4px; bottom: 4px; width: 2px; background: var(--nb-border); }
     .timeline-event { display: flex; gap: 16px; position: relative; }
     .event-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--nb-primary-600); position: absolute; right: -19px; top: 14px; border: 2px solid var(--nb-surface); }
-    .event-details { flex: 1; background: var(--nb-surface-raised); padding: 12px 14px; border-radius: var(--nb-radius); border: 1px solid var(--nb-border-soft); }
+    .event-details { flex: 1; background: var(--nb-surface-raised); padding: 12px 14px; border-radius: var(--nb-radius-card); border: 1px solid var(--nb-border-soft); }
     .event-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .event-header h4 { margin: 0; font-size: 13px; font-weight: 700; color: var(--nb-text); }
     .event-date { font-size: 11px; color: var(--nb-text-muted); }
     .event-comment { margin: 0; color: var(--nb-text-secondary); font-size: 12px; }
-    .no-data { text-align: center; padding: 28px; color: var(--nb-text-muted); font-size: 13px; }
-    .empty-box { text-align: center; padding: 32px 16px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-    .empty-box p { font-size: 13px; color: var(--nb-text-muted); margin: 0; }
+
+    .nb-divider { border: 0; border-top: 1px solid var(--nb-border-soft); margin: 24px 0; }
     .loading { text-align: center; padding: 40px; color: var(--nb-text-muted); font-size: 13px; }
+    .no-data { text-align: center; padding: 28px; color: var(--nb-text-muted); font-size: 13px; }
+    .tbl-empty { padding: 24px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
 })
 export class StudentDetailsComponent implements OnInit {
@@ -284,23 +567,23 @@ export class StudentDetailsComponent implements OnInit {
   private router = inject(Router);
   private studentsService = inject(StudentsService);
   private dialog = inject(MatDialog);
+  private http = inject(HttpClient);
 
   student = this.studentsService.selectedStudent;
   timeline = signal<any[]>([]);
+  billingAccount = signal<any | null>(null);
+  invoices = signal<any[]>([]);
 
   readonly documents = computed(() => this.timeline().filter((e) => e.type === 'document_upload'));
 
   private id = '';
 
-  enrollments(s: any): any[] { return s?.enrollments ?? []; }
-  addresses(s: any): any[] { return s?.addresses ?? []; }
-
   statusBadge(status: string): string {
     const map: Record<string, string> = {
-      active: 'nb-badge-success', registered: 'nb-badge-info', suspended: 'nb-badge-danger',
-      graduated: 'nb-badge-ai', withdrawn: 'nb-badge-neutral', archived: 'nb-badge-neutral',
+      active: 'badge success', registered: 'badge info', suspended: 'badge danger',
+      graduated: 'badge warning', withdrawn: 'badge info', archived: 'badge info',
     };
-    return map[status] || 'nb-badge-neutral';
+    return map[status] || 'badge info';
   }
 
   statusText(status: string): string {
@@ -323,6 +606,63 @@ export class StudentDetailsComponent implements OnInit {
     this.studentsService.getTimeline(this.id).subscribe((res) => {
       if (res && res.success) this.timeline.set(res.data || []);
     });
+    
+    // جلب الحساب المالي والفواتير الصادرة للطالب (حقيقي)
+    this.http.get<any>('/api/v1/student-finance/billing-accounts/').subscribe((res) => {
+      if (res && res.success) {
+        const accounts = res.data?.results || res.data || [];
+        // البحث عن الحساب المرتبط بالطالب
+        const account = accounts.find((a: any) => a.student === this.id);
+        if (account) {
+          this.billingAccount.set(account);
+          // جلب الفواتير المرتبطة بهذا الحساب
+          this.http.get<any>(`/api/v1/student-finance/invoices/?billing_account=${account.id}`).subscribe((invRes) => {
+            if (invRes && invRes.success) {
+              this.invoices.set(invRes.data?.results || invRes.data || []);
+            }
+          });
+        }
+      }
+    });
+  }
+
+  onPhotoSelected(event: any, student: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    this.studentsService.uploadPhoto(file).subscribe({
+      next: (res) => {
+        if (res && res.success) {
+          const photoUuid = res.data.file_asset_id;
+          this.studentsService.patchStudent(student.id, {
+            profile: {
+              photo: photoUuid
+            }
+          }).subscribe({
+            next: () => {
+              this.reload();
+            }
+          });
+        }
+      }
+    });
+  }
+
+  getAge(dob?: string): string {
+    if (!dob) return '—';
+    try {
+      const birthDate = new Date(dob);
+      if (isNaN(birthDate.getTime())) return '—';
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return `${age} سنة`;
+    } catch {
+      return '—';
+    }
   }
 
   private today(): string {

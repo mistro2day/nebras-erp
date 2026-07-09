@@ -9,10 +9,26 @@ from apps.students.domain.models import (
 )
 
 class StudentProfileSerializer(serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentProfile
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id', 'student']
+
+    def get_photo_url(self, obj):
+        if obj.photo:
+            from apps.platform.domain.models import AttachmentMetadata
+            try:
+                meta = AttachmentMetadata.objects.get(file_asset_id=obj.photo)
+                request = self.context.get('request')
+                url = f"/media/{meta.storage_path}"
+                if request:
+                    return request.build_absolute_uri(url)
+                return url
+            except AttachmentMetadata.DoesNotExist:
+                return None
+        return None
 
 
 class StudentMedicalProfileSerializer(serializers.ModelSerializer):
@@ -37,10 +53,18 @@ class StudentEmergencyContactSerializer(serializers.ModelSerializer):
 
 
 class StudentFamilyRelationSerializer(serializers.ModelSerializer):
+    is_portal_active = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentFamilyRelation
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id', 'student']
+
+    def get_is_portal_active(self, obj):
+        if not obj.email:
+            return False
+        from apps.portal.domain.models import PortalUser
+        return PortalUser.objects.filter(user__email=obj.email, user_type='parent').exists()
 
 
 class StudentAttachmentSerializer(serializers.ModelSerializer):

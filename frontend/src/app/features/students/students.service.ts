@@ -127,6 +127,16 @@ export class StudentsService {
     );
   }
 
+  patchStudent(id: string, data: any): Observable<any> {
+    return this.apiClient.patch<any>(`students/students/${id}/`, data).pipe(
+      tap(res => {
+        if (res && res.success) {
+          this.selectedStudent.set(normalizeStudent(res.data));
+        }
+      })
+    );
+  }
+
   enrollStudent(studentId: string, enrollmentData: any): Observable<any> {
     return this.apiClient.post(`students/students/${studentId}/enroll/`, enrollmentData);
   }
@@ -175,11 +185,34 @@ export class StudentsService {
     return this.apiClient.post('students/students/bulk-import/', formData);
   }
 
+  createStudent(studentData: any): Observable<any> {
+    return this.apiClient.post('students/students/', studentData);
+  }
+
+  uploadPhoto(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', 'student_photos');
+    return this.http.post<any>(`${environment.apiUrl}platform/storage/upload/`, formData);
+  }
+
   /** تصدير قائمة الطلاب CSV (نقطة نهاية حقيقية bulk-export؛ المصادقة والمستأجر يُحقنان عبر الـ interceptor) */
   bulkExport(params?: Record<string, string>): Observable<Blob> {
     return this.http.get(`${environment.apiUrl}students/students/bulk-export/`, {
       params: params ?? {},
       responseType: 'blob',
     });
+  }
+
+  saveRelation(studentId: string, relationData: any): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/save-relation/`, relationData);
+  }
+
+  deleteRelation(studentId: string, relationId: string): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/delete-relation/`, { relation_id: relationId });
+  }
+
+  activateGuardianPortal(studentId: string, relationId: string): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/activate-guardian/`, { relation_id: relationId });
   }
 }

@@ -120,6 +120,74 @@ class StudentApplicationService:
 
     @classmethod
     @transaction.atomic
+    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None) -> Student:
+        """
+        إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية الأساسية
+        """
+        # 1. توليد رقم الطالب الأكاديمي
+        student_number = StudentNumberGenerator.generate(
+            tenant_id=tenant_id,
+            branch_code="BR",
+            academic_year_code="2026",
+            sequence_num=Student.objects.filter(tenant_id=tenant_id).count() + 1,
+            config=config
+        )
+        
+        # 2. إنشاء الكيان الرئيسي للطالب
+        student = Student.objects.create(
+            student_number=student_number,
+            status='active',
+            tenant_id=tenant_id,
+            created_by=user_id
+        )
+        
+        # 3. إنشاء البروفايل الشخصي
+        dob = profile_data.get('date_of_birth') or '2010-01-01'
+        
+        StudentProfile.objects.create(
+            student=student,
+            arabic_name=profile_data.get('arabic_name', 'طالب جديد'),
+            english_name=profile_data.get('english_name', ''),
+            gender=profile_data.get('gender', 'male'),
+            date_of_birth=dob,
+            nationality=profile_data.get('nationality', 'سوداني'),
+            national_id=profile_data.get('national_id', ''),
+            passport=profile_data.get('passport', ''),
+            religion=profile_data.get('religion', ''),
+            blood_group=profile_data.get('blood_group', ''),
+            photo=None,
+            languages=profile_data.get('languages', []),
+            special_needs=profile_data.get('special_needs', ''),
+            learning_difficulty=profile_data.get('learning_difficulty', ''),
+            talented_program=profile_data.get('talented_program', ''),
+            notes=profile_data.get('notes', ''),
+            tenant_id=tenant_id,
+            created_by=user_id
+        )
+        
+        # 4. إنشاء الملف الطبي
+        StudentMedicalProfile.objects.create(
+            student=student,
+            allergies=profile_data.get('allergies', []),
+            chronic_diseases=profile_data.get('chronic_diseases', []),
+            medication=profile_data.get('medication', []),
+            doctor=profile_data.get('doctor', ''),
+            medical_notes=profile_data.get('medical_notes', ''),
+            tenant_id=tenant_id,
+            created_by=user_id
+        )
+        
+        # 5. نشر حدث النطاق
+        DomainEventPublisher.publish("StudentCreated", {
+            "student_id": str(student.id),
+            "student_number": student_number,
+            "tenant_id": str(tenant_id)
+        })
+        
+        return student
+
+    @classmethod
+    @transaction.atomic
     def enroll_student(cls, student_id: uuid.UUID, academic_year_id: uuid.UUID, grade_id: uuid.UUID,
                        tenant_id: uuid.UUID, user_id: uuid.UUID, term_id: uuid.UUID = None,
                        section_id: uuid.UUID = None, branch_id: uuid.UUID = None,

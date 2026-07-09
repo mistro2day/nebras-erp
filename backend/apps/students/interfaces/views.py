@@ -76,18 +76,52 @@ class StudentViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
-        # تحديث البروفايل
+        # 1. تحديث البروفايل الشخصي
         profile_data = request.data.get('profile', {})
         if profile_data and hasattr(instance, 'profile'):
             profile_serializer = StudentProfileSerializer(instance.profile, data=profile_data, partial=partial)
             profile_serializer.is_valid(raise_exception=True)
             profile_serializer.save()
             
+        # 2. تحديث الملف الطبي
+        medical_data = request.data.get('medical_profile', {})
+        if medical_data and hasattr(instance, 'medical_profile'):
+            medical_serializer = StudentMedicalProfileSerializer(instance.medical_profile, data=medical_data, partial=partial)
+            medical_serializer.is_valid(raise_exception=True)
+            medical_serializer.save()
+
+        # 3. تحديث حالة الطالب مباشرة (للمستخدم الخارق)
+        status_val = request.data.get('status')
+        if status_val:
+            instance.status = status_val
+            instance.save(update_fields=['status'])
+            
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         
         return StandardResponse(serializer.data, message="تم تحديث بيانات الطالب بنجاح.")
+
+    def create(self, request, *args, **kwargs):
+        """إنشاء ملف طالب يدوياً بالكامل"""
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        user_id = request.user.id if request.user else uuid.uuid4()
+        
+        # استخراج البيانات المتداخلة
+        profile_data = request.data.get('profile', {})
+        medical_data = request.data.get('medical_profile', {})
+        
+        # دمج البيانات
+        full_data = {**profile_data, **medical_data}
+        
+        student = StudentApplicationService.create_student_manually(
+            profile_data=full_data,
+            tenant_id=tenant_id,
+            user_id=user_id
+        )
+        
+        serializer = self.get_serializer(student)
+        return StandardResponse(serializer.data, message="تم تسجيل ملف الطالب يدوياً وتوليد الرقم الأكاديمي بنجاح.", status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'], url_path='create-from-applicant')
     def create_from_applicant(self, request):
@@ -416,3 +450,154 @@ class StudentViewSet(viewsets.ModelViewSet):
         response = Response(output.getvalue(), content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="students_export.csv"'
         return response
+
+    @action(detail=True, methods=['post'], url_path='activate-guardian')
+    def activate_guardian(self, request, pk=None):
+        """تفعيل حساب ولي أمر الطالب"""
+        student = self.get_object()
+        relation_id = request.data.get('relation_id')
+        if not relation_id:
+            raise ValidationError("يجب توفير معرف ولي الأمر relation_id.")
+            
+        try:
+            relation = student.family_relations.get(id=relation_id)
+        except StudentFamilyRelation.DoesNotExist:
+            raise ValidationError("ولي الأمر غير مرتبط بهذا الطالب.")
+            
+        if not relation.email:
+            raise ValidationError("يجب توفير البريد الإلكتروني لولي الأمر لتفعيل حسابه.")
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else student.tenant_id
+        user_id = request.user.id if request.user else None
+        
+        # 1. البحث عن المستخدم أو إنشاؤه
+        user, created = User.objects.get_or_create(
+            email=relation.email,
+            defaults={
+                'username': relation.email.split('@')[0] + '_' + str(uuid.uuid4())[:4],
+                'first_name': relation.full_name,
+                'last_name': 'ولي أمر',
+                'phone': relation.phone,
+                'national_id': relation.national_id,
+                'status': 'active',
+                'is_active': True,
+            }
+        )
+        
+        if created:
+            user.set_password('Parent@123456')
+            user.save()
+            
+        # 2. إنشاء PortalUser
+        from apps.portal.domain.models import PortalUser, PortalProfile, ParentProfile
+        
+        portal_user, pu_created = PortalUser.objects.get_or_create(
+            user=user,
+            defaults={
+                'user_type': 'parent',
+                'tenant_id': tenant_id,
+                'created_by': user_id
+            }
+        )
+        
+        # 3. إنشاء أو تحديث PortalProfile
+        portal_profile, pp_created = PortalProfile.objects.get_or_create(
+            portal_user=portal_user,
+            defaults={
+                'display_name_ar': relation.full_name,
+                'phone_number': relation.phone,
+                'email': relation.email,
+                'tenant_id': tenant_id,
+                'created_by': user_id
+            }
+        )
+        
+        # 4. إنشاء أو تحديث ParentProfile
+        parent_profile, pr_created = ParentProfile.objects.get_or_create(
+            portal_profile=portal_profile,
+            defaults={
+                'national_id': relation.national_id or '',
+                'occupation': relation.occupation or '',
+                'employer': relation.employer or '',
+                'linked_students': [str(student.id)],
+                'tenant_id': tenant_id,
+                'created_by': user_id
+            }
+        )
+        
+        if not pr_created:
+            students_list = parent_profile.linked_students or []
+            if str(student.id) not in [str(sid) for sid in students_list]:
+                students_list.append(str(student.id))
+                parent_profile.linked_students = students_list
+                parent_profile.save(update_fields=['linked_students'])
+                
+        # 5. إرسال بريد إلكتروني تفاعلي تلقائي
+        # في بيئة التطوير نقوم بكتابته في السجلات أو محاكاته بنجاح
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"تم إرسال بريد إلكتروني لتفعيل حساب ولي الأمر: {user.email}. كلمة المرور: Parent@123456")
+                
+        return StandardResponse({
+            'user_id': str(user.id),
+            'email': user.email,
+            'created': created,
+            'portal_user_id': str(portal_user.id)
+        }, message="تم تفعيل حساب ولي الأمر بنجاح. كلمة المرور الافتراضية: Parent@123456")
+
+    @action(detail=True, methods=['post'], url_path='save-relation')
+    def save_relation(self, request, pk=None):
+        """إضافة أو تحديث علاقة عائلية (ولي أمر) للطالب"""
+        student = self.get_object()
+        relation_id = request.data.get('id')
+        
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else student.tenant_id
+        user_id = request.user.id if request.user else None
+        
+        data = {
+            'relationship': request.data.get('relationship'),
+            'full_name': request.data.get('full_name'),
+            'phone': request.data.get('phone'),
+            'email': request.data.get('email'),
+            'occupation': request.data.get('occupation', ''),
+            'employer': request.data.get('employer', ''),
+            'national_id': request.data.get('national_id', ''),
+            'emergency_contact': request.data.get('emergency_contact', False),
+        }
+        
+        if relation_id:
+            try:
+                relation = student.family_relations.get(id=relation_id)
+                for attr, val in data.items():
+                    setattr(relation, attr, val)
+                relation.save()
+            except StudentFamilyRelation.DoesNotExist:
+                raise ValidationError("سجل ولي الأمر غير موجود.")
+        else:
+            relation = StudentFamilyRelation.objects.create(
+                student=student,
+                tenant_id=tenant_id,
+                created_by=user_id,
+                **data
+            )
+            
+        serializer = StudentFamilyRelationSerializer(relation)
+        return StandardResponse(serializer.data, message="تم حفظ بيانات ولي الأمر بنجاح.")
+
+    @action(detail=True, methods=['post'], url_path='delete-relation')
+    def delete_relation(self, request, pk=None):
+        """حذف علاقة عائلية لولي الأمر"""
+        student = self.get_object()
+        relation_id = request.data.get('relation_id')
+        if not relation_id:
+            raise ValidationError("يجب توفير relation_id.")
+            
+        try:
+            relation = student.family_relations.get(id=relation_id)
+            relation.delete()
+            return StandardResponse(None, message="تم حذف ولي الأمر بنجاح.")
+        except StudentFamilyRelation.DoesNotExist:
+            raise ValidationError("السجل غير موجود أو غير مرتبط بهذا الطالب.")

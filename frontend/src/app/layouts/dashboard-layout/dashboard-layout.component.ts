@@ -49,15 +49,27 @@ interface NavGroup {
             @for (item of group.items; track item.label) {
               @if (item.children && item.children.length) {
                 <!-- عنصر أب بقائمة فرعية قابلة للطي -->
-                <button
-                  type="button"
-                  class="nav-item nav-parent"
-                  [class.active]="isBranchActive(item)"
-                  (click)="toggleGroup(item.label)"
-                >
-                  <span>{{ item.label }}</span>
-                  <span class="chevron" [class.open]="isExpanded(item)">‹</span>
-                </button>
+                @if (item.link) {
+                  <a
+                    [routerLink]="item.link"
+                    class="nav-item nav-parent"
+                    [class.active]="isBranchActive(item)"
+                    (click)="toggleGroup(item.label)"
+                  >
+                    <span>{{ item.label }}</span>
+                    <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                  </a>
+                } @else {
+                  <button
+                    type="button"
+                    class="nav-item nav-parent"
+                    [class.active]="isBranchActive(item)"
+                    (click)="toggleGroup(item.label)"
+                  >
+                    <span>{{ item.label }}</span>
+                    <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                  </button>
+                }
                 @if (isExpanded(item)) {
                   <div class="submenu">
                     @for (child of item.children; track child.label) {
@@ -103,7 +115,7 @@ interface NavGroup {
           </div>
         </div>
         <mat-menu #userMenu="matMenu">
-          <button mat-menu-item routerLink="/platform/settings">إعدادات الحساب</button>
+          <button mat-menu-item routerLink="/profile">إعدادات الحساب</button>
           <button mat-menu-item (click)="logout()">تسجيل الخروج</button>
         </mat-menu>
       </aside>
@@ -469,10 +481,16 @@ export class DashboardLayoutComponent {
   }
 
   toggleGroup(label: string): void {
-    const current = this.manuallyToggled();
     const item = this.navGroups.flatMap((g) => g.items).find((i) => i.label === label);
-    const currentlyOpen = item ? this.isExpanded(item) : false;
-    this.manuallyToggled.set({ ...current, [label]: !currentlyOpen });
+    if (!item) return;
+    const currentlyOpen = this.isExpanded(item);
+    
+    const parents = this.navGroups.flatMap((g) => g.items).filter((i) => i.children && i.children.length > 0);
+    const nextState: Record<string, boolean> = {};
+    for (const p of parents) {
+      nextState[p.label] = p.label === label ? !currentlyOpen : false;
+    }
+    this.manuallyToggled.set(nextState);
   }
 
   /* عناصر التنقل — الترتيب والتسميات والعدّادات كما في تصدير 1a حرفيًا */
@@ -491,6 +509,7 @@ export class DashboardLayoutComponent {
         {
           label: 'الطلاب',
           match: '/students',
+          link: '/students/dashboard',
           children: [
             { label: 'قائمة الطلاب', link: '/students/list' },
             { label: 'لوحة شؤون الطلاب', link: '/students/dashboard' },
@@ -500,6 +519,7 @@ export class DashboardLayoutComponent {
         {
           label: 'القبول والتسجيل',
           match: '/admissions',
+          link: '/admissions/dashboard',
           children: [
             { label: 'قائمة طلبات الالتحاق', link: '/admissions/applications' },
             { label: 'تسجيل طلب جديد', link: '/admissions/applications/new' },
@@ -517,6 +537,7 @@ export class DashboardLayoutComponent {
         {
           label: 'الشؤون الأكاديمية',
           match: '/academics',
+          link: '/academics/dashboard',
           children: [
             { label: 'لوحة الأكاديمية', link: '/academics/dashboard' },
             { label: 'السنوات الدراسية', link: '/academics/years' },
@@ -548,6 +569,7 @@ export class DashboardLayoutComponent {
         {
           label: 'حسابات الطلاب المالية',
           match: '/student-finance',
+          link: '/student-finance/accounts',
           children: [
             { label: 'حسابات الطلاب', link: '/student-finance/accounts' },
             { label: 'فواتير الطلاب', link: '/student-finance/invoices' },
@@ -655,8 +677,14 @@ export class DashboardLayoutComponent {
   }
 
   logout(): void {
-    this.authService.logout().subscribe(() => {
-      this.router.navigate(['/accounts/login']);
+    this.authService.logout().subscribe({
+      next: () => {
+        this.router.navigate(['/accounts/login']);
+      },
+      error: () => {
+        this.authService.clearSession();
+        this.router.navigate(['/accounts/login']);
+      }
     });
   }
 }

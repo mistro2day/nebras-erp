@@ -56,6 +56,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/platform/platform.routes').then((m) => m.PLATFORM_ROUTES),
       },
       {
+        path: 'profile',
+        loadComponent: () => import('./features/accounts/profile/profile.component').then((m) => m.UserProfileComponent),
+      },
+      {
         path: 'settings',
         redirectTo: 'platform/settings',
         pathMatch: 'full',
