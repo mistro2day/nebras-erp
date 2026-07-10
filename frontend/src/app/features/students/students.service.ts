@@ -37,6 +37,7 @@ export interface Student {
     medical_attachments?: string[];
   };
   family_relations: any[];
+  enrollments?: any[];
 }
 
 const EMPTY_STUDENT: Student = {

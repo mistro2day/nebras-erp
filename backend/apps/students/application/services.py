@@ -14,6 +14,7 @@ from apps.workflow.services import WorkflowEngine
 from apps.admissions.domain.models import Applicant
 from apps.common.exceptions import BusinessException
 import uuid
+import datetime
 
 class StudentApplicationService:
     """
@@ -213,7 +214,7 @@ class StudentApplicationService:
             section_id=section_id,
             branch_id=branch_id,
             campus_id=campus_id,
-            enrollment_date=uuid.uuid4(), # date placeholder
+            enrollment_date=datetime.date.today(),
             enrollment_type=enrollment_type,
             status='active',
             tenant_id=tenant_id,
@@ -250,11 +251,29 @@ class StudentApplicationService:
         enrollment.status = 'completed'
         enrollment.save()
         
+        # البحث عن القسم الجديد المقابل بنفس الاسم في الصف الجديد
+        new_section_id = None
+        if enrollment.section_id:
+            try:
+                old_section = enrollment.section
+                from apps.academics.domain.models import Section
+                matching_section = Section.objects.filter(
+                    grade_id=to_grade_id,
+                    name=old_section.name,
+                    tenant_id=tenant_id,
+                    deleted_at__isnull=True
+                ).first()
+                if matching_section:
+                    new_section_id = matching_section.id
+            except Exception:
+                pass
+
         # إنشاء التسجيل الجديد
         new_enrollment = StudentEnrollment.objects.create(
             student_id=student_id,
             academic_year_id=academic_year_id,
             grade_id=to_grade_id,
+            section_id=new_section_id,
             enrollment_date=enrollment.enrollment_date,
             enrollment_type='returning',
             status='active',

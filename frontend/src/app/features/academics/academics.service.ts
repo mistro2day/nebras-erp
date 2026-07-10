@@ -110,6 +110,11 @@ export class AcademicsService {
   createSubject(body: Partial<Subject>): Observable<any> { return this.apiClient.post('academics/subjects/', body); }
   updateSubject(id: string, body: Partial<Subject>): Observable<any> { return this.apiClient.patch(`academics/subjects/${id}/`, body); }
   deleteSubject(id: string): Observable<any> { return this.apiClient.delete(`academics/subjects/${id}/`); }
+  /** إدراج المنهج الافتراضي (المراحل والصفوف والمواد) دفعةً واحدة — idempotent. */
+  seedCurriculum(): Observable<any> { return this.apiClient.post('academics/subjects/seed-curriculum/', {}); }
+
+  /** امتحانات مرتبطة بمادة (تُفلتر بالـ subject_id على العميل). */
+  getExams(params?: any): Observable<any> { return this.apiClient.get('examinations/exams/', { page_size: 500, ...(params ?? {}) }); }
 
   // ---------- مؤشرات اللوحة الأكاديمية (مربوطة بالطلاب) ----------
   getDashboardStats(params?: any): Observable<any> { return this.apiClient.get('academics/dashboard-stats/', params); }

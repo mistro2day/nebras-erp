@@ -66,6 +66,12 @@ class SubjectCategorySerializer(serializers.ModelSerializer):
 
 
 class SubjectSerializer(serializers.ModelSerializer):
+    grade_name = serializers.CharField(source='grade.name', read_only=True)
+    stage_id = serializers.UUIDField(source='grade.stage_id', read_only=True)
+    stage_name = serializers.CharField(source='grade.stage.name', read_only=True)
+    stage_order = serializers.IntegerField(source='grade.stage.order', read_only=True)
+    grade_order = serializers.IntegerField(source='grade.order', read_only=True)
+
     class Meta:
         model = Subject
         fields = '__all__'

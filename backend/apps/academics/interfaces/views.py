@@ -103,6 +103,94 @@ class SubjectViewSet(AcademicsBaseViewSet):
     serializer_class = SubjectSerializer
     search_fields = ['arabic_name', 'english_name', 'code']
 
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('grade', 'grade__stage')
+        grade = self.request.query_params.get('grade')
+        if grade:
+            qs = qs.filter(grade_id=grade)
+        track = self.request.query_params.get('track')
+        if track is not None and track != '':
+            qs = qs.filter(track=track)
+        return qs.order_by('grade__stage__order', 'grade__order', 'track', 'arabic_name')
+
+    def paginate_queryset(self, queryset):
+        # ?all=1 يُعيد المنهج كاملاً دون تقييد الترقيم (المنهج قائمة محدودة الحجم).
+        if str(self.request.query_params.get('all', '')).lower() in ('1', 'true'):
+            return None
+        return super().paginate_queryset(queryset)
+
+    @action(detail=False, methods=['post'], url_path='seed-curriculum')
+    def seed_curriculum(self, request):
+        """
+        إدراج المنهج الافتراضي: يضمن وجود المراحل والصفوف ثم يُدرج المواد لكل صف (إدراج فكري idempotent).
+        لا يُكرّر مادة موجودة لنفس (الصف + الاسم + المسار).
+        """
+        from apps.academics.interfaces.curriculum_seed import CURRICULUM_PLAN, WEEKLY_PERIODS
+        import re
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+
+        def slugify(text):
+            return re.sub(r'[^A-Za-z0-9]+', '', text)[:8] or 'X'
+
+        created_stages = created_grades = created_subjects = 0
+        skipped_subjects = 0
+
+        for st in CURRICULUM_PLAN:
+            stage, s_new = Stage.objects.get_or_create(
+                tenant_id=tenant_id, name=st['stage'],
+                defaults={'code': f"ST{st['order']:02d}", 'order': st['order'],
+                          'minimum_age': st.get('min_age', 6), 'maximum_age': st.get('max_age', 18)},
+            )
+            created_stages += int(s_new)
+
+            for gr in st['grades']:
+                grade, g_new = Grade.objects.get_or_create(
+                    tenant_id=tenant_id, name=gr['name'],
+                    defaults={'stage': stage, 'code': f"G{gr['order']:02d}", 'order': gr['order']},
+                )
+                # ضمان ربط الصف بالمرحلة الصحيحة إن كان موجوداً مسبقاً بلا مرحلة
+                if not g_new and grade.stage_id != stage.id:
+                    grade.stage = stage
+                    grade.save(update_fields=['stage'])
+                created_grades += int(g_new)
+
+                seq = 0
+                for item in gr['subjects']:
+                    name = item['name']
+                    track = item.get('track', '')
+                    seq += 1
+                    exists = Subject.objects.filter(
+                        tenant_id=tenant_id, grade=grade, arabic_name=name, track=track
+                    ).exists()
+                    if exists:
+                        skipped_subjects += 1
+                        continue
+                    # رمز فريد لكل مستأجر
+                    base_code = f"{grade.code}-{slugify(item.get('en', name))}{('-' + track[:3]) if track else ''}"
+                    code = base_code
+                    n = 1
+                    while Subject.objects.filter(tenant_id=tenant_id, code=code).exists():
+                        n += 1
+                        code = f"{base_code}{n}"
+                    Subject.objects.create(
+                        tenant_id=tenant_id, grade=grade, track=track,
+                        arabic_name=name, english_name=item.get('en', ''),
+                        code=code, weekly_periods=WEEKLY_PERIODS.get(name, 3),
+                        passing_mark=50, maximum_mark=100, status=True,
+                    )
+                    created_subjects += 1
+
+        return StandardResponse(
+            data={
+                'created_stages': created_stages,
+                'created_grades': created_grades,
+                'created_subjects': created_subjects,
+                'skipped_subjects': skipped_subjects,
+            },
+            message=f"تم إدراج المنهج: {created_subjects} مادة جديدة ({skipped_subjects} موجودة مسبقاً).",
+        )
+
 
 class CurriculumViewSet(AcademicsBaseViewSet):
     model_class = Curriculum

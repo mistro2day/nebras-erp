@@ -341,32 +341,95 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='dashboard-widgets')
     def dashboard_widgets(self, request):
-        """لوحة التحكم ومؤشرات الأداء للطلاب"""
+        """لوحة التحكم ومؤشرات الأداء للطلاب — بيانات شاملة لدورة حياة الطالب."""
+        from django.db.models import Count
+        from django.utils import timezone
+
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
-        
+
         students = Student.objects.filter(deleted_at__isnull=True)
         if tenant_id:
             students = students.filter(tenant_id=tenant_id)
-            
+
         total_students = students.count()
-        active_students = students.filter(status='active').count()
-        suspended_students = students.filter(status='suspended').count()
-        withdrawn_students = students.filter(status='withdrawn').count()
-        graduated_students = students.filter(status='graduated').count()
-        
+
+        # توزيع دقيق حسب الحالة (دورة حياة الطالب كاملة)
+        status_rows = students.values('status').annotate(n=Count('id'))
+        status_breakdown = {row['status']: row['n'] for row in status_rows}
+
+        def sc(*keys):
+            return sum(status_breakdown.get(k, 0) for k in keys)
+
+        active_students = sc('active')
+        suspended_students = sc('suspended')
+        withdrawn_students = sc('withdrawn', 'dismissed')
+        graduated_students = sc('graduated', 'alumni')
+        transferred_students = sc('transferred')
+        archived_students = sc('archived')
+        new_students = sc('applicant', 'accepted', 'registered', 'enrolled')
+
         male_count = students.filter(profile__gender='male').count()
         female_count = students.filter(profile__gender='female').count()
-        
+
+        # الجدد هذا الشهر
+        now = timezone.now()
+        new_this_month = students.filter(
+            created_at__year=now.year, created_at__month=now.month
+        ).count()
+
+        # أعلى الجنسيات
+        nat_rows = (
+            students.values('profile__nationality')
+            .annotate(n=Count('id'))
+            .order_by('-n')[:5]
+        )
+        nationalities = [
+            {'name': r['profile__nationality'] or 'غير محدد', 'count': r['n']}
+            for r in nat_rows
+        ]
+
+        # التسجيلات الأكاديمية
+        enrollments = StudentEnrollment.objects.filter(deleted_at__isnull=True)
+        if tenant_id:
+            enrollments = enrollments.filter(tenant_id=tenant_id)
+        total_enrollments = enrollments.count()
+        active_enrollments = enrollments.filter(status='active').count()
+
+        # أحدث الطلاب المسجّلين
+        recent_qs = students.select_related('profile').order_by('-created_at')[:6]
+        recent_students = [
+            {
+                'id': str(s.id),
+                'student_number': s.student_number,
+                'name': getattr(getattr(s, 'profile', None), 'arabic_name', '') or '—',
+                'gender': getattr(getattr(s, 'profile', None), 'gender', '') or '',
+                'status': s.status,
+                'created_at': s.created_at,
+            }
+            for s in recent_qs
+        ]
+
         widgets = {
             'totalStudents': total_students,
             'activeStudents': active_students,
             'suspendedStudents': suspended_students,
             'withdrawnStudents': withdrawn_students,
             'graduatedStudents': graduated_students,
+            'transferredStudents': transferred_students,
+            'archivedStudents': archived_students,
+            'newStudents': new_students,
+            'newThisMonth': new_this_month,
+            'statusBreakdown': status_breakdown,
             'genderDistribution': {
                 'male': male_count,
-                'female': female_count
-            }
+                'female': female_count,
+            },
+            'nationalities': nationalities,
+            'enrollments': {
+                'total': total_enrollments,
+                'active': active_enrollments,
+            },
+            'recentStudents': recent_students,
         }
         return StandardResponse(widgets, message="تم جلب مؤشرات لوحة التحكم بنجاح.")
 

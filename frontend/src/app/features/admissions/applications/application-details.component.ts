@@ -48,7 +48,7 @@ const RELATION_TEXT: Record<string, string> = {
 
         <nb-panel title="بيانات المتقدم">
           <div class="info-grid">
-            <div class="info-item"><strong>الهوية الوطنية:</strong> {{ a.national_id || '—' }}</div>
+            <div class="info-item"><strong>الرقم الوطني / الجواز:</strong> {{ a.national_id || '—' }}</div>
             <div class="info-item"><strong>رقم الجواز:</strong> {{ a.passport_number || '—' }}</div>
             <div class="info-item"><strong>الديانة:</strong> {{ a.religion || '—' }}</div>
             <div class="info-item"><strong>فصيلة الدم:</strong> {{ a.blood_group || '—' }}</div>

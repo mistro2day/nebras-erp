@@ -50,7 +50,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               </div>
               <div class="field"><label>تاريخ الميلاد</label><nb-datepicker [(value)]="personalForm.date_of_birth" ariaLabel="تاريخ الميلاد"></nb-datepicker></div>
               <div class="field"><label>الجنسية</label><input [(ngModel)]="personalForm.nationality" /></div>
-              <div class="field"><label>الهوية الوطنية / الإقامة</label><input [(ngModel)]="personalForm.national_id" /></div>
+              <div class="field"><label>الرقم الوطني / الجواز</label><input [(ngModel)]="personalForm.national_id" /></div>
               <div class="field"><label>رقم الجواز</label><input [(ngModel)]="personalForm.passport" /></div>
               <div class="field"><label>الديانة</label><input [(ngModel)]="personalForm.religion" /></div>
               <div class="field">
@@ -143,7 +143,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <div class="rel-info-item"><strong>الاسم الكامل:</strong> {{ rel.full_name }}</div>
                   <div class="rel-info-item"><strong>الهاتف:</strong> {{ rel.phone }}</div>
                   <div class="rel-info-item"><strong>البريد الإلكتروني:</strong> {{ rel.email || '—' }}</div>
-                  <div class="rel-info-item"><strong>رقم الهوية:</strong> {{ rel.national_id || '—' }}</div>
+                  <div class="rel-info-item"><strong>الرقم الوطني / الجواز:</strong> {{ rel.national_id || '—' }}</div>
                   <div class="rel-info-item"><strong>المهنة والوظيفة:</strong> {{ rel.occupation || '—' }}</div>
                   <div class="rel-info-item"><strong>جهة اتصال طوارئ:</strong> {{ rel.emergency_contact ? 'نعم 🚨' : 'لا' }}</div>
                 </div>
@@ -204,7 +204,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <input type="email" [(ngModel)]="relationForm.email" name="email" />
                 </div>
                 <div class="field">
-                  <label>رقم الهوية الوطنية / الإقامة</label>
+                  <label>الرقم الوطني أو رقم الجواز</label>
                   <input type="text" [(ngModel)]="relationForm.national_id" name="national_id" />
                 </div>
                 <div class="field">

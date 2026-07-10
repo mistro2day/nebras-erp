@@ -66,6 +66,16 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
     serializer_class = ApplicantSerializer
     search_fields = ['arabic_full_name', 'english_full_name', 'national_id', 'application_number']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # فلترة حسب الحالة: ?status=accepted أو قائمة مفصولة بفواصل ?status=accepted,enrolled
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            statuses = [s.strip() for s in status_param.split(',') if s.strip()]
+            if statuses:
+                qs = qs.filter(status__in=statuses)
+        return qs
+
     def perform_create(self, serializer):
         # توليد رقم الطلب تلقائياً
         app_num = f"APP-{random.randint(100000, 999999)}"

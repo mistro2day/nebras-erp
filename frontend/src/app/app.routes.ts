@@ -114,7 +114,7 @@ export const routes: Routes = [
       {
         path: 'hr',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/hr/hr.routes').then((m) => m.HR_ROUTES),
       },
       {
         path: 'inventory',

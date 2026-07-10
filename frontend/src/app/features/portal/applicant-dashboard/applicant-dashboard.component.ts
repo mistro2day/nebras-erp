@@ -36,7 +36,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
         </nb-panel>
 
         <nb-panel title="الوثائق والمستندات المطلوبة">
-          <div class="doc"><span class="nb-dot success"></span><span>صورة الهوية الوطنية / الإقامة لولي الأمر</span></div>
+  <div class="doc"><span class="nb-dot success"></span><span>صورة الرقم الوطني / الجواز لولي الأمر</span></div>
           <div class="doc"><span class="nb-dot success"></span><span>شهادة ميلاد الطالب</span></div>
           <div class="doc"><span class="nb-dot danger"></span><span class="req">سجل التطعيمات وتقرير اللياقة الطبية (مطلوب)</span></div>
         </nb-panel>

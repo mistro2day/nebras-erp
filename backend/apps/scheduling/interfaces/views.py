@@ -46,6 +46,57 @@ class ScheduleResourceViewSet(BaseCRUDViewSet):
     model_class = ScheduleResource
     serializer_class = ScheduleResourceSerializer
 
+    @action(detail=False, methods=['post'], url_path='sync-resources')
+    def sync_resources(self, request):
+        """
+        مزامنة الموارد القابلة للجدولة من الموديولات المصدر — idempotent.
+        المعلمون (faculty) كموارد من نوع teacher عبر reference_id.
+        """
+        from apps.faculty.domain.models import FacultyMember
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        created = skipped = 0
+
+        teachers = FacultyMember.objects.filter(deleted_at__isnull=True)
+        if tenant_id:
+            teachers = teachers.filter(tenant_id=tenant_id)
+
+        for t in teachers:
+            exists = ScheduleResource.objects.filter(
+                tenant_id=tenant_id, resource_type='teacher', reference_id=t.id
+            ).exists()
+            if exists:
+                skipped += 1
+                continue
+            ScheduleResource.objects.create(
+                tenant_id=tenant_id, name=t.full_name_ar or t.employee_number,
+                resource_type='teacher', reference_id=t.id, capacity=1, is_active=True,
+            )
+            created += 1
+
+        # موارد مؤسسية افتراضية قابلة للحجز (تُنشأ مرة واحدة) لضمان توفّر موارد للجدولة.
+        defaults = [
+            ('قاعة 1', 'room', 30), ('قاعة 2', 'room', 30), ('قاعة 3', 'room', 30),
+            ('مختبر العلوم', 'laboratory', 24), ('مختبر الحاسوب', 'laboratory', 24),
+            ('القاعة الكبرى', 'hall', 200), ('صالة الأنشطة', 'hall', 120),
+            ('غرفة الاجتماعات', 'room', 16), ('غرفة العيادة', 'clinic_room', 4),
+            ('حافلة 1', 'bus', 40), ('حافلة 2', 'bus', 40),
+        ]
+        for name, rtype, cap in defaults:
+            obj, is_new = ScheduleResource.objects.get_or_create(
+                tenant_id=tenant_id, name=name, resource_type=rtype,
+                defaults={'capacity': cap, 'is_active': True},
+            )
+            if is_new:
+                created += 1
+            else:
+                skipped += 1
+
+        return StandardResponse(
+            data={'created': created, 'skipped': skipped, 'teachers': teachers.count()},
+            message=f"تمت مزامنة الموارد: {created} مورد جديد ({skipped} موجود مسبقاً).",
+        )
+
 
 class ScheduleTemplateViewSet(BaseCRUDViewSet):
     model_class = ScheduleTemplate

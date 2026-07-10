@@ -40,7 +40,12 @@ class Subject(CombinedBaseModel):
     """
     group = models.ForeignKey(SubjectGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='subjects')
     category = models.ForeignKey(SubjectCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='subjects')
-    
+
+    # ربط المادة بالصف الدراسي مباشرةً (المرحلة تُشتق من grade.stage)
+    grade = models.ForeignKey(Grade, on_delete=models.CASCADE, null=True, blank=True, related_name='subjects')
+    # المسار للمرحلة الثانوية: '' (مشترك)، 'scientific' (علمي)، 'literary' (أدبي)
+    track = models.CharField(max_length=20, blank=True, default='', db_index=True)
+
     code = models.CharField(max_length=50, db_index=True)
     arabic_name = models.CharField(max_length=255)
     english_name = models.CharField(max_length=255, blank=True, null=True)

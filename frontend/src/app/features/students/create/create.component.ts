@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StudentsService } from '../students.service';
+import { AdmissionsService } from '../../admissions/admissions.service';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
 import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
@@ -126,7 +126,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                     <span class="field-value">{{ a.nationality }}</span>
                   </div>
                   <div class="detail-field">
-                    <span class="field-label">رقم الهوية الوطنية / الإقامة:</span>
+                     <span class="field-label">الرقم الوطني / الجواز:</span>
                     <span class="field-value">{{ a.national_id }}</span>
                   </div>
                   <div class="detail-field">
@@ -186,7 +186,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                   <input type="text" [(ngModel)]="personalForm.nationality" name="nationality" placeholder="سوداني، سعودي..." />
                 </div>
                 <div class="field">
-                  <label>رقم الهوية الوطنية / الإقامة</label>
+                  <label>الرقم الوطني / الجواز</label>
                   <input type="text" [(ngModel)]="personalForm.national_id" name="national_id" placeholder="10 أرقام" />
                 </div>
                 <div class="field">
@@ -534,8 +534,8 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 })
 export class StudentCreateComponent implements OnInit {
   private studentsService = inject(StudentsService);
+  private admissionsService = inject(AdmissionsService);
   private router = inject(Router);
-  private http = inject(HttpClient);
 
   regMode = signal<'admission' | 'manual'>('admission');
   activeFormTab = signal<'personal' | 'medical'>('personal');
@@ -569,10 +569,12 @@ export class StudentCreateComponent implements OnInit {
   }
 
   loadAcceptedApplicants() {
-    this.http.get<any>('/api/v1/admissions/applicants/?status=accepted').subscribe(res => {
+    // المرور عبر AdmissionsService/ApiClientService لضمان الرابط الصحيح للخادم وحقن المصادقة والمستأجر.
+    this.admissionsService.getApplicants({ status: 'accepted', page_size: 100 }).subscribe(res => {
       if (res && res.success) {
         const data = res.data?.results || res.data || [];
-        this.applicants.set(data);
+        // احتياط إضافي: نعرض المقبولين فقط (غير المُحوّلين لطلاب بعد).
+        this.applicants.set((data as any[]).filter(a => a.status === 'accepted'));
       }
     });
   }
@@ -605,7 +607,8 @@ export class StudentCreateComponent implements OnInit {
       next: (res) => {
         this.submitting.set(false);
         if (res && res.success) {
-          this.router.navigate(['/students/details', res.data.id]);
+          // فتح صفحة التعديل لاستكمال بيانات الطالب بعد توليد رقمه الأكاديمي.
+          this.router.navigate(['/students/edit', res.data.id]);
         }
       },
       error: () => this.submitting.set(false)

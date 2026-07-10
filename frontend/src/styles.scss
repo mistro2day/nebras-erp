@@ -77,3 +77,165 @@ app-dashboard-layout > .shell > .main > .page > *:not(router-outlet):not(script)
   display: flex;
   flex-direction: column;
 }
+
+@media print {
+  /* إخفاء السايد بار والتوب بار وكل عناصر الواجهة غير الضرورية */
+  .sidebar, .topbar, aside, header, footer,
+  .summary-card, .tabs-card, .action-bar, button, .nb-btn-primary, .nb-btn-secondary {
+    display: none !important;
+  }
+
+  /* تصفير الحواف لجميع الأباء المباشرين لضمان عدم وجود إزاحة جانية أو علوية */
+  html, body, app-root, app-dashboard-layout, .shell, .main, app-dashboard-layout .page, app-student-details, .page {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* إعدادات هوامش الورقة الرسمية للمتصفح */
+  @page {
+    size: A4 portrait;
+    margin: 4mm 6mm !important;
+  }
+
+  /* تنسيق الشهادة لتتوسط وتملأ الصفحة بالكامل */
+  .print-only-container {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    font-family: 'IBM Plex Sans Arabic', sans-serif !important;
+    background: white !important;
+    width: 100% !important;
+    height: 278mm !important; /* Perfect height to fill A4 portrait page */
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
+  }
+
+  /* إطار الشهادة المزدوج الاحترافي */
+  .print-certificate-frame {
+    border: 4px double #1e3a8a !important;
+    padding: 18px 22px !important;
+    position: relative !important;
+    background: #fff !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    flex: 1 !important;
+  }
+
+  /* علامة مائية ذكية في الخلفية */
+  .print-certificate-frame::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 280px !important;
+    height: 280px !important;
+    transform: translate(-50%, -50%) !important;
+    background-image: var(--school-logo-url) !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+    opacity: 0.05 !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+  }
+
+  /* فاصل هندسي مميز يعكس الطابع الأكاديمي */
+  .print-geometric-divider {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    margin: 8px 0 !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  .print-geometric-divider::before, .print-geometric-divider::after {
+    content: '' !important;
+    flex: 1 !important;
+    height: 1.5px !important;
+    background: linear-gradient(to right, transparent, #1e3a8a, transparent) !important;
+  }
+  .print-geometric-diamond {
+    width: 8px !important;
+    height: 8px !important;
+    background: #1e3a8a !important;
+    transform: rotate(45deg) !important;
+    display: inline-block !important;
+  }
+
+  .print-header { display: flex !important; align-items: center !important; gap: 20px !important; margin-bottom: 8px !important; position: relative !important; z-index: 1 !important; }
+  .school-logo-box { width: 60px !important; height: 60px !important; flex-shrink: 0 !important; }
+  .print-school-logo { width: 60px !important; height: 60px !important; object-fit: contain !important; }
+  .school-details-box { display: flex !important; flex-direction: column !important; gap: 1px !important; text-align: right !important; flex: 1 !important; }
+  .print-student-photo-box { width: 60px !important; height: 74px !important; flex-shrink: 0 !important; border: 1px solid #cbd5e1 !important; border-radius: 6px !important; overflow: hidden !important; }
+  .print-student-photo { width: 60px !important; height: 74px !important; object-fit: cover !important; }
+  .print-photo-placeholder { width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 8px !important; color: #94a3b8 !important; background: #f8fafc !important; text-align: center !important; }
+  .print-school-name { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #1e3a8a !important; }
+  .print-school-sub { font-size: 10px !important; margin: 0 !important; color: #64748b !important; }
+  .print-school-contact, .print-school-addr { font-size: 9px !important; margin: 0 !important; color: #64748b !important; }
+  
+  .print-title { text-align: center !important; font-size: 15px !important; font-weight: 800 !important; margin-bottom: 12px !important; color: #0f172a !important; position: relative !important; z-index: 1 !important; }
+  
+  .print-student-info {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px 12px !important;
+    background: #f8fafc !important;
+    padding: 10px 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    margin-bottom: 12px !important;
+    font-size: 11px !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  .print-student-info .info-item { display: block !important; }
+  
+  .print-table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 12px !important; position: relative !important; z-index: 1 !important; }
+  .print-table th, .print-table td { border: 1px solid #cbd5e1 !important; padding: 4px 8px !important; font-size: 11px !important; text-align: right !important; }
+  .print-table th { background: #f1f5f9 !important; font-weight: 700 !important; color: #0f172a !important; }
+  .print-table td.center, .print-table th.center { text-align: center !important; }
+  .print-table td.bold { font-weight: 700 !important; }
+  
+  .print-summary { display: flex !important; justify-content: flex-end !important; margin-bottom: 14px !important; position: relative !important; z-index: 1 !important; }
+  .summary-box {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    border: 1.5px solid #1e3a8a !important;
+    padding: 6px 14px !important;
+    border-radius: 6px !important;
+    font-size: 11.5px !important;
+    background: #f0fdf4 !important;
+  }
+  .summary-box strong { color: #15803d !important; }
+  
+  .print-signatures-stamps {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    padding-top: 10px !important;
+    margin-top: auto !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  .sig-box { text-align: center !important; width: 130px !important; }
+  .sig-box p { font-size: 11px !important; font-weight: 600 !important; margin-bottom: 24px !important; }
+  .sig-line { border-bottom: 1px dashed #94a3b8 !important; width: 100% !important; }
+  
+  .stamp-box { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+  .stamp-box p { font-size: 9px !important; color: #64748b !important; margin-bottom: 2px !important; }
+  .print-school-stamp { width: 65px !important; height: 65px !important; object-fit: contain !important; opacity: 0.85 !important; }
+}

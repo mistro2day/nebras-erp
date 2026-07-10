@@ -45,8 +45,8 @@ interface DistStudent {
   ],
   template: `
     <div class="page" dir="rtl">
-      <nb-page-header title="توزيع الطلاب على الشعب"
-        subtitle="تسكين الطلاب في شعب الصف — توزيع تلقائي متوازن أو تعيين ونقل يدوي، مع مراعاة السعة والنوع.">
+      <nb-page-header title="توزيع الطلاب على الفصول"
+        subtitle="تسكين الطلاب في فصول الصف — توزيع تلقائي متوازن أو تعيين ونقل يدوي، مع مراعاة السعة والنوع.">
         <button class="nb-btn-secondary" (click)="reload()" [disabled]="!gradeId()">تحديث</button>
         <button class="nb-btn-primary" (click)="autoDistribute()"
           [disabled]="!gradeId() || unassigned().length === 0 || sections().length === 0 || busy()">
@@ -85,7 +85,7 @@ interface DistStudent {
       @if (!gradeId()) {
         <nb-panel><p class="hint">اختر السنة الدراسية والصف لعرض لوحة التوزيع.</p></nb-panel>
       } @else if (loading()) {
-        <nb-loading message="جارٍ تحميل طلاب الصف والشعب…"></nb-loading>
+        <nb-loading message="جارٍ تحميل طلاب الصف والفصول…"></nb-loading>
       } @else {
         <!-- مؤشرات -->
         <div class="stats-grid">
@@ -95,7 +95,7 @@ interface DistStudent {
             <div class="bar"><div class="fill active" [style.width.%]="100"></div></div>
           </div>
           <div class="metric-card">
-            <span class="label">الموزّعون على شعب</span>
+            <span class="label">الموزّعون على فصول</span>
             <span class="value success">{{ assignedCount() }}</span>
             <div class="bar"><div class="fill success" [style.width.%]="pct(assignedCount())"></div></div>
           </div>
@@ -105,14 +105,14 @@ interface DistStudent {
             <div class="bar"><div class="fill danger" [style.width.%]="pct(unassigned().length)"></div></div>
           </div>
           <div class="metric-card">
-            <span class="label">عدد الشعب</span>
+            <span class="label">عدد الفصول</span>
             <span class="value info">{{ sections().length }}</span>
             <div class="bar"><div class="fill info" [style.width.%]="sections().length ? 100 : 0"></div></div>
           </div>
         </div>
 
         @if (sections().length === 0) {
-          <nb-panel><p class="hint">لا توجد شعب لهذا الصف. أنشئ الشعب أولًا من صفحة «الشعب الدراسية».</p></nb-panel>
+          <nb-panel><p class="hint">لا توجد فصول لهذا الصف. أنشئ الفصول أولًا من صفحة «الفصول الدراسية».</p></nb-panel>
         }
 
         <div class="board">
@@ -141,12 +141,12 @@ interface DistStudent {
                 </button>
               }
               @if (unassigned().length === 0) {
-                <div class="empty-col">🎉 كل الطلاب موزّعون على الشعب.</div>
+                <div class="empty-col">🎉 كل الطلاب موزّعون على الفصول.</div>
               }
             </div>
           </div>
 
-          <!-- أعمدة الشعب -->
+          <!-- أعمدة الفصول -->
           <div class="sections-scroll">
             @for (sec of sections(); track sec.id) {
               <div class="section-col" [class.drop-target]="selectedIds().size > 0 && canAssignTo(sec)"
@@ -177,11 +177,11 @@ interface DistStudent {
                         <span class="chip-name">{{ s.name }}</span>
                         <span class="chip-num">{{ s.student_number }}</span>
                       </span>
-                      <span class="move" title="نقل لشعبة أخرى" (click)="openTransfer(s)">⇄</span>
+                      <span class="move" title="نقل لفصل آخر" (click)="openTransfer(s)">⇄</span>
                     </div>
                   }
                   @if (inSection(sec.id).length === 0) {
-                    <div class="empty-col small">شعبة فارغة — عيّن طلابًا إليها.</div>
+                    <div class="empty-col small">فصل فارغ — عيّن طلابًا إليه.</div>
                   }
                 </div>
               </div>
@@ -190,16 +190,16 @@ interface DistStudent {
         </div>
       }
 
-      <!-- نافذة النقل بين الشعب -->
+      <!-- نافذة النقل بين الفصول -->
       @if (transferFor()) {
         <div class="overlay" (click)="transferFor.set(null)">
           <div class="modal" (click)="$event.stopPropagation()">
             <h3>نقل الطالب</h3>
             <p class="modal-sub">{{ transferFor()!.name }} — {{ transferFor()!.student_number }}</p>
             <div class="fld">
-              <label>الشعبة الجديدة</label>
+              <label>الفصل الجديد</label>
               <select [(ngModel)]="transferTarget">
-                <option value="">اختر شعبة…</option>
+                <option value="">اختر فصلاً…</option>
                 @for (sec of sections(); track sec.id) {
                   @if (sec.id !== transferFor()!.sectionId && canAssignGender(sec, transferFor()!.gender)) {
                     <option [value]="sec.id">{{ sec.name }} ({{ inSection(sec.id).length }}/{{ sec.capacity }})</option>
@@ -384,7 +384,7 @@ export class AcademicDistributionComponent implements OnInit {
     const grade = this.gradeId();
     if (!grade) { this.students.set([]); return; }
     this.loading.set(true);
-    this.svc.getStudentsForDistribution().subscribe({
+    this.svc.getStudentsForDistribution({ grade_id: grade, academic_year_id: this.yearId() }).subscribe({
       next: (res) => { this.students.set(this.mapStudents(pickList(res))); this.loading.set(false); },
       error: () => { this.students.set([]); this.loading.set(false); },
     });
@@ -441,7 +441,7 @@ export class AcademicDistributionComponent implements OnInit {
   // ---------- التعيين اليدوي ----------
   assignSelectedTo(sec: any): void {
     if (this.selectedIds().size === 0 || busyGuard(this)) return;
-    if (!this.canAssignTo(sec)) { this.notify.error('نوع بعض الطلاب المحدّدين لا يطابق نوع الشعبة.'); return; }
+    if (!this.canAssignTo(sec)) { this.notify.error('نوع بعض الطلاب المحدّدين لا يطابق نوع الفصل.'); return; }
     const ids = [...this.selectedIds()];
     this.commitAssignments(ids.map((id) => ({ id, sectionId: sec.id })), `تم تعيين ${ids.length} طالبًا في ${sec.name}.`);
   }
@@ -452,7 +452,7 @@ export class AcademicDistributionComponent implements OnInit {
     if (secs.length === 0 || busyGuard(this)) return;
     const data: ConfirmDialogData = {
       title: 'توزيع تلقائي',
-      message: `سيُوزَّع ${this.unassigned().length} طالبًا على ${secs.length} شعبة بشكل متوازن مع مراعاة السعة والنوع.`,
+      message: `سيُوزَّع ${this.unassigned().length} طالبًا على ${secs.length} فصل بشكل متوازن مع مراعاة السعة والنوع.`,
       color: 'primary',
     };
     this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe((ok) => {
@@ -503,7 +503,7 @@ export class AcademicDistributionComponent implements OnInit {
     const s = this.transferFor();
     if (!s || !this.transferTarget) return;
     this.transferFor.set(null);
-    this.commitAssignments([{ id: s.id, sectionId: this.transferTarget }], `تم نقل ${s.name} إلى الشعبة الجديدة.`);
+    this.commitAssignments([{ id: s.id, sectionId: this.transferTarget }], `تم نقل ${s.name} إلى الفصل الجديد.`);
   }
 
   // ---------- الترقية / تخطّي الصف ----------
