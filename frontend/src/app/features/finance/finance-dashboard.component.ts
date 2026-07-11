@@ -1,748 +1,326 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { Router } from '@angular/router';
 import { FinanceService } from './finance.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
+interface FinanceModule {
+  key: string; title: string; desc: string; icon: string; route: string;
+}
+
+/**
+ * مساحة العمل المالية (Finance Workspace)
+ * العنصر المميّز: «ميزان المعادلة المحاسبية» (الأصول = الخصوم + حقوق الملكية) —
+ * الأثر الأصيل في عالم المحاسبة، يُظهر توازن المركز المالي بصريًا.
+ * البقية هادئة ومنضبطة على غرار Workspace في D365 Finance ولوحة Odoo Accounting.
+ */
 @Component({
   selector: 'app-finance-dashboard',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, MatCardModule, MatIconModule, MatButtonModule,
-    MatTableModule, MatTabsModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatDialogModule, MatProgressBarModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, NbPageHeaderComponent, NbPanelComponent],
   template: `
-    <div class="finance-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>المنصة المالية وإدارة دفتر الأستاذ العام</h1>
-          <p>بوابة العمليات الحسابية المزدوجة، شجرة الحسابات، الموازنات التقديرية، والرقابة المالية للمؤسسة</p>
-        </div>
-        <div class="fiscal-status-badge">
-          <span class="nb-dot success"></span>
-          <span>حالة النظام: <strong>{{ stats().fiscal_status || 'مستقر ونشط' }}</strong></span>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="المنصة المالية ودفتر الأستاذ العام"
+        subtitle="مساحة عمل محاسبية موحّدة للقيد المزدوج، شجرة الحسابات، الموازنات، والرقابة المالية.">
+        <span class="fiscal-chip"><span class="dot"></span>حالة النظام: <strong>{{ stats().fiscal_status || 'مستقر ونشط' }}</strong></span>
+      </nb-page-header>
 
-      <!-- KPI Widgets Grid -->
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <span class="kpi-label">إجمالي الأصول</span>
-          <span class="kpi-value">{{ stats().total_assets | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
-          <span class="kpi-sub">السيولة النقدية + الأصول الثابتة</span>
+      <!-- العنصر المميّز: ميزان المعادلة المحاسبية -->
+      <section class="beam-card">
+        <div class="beam-head">
+          <div>
+            <h2 class="beam-title">ميزان المركز المالي</h2>
+            <p class="beam-sub">المعادلة المحاسبية الأساسية — الأصول تساوي الخصوم مضافًا إليها حقوق الملكية</p>
+          </div>
+          <span class="beam-verdict" [class.ok]="isBalanced()" [class.off]="!isBalanced()">
+            {{ isBalanced() ? '⚖︎ متوازن' : '⚠︎ فرق: ' + fmt(imbalance()) }}
+          </span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">الالتزامات والخصوم</span>
-          <span class="kpi-value">{{ stats().total_liabilities | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
-          <span class="kpi-sub">المستحقات + الديون قصيرة الأجل</span>
+
+        <div class="equation">
+          <div class="term assets">
+            <span class="term-label">الأصول</span>
+            <span class="term-value">{{ fmt(stats().total_assets) }}</span>
+            <span class="term-unit">ر.س</span>
+          </div>
+          <span class="op">=</span>
+          <div class="term liab">
+            <span class="term-label">الخصوم</span>
+            <span class="term-value">{{ fmt(stats().total_liabilities) }}</span>
+            <span class="term-unit">ر.س</span>
+          </div>
+          <span class="op">+</span>
+          <div class="term equity">
+            <span class="term-label">حقوق الملكية</span>
+            <span class="term-value">{{ fmt(equity()) }}</span>
+            <span class="term-unit">ر.س</span>
+          </div>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">الإيرادات الإجمالية</span>
-          <span class="kpi-value">{{ stats().revenue | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
-          <span class="kpi-sub">مقبوضات الرسوم والمصادر الأخرى</span>
+
+        <!-- الشريط النسبي: توزيع تمويل الأصول بين الخصوم وحقوق الملكية -->
+        <div class="beam-bar">
+          <span class="seg-liab" [style.width.%]="liabShare()">
+            @if (liabShare() > 12) { <span class="seg-txt">خصوم {{ liabShare() | number:'1.0-0' }}%</span> }
+          </span>
+          <span class="seg-equity" [style.width.%]="100 - liabShare()">
+            @if (100 - liabShare() > 12) { <span class="seg-txt">ملكية {{ (100 - liabShare()) | number:'1.0-0' }}%</span> }
+          </span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">المصروفات التشغيلية</span>
-          <span class="kpi-value">{{ stats().expenses | number:'1.2-2' }} <span class="kpi-unit">ر.س</span></span>
-          <span class="kpi-sub">المرتبات والمصاريف الإدارية</span>
+      </section>
+
+      <!-- صف النتائج: الإيرادات والمصروفات وصافي الفترة -->
+      <div class="result-row">
+        <div class="rk">
+          <span class="rk-label">الإيرادات</span>
+          <span class="rk-value pos">{{ fmt(stats().revenue) }}</span>
+          <span class="rk-unit">ر.س</span>
+        </div>
+        <span class="minus">−</span>
+        <div class="rk">
+          <span class="rk-label">المصروفات</span>
+          <span class="rk-value neg">{{ fmt(stats().expenses) }}</span>
+          <span class="rk-unit">ر.س</span>
+        </div>
+        <span class="eq">=</span>
+        <div class="rk net" [class.profit]="netResult() >= 0" [class.loss]="netResult() < 0">
+          <span class="rk-label">{{ netResult() >= 0 ? 'صافي الربح' : 'صافي الخسارة' }}</span>
+          <span class="rk-value">{{ fmt(abs(netResult())) }}</span>
+          <span class="rk-unit">ر.س</span>
         </div>
       </div>
 
-      <!-- Secondary Stats & Liquidity -->
-      <div class="secondary-grid">
-        <div class="stat-box">
-          <h4>السيولة والخزائن</h4>
-          <div class="progress-info">
-            <span>الخزينة النقدية: {{ stats().cash_balance | number:'1.2-2' }} ر.س</span>
-            <span>الحسابات البنكية: {{ stats().bank_balance | number:'1.2-2' }} ر.س</span>
+      <!-- صف الرؤى: السيولة، الموازنة، التنبيهات -->
+      <div class="insight-row">
+        <nb-panel title="السيولة والخزائن" subtitle="توزيع النقد بين الصناديق والحسابات البنكية.">
+          <div class="liquidity">
+            <div class="liq-item"><span class="lbl">الخزينة النقدية</span><span class="val">{{ fmt(stats().cash_balance) }} <em>ر.س</em></span></div>
+            <div class="liq-item"><span class="lbl">الحسابات البنكية</span><span class="val">{{ fmt(stats().bank_balance) }} <em>ر.س</em></span></div>
+            <div class="bar"><span class="fill" [style.width.%]="40"></span></div>
           </div>
-          <mat-progress-bar mode="determinate" [value]="40" color="primary"></mat-progress-bar>
-        </div>
+        </nb-panel>
 
-        <div class="stat-box">
-          <h4>استهلاك الموازنة التقديرية</h4>
-          <div class="progress-info">
-            <span>المنفق: {{ stats().budget_consumed | number:'1.2-2' }} ر.س</span>
-            <span>المرصود: {{ stats().budget_allocated | number:'1.2-2' }} ر.س</span>
+        <nb-panel title="استهلاك الموازنة التقديرية" subtitle="نسبة المنفَق من إجمالي المرصود المعتمد.">
+          <div class="liquidity">
+            <div class="liq-item"><span class="lbl">المنفَق</span><span class="val">{{ fmt(stats().budget_consumed) }} <em>ر.س</em></span></div>
+            <div class="liq-item"><span class="lbl">المرصود</span><span class="val">{{ fmt(stats().budget_allocated) }} <em>ر.س</em></span></div>
+            <div class="bar"><span class="fill" [class.warn]="(stats().budget_utilization_rate || 0) > 85" [style.width.%]="clamp(stats().budget_utilization_rate)"></span></div>
+            <span class="rate">نسبة الاستهلاك: <strong>{{ fmt(stats().budget_utilization_rate) }}%</strong></span>
           </div>
-          <mat-progress-bar mode="determinate" [value]="stats().budget_utilization_rate || 0" color="accent"></mat-progress-bar>
-        </div>
+        </nb-panel>
 
-        <div class="stat-box alerts">
-          <h4>التنبيهات المالية النشطة</h4>
-          <div class="alert-list">
-            <div class="alert-item" *ngFor="let alert of stats().alerts" [ngClass]="alert.type">
-              <span class="nb-dot" [class.warning]="alert.type === 'warning'" [class.info]="alert.type === 'info'"></span>
-              <span>{{ alert.message }}</span>
-            </div>
+        <nb-panel title="التنبيهات المالية النشطة" subtitle="إشعارات الرقابة والالتزام بالموازنة.">
+          <div class="alerts">
+            @for (a of stats().alerts || []; track a.id) {
+              <div class="alert" [class]="a.type"><span class="dot"></span>{{ a.message }}</div>
+            }
+            @if (!(stats().alerts || []).length) { <div class="alert info"><span class="dot"></span>لا توجد تنبيهات مالية حالياً.</div> }
           </div>
-        </div>
+          <div class="counters">
+            <span>قيود قيد الإدخال (مسودة): <strong>{{ stats().open_journals || 0 }}</strong></span>
+            <span>بانتظار الترحيل (معتمدة): <strong>{{ stats().pending_approvals || 0 }}</strong></span>
+          </div>
+        </nb-panel>
       </div>
 
-      <!-- Main Tabs Group -->
-      <mat-tab-group class="finance-tabs">
-        <!-- Tab 1: Chart of Accounts (COA) -->
-        <mat-tab label="شجرة الحسابات">
-          <div class="tab-content">
-            <div class="coa-controls">
-              <h2>هيكل الحسابات المعتمد</h2>
-              <button mat-flat-button color="primary" (click)="showAddAccount = !showAddAccount">
-                <mat-icon>add</mat-icon> إضافة حساب جديد
-              </button>
-            </div>
+      <!-- أحدث القيود المحاسبية -->
+      <nb-panel title="أحدث القيود المحاسبية" subtitle="آخر الحركات المسجلة في اليومية العامة." [flush]="true" class="recent">
+        <div class="table-wrap">
+          <table class="nb-table">
+            <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>الحالة</th></tr></thead>
+            <tbody>
+              @for (j of recent(); track j.id) {
+                <tr (click)="go('/finance/journals')">
+                  <td><strong>{{ j.entry_number }}</strong></td>
+                  <td class="mono">{{ j.date }}</td>
+                  <td class="desc">{{ j.description }}</td>
+                  <td><span class="badge" [class]="j.status">{{ statusLabel(j.status) }}</span></td>
+                </tr>
+              }
+              @if (!recent().length) { <tr><td colspan="4" class="empty">لا توجد قيود مسجلة بعد — ابدأ بإنشاء قيد جديد.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      </nb-panel>
 
-            <!-- Add Account Panel -->
-            <div class="add-account-panel" *ngIf="showAddAccount">
-              <h3>إضافة حساب جديد في الشجرة</h3>
-              <div class="form-row">
-                <mat-form-field appearance="outline">
-                  <mat-label>رمز الحساب</mat-label>
-                  <input matInput [(ngModel)]="newAccount.code" placeholder="مثال: 1102" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>الاسم باللغة العربية</mat-label>
-                  <input matInput [(ngModel)]="newAccount.name_ar" placeholder="مثال: بنك الراجحي" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>الاسم باللغة الإنجليزية</mat-label>
-                  <input matInput [(ngModel)]="newAccount.name_en" placeholder="مثال: Al Rajhi Bank" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>نوع الحساب</mat-label>
-                  <mat-select [(ngModel)]="newAccount.account_type">
-                    <mat-option *ngFor="let type of accountTypes()" [value]="type.id">{{ type.name_ar }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>الحساب الأب (إن وجد)</mat-label>
-                  <mat-select [(ngModel)]="newAccount.parent">
-                    <mat-option [value]="null">حساب رئيسي</mat-option>
-                    <mat-option *ngFor="let acc of coa()" [value]="acc.id">{{ acc.code }} - {{ acc.name_ar }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-              <div class="form-actions">
-                <button mat-flat-button color="accent" (click)="saveAccount()">حفظ الحساب</button>
-                <button mat-button (click)="showAddAccount = false">إلغاء</button>
-              </div>
-            </div>
+      <!-- بطاقات التنقل -->
+      <h3 class="section-title">العمليات المحاسبية</h3>
+      <div class="tiles">
+        @for (m of operations; track m.key) {
+          <button class="tile" (click)="go(m.route)">
+            <span class="tile-icon">{{ m.icon }}</span>
+            <span class="tile-body"><span class="tile-title">{{ m.title }}</span><span class="tile-desc">{{ m.desc }}</span></span>
+            <span class="tile-arrow">←</span>
+          </button>
+        }
+      </div>
 
-            <!-- COA Table / Tree -->
-            <table mat-table [dataSource]="coa()" class="mat-elevation-z8 finance-table">
-              <ng-container matColumnDef="code">
-                <th mat-header-cell *matHeaderCellDef>الرمز الحسابي</th>
-                <td mat-cell *matCellDef="let element">{{ element.code }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>اسم الحساب (عربي / إنجليزي)</th>
-                <td mat-cell *matCellDef="let element">
-                  <strong>{{ element.name_ar }}</strong> <span class="en-name">({{ element.name_en }})</span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="type">
-                <th mat-header-cell *matHeaderCellDef>طبيعة الحساب</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="type-badge" [ngClass]="element.normal_balance">
-                    {{ element.normal_balance === 'debit' ? 'مدين (Debit)' : 'دائن (Credit)' }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="status-badge" [ngClass]="element.status">{{ element.status === 'active' ? 'نشط' : 'غير نشط' }}</span>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="coaColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: coaColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 2: Journal Entries (Editor & Approvals) -->
-        <mat-tab label="قيود اليومية والاعتمادات">
-          <div class="tab-content">
-            <div class="coa-controls">
-              <h2>قيود اليومية الدفترية</h2>
-              <button mat-flat-button color="primary" (click)="toggleJournalEditor()">
-                <mat-icon>post_add</mat-icon> إنشاء قيد يومية يدوي جديد
-              </button>
-            </div>
-
-            <!-- Journal Editor Panel -->
-            <div class="journal-editor-panel" *ngIf="showJournalEditor">
-              <h3>محرر قيود اليومية الثنائية</h3>
-              <div class="form-row">
-                <mat-form-field appearance="outline">
-                  <mat-label>رقم القيد</mat-label>
-                  <input matInput [(ngModel)]="newJournal.entry_number" placeholder="مثال: JV-100" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>التاريخ</mat-label>
-                  <input matInput type="date" [(ngModel)]="newJournal.date" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>الفترة المحاسبية</mat-label>
-                  <mat-select [(ngModel)]="newJournal.accounting_period">
-                    <mat-option *ngFor="let p of periods()" [value]="p.id">{{ p.name }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>الوصف / البيان</mat-label>
-                  <input matInput [(ngModel)]="newJournal.description" />
-                </mat-form-field>
-              </div>
-
-              <!-- Lines -->
-              <h4>تفاصيل أسطر القيد الحسابي</h4>
-              <div class="journal-line-row" *ngFor="let line of newJournal.lines; let i = index">
-                <mat-form-field appearance="outline" style="width: 30%">
-                  <mat-label>الحساب</mat-label>
-                  <mat-select [(ngModel)]="line.account">
-                    <mat-option *ngFor="let acc of coa()" [value]="acc.id">{{ acc.code }} - {{ acc.name_ar }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field appearance="outline" style="width: 20%">
-                  <mat-label>المدين (Debit)</mat-label>
-                  <input matInput type="number" [(ngModel)]="line.debit" (ngModelChange)="checkBalance()" />
-                </mat-form-field>
-                <mat-form-field appearance="outline" style="width: 20%">
-                  <mat-label>الدائن (Credit)</mat-label>
-                  <input matInput type="number" [(ngModel)]="line.credit" (ngModelChange)="checkBalance()" />
-                </mat-form-field>
-                <mat-form-field appearance="outline" style="width: 20%">
-                  <mat-label>مركز التكلفة</mat-label>
-                  <mat-select [(ngModel)]="line.cost_center">
-                    <mat-option *ngFor="let cc of costCenters()" [value]="cc.id">{{ cc.name_ar }}</mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <button mat-icon-button color="warn" (click)="removeJournalLine(i)">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </div>
-
-              <div class="editor-actions">
-                <button mat-stroked-button (click)="addJournalLine()">
-                  <mat-icon>add</mat-icon> إضافة سطر حسابي
-                </button>
-                <div class="balance-summary" [ngClass]="isBalanced ? 'balanced' : 'unbalanced'">
-                  <span>إجمالي المدين: {{ totalDebit }} ر.س</span> | 
-                  <span>إجمالي الدائن: {{ totalCredit }} ر.س</span> | 
-                  <span>حالة القيد: <strong>{{ isBalanced ? 'متزن' : 'غير متزن' }}</strong></span>
-                </div>
-              </div>
-
-              <div class="form-actions" style="margin-top: 1.5rem;">
-                <button mat-flat-button color="accent" [disabled]="!isBalanced" (click)="saveJournal()">حفظ القيد كمسودة</button>
-                <button mat-button (click)="showJournalEditor = false">إلغاء</button>
-              </div>
-            </div>
-
-            <!-- Journals List Table -->
-            <table mat-table [dataSource]="journals()" class="mat-elevation-z8 finance-table">
-              <ng-container matColumnDef="number">
-                <th mat-header-cell *matHeaderCellDef>رقم القيد</th>
-                <td mat-cell *matCellDef="let element"><strong>{{ element.entry_number }}</strong></td>
-              </ng-container>
-
-              <ng-container matColumnDef="date">
-                <th mat-header-cell *matHeaderCellDef>التاريخ</th>
-                <td mat-cell *matCellDef="let element">{{ element.date }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="description">
-                <th mat-header-cell *matHeaderCellDef>البيان / الوصف</th>
-                <td mat-cell *matCellDef="let element">{{ element.description }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>الحالة</th>
-                <td mat-cell *matCellDef="let element">
-                  <span class="status-badge" [ngClass]="element.status">
-                    {{ getStatusLabel(element.status) }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>إجراءات الترحيل والاعتماد</th>
-                <td mat-cell *matCellDef="let element">
-                  <div class="action-buttons">
-                    <button mat-flat-button color="primary" *ngIf="element.status === 'draft'" (click)="approveJournal(element.id)">اعتماد</button>
-                    <button mat-flat-button color="accent" *ngIf="element.status === 'approved'" (click)="postJournal(element.id)">ترحيل لدفتر الأستاذ</button>
-                    <button mat-stroked-button color="warn" *ngIf="element.status === 'posted'" (click)="reverseJournal(element.id)">عكس القيد</button>
-                  </div>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="journalColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: journalColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 3: General Ledger (دفتر الأستاذ) -->
-        <mat-tab label="دفتر الأستاذ العام">
-          <div class="tab-content">
-            <div class="ledger-filters">
-              <mat-form-field appearance="outline">
-                <mat-label>تصفية بحسب الحساب</mat-label>
-                <mat-select [(ngModel)]="filterAccount" (selectionChange)="loadLedgerEntries()">
-                  <mat-option [value]="''">جميع الحسابات</mat-option>
-                  <mat-option *ngFor="let acc of coa()" [value]="acc.id">{{ acc.code }} - {{ acc.name_ar }}</mat-option>
-                </mat-select>
-              </mat-form-field>
-
-              <mat-form-field appearance="outline">
-                <mat-label>مركز التكلفة</mat-label>
-                <mat-select [(ngModel)]="filterCostCenter" (selectionChange)="loadLedgerEntries()">
-                  <mat-option [value]="''">جميع المراكز</mat-option>
-                  <mat-option *ngFor="let cc of costCenters()" [value]="cc.id">{{ cc.name_ar }}</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-
-            <!-- Ledger Table -->
-            <table mat-table [dataSource]="ledgerEntries()" class="mat-elevation-z8 finance-table">
-              <ng-container matColumnDef="date">
-                <th mat-header-cell *matHeaderCellDef>التاريخ</th>
-                <td mat-cell *matCellDef="let element">{{ element.date }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="account">
-                <th mat-header-cell *matHeaderCellDef>الحساب</th>
-                <td mat-cell *matCellDef="let element">{{ element.account_code }} - {{ element.account_name }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="debit">
-                <th mat-header-cell *matHeaderCellDef>المدين (Debit)</th>
-                <td mat-cell *matCellDef="let element" class="debit-text">{{ element.debit > 0 ? (element.debit | number:'1.2-2') : '-' }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="credit">
-                <th mat-header-cell *matHeaderCellDef>الدائن (Credit)</th>
-                <td mat-cell *matCellDef="let element" class="credit-text">{{ element.credit > 0 ? (element.credit | number:'1.2-2') : '-' }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="balance">
-                <th mat-header-cell *matHeaderCellDef>الرصيد التراكمي</th>
-                <td mat-cell *matCellDef="let element"><strong>{{ element.balance_snapshot | number:'1.2-2' }} ر.س</strong></td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="ledgerColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: ledgerColumns;"></tr>
-            </table>
-          </div>
-        </mat-tab>
-
-        <!-- Tab 4: Fiscal Closings & Settings (إغلاق الفترات والسنوات) -->
-        <mat-tab label="الفترات المالية والإغلاق">
-          <div class="tab-content">
-            <h2>إدارة إغلاق الفترات المحاسبية المقفلة</h2>
-            <div class="periods-grid">
-              <div class="period-card" *ngFor="let p of periods()">
-                <span class="period-lock" [ngClass]="p.status">🔒</span>
-                <div class="meta">
-                  <h3>{{ p.name }}</h3>
-                  <p>تاريخ البدء: {{ p.start_date }} - النهاية: {{ p.end_date }}</p>
-                  <span class="status" [ngClass]="p.status">الحالة: {{ p.status === 'open' ? 'مفتوحة للتسجيل' : 'مغلقة ومقفلة' }}</span>
-                </div>
-                <button mat-flat-button color="warn" *ngIf="p.status === 'open'" (click)="closePeriod(p.id)">
-                  إغلاق وقفل الفترة
-                </button>
-              </div>
-            </div>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+      <h3 class="section-title">الإعداد والمرجعيات المالية</h3>
+      <div class="tiles">
+        @for (m of setup; track m.key) {
+          <button class="tile" (click)="go(m.route)">
+            <span class="tile-icon">{{ m.icon }}</span>
+            <span class="tile-body"><span class="tile-title">{{ m.title }}</span><span class="tile-desc">{{ m.desc }}</span></span>
+            <span class="tile-arrow">←</span>
+          </button>
+        }
+      </div>
     </div>
   `,
   styles: [`
-    .finance-dashboard {
-      flex: 1;
-      padding: 20px;
-      min-width: 0;
-      overflow-y: auto;
-      background: var(--nb-bg);
-      color: var(--nb-text);
-    }
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .dashboard-header h1 {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--nb-text);
-      margin: 0;
-    }
-    .dashboard-header p { color: var(--nb-text-muted); margin: 4px 0 0; font-size: 12px; }
-    .fiscal-status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--nb-surface);
-      color: var(--nb-text-secondary);
-      font-size: 12px;
-      padding: 7px 12px;
-      border-radius: var(--nb-radius);
-      border: 1px solid var(--nb-border);
-    }
+    .page { flex: 1; padding: 24px; overflow-y: auto; background: var(--nb-bg); font-family: var(--nb-font-family); }
+    .fiscal-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--nb-text-secondary);
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 7px 12px; }
+    .fiscal-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--nb-success); }
 
-    /* KPI Grid */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
+    /* ===== العنصر المميّز: ميزان المعادلة المحاسبية ===== */
+    .beam-card {
+      background:
+        radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--nb-primary-600) 9%, transparent), transparent 55%),
+        var(--nb-surface);
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
+      padding: 20px 22px; margin-bottom: 14px;
     }
-    .kpi-card {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .kpi-label { font-size: 12px; color: var(--nb-text-muted); }
-    .kpi-value { font-size: 20px; font-weight: 700; color: var(--nb-text); }
-    .kpi-unit { font-size: 12px; font-weight: 500; color: var(--nb-text-muted); }
-    .kpi-sub { font-size: 11px; color: var(--nb-text-faint); }
+    .beam-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+    .beam-title { margin: 0; font-size: 16px; font-weight: 800; color: var(--nb-text); letter-spacing: -0.2px; }
+    .beam-sub { margin: 3px 0 0; font-size: 12px; color: var(--nb-text-muted); }
+    .beam-verdict { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: var(--nb-radius-pill); white-space: nowrap; }
+    .beam-verdict.ok { background: var(--nb-success-bg); color: var(--nb-success); }
+    .beam-verdict.off { background: var(--nb-warning-bg); color: var(--nb-warning); }
 
-    /* Secondary Grid */
-    .secondary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .stat-box {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 16px;
-    }
-    .stat-box h4 { margin: 0 0 12px 0; font-size: 13px; font-weight: 700; color: var(--nb-text); }
-    .progress-info {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--nb-text-secondary);
-      margin-bottom: 8px;
-    }
-    .alert-list { display: flex; flex-direction: column; gap: 8px; }
-    .alert-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--nb-text-secondary);
-    }
+    .equation { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; gap: 12px; }
+    .term { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      padding: 16px 10px; border-radius: var(--nb-radius); border: 1px solid var(--nb-border-soft); background: var(--nb-surface-raised);
+      border-top: 3px solid var(--nb-text-faint); }
+    .term.assets { border-top-color: var(--nb-info); }
+    .term.liab { border-top-color: var(--nb-warning); }
+    .term.equity { border-top-color: var(--nb-success); }
+    .term-label { font-size: 12px; color: var(--nb-text-muted); }
+    .term-value { font-size: 24px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+    .term-unit { font-size: 11px; color: var(--nb-text-faint); }
+    .op { align-self: center; font-size: 26px; font-weight: 300; color: var(--nb-text-muted); }
 
-    /* Tabs */
-    .finance-tabs {
-      background: var(--nb-surface);
-      border-radius: var(--nb-radius-card);
-      border: 1px solid var(--nb-border);
-      padding: 8px 16px 16px;
-    }
-    .tab-content { padding: 16px 0 4px; }
-    .coa-controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .coa-controls h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .beam-bar { display: flex; height: 12px; border-radius: var(--nb-radius-pill); overflow: hidden; margin-top: 16px; border: 1px solid var(--nb-border-soft); }
+    .beam-bar span { display: flex; align-items: center; justify-content: center; min-width: 0; transition: width .5s ease; }
+    .seg-liab { background: color-mix(in srgb, var(--nb-warning) 82%, white); }
+    .seg-equity { background: color-mix(in srgb, var(--nb-success) 82%, white); }
+    .seg-txt { font-size: 9.5px; font-weight: 800; color: #fff; white-space: nowrap; }
 
-    .finance-table { width: 100%; background: var(--nb-surface); }
-    ::ng-deep .finance-table .mat-mdc-header-cell {
-      color: var(--nb-text-muted) !important;
-      font-weight: 700;
-      font-size: 11px;
-      background: var(--nb-surface-raised);
-      border-bottom: 1px solid var(--nb-border-soft) !important;
-    }
-    ::ng-deep .finance-table .mat-mdc-cell {
-      border-bottom: 1px solid var(--nb-border-row) !important;
-      color: var(--nb-text) !important;
-      font-size: 13px;
-      padding: 9px 16px !important;
-    }
-    ::ng-deep .finance-table .mat-mdc-row:hover .mat-mdc-cell { background: var(--nb-surface-raised); }
-    .en-name { color: var(--nb-text-muted); font-size: 12px; margin-right: 8px; }
+    /* ===== صف النتائج ===== */
+    .result-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 14px; }
+    .rk { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); }
+    .rk-label { font-size: 12px; color: var(--nb-text-muted); }
+    .rk-value { font-size: 20px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+    .rk-value.pos { color: var(--nb-success); } .rk-value.neg { color: var(--nb-danger); }
+    .rk-unit { font-size: 11px; color: var(--nb-text-faint); }
+    .rk.net.profit { border-color: var(--nb-success); background: var(--nb-success-bg); }
+    .rk.net.loss { border-color: var(--nb-danger); background: var(--nb-danger-bg); }
+    .rk.net.profit .rk-value { color: var(--nb-success); } .rk.net.loss .rk-value { color: var(--nb-danger); }
+    .minus, .eq { align-self: center; font-size: 20px; font-weight: 300; color: var(--nb-text-muted); }
+    @media (max-width: 720px) { .result-row { flex-wrap: wrap; } .minus, .eq { display: none; } .rk { flex: 1 1 40%; } }
 
-    /* Panels & Forms */
-    .add-account-panel, .journal-editor-panel {
-      background: var(--nb-surface-raised);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    .add-account-panel h3, .journal-editor-panel h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
-    .journal-editor-panel h4 { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 12px 0 8px; }
-    .form-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .form-actions { display: flex; gap: 12px; }
+    /* ===== صف الرؤى ===== */
+    .insight-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+    @media (max-width: 1000px) { .insight-row { grid-template-columns: 1fr; } .equation { grid-template-columns: 1fr; } .op { display: none; } }
+    .liquidity { display: flex; flex-direction: column; gap: 8px; }
+    .liq-item { display: flex; justify-content: space-between; font-size: 13px; }
+    .liq-item .lbl { color: var(--nb-text-muted); }
+    .liq-item .val { font-weight: 700; color: var(--nb-text); }
+    .liq-item .val em { font-size: 11px; font-weight: 500; color: var(--nb-text-muted); font-style: normal; }
+    .bar { height: 8px; border-radius: 6px; background: var(--nb-border-soft); overflow: hidden; margin-top: 4px; }
+    .fill { display: block; height: 100%; background: var(--nb-primary-600); border-radius: 6px; }
+    .fill.warn { background: var(--nb-danger); }
+    .rate { font-size: 12px; color: var(--nb-text-muted); }
+    .alerts { display: flex; flex-direction: column; gap: 8px; }
+    .alert { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--nb-text-secondary); }
+    .alert .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .alert.warning .dot { background: var(--nb-warning); }
+    .alert.info .dot { background: var(--nb-info); }
+    .counters { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 10px;
+      border-top: 1px solid var(--nb-border-soft); font-size: 12px; color: var(--nb-text-muted); }
+    .counters strong { color: var(--nb-text); }
 
-    /* Badges */
-    .type-badge, .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: var(--nb-radius-sm);
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .type-badge.debit { background: var(--nb-info-bg); color: var(--nb-info); }
-    .type-badge.credit { background: var(--nb-success-bg); color: var(--nb-success); }
-    .status-badge.active, .status-badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
-    .status-badge.draft { background: var(--nb-bg); color: var(--nb-text-secondary); }
-    .status-badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
-    .status-badge.reversed { background: var(--nb-danger-bg); color: var(--nb-danger); }
+    /* ===== أحدث القيود ===== */
+    .recent { margin-bottom: 20px; }
+    .table-wrap { overflow-x: auto; }
+    .nb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .nb-table th { text-align: start; font-weight: 700; font-size: 11px; color: var(--nb-text-muted);
+      background: var(--nb-surface-raised); padding: 9px 14px; border-bottom: 1px solid var(--nb-border-soft); }
+    .nb-table td { padding: 9px 14px; border-bottom: 1px solid var(--nb-border-row); color: var(--nb-text); }
+    .nb-table tbody tr { cursor: pointer; }
+    .nb-table tbody tr:hover td { background: var(--nb-surface-raised); }
+    .nb-table tr:last-child td { border-bottom: none; }
+    .mono { font-variant-numeric: tabular-nums; }
+    .desc { color: var(--nb-text-secondary); }
+    .empty { text-align: center; padding: 22px; color: var(--nb-text-muted); }
+    .badge { display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: var(--nb-radius-sm); }
+    .badge.draft { background: var(--nb-border-soft); color: var(--nb-text-secondary); }
+    .badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
+    .badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
+    .badge.reversed, .badge.cancelled { background: var(--nb-danger-bg); color: var(--nb-danger); }
 
-    /* Journal Editor */
-    .journal-line-row { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
-    .editor-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 12px;
-    }
-    .balance-summary { font-size: 13px; color: var(--nb-text-muted); }
-    .balance-summary.balanced { color: var(--nb-success); }
-    .balance-summary.unbalanced { color: var(--nb-danger); }
-
-    /* Ledger & Filters */
-    .ledger-filters { display: flex; gap: 16px; margin-bottom: 16px; }
-    .debit-text { color: var(--nb-info); font-weight: 500; }
-    .credit-text { color: var(--nb-success); font-weight: 500; }
-
-    /* Periods Grid */
-    .periods-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    .period-card {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 10px;
-    }
-    .period-lock { font-size: 26px; }
-    .period-card .meta h3 { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 0; }
-    .period-card .meta p { font-size: 12px; color: var(--nb-text-muted); margin: 4px 0; }
-    .period-card .status { font-size: 12px; font-weight: 700; }
-    .period-card .status.open { color: var(--nb-success); }
-    .period-card .status.closed { color: var(--nb-danger); }
-  `]
+    /* ===== بطاقات التنقل ===== */
+    .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 4px 0 12px; }
+    .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 720px) { .tiles { grid-template-columns: 1fr; } }
+    .tile { display: flex; align-items: center; gap: 14px; text-align: start; cursor: pointer;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
+      padding: 16px; transition: all 0.15s ease; font-family: inherit; }
+    .tile:hover { border-color: var(--nb-primary-400); background: var(--nb-surface-raised); transform: translateY(-1px); }
+    .tile:hover .tile-arrow { opacity: 1; transform: translateX(-3px); }
+    .tile-icon { font-size: 22px; width: 44px; height: 44px; display: grid; place-items: center; flex: none;
+      background: var(--nb-primary-50); border-radius: var(--nb-radius); }
+    .tile-body { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+    .tile-title { font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .tile-desc { font-size: 12px; color: var(--nb-text-muted); }
+    .tile-arrow { color: var(--nb-primary-600); font-size: 18px; opacity: 0; transition: all 0.15s ease; }
+  `],
 })
 export class FinanceDashboardComponent implements OnInit {
   private service = inject(FinanceService);
+  private router = inject(Router);
 
   stats = signal<any>({ alerts: [] });
-  coa = signal<any[]>([]);
-  journals = signal<any[]>([]);
-  periods = signal<any[]>([]);
-  costCenters = signal<any[]>([]);
-  ledgerEntries = signal<any[]>([]);
-  accountTypes = signal<any[]>([]);
+  recent = signal<any[]>([]);
 
-  filterAccount = '';
-  filterCostCenter = '';
+  equity = computed(() => (Number(this.stats().total_assets) || 0) - (Number(this.stats().total_liabilities) || 0));
+  netResult = computed(() => (Number(this.stats().revenue) || 0) - (Number(this.stats().expenses) || 0));
+  imbalance = computed(() => Math.abs((Number(this.stats().total_assets) || 0) - (Number(this.stats().total_liabilities) || 0) - this.equity()));
+  isBalanced = computed(() => this.imbalance() < 0.01);
+  liabShare = computed(() => {
+    const l = Number(this.stats().total_liabilities) || 0;
+    const e = this.equity();
+    const total = l + e;
+    return total > 0 ? this.clamp((l / total) * 100) : 50;
+  });
 
-  showAddAccount = false;
-  showJournalEditor = false;
-
-  newAccount = { code: '', name_ar: '', name_en: '', account_type: '', parent: null as string | null };
-  newJournal = {
-    entry_number: '',
-    date: new Date().toISOString().split('T')[0],
-    accounting_period: '',
-    description: '',
-    lines: [] as any[]
-  };
-
-  totalDebit = 0;
-  totalCredit = 0;
-  isBalanced = false;
-
-  coaColumns = ['code', 'name', 'type', 'status'];
-  journalColumns = ['number', 'date', 'description', 'status', 'actions'];
-  ledgerColumns = ['date', 'account', 'debit', 'credit', 'balance'];
+  readonly operations: FinanceModule[] = [
+    { key: 'coa', title: 'شجرة الحسابات', desc: 'دليل الحسابات والتصنيفات المحاسبية.', icon: '🗂️', route: '/finance/coa' },
+    { key: 'journals', title: 'قيود اليومية', desc: 'إنشاء واعتماد وترحيل القيود المزدوجة.', icon: '📝', route: '/finance/journals' },
+    { key: 'ledger', title: 'دفتر الأستاذ العام', desc: 'استعراض حركات وأرصدة الحسابات.', icon: '📚', route: '/finance/ledger' },
+    { key: 'vouchers', title: 'سندات الصرف والقبض', desc: 'السندات المالية وترحيلها للدفاتر.', icon: '🧾', route: '/finance/vouchers' },
+    { key: 'budgets', title: 'الموازنات التقديرية', desc: 'رصد واعتماد الموازنات ومتابعة الاستهلاك.', icon: '📊', route: '/finance/budgets' },
+    { key: 'fiscal', title: 'الفترات والإغلاق', desc: 'السنوات المالية وإغلاق الفترات.', icon: '🔒', route: '/finance/fiscal' },
+  ];
+  readonly setup: FinanceModule[] = [
+    { key: 'banking', title: 'البنوك والصناديق', desc: 'الحسابات البنكية والخزائن النقدية.', icon: '🏦', route: '/finance/banking' },
+    { key: 'cost-centers', title: 'مراكز التكلفة', desc: 'هيكل مراكز التكلفة والفروع.', icon: '🎯', route: '/finance/cost-centers' },
+    { key: 'taxes', title: 'الضرائب', desc: 'ضريبة القيمة المضافة والاستقطاع.', icon: '％', route: '/finance/taxes' },
+    { key: 'currencies', title: 'العملات وأسعار الصرف', desc: 'العملات المعتمدة وأسعار التحويل.', icon: '💱', route: '/finance/currencies' },
+    { key: 'setup', title: 'الإعداد والمرجعيات', desc: 'أنواع الحسابات والتصنيفات وطرق الدفع.', icon: '⚙️', route: '/finance/setup' },
+  ];
 
   ngOnInit() {
-    this.loadDashboard();
-    this.loadCOA();
-    this.loadJournals();
-    this.loadPeriods();
-    this.loadCostCenters();
-    this.loadLedgerEntries();
-    
-    this.service.getAccountTypes().subscribe(res => {
-      if (res.success) this.accountTypes.set(res.data);
-    });
+    this.service.getDashboardData().subscribe({ next: (r) => { if (r?.success) this.stats.set(r.data); }, error: () => {} });
+    this.service.getJournals().subscribe({ next: (r) => { if (r?.success) this.recent.set((r.data || []).slice(0, 6)); }, error: () => {} });
   }
 
-  loadDashboard() {
-    this.service.getDashboardData().subscribe(res => {
-      if (res.success) this.stats.set(res.data);
-    });
-  }
-
-  loadCOA() {
-    this.service.getCOA().subscribe(res => {
-      if (res.success) this.coa.set(res.data);
-    });
-  }
-
-  loadJournals() {
-    this.service.getJournals().subscribe(res => {
-      if (res.success) this.journals.set(res.data);
-    });
-  }
-
-  loadPeriods() {
-    this.service.getPeriods().subscribe(res => {
-      if (res.success) this.periods.set(res.data);
-    });
-  }
-
-  loadCostCenters() {
-    this.service.getCostCenters().subscribe(res => {
-      if (res.success) this.costCenters.set(res.data);
-    });
-  }
-
-  loadLedgerEntries() {
-    this.service.getLedgerEntries(this.filterAccount, this.filterCostCenter).subscribe(res => {
-      if (res.success) this.ledgerEntries.set(res.data);
-    });
-  }
-
-  saveAccount() {
-    this.service.createAccount(this.newAccount).subscribe(res => {
-      if (res.success) {
-        this.loadCOA();
-        this.showAddAccount = false;
-        this.newAccount = { code: '', name_ar: '', name_en: '', account_type: '', parent: null };
-      }
-    });
-  }
-
-  toggleJournalEditor() {
-    this.showJournalEditor = !this.showJournalEditor;
-    if (this.showJournalEditor && this.newJournal.lines.length === 0) {
-      this.addJournalLine();
-      this.addJournalLine();
-    }
-  }
-
-  addJournalLine() {
-    this.newJournal.lines.push({ account: '', debit: 0, credit: 0, cost_center: null });
-    this.checkBalance();
-  }
-
-  removeJournalLine(index: number) {
-    this.newJournal.lines.splice(index, 1);
-    this.checkBalance();
-  }
-
-  checkBalance() {
-    this.totalDebit = this.newJournal.lines.reduce((sum, line) => sum + (Number(line.debit) || 0), 0);
-    this.totalCredit = this.newJournal.lines.reduce((sum, line) => sum + (Number(line.credit) || 0), 0);
-    this.isBalanced = this.totalDebit > 0 && Math.abs(this.totalDebit - this.totalCredit) < 0.01;
-  }
-
-  saveJournal() {
-    const defaultCurrency = 'SAR'; // مثال للعملة الأساسية
-    this.service.getCurrencies().subscribe(currRes => {
-      const baseCurr = currRes.data?.find((c: any) => c.is_base) || currRes.data?.[0];
-      const payload = {
-        ...this.newJournal,
-        currency: baseCurr?.id,
-        exchange_rate: 1.0
-      };
-      this.service.createJournal(payload).subscribe(res => {
-        if (res.success) {
-          this.loadJournals();
-          this.showJournalEditor = false;
-          this.newJournal = {
-            entry_number: '',
-            date: new Date().toISOString().split('T')[0],
-            accounting_period: '',
-            description: '',
-            lines: []
-          };
-          this.totalDebit = 0;
-          this.totalCredit = 0;
-          this.isBalanced = false;
-        }
-      });
-    });
-  }
-
-  approveJournal(id: string) {
-    this.service.approveJournal(id).subscribe(() => this.loadJournals());
-  }
-
-  postJournal(id: string) {
-    this.service.postJournal(id).subscribe(() => {
-      this.loadJournals();
-      this.loadLedgerEntries();
-      this.loadDashboard();
-    });
-  }
-
-  reverseJournal(id: string) {
-    this.service.reverseJournal(id).subscribe(() => {
-      this.loadJournals();
-      this.loadLedgerEntries();
-      this.loadDashboard();
-    });
-  }
-
-  closePeriod(id: string) {
-    this.service.closePeriod(id).subscribe(() => this.loadPeriods());
-  }
-
-  getStatusLabel(status: string): string {
-    const labels: { [key: string]: string } = {
-      'draft': 'مسودة',
-      'approved': 'معتمد',
-      'posted': 'مرحل',
-      'cancelled': 'ملغي',
-      'reversed': 'معكوس'
-    };
-    return labels[status] || status;
-  }
+  go(route: string) { this.router.navigateByUrl(route); }
+  fmt(v: any): string { return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  abs(v: number): number { return Math.abs(v); }
+  clamp(v: any): number { const n = Number(v) || 0; return Math.max(0, Math.min(100, n)); }
+  statusLabel(s: string) { return ({ draft: 'مسودة', approved: 'معتمد', posted: 'مرحّل', cancelled: 'ملغي', reversed: 'معكوس' } as any)[s] || s; }
 }

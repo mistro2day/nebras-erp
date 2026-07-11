@@ -6,4 +6,8 @@ export const HR_ROUTES: Routes = [
     path: '',
     component: HRComponent,
   },
+  {
+    path: 'create',
+    loadComponent: () => import('./create/create.component').then(m => m.EmployeeCreateComponent),
+  },
 ];

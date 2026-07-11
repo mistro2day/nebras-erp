@@ -171,7 +171,9 @@ class ReservationViewSet(BaseCRUDViewSet):
             resource_id=resource_id,
             date_val=date_val,
             start_time=start_time,
-            end_time=end_time
+            end_time=end_time,
+            exclude_reservation_id=request.data.get('exclude_reservation_id') or None,
+            exclude_event_id=request.data.get('exclude_event_id') or None,
         )
 
         return StandardResponse(

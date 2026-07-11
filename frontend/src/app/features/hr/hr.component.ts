@@ -1,10 +1,13 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { MatDialogModule } from '@angular/material/dialog';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NotificationService } from '../../core/services/notification.service';
+import { environment } from '../../../environments/environment';
 
 interface Employee {
   id: string;
@@ -40,7 +43,7 @@ interface LeaveRequest {
     <div class="page" dir="rtl">
       <nb-page-header title="الموارد البشرية" subtitle="إدارة الموظفين، العقود، طلبات الإجازات، والخدمة الذاتية.">
         <button class="nb-btn-secondary" (click)="activeTab.set('requests')">الطلبات المعلقة ({{ pendingCount() }})</button>
-        <button class="nb-btn-primary" (click)="openAddEmployeeModal()">إضافة موظف جديد</button>
+        <button class="nb-btn-primary" (click)="navigateToCreate()">إضافة موظف جديد</button>
       </nb-page-header>
 
       <!-- التبويبات الرئيسية بتصميم عصري -->
@@ -91,7 +94,7 @@ interface LeaveRequest {
           <!-- الإجراءات السريعة -->
           <nb-panel title="إجراءات سريعة للموارد البشرية" [flush]="true">
             <div class="quick-actions">
-              <button class="action-card" (click)="openAddEmployeeModal()">
+              <button class="action-card" (click)="navigateToCreate()">
                 <span class="icon">➕</span>
                 <span class="title">توظيف جديد</span>
                 <span class="desc">إنشاء ملف وتعاقد لموظف</span>
@@ -294,51 +297,6 @@ interface LeaveRequest {
         </div>
       }
     </div>
-
-    <!-- نافذة إضافة موظف جديد -->
-    @if (showAddModal()) {
-      <div class="overlay" (click)="showAddModal.set(false)">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <h3>إضافة موظف جديد</h3>
-          <p class="modal-sub">قم بإدخال البيانات الأساسية للموظف الجديد لربطه بالنظام.</p>
-          <div class="form-grid">
-            <div class="fld req">
-              <label>اسم الموظف بالكامل</label>
-              <input [(ngModel)]="newEmp.name" placeholder="الاسم ثلاثي أو رباعي" />
-            </div>
-            <div class="fld req">
-              <label>المسمى الوظيفي</label>
-              <input [(ngModel)]="newEmp.jobTitle" placeholder="مثال: معلم أول رياضيات" />
-            </div>
-            <div class="fld req">
-              <label>القسم</label>
-              <select [(ngModel)]="newEmp.department">
-                <option value="التعليم والإشراف">التعليم والإشراف</option>
-                <option value="الإدارة المالية">الإدارة المالية</option>
-                <option value="تقنية المعلومات">تقنية المعلومات</option>
-                <option value="الموارد البشرية">الموارد البشرية</option>
-              </select>
-            </div>
-            <div class="fld req">
-              <label>رقم الهاتف</label>
-              <input [(ngModel)]="newEmp.phone" placeholder="09xxxxxxxx" />
-            </div>
-            <div class="fld">
-              <label>البريد الإلكتروني</label>
-              <input [(ngModel)]="newEmp.email" placeholder="example@nebras.edu" />
-            </div>
-            <div class="fld req">
-              <label>الراتب الأساسي</label>
-              <input type="number" [(ngModel)]="newEmp.salary" />
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button class="nb-btn-ghost" (click)="showAddModal.set(false)">إلغاء</button>
-            <button class="nb-btn-primary" (click)="submitNewEmployee()">توظيف</button>
-          </div>
-        </div>
-      </div>
-    }
   `,
   styles: [`
     .page { flex: 1; padding: 24px; overflow-y: auto; font-family: var(--nb-font-family); background: var(--nb-background); }
@@ -457,89 +415,19 @@ interface LeaveRequest {
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
   `],
 })
-export class HRComponent {
+export class HRComponent implements OnInit {
   private readonly notify = inject(NotificationService);
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   readonly activeTab = signal<'dashboard' | 'directory' | 'contracts' | 'requests' | 'org'>('dashboard');
-  readonly showAddModal = signal(false);
 
   // الفلاتر والبحث
   searchQuery = '';
   deptFilter = '';
 
-  // بيانات الموظفين الافتراضية للشركة
-  readonly employees = signal<Employee[]>([
-    {
-      id: '1',
-      name: 'أ. محمد أحمد الفكي',
-      avatar: '',
-      jobTitle: 'مدير الشؤون الأكاديمية والتعليمية',
-      department: 'التعليم والإشراف',
-      email: 'm.faki@nebras.edu',
-      phone: '0912345678',
-      hireDate: '2022-09-01',
-      status: 'active',
-      salary: 450000,
-      allowance: 90000,
-      contractType: 'دوام كامل'
-    },
-    {
-      id: '2',
-      name: 'أ. عثمان نوري محمد',
-      avatar: '',
-      jobTitle: 'المدير المالي للمجموعة',
-      department: 'الإدارة المالية',
-      email: 'o.nouri@nebras.edu',
-      phone: '0922446688',
-      hireDate: '2023-01-15',
-      status: 'active',
-      salary: 500000,
-      allowance: 100000,
-      contractType: 'دوام كامل'
-    },
-    {
-      id: '3',
-      name: 'م. حيدر محجوب البشير',
-      avatar: '',
-      jobTitle: 'رئيس قسم تقنية المعلومات والنظم',
-      department: 'تقنية المعلومات',
-      email: 'h.mahgoub@nebras.edu',
-      phone: '0911883377',
-      hireDate: '2023-06-01',
-      status: 'active',
-      salary: 400000,
-      allowance: 80000,
-      contractType: 'دوام كامل'
-    },
-    {
-      id: '4',
-      name: 'أ. أمل مصطفى عبد الله',
-      avatar: '',
-      jobTitle: 'مسؤول الموارد البشرية والرواتب',
-      department: 'الموارد البشرية',
-      email: 'a.mustafa@nebras.edu',
-      phone: '0966778899',
-      hireDate: '2024-02-01',
-      status: 'active',
-      salary: 350000,
-      allowance: 70000,
-      contractType: 'دوام كامل'
-    },
-    {
-      id: '5',
-      name: 'أ. سارة جعفر كمال',
-      avatar: '',
-      jobTitle: 'معلمة أولى للمرحلة الابتدائية',
-      department: 'التعليم والإشراف',
-      email: 's.jaafar@nebras.edu',
-      phone: '0955331122',
-      hireDate: '2025-08-10',
-      status: 'probation',
-      salary: 300000,
-      allowance: 50000,
-      contractType: 'عقد مؤقت'
-    }
-  ]);
+  // بيانات الموظفين
+  readonly employees = signal<Employee[]>([]);
 
   // قائمة طلبات الإجازات والخدمة الذاتية
   readonly requests = signal<LeaveRequest[]>([
@@ -565,16 +453,6 @@ export class HRComponent {
     }
   ]);
 
-  // معالجة نموذج الموظف الجديد
-  newEmp = {
-    name: '',
-    jobTitle: '',
-    department: 'التعليم والإشراف',
-    phone: '',
-    email: '',
-    salary: 250000
-  };
-
   // محسوبات لوحة التحكم
   readonly activeCount = computed(() => this.employees().filter((e) => e.status === 'active').length);
   readonly probationCount = computed(() => this.employees().filter((e) => e.status === 'probation').length);
@@ -596,6 +474,34 @@ export class HRComponent {
       return matchQ && matchDept;
     });
   });
+
+  ngOnInit() {
+    this.loadEmployees();
+  }
+
+  loadEmployees() {
+    this.http.get<any>(`${environment.apiUrl}employees/employees/`).subscribe({
+      next: (res) => {
+        if (res && res.success) {
+          const mapped = res.data.map((e: any) => ({
+            id: e.id,
+            name: e.full_name_ar,
+            avatar: e.photo_url || '',
+            jobTitle: e.position,
+            department: e.department,
+            email: e.email,
+            phone: e.mobile,
+            hireDate: e.joining_date,
+            status: e.status === 'active' ? 'active' : (e.status === 'suspended' ? 'suspended' : 'probation'),
+            salary: Number(e.salary) || 250000,
+            allowance: Number(e.allowance) || Math.round((Number(e.salary) || 250000) * 0.2),
+            contractType: e.employment_type === 'Full-time' ? 'دوام كامل' : (e.employment_type === 'Part-time' ? 'دوام جزئي' : 'عقد مؤقت')
+          }));
+          this.employees.set(mapped);
+        }
+      }
+    });
+  }
 
   initials(name: string): string {
     const parts = name.split(' ');
@@ -626,40 +532,8 @@ export class HRComponent {
     this.notify.success('تم رفض طلب الإجازة.');
   }
 
-  openAddEmployeeModal(): void {
-    this.newEmp = {
-      name: '',
-      jobTitle: '',
-      department: 'التعليم والإشراف',
-      phone: '',
-      email: '',
-      salary: 250000
-    };
-    this.showAddModal.set(true);
-  }
-
-  submitNewEmployee(): void {
-    if (!this.newEmp.name || !this.newEmp.jobTitle || !this.newEmp.phone) {
-      this.notify.error('يرجى ملء الحقول المطلوبة بنجاح.');
-      return;
-    }
-    const created: Employee = {
-      id: String(this.employees().length + 1),
-      name: this.newEmp.name,
-      avatar: '',
-      jobTitle: this.newEmp.jobTitle,
-      department: this.newEmp.department,
-      phone: this.newEmp.phone,
-      email: this.newEmp.email || `${this.newEmp.name.replace(' ', '.')}@nebras.edu`,
-      hireDate: new Date().toISOString().split('T')[0],
-      status: 'probation',
-      salary: this.newEmp.salary,
-      allowance: Math.round(this.newEmp.salary * 0.2),
-      contractType: 'دوام كامل'
-    };
-    this.employees.update((list) => [...list, created]);
-    this.showAddModal.set(false);
-    this.notify.success('تم إضافة وتسجيل ملف الموظف الجديد في الموارد البشرية بنجاح.');
+  navigateToCreate(): void {
+    this.router.navigate(['/hr/create']);
   }
 
   exportPayrollReport(): void {

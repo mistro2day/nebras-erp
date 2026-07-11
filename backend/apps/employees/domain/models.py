@@ -28,6 +28,12 @@ class Employee(CombinedSharedModel):
     joining_date = models.DateField(default=timezone.now)
     status = models.CharField(max_length=30, default='active', db_index=True) # active, suspended, resigned, terminated
 
+    def save(self, *args, **kwargs):
+        if not self.employee_number:
+            count = Employee.objects.filter(deleted_at__isnull=True).count() + 1
+            self.employee_number = f"EMP-2026-{str(count).zfill(3)}"
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'nebras_employees'
 

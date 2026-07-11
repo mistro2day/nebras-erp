@@ -7,12 +7,13 @@ import { Router } from '@angular/router';
 import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 
 @Component({
   selector: 'app-student-create',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -179,7 +180,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                 </div>
                 <div class="field">
                   <label>تاريخ الميلاد</label>
-                  <input type="date" [(ngModel)]="personalForm.date_of_birth" name="date_of_birth" required />
+                  <nb-datepicker [(value)]="personalForm.date_of_birth" placeholder="اختر تاريخ الميلاد"></nb-datepicker>
                 </div>
                 <div class="field">
                   <label>الجنسية</label>

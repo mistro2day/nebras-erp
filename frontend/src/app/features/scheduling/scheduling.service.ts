@@ -19,6 +19,8 @@ export class SchedulingService {
 
   getReservations(params?: any): Observable<any> { return this.api.get('scheduling/reservations/', { page_size: 200, ...(params ?? {}) }); }
   createReservation(body: any): Observable<any> { return this.api.post('scheduling/reservations/', body); }
+  updateReservation(id: string, body: any): Observable<any> { return this.api.patch(`scheduling/reservations/${id}/`, body); }
+  deleteReservation(id: string): Observable<any> { return this.api.delete(`scheduling/reservations/${id}/`); }
   /** الحجز الذكي: كشف تعارض المورد قبل التأكيد. */
   checkConflicts(body: { resource_id: string; date: string; start_time: string; end_time: string }): Observable<any> {
     return this.api.post('scheduling/reservations/check-conflicts/', body);

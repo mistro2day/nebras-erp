@@ -33,6 +33,79 @@ class FacultyMember(CombinedSharedModel):
     joining_date = models.DateField(default=timezone.now)
     status = models.CharField(max_length=30, default='draft', db_index=True) # draft, pending_review, approved, active, suspended, resigned
 
+    def save(self, *args, **kwargs):
+        from apps.employees.domain.models import Employee
+        
+        # تحضير حالة الموظف بناءً على حالة المعلم
+        emp_status = 'active' if self.status in ['approved', 'active'] else 'suspended'
+        if self.status == 'resigned':
+            emp_status = 'resigned'
+            
+        if not self.employee:
+            # البحث عن موظف بنفس الهوية الوطنية أو الرقم الوظيفي لتجنب التكرار
+            employee = Employee.objects.filter(
+                tenant_id=self.tenant_id,
+                national_id=self.national_id,
+                deleted_at__isnull=True
+            ).first()
+            if not employee:
+                employee = Employee.objects.filter(
+                    tenant_id=self.tenant_id,
+                    employee_number=self.employee_number,
+                    deleted_at__isnull=True
+                ).first()
+                
+            if not employee:
+                # إنشاء موظف جديد
+                employee = Employee.objects.create(
+                    tenant_id=self.tenant_id,
+                    employee_number=self.employee_number,
+                    national_id=self.national_id,
+                    passport=self.passport,
+                    full_name_ar=self.full_name_ar,
+                    full_name_en=self.full_name_en,
+                    gender=self.gender,
+                    nationality=self.nationality,
+                    religion=self.religion,
+                    date_of_birth=self.date_of_birth,
+                    marital_status=self.marital_status,
+                    photo_url=self.photo_url,
+                    email=self.email,
+                    mobile=self.mobile,
+                    address=self.address,
+                    branch_id=self.branch_id,
+                    department=self.department,
+                    position=self.current_position,
+                    employment_type='Full-time',
+                    joining_date=self.joining_date,
+                    status=emp_status
+                )
+            self.employee = employee
+        else:
+            # مزامنة البيانات الشخصية والوظيفية إذا كان الرابط موجوداً بالفعل
+            emp = self.employee
+            emp.employee_number = self.employee_number
+            emp.national_id = self.national_id
+            emp.passport = self.passport
+            emp.full_name_ar = self.full_name_ar
+            emp.full_name_en = self.full_name_en
+            emp.gender = self.gender
+            emp.nationality = self.nationality
+            emp.religion = self.religion
+            emp.date_of_birth = self.date_of_birth
+            emp.marital_status = self.marital_status
+            emp.photo_url = self.photo_url
+            emp.email = self.email
+            emp.mobile = self.mobile
+            emp.address = self.address
+            emp.branch_id = self.branch_id
+            emp.department = self.department
+            emp.position = self.current_position
+            emp.status = emp_status
+            emp.save()
+            
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'nebras_faculty_members'
 

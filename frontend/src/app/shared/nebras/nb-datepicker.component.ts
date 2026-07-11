@@ -17,19 +17,25 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="dp" [class.open]="open()">
-      <button type="button" class="dp-field" (click)="toggle($event)" [attr.aria-expanded]="open()"
-              [attr.aria-label]="ariaLabel || 'اختيار تاريخ'" [disabled]="disabled">
+      <div class="dp-field" [class.disabled]="disabled" (click)="openOnFieldClick($event)">
         <svg class="cal-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" (click)="toggle($event)">
           <rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" />
         </svg>
-        <span class="dp-value" [class.placeholder]="!val()">{{ val() || (placeholder || 'اختر التاريخ') }}</span>
+        <input class="dp-input" 
+               dir="rtl"
+               [value]="val()" 
+               [placeholder]="placeholder || 'اختر التاريخ'" 
+               [disabled]="disabled" 
+               (input)="onInputChange($event)"
+               (focus)="openCalendar()"
+               aria-label="تاريخ" />
         @if (val() && !disabled) {
           <span class="dp-clear" role="button" aria-label="مسح التاريخ" (click)="clear($event)">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </span>
         }
-      </button>
+      </div>
 
     @if (open()) {
          <div class="dp-pop" role="dialog" aria-label="تقويم" (click)="$event.stopPropagation()" [style.top.px]="posTop()" [style.left.px]="posLeft()">
@@ -38,11 +44,11 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
             </button>
             <div class="dp-title">
-              <select class="mon" [value]="viewMonth()" (change)="setMonth($event)" aria-label="الشهر">
-                @for (m of monthNames; track $index) { <option [value]="$index">{{ m }}</option> }
+              <select class="mon" (change)="setMonth($event)" aria-label="الشهر">
+                @for (m of monthNames; track $index) { <option [value]="$index" [selected]="$index === viewMonth()">{{ m }}</option> }
               </select>
-              <select class="yr" [value]="viewYear()" (change)="setYear($event)" aria-label="السنة">
-                @for (y of yearRange(); track y) { <option [value]="y">{{ y }}</option> }
+              <select class="yr" (change)="setYear($event)" aria-label="السنة">
+                @for (y of yearRange(); track y) { <option [value]="y" [selected]="y === viewYear()">{{ y }}</option> }
               </select>
             </div>
             <button type="button" class="nav" (click)="nextMonth()" aria-label="الشهر التالي">
@@ -76,14 +82,15 @@ interface DayCell { day: number; iso: string; inMonth: boolean; today: boolean; 
     .dp { position: relative; }
     .dp-field { display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; padding: 0 10px;
       border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface);
-      color: var(--nb-text); font-family: var(--nb-font-family); font-size: 13px; cursor: pointer; text-align: start;
+      color: var(--nb-text); font-family: var(--nb-font-family); font-size: 13px; cursor: text; text-align: start;
       transition: border-color 150ms ease, box-shadow 150ms ease; }
-    .dp-field:hover:not(:disabled) { border-color: var(--nb-text-faint); }
-    .dp.open .dp-field, .dp-field:focus-visible { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); outline: none; }
-    .dp-field:disabled { opacity: 0.55; cursor: not-allowed; }
-    .cal-ico { color: var(--nb-text-muted); flex-shrink: 0; }
-    .dp-value { flex: 1; font-variant-numeric: tabular-nums; }
-    .dp-value.placeholder { color: var(--nb-text-faint); }
+    .dp-field:hover:not(.disabled) { border-color: var(--nb-text-faint); }
+    .dp.open .dp-field, .dp-field:focus-within { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); outline: none; }
+    .dp-field.disabled { opacity: 0.55; cursor: not-allowed; }
+    .dp-field.disabled .dp-input { cursor: not-allowed; }
+    .cal-ico { color: var(--nb-text-muted); flex-shrink: 0; cursor: pointer; }
+    .dp-input { flex: 1; border: none; background: transparent; color: var(--nb-text); font-family: var(--nb-font-family); font-size: 13px; outline: none; padding: 0; height: 100%; width: 100%; font-variant-numeric: tabular-nums; }
+    .dp-input::placeholder { color: var(--nb-text-faint); }
     .dp-clear { display: inline-flex; color: var(--nb-text-muted); border-radius: 50%; padding: 2px; }
     .dp-clear:hover { background: var(--nb-surface-raised); color: var(--nb-danger); }
 
@@ -264,6 +271,45 @@ export class NbDatepickerComponent implements OnDestroy {
   }
 
   clear(e: Event): void { e.stopPropagation(); this.val.set(''); this.valueChange.emit(''); }
+
+  openCalendar(): void {
+    if (this.disabled) return;
+    this.open.set(true);
+    this.syncView();
+    this.syncPosition();
+  }
+
+  openOnFieldClick(e: Event): void {
+    e.stopPropagation();
+    if (this.disabled) return;
+    if (!this.open()) {
+      this.openCalendar();
+    }
+  }
+
+  onInputChange(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    let value = input.value.replace(/[^0-9]/g, '');
+    if (value.length > 8) {
+      value = value.substring(0, 8);
+    }
+    let formatted = '';
+    if (value.length > 0) {
+      formatted += value.substring(0, 4);
+    }
+    if (value.length > 4) {
+      formatted += '-' + value.substring(4, 6);
+    }
+    if (value.length > 6) {
+      formatted += '-' + value.substring(6, 8);
+    }
+    input.value = formatted;
+    this.val.set(formatted);
+    this.valueChange.emit(formatted);
+    if (formatted.length === 10) {
+      this.syncView();
+    }
+  }
 
   @HostListener('document:click', ['$event'])
   onDocClick(e: MouseEvent): void {
