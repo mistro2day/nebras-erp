@@ -7,7 +7,8 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 interface Line { account: string; debit: number; credit: number; cost_center: string | null; description?: string; }
 
@@ -19,13 +20,12 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
   selector: 'app-journal-entries',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="قيود اليومية والاعتمادات" subtitle="إنشاء القيود المزدوجة المتوازنة، واعتمادها، وترحيلها لدفتر الأستاذ العام.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="cols()" [rows]="journals()" title="قيود اليومية" subtitle="سجل القيود المحاسبية" filename="قيود-اليومية"></nb-export-menu>
         <button class="btn primary" (click)="toggleEditor()">＋ قيد يومية جديد</button>
       </nb-page-header>
 
@@ -88,13 +88,13 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
             <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>المصدر</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>
               @for (j of journals(); track j.id) {
-                <tr>
+                <tr class="clickable" (click)="openDetail(j)">
                   <td><strong>{{ j.entry_number }}</strong></td>
                   <td class="mono">{{ j.date }}</td>
                   <td>{{ j.description }}</td>
                   <td>{{ sourceLabel(j.source_type) }}</td>
                   <td><span class="badge" [class]="j.status">{{ statusLabel(j.status) }}</span></td>
-                  <td>
+                  <td (click)="$event.stopPropagation()">
                     <div class="actions">
                       @if (j.status === 'draft') { <button class="btn primary xs" (click)="approve(j)">اعتماد</button> }
                       @if (j.status === 'approved') { <button class="btn primary xs" (click)="post(j)">ترحيل</button> }
@@ -108,6 +108,46 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
           </table>
         </div>
       </nb-panel>
+
+      <!-- تفاصيل القيد المحاسبي -->
+      <nb-drawer [open]="!!detail()" [width]="640"
+        [title]="'قيد رقم ' + (detail()?.entry_number || '')"
+        [subtitle]="detail()?.description" (closed)="detail.set(null)">
+        @if (detail(); as d) {
+          <div class="dsummary">
+            <div class="chip"><span class="k">التاريخ</span><span class="v mono">{{ d.date }}</span></div>
+            <div class="chip"><span class="k">الحالة</span><span class="badge" [class]="d.status">{{ statusLabel(d.status) }}</span></div>
+            <div class="chip"><span class="k">المصدر</span><span class="v">{{ sourceLabel(d.source_type) }}</span></div>
+            @if (d.reference) { <div class="chip"><span class="k">المرجع</span><span class="v">{{ d.reference }}</span></div> }
+          </div>
+
+          <h4 class="dh">أسطر القيد</h4>
+          <div class="table-wrap">
+            <table class="nb-table dlines">
+              <thead><tr><th>الحساب</th><th class="end">مدين</th><th class="end">دائن</th></tr></thead>
+              <tbody>
+                @for (l of d.lines || []; track $index) {
+                  <tr>
+                    <td><strong>{{ l.account_code }}</strong> <span class="nm">{{ l.account_name }}</span></td>
+                    <td class="end mono info">{{ +l.debit > 0 ? (l.debit | number:'1.2-2') : '—' }}</td>
+                    <td class="end mono success">{{ +l.credit > 0 ? (l.credit | number:'1.2-2') : '—' }}</td>
+                  </tr>
+                }
+                <tr class="sum">
+                  <td>الإجمالي</td>
+                  <td class="end mono"><strong>{{ detailDebit() | number:'1.2-2' }}</strong></td>
+                  <td class="end mono"><strong>{{ detailCredit() | number:'1.2-2' }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        }
+        <div drawer-actions>
+          <button class="btn ghost" (click)="printDetail()">🖨️ طباعة القيد</button>
+          @if (detail()?.status === 'draft') { <button class="btn primary" (click)="approve(detail()); detail.set(null)">اعتماد</button> }
+          @if (detail()?.status === 'approved') { <button class="btn primary" (click)="post(detail()); detail.set(null)">ترحيل</button> }
+        </div>
+      </nb-drawer>
     </div>
   `,
   styles: [`
@@ -151,6 +191,18 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
     .mono { font-variant-numeric: tabular-nums; }
     .empty { text-align: center; padding: 26px; color: var(--nb-text-muted); }
     .actions { display: flex; gap: 6px; }
+    .nb-table tbody tr.clickable { cursor: pointer; }
+    .info { color: var(--nb-info); } .success { color: var(--nb-success); }
+    .nm { color: var(--nb-text-muted); font-size: 12px; }
+
+    /* درج التفاصيل */
+    .dsummary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    .chip { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--nb-border-soft);
+      border-radius: var(--nb-radius); background: var(--nb-surface-raised); min-width: 110px; }
+    .chip .k { font-size: 11px; color: var(--nb-text-muted); }
+    .chip .v { font-size: 13px; font-weight: 700; color: var(--nb-text); }
+    .dh { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 4px 0 10px; }
+    .dlines .sum td { border-top: 2px solid var(--nb-border); font-weight: 700; background: var(--nb-surface-raised); }
     .badge { display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: var(--nb-radius-sm); }
     .badge.draft { background: var(--nb-border-soft); color: var(--nb-text-secondary); }
     .badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
@@ -179,6 +231,10 @@ export class JournalEntriesComponent implements OnInit {
   showEditor = signal(false);
   saving = signal(false);
   statusFilter = signal<string>('');
+  detail = signal<any | null>(null);
+
+  detailDebit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0));
+  detailCredit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0));
 
   statuses = [
     { key: '', label: 'الكل' }, { key: 'draft', label: 'مسودة' },
@@ -238,7 +294,7 @@ export class JournalEntriesComponent implements OnInit {
   post(j: any) { this.service.postJournal(j.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم ترحيل القيد لدفتر الأستاذ.'); this.load(); } else this.notify.error(r?.message || 'تعذر الترحيل.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر ترحيل القيد.') }); }
   reverse(j: any) { this.service.reverseJournal(j.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم إنشاء القيد العكسي.'); this.load(); } else this.notify.error(r?.message || 'تعذر العكس.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر عكس القيد.') }); }
 
-  private cols(): ExportColumn[] {
+  cols(): ExportColumn[] {
     return [
       { key: 'entry_number', label: 'رقم القيد' },
       { key: 'date', label: 'التاريخ' },
@@ -247,8 +303,26 @@ export class JournalEntriesComponent implements OnInit {
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
     ];
   }
-  exportFile() { exportCsv('قيود-اليومية', this.cols(), this.journals()); }
-  print() { printTable('قيود اليومية', this.cols(), this.journals(), 'سجل القيود المحاسبية'); }
+
+  openDetail(j: any) {
+    this.detail.set(j); // عرض فوري بالبيانات المتوفرة
+    this.service.getJournalDetails(j.id).subscribe({ next: (r) => { if (r?.success) this.detail.set(r.data); } });
+  }
+  printDetail() {
+    const d = this.detail();
+    if (!d) return;
+    import('../../../shared/export').then(({ printDoc }) => {
+      printDoc(
+        { title: `قيد يومية رقم ${d.entry_number}`, subtitle: d.description },
+        [
+          { key: 'account', label: 'الحساب', map: (l: any) => `${l.account_code} - ${l.account_name}` },
+          { key: 'debit', label: 'مدين', align: 'end' },
+          { key: 'credit', label: 'دائن', align: 'end' },
+        ],
+        d.lines || [],
+      );
+    });
+  }
 
   statusLabel(s: string) { return ({ draft: 'مسودة', approved: 'معتمد', posted: 'مرحّل', cancelled: 'ملغي', reversed: 'معكوس' } as any)[s] || s; }
   sourceLabel(s: string) { return ({ manual: 'يدوي', automatic: 'تلقائي', recurring: 'دوري', reversing: 'عكسي', imported: 'مستورد' } as any)[s] || s; }

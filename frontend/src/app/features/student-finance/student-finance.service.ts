@@ -85,6 +85,46 @@ export class StudentFinanceService {
     return this.api.post('student-finance/receipts/receive-payment/', body);
   }
 
+  // ---- الربط بالمالية والطلاب: مراجع ومصادر (360° لحساب الطالب) ----
+  /** الإعدادات المالية للطلاب (ربط حساب المدينين والإيرادات بشجرة المالية). */
+  getSettings(): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/settings/');
+  }
+  listCashBoxes(): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('finance/cash-boxes/', { page_size: 100 });
+  }
+  listBankAccounts(): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('finance/bank-accounts/', { page_size: 100 });
+  }
+
+  /** القوائم الفرعية لحساب طالب محدّد. */
+  invoicesForAccount(accountId: string): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/invoices/', { student_billing_account: accountId, page_size: 100, ordering: '-issue_date' });
+  }
+  receiptsForAccount(accountId: string): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/receipts/', { student_billing_account: accountId, page_size: 100 });
+  }
+  receivablesForAccount(accountId: string): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/receivables/', { student_billing_account: accountId, page_size: 100 });
+  }
+  scholarshipsForAccount(accountId: string): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/scholarships/', { student_billing_account: accountId, page_size: 100 });
+  }
+  holdsForAccount(accountId: string): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/financial-holds/', { student_billing_account: accountId, page_size: 100 });
+  }
+
+  /** عمليات على حساب طالب. */
+  applyScholarshipApi(body: { billing_account_id: string; name: string; type: string; amount_percentage?: number; fixed_amount?: number; start_date: string; end_date?: string }): Observable<any> {
+    return this.api.post('student-finance/scholarships/apply-scholarship/', body);
+  }
+  applyHoldApi(body: { billing_account_id: string; hold_type: string; reason: string }): Observable<any> {
+    return this.api.post('student-finance/financial-holds/apply-hold/', body);
+  }
+  releaseHold(holdId: string): Observable<any> {
+    return this.api.post(`student-finance/financial-holds/${holdId}/release/`, {});
+  }
+
   // Signals for state management
   stats = signal<DashboardStats | null>(null);
   loading = signal<boolean>(false);

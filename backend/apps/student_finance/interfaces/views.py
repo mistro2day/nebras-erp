@@ -126,6 +126,16 @@ class StudentInvoiceViewSet(BaseCRUDViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['invoice_number']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        status_param = self.request.query_params.get('status')
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return qs
+
     @action(detail=False, methods=['post'], url_path='generate-invoice')
     def generate_invoice(self, request):
         tenant_id = request.tenant_id
@@ -168,6 +178,13 @@ class InvoiceDiscountViewSet(BaseCRUDViewSet):
 class ScholarshipViewSet(BaseCRUDViewSet):
     model_class = Scholarship
     serializer_class = ScholarshipSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        return qs
 
     @action(detail=False, methods=['post'], url_path='apply-scholarship')
     def apply_scholarship(self, request):
@@ -219,6 +236,16 @@ class StudentReceivableViewSet(BaseCRUDViewSet):
     model_class = StudentReceivable
     serializer_class = StudentReceivableSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        status_param = self.request.query_params.get('status')
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return qs
+
 
 class PaymentAllocationViewSet(BaseCRUDViewSet):
     model_class = PaymentAllocation
@@ -228,6 +255,15 @@ class PaymentAllocationViewSet(BaseCRUDViewSet):
 class ReceiptViewSet(BaseCRUDViewSet):
     model_class = Receipt
     serializer_class = ReceiptSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['receipt_number']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        return qs
 
     @action(detail=False, methods=['post'], url_path='receive-payment')
     def receive_payment(self, request):
@@ -282,6 +318,29 @@ class CollectionPolicyViewSet(BaseCRUDViewSet):
 class FinancialHoldViewSet(BaseCRUDViewSet):
     model_class = FinancialHold
     serializer_class = FinancialHoldSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        status_param = self.request.query_params.get('status')
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='release')
+    def release_hold(self, request, pk=None):
+        hold = self.get_queryset().get(id=pk)
+        hold.status = 'released'
+        hold.released_at = timezone.now()
+        hold.save(update_fields=['status', 'released_at'])
+        # رفع علم الحظر عن الحساب إذا لم تبقَ حالات حظر نشطة
+        acc = hold.student_billing_account
+        if not FinancialHold.objects.filter(student_billing_account=acc, status='active').exists():
+            acc.financial_hold = False
+            acc.save(update_fields=['financial_hold'])
+        return StandardResponse(data=self.get_serializer(hold).data, message="تم رفع الحظر المالي بنجاح.")
 
     @action(detail=False, methods=['post'], url_path='apply-hold')
     def apply_hold(self, request):

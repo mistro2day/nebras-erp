@@ -7,7 +7,8 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
  * السندات المالية (Vouchers) — سندات الصرف والقبض وترحيلها للدفاتر،
@@ -17,13 +18,12 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
   selector: 'app-vouchers',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="سندات الصرف والقبض" subtitle="إصدار السندات المالية النقدية والبنكية واعتمادها وترحيلها لدفتر الأستاذ.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="cols()" [rows]="vouchers()" title="السندات المالية" subtitle="سندات الصرف والقبض" filename="السندات-المالية"></nb-export-menu>
         <button class="btn primary" (click)="showForm.set(!showForm())">＋ سند جديد</button>
       </nb-page-header>
 
@@ -89,14 +89,14 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
             <thead><tr><th>رقم السند</th><th>النوع</th><th>التاريخ</th><th class="end">المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>
               @for (v of vouchers(); track v.id) {
-                <tr>
+                <tr class="clickable" (click)="detail.set(v)">
                   <td><strong>{{ v.voucher_number }}</strong></td>
                   <td><span class="badge" [class.pay]="v.voucher_type==='payment'" [class.rcv]="v.voucher_type==='receipt'">{{ typeLabel(v.voucher_type) }}</span></td>
                   <td class="mono">{{ v.date }}</td>
                   <td class="end mono"><strong>{{ v.amount | number:'1.2-2' }}</strong></td>
                   <td>{{ v.description }}</td>
                   <td><span class="badge" [class]="v.status">{{ statusLabel(v.status) }}</span></td>
-                  <td>@if (v.status === 'draft' || v.status === 'approved') { <button class="btn primary xs" (click)="post(v)">ترحيل</button> }</td>
+                  <td (click)="$event.stopPropagation()">@if (v.status === 'draft' || v.status === 'approved') { <button class="btn primary xs" (click)="post(v)">ترحيل</button> }</td>
                 </tr>
               }
               @if (!vouchers().length) { <tr><td colspan="7" class="empty">لا توجد سندات مطابقة.</td></tr> }
@@ -104,6 +104,28 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
           </table>
         </div>
       </nb-panel>
+
+      <!-- تفاصيل السند المالي -->
+      <nb-drawer [open]="!!detail()" [width]="560"
+        [title]="typeLabel(detail()?.voucher_type) + ' — ' + (detail()?.voucher_number || '')"
+        [subtitle]="detail()?.description" (closed)="detail.set(null)">
+        @if (detail(); as v) {
+          <div class="dl">
+            <div class="dl-row"><span class="k">نوع السند</span><span class="v"><span class="badge" [class.pay]="v.voucher_type==='payment'" [class.rcv]="v.voucher_type==='receipt'">{{ typeLabel(v.voucher_type) }}</span></span></div>
+            <div class="dl-row"><span class="k">التاريخ</span><span class="v mono">{{ v.date }}</span></div>
+            <div class="dl-row big"><span class="k">المبلغ</span><span class="v mono">{{ v.amount | number:'1.2-2' }} {{ currCode(v.currency) }}</span></div>
+            <div class="dl-row"><span class="k">طريقة الدفع</span><span class="v">{{ methodName(v.payment_method) }}</span></div>
+            <div class="dl-row"><span class="k">الحساب المقابل</span><span class="v">{{ accName(v.gl_account) }}</span></div>
+            @if (v.bank_account) { <div class="dl-row"><span class="k">الحساب البنكي</span><span class="v">{{ bankName(v.bank_account) }}</span></div> }
+            @if (v.cash_box) { <div class="dl-row"><span class="k">الصندوق</span><span class="v">{{ boxName(v.cash_box) }}</span></div> }
+            <div class="dl-row"><span class="k">الحالة</span><span class="v"><span class="badge" [class]="v.status">{{ statusLabel(v.status) }}</span></span></div>
+            <div class="dl-row"><span class="k">البيان</span><span class="v">{{ v.description }}</span></div>
+          </div>
+        }
+        <div drawer-actions>
+          @if (detail()?.status === 'draft' || detail()?.status === 'approved') { <button class="btn primary" (click)="post(detail()); detail.set(null)">ترحيل السند</button> }
+        </div>
+      </nb-drawer>
     </div>
   `,
   styles: [`
@@ -134,8 +156,14 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
     .end { text-align: end; }
     .empty { text-align: center; padding: 26px; color: var(--nb-text-muted); }
     .badge { display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: var(--nb-radius-sm); }
+    .nb-table tbody tr.clickable { cursor: pointer; }
     .badge.pay { background: var(--nb-danger-bg); color: var(--nb-danger); }
     .badge.rcv { background: var(--nb-success-bg); color: var(--nb-success); }
+    .dl { display: flex; flex-direction: column; }
+    .dl-row { display: flex; justify-content: space-between; gap: 16px; padding: 11px 2px; border-bottom: 1px solid var(--nb-border-soft); font-size: 13px; }
+    .dl-row .k { color: var(--nb-text-muted); }
+    .dl-row .v { color: var(--nb-text); font-weight: 600; text-align: end; }
+    .dl-row.big .v { font-size: 18px; font-weight: 800; }
     .badge.draft { background: var(--nb-border-soft); color: var(--nb-text-secondary); }
     .badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
     .badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
@@ -163,6 +191,7 @@ export class VouchersComponent implements OnInit {
   showForm = signal(false);
   saving = signal(false);
   typeFilter = signal('');
+  detail = signal<any | null>(null);
 
   typeTabs = [{ key: '', label: 'الكل' }, { key: 'payment', label: 'سندات الصرف' }, { key: 'receipt', label: 'سندات القبض' }, { key: 'journal', label: 'سندات التسوية' }];
 
@@ -191,18 +220,21 @@ export class VouchersComponent implements OnInit {
   }
   post(v: any) { this.service.postVoucher(v.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم ترحيل السند للدفاتر.'); this.load(); } else this.notify.error(r?.message || 'تعذر الترحيل.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر ترحيل السند.') }); }
 
-  private cols(): ExportColumn[] {
+  cols(): ExportColumn[] {
     return [
       { key: 'voucher_number', label: 'رقم السند' },
       { key: 'voucher_type', label: 'النوع', map: (r) => this.typeLabel(r.voucher_type) },
       { key: 'date', label: 'التاريخ' },
-      { key: 'amount', label: 'المبلغ' },
+      { key: 'amount', label: 'المبلغ', align: 'end' },
       { key: 'description', label: 'البيان' },
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
     ];
   }
-  exportFile() { exportCsv('السندات-المالية', this.cols(), this.vouchers()); }
-  print() { printTable('السندات المالية', this.cols(), this.vouchers(), 'سندات الصرف والقبض'); }
+  currCode(id: string) { return this.currencies().find((c) => c.id === id)?.code || ''; }
+  methodName(id: string) { return this.methods().find((m) => m.id === id)?.name_ar || '—'; }
+  accName(id: string) { const a = this.accounts().find((x) => x.id === id); return a ? `${a.code} - ${a.name_ar}` : '—'; }
+  bankName(id: string) { const b = this.bankAccounts().find((x) => x.id === id); return b ? `${b.bank_name} - ${b.account_number}` : '—'; }
+  boxName(id: string) { return this.cashBoxes().find((x) => x.id === id)?.name_ar || '—'; }
 
   typeLabel(t: string) { return ({ payment: 'صرف', receipt: 'قبض', journal: 'تسوية' } as any)[t] || t; }
   statusLabel(s: string) { return ({ draft: 'مسودة', approved: 'معتمد', posted: 'مرحّل', cancelled: 'ملغي' } as any)[s] || s; }

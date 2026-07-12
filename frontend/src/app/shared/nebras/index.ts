@@ -4,3 +4,4 @@ export { NbStatCardComponent } from './nb-stat-card.component';
 export { NbBadgeComponent, type NbBadgeKind } from './nb-badge.component';
 export { NbDataTableComponent, type NbColumn } from './nb-data-table.component';
 export { NbLoadingComponent } from './nb-loading.component';
+export { NbDrawerComponent } from './nb-drawer.component';

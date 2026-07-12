@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,7 @@ import { environment } from '../../../../environments/environment';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NotificationService } from '../../../core/services/notification.service';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 interface Employee {
   id: string;
@@ -21,13 +22,15 @@ interface Loan {
   monthly_installment: string;
   remaining_balance: string;
   status: 'pending' | 'approved' | 'paid' | 'settled';
+  deduction_start_month?: string;
+  skipped_months?: string;
 }
 
 @Component({
   selector: 'app-payroll-loans',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, DecimalPipe, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="السلف والقروض المدرسية" subtitle="إدارة طلبات السلف والقروض والأقساط الشهرية الخاصة بكادر المدرسة.">
@@ -38,6 +41,9 @@ interface Loan {
         <!-- جدول القروض الحالية -->
         <div class="table-panel">
           <nb-panel title="سجل السلف والقروض النشطة" subtitle="تفاصيل السلف القائمة والأقساط المستقطعة الشهرية.">
+            @if (loading()) {
+              <nb-loading message="جاري تحميل سجل السلف والقروض..."></nb-loading>
+            }
             <div class="table-responsive">
               <table class="nb-table">
                 <thead>
@@ -46,6 +52,8 @@ interface Loan {
                     <th>مبلغ القرض/السلفة</th>
                     <th>القسط الشهري</th>
                     <th>الرصيد المتبقي</th>
+                    <th>بدء الخصم</th>
+                    <th>أشهر التخطي</th>
                     <th>الحالة</th>
                     <th>الإجراءات</th>
                   </tr>
@@ -57,6 +65,12 @@ interface Loan {
                       <td>{{ (Number(loan.loan_amount) | number:'1.0-0') }} ج.س</td>
                       <td>{{ (Number(loan.monthly_installment) | number:'1.0-0') }} ج.س</td>
                       <td class="font-bold highlight">{{ (Number(loan.remaining_balance) | number:'1.0-0') }} ج.س</td>
+                      <td>{{ loan.deduction_start_month || 'فوري' }}</td>
+                      <td>
+                        <span class="text-warning font-bold" [title]="loan.skipped_months || ''">
+                          {{ loan.skipped_months || 'لا يوجد' }}
+                        </span>
+                      </td>
                       <td>
                         <span class="badge" [class]="loan.status">{{ getStatusLabel(loan.status) }}</span>
                       </td>
@@ -87,14 +101,26 @@ interface Loan {
         <div class="form-panel">
           <nb-panel title="تسجيل طلب سلفة جديد" subtitle="إدخال طلب سلفة وجدولة الأقساط الشهرية للموظف.">
             <form (submit)="submitLoan($event)" class="loan-form">
-              <div class="field req">
+              <div class="field req search-dropdown-container">
                 <label>اختر الموظف المستفيد</label>
-                <select [(ngModel)]="newLoan.employee" name="employee" required>
-                  <option value="">— اختر الموظف —</option>
-                  @for (emp of employees(); track emp.id) {
-                    <option [value]="emp.id">{{ emp.full_name_ar }}</option>
+                <div class="search-input-wrapper">
+                  <input 
+                    type="text" 
+                    placeholder="ابحث عن اسم الموظف..." 
+                    [value]="selectedEmployeeName()"
+                    (focus)="showDropdown.set(true)"
+                    (input)="onSearchInput($event)"
+                  />
+                  @if (showDropdown() && filteredEmployees().length > 0) {
+                    <div class="dropdown-list">
+                      @for (emp of filteredEmployees(); track emp.id) {
+                        <div class="dropdown-item" (click)="selectEmployee(emp)">
+                          {{ emp.full_name_ar }}
+                        </div>
+                      }
+                    </div>
                   }
-                </select>
+                </div>
               </div>
 
               <div class="field req">
@@ -105,6 +131,16 @@ interface Loan {
               <div class="field req">
                 <label>القسط الشهري المستقطع (ج.س)</label>
                 <input type="number" [(ngModel)]="newLoan.monthly_installment" name="monthly_installment" required min="1" />
+              </div>
+
+              <div class="field">
+                <label>شهر بدء الخصم (مثال: 2026-08)</label>
+                <input type="month" [(ngModel)]="newLoan.deduction_start_month" name="deduction_start_month" placeholder="YYYY-MM" />
+              </div>
+
+              <div class="field">
+                <label>تخطي أقساط أشهر معينة (مفصولة بفاصلة)</label>
+                <input type="text" [(ngModel)]="newLoan.skipped_months" name="skipped_months" placeholder="مثال: 2026-10, 2026-12" />
               </div>
 
               <button type="submit" class="nb-btn-primary submit-btn" [disabled]="submitting()">
@@ -196,6 +232,32 @@ interface Loan {
     .nb-btn-secondary { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .nb-btn-secondary:hover:not(:disabled) { background: var(--nb-border-soft); }
     .nb-btn-primary:disabled, .nb-btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Searchable dropdown */
+    .search-dropdown-container { position: relative; }
+    .search-input-wrapper { position: relative; }
+    .dropdown-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-top: 4px;
+    }
+    .dropdown-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--nb-text);
+      transition: background 0.15s;
+    }
+    .dropdown-item:hover { background: var(--nb-primary-50); color: var(--nb-primary-700); }
   `]
 })
 export class PayrollLoansComponent implements OnInit {
@@ -207,11 +269,25 @@ export class PayrollLoansComponent implements OnInit {
   readonly loans = signal<Loan[]>([]);
   readonly employees = signal<Employee[]>([]);
   readonly submitting = signal(false);
+  readonly loading = signal(false);
+
+  readonly employeeSearchQuery = signal('');
+  readonly showDropdown = signal(false);
+  readonly selectedEmployeeName = signal('');
+
+
+  readonly filteredEmployees = computed(() => {
+    const q = this.employeeSearchQuery().trim().toLowerCase();
+    if (!q) return this.employees();
+    return this.employees().filter(e => e.full_name_ar.toLowerCase().includes(q));
+  });
 
   newLoan = {
     employee: '',
     loan_amount: null as number | null,
-    monthly_installment: null as number | null
+    monthly_installment: null as number | null,
+    deduction_start_month: '',
+    skipped_months: ''
   };
 
   ngOnInit() {
@@ -220,13 +296,18 @@ export class PayrollLoansComponent implements OnInit {
   }
 
   loadLoans() {
+    this.loading.set(true);
     this.http.get<any>(`${environment.apiUrl}payroll/loans/`).subscribe({
       next: (res) => {
+        this.loading.set(false);
         if (res && res.success) {
           const rawLoans = res.data;
           this.loans.set(rawLoans);
           this.fetchEmployeeNamesForLoans(rawLoans);
         }
+      },
+      error: () => {
+        this.loading.set(false);
       }
     });
   }
@@ -239,6 +320,19 @@ export class PayrollLoansComponent implements OnInit {
         }
       }
     });
+  }
+
+  onSearchInput(event: Event) {
+    const val = (event.target as HTMLInputElement).value;
+    this.employeeSearchQuery.set(val);
+    this.selectedEmployeeName.set(val);
+    this.showDropdown.set(true);
+  }
+
+  selectEmployee(emp: Employee) {
+    this.newLoan.employee = emp.id;
+    this.selectedEmployeeName.set(emp.full_name_ar);
+    this.showDropdown.set(false);
   }
 
   fetchEmployeeNamesForLoans(rawLoans: any[]) {
@@ -275,6 +369,8 @@ export class PayrollLoansComponent implements OnInit {
       loan_amount: String(this.newLoan.loan_amount),
       monthly_installment: String(this.newLoan.monthly_installment),
       remaining_balance: String(this.newLoan.loan_amount),
+      deduction_start_month: this.newLoan.deduction_start_month || '',
+      skipped_months: this.newLoan.skipped_months || '',
       status: 'pending'
     };
 
@@ -283,7 +379,9 @@ export class PayrollLoansComponent implements OnInit {
         this.submitting.set(false);
         if (res && res.success) {
           this.notify.success('تم تسجيل طلب السلفة/القرض بنجاح وبانتظار الاعتماد المالي.');
-          this.newLoan = { employee: '', loan_amount: null, monthly_installment: null };
+          this.newLoan = { employee: '', loan_amount: null, monthly_installment: null, deduction_start_month: '', skipped_months: '' };
+          this.selectedEmployeeName.set('');
+          this.employeeSearchQuery.set('');
           this.loadLoans();
         } else {
           this.notify.error(res?.message || 'حدث خطأ أثناء تسجيل طلب السلفة.');

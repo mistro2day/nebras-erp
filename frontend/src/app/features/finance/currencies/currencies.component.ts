@@ -7,7 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-import { exportCsv, printTable } from '../finance-export.util';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
  * العملات وأسعار الصرف (Currencies & Exchange Rates) — العملات المعتمدة وأسعار التحويل،
@@ -17,13 +17,12 @@ import { exportCsv, printTable } from '../finance-export.util';
   selector: 'app-currencies',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="العملات وأسعار الصرف" subtitle="إدارة العملات المعتمدة وأسعار التحويل بين العملات لتقييم المعاملات متعددة العملات.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="expCols()" [rows]="expRows()" [title]="tab()==='cur' ? 'العملات' : 'أسعار الصرف'" filename="عملات-وأسعار-صرف"></nb-export-menu>
       </nb-page-header>
 
       <div class="statusbar">
@@ -136,13 +135,10 @@ export class CurrenciesComponent implements OnInit {
       error: (e) => this.notify.error(e?.error?.message || 'حدث خطأ أثناء الاتصال بالخادم.'),
     });
   }
-  exportFile() {
-    if (this.tab() === 'cur') exportCsv('العملات', [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'symbol', label: 'الرمز المختصر' }, { key: 'is_base', label: 'أساسية', map: (r: any) => (r.is_base ? 'نعم' : 'لا') }], this.currencies());
-    else exportCsv('أسعار-الصرف', [{ key: 'from_currency', label: 'من', map: (r: any) => this.code(r.from_currency) }, { key: 'to_currency', label: 'إلى', map: (r: any) => this.code(r.to_currency) }, { key: 'rate', label: 'السعر' }, { key: 'rate_date', label: 'التاريخ' }], this.rates());
+  expCols(): ExportColumn[] {
+    if (this.tab() === 'cur') return [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'symbol', label: 'الرمز المختصر' }, { key: 'is_base', label: 'أساسية', map: (r: any) => (r.is_base ? 'نعم' : 'لا') }];
+    return [{ key: 'from_currency', label: 'من', map: (r: any) => this.code(r.from_currency) }, { key: 'to_currency', label: 'إلى', map: (r: any) => this.code(r.to_currency) }, { key: 'rate', label: 'السعر', align: 'end' }, { key: 'rate_date', label: 'التاريخ' }];
   }
-  print() {
-    if (this.tab() === 'cur') printTable('العملات', [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'symbol', label: 'الرمز المختصر' }], this.currencies());
-    else printTable('أسعار الصرف', [{ key: 'from_currency', label: 'من', map: (r: any) => this.code(r.from_currency) }, { key: 'to_currency', label: 'إلى', map: (r: any) => this.code(r.to_currency) }, { key: 'rate', label: 'السعر' }, { key: 'rate_date', label: 'التاريخ' }], this.rates());
-  }
+  expRows(): any[] { return this.tab() === 'cur' ? this.currencies() : this.rates(); }
   back() { this.router.navigateByUrl('/finance/dashboard'); }
 }

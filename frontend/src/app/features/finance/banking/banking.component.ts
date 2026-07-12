@@ -6,7 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
  * البنوك والصناديق (Cash & Bank) — إدارة البنوك، الحسابات البنكية، والخزائن النقدية،
@@ -16,13 +16,12 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
   selector: 'app-banking',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="البنوك والصناديق النقدية" subtitle="إدارة المصارف، الحسابات البنكية، والخزائن النقدية المرتبطة بالحسابات المحاسبية.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="expCols()" [rows]="expRows()" [title]="expTitle()" filename="بنوك-وصناديق"></nb-export-menu>
       </nb-page-header>
 
       <div class="statusbar">
@@ -170,15 +169,12 @@ export class BankingComponent implements OnInit {
     this.handle(this.service.createCashBox(this.box), 'تم حفظ الخزينة.', () => (this.box = { name_ar: '', name_en: '', currency: '', gl_account: '', custodian_id: '00000000-0000-0000-0000-000000000000' }));
   }
 
-  exportFile() {
-    if (this.tab() === 'banks') exportCsv('المصارف', [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'swift_code', label: 'SWIFT' }], this.banks());
-    else if (this.tab() === 'accounts') exportCsv('الحسابات-البنكية', [{ key: 'bank_name', label: 'المصرف' }, { key: 'account_number', label: 'رقم الحساب' }, { key: 'iban', label: 'IBAN' }], this.bankAccounts());
-    else exportCsv('الخزائن', [{ key: 'name_ar', label: 'الاسم' }, { key: 'currency', label: 'العملة', map: (r: any) => this.currCode(r.currency) }], this.cashBoxes());
+  expTitle(): string { return this.tab() === 'banks' ? 'المصارف' : this.tab() === 'accounts' ? 'الحسابات البنكية' : 'الخزائن النقدية'; }
+  expCols(): ExportColumn[] {
+    if (this.tab() === 'banks') return [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'swift_code', label: 'SWIFT' }];
+    if (this.tab() === 'accounts') return [{ key: 'bank_name', label: 'المصرف' }, { key: 'account_number', label: 'رقم الحساب' }, { key: 'iban', label: 'IBAN' }];
+    return [{ key: 'name_ar', label: 'الاسم' }, { key: 'currency', label: 'العملة', map: (r: any) => this.currCode(r.currency) }];
   }
-  print() {
-    if (this.tab() === 'banks') printTable('المصارف', [{ key: 'code', label: 'الرمز' }, { key: 'name_ar', label: 'الاسم' }, { key: 'swift_code', label: 'SWIFT' }], this.banks());
-    else if (this.tab() === 'accounts') printTable('الحسابات البنكية', [{ key: 'bank_name', label: 'المصرف' }, { key: 'account_number', label: 'رقم الحساب' }, { key: 'iban', label: 'IBAN' }], this.bankAccounts());
-    else printTable('الخزائن النقدية', [{ key: 'name_ar', label: 'الاسم' }, { key: 'currency', label: 'العملة', map: (r: any) => this.currCode(r.currency) }], this.cashBoxes());
-  }
+  expRows(): any[] { return this.tab() === 'banks' ? this.banks() : this.tab() === 'accounts' ? this.bankAccounts() : this.cashBoxes(); }
   back() { this.router.navigateByUrl('/finance/dashboard'); }
 }

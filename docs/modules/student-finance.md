@@ -52,7 +52,16 @@ graph TD
 * `GET /api/v1/student-finance/billing-accounts/dashboard-stats/` - إحصائيات لوحة التحكم للطلاب.
 
 ### مسارات التوجيه في الفرونت إند (Angular Routes)
-* `/student-finance/dashboard` - لوحة التحكم المالية للطلاب ومؤشرات التحصيل الحية.
+* `/student-finance/dashboard` - مساحة العمل: حلقة أداء التحصيل + تنبيهات + بطاقات تنقل.
+* `/student-finance/accounts` - **حسابات الطلاب (عرض 360°)**: لكل طالب لوح تفاصيل موحّد يعرض الأرصدة والفواتير والتحصيلات والمستحقات والمنح والحظر، مع إجراءات فورية (إصدار فاتورة، تحصيل دفعة، منح، فرض/رفع حظر) تُرحّل مباشرة في المالية، ورابط لملف الطالب.
+* `/student-finance/invoices` · `/receipts` · `/outstanding` - قوائم الفواتير والتحصيلات والمستحقات.
+
+### التهيئة التلقائية والربط (Auto-Provisioning & Integration)
+لكل مستأجر جديد يُهيَّأ تلقائياً كتالوج الرسوم المدرسية (فئات/أنواع/هياكل للعام الدراسي) وإعدادات فوترة الطلاب التي تربط **حساب المدينين (COA 1103)** و**حساب إيرادات الرسوم (COA 4100)** من شجرة حسابات المالية:
+* المصدر الموحّد: `apps/student_finance/application/provisioning.py::provision_student_finance_defaults`.
+* التفعيل: إشارة `post_save` على `Tenant` (`apps/student_finance/signals.py`، عبر `StudentFinanceConfig.ready()`) — تعمل بعد تهيئة المالية.
+* تعبئة الحاليين: `python manage.py provision_student_finance`.
+* بذرة تجريبية بطلاب فعليين: `backend/seed_student_finance.py` (تفتح حسابات، تُصدر فواتير مرحّلة في المالية، وتُحصّل دفعات تولّد سندات قبض).
 
 ---
 

@@ -23,6 +23,8 @@ class EmployeeLoan(CombinedSharedModel):
     monthly_installment = models.DecimalField(max_digits=12, decimal_places=2)
     remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=30, default='pending') # pending, approved, paid, settled
+    deduction_start_month = models.CharField(max_length=20, default='', blank=True) # e.g. "2026-08"
+    skipped_months = models.TextField(default='', blank=True) # e.g. "2026-10,2026-12"
 
     class Meta:
         db_table = 'nebras_payroll_loans'

@@ -6,7 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 interface Account {
   id: string; code: string; name_ar: string; name_en: string;
@@ -21,13 +21,12 @@ interface Account {
   selector: 'app-chart-of-accounts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="شجرة الحسابات" subtitle="دليل الحسابات المعتمد: الأصول، الخصوم، حقوق الملكية، الإيرادات، والمصروفات.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="cols()" [rows]="filtered()" title="شجرة الحسابات" subtitle="دليل الحسابات المعتمد" filename="شجرة-الحسابات"></nb-export-menu>
         <button class="btn primary" (click)="showForm.set(!showForm())">＋ حساب جديد</button>
       </nb-page-header>
 
@@ -177,7 +176,7 @@ export class ChartOfAccountsComponent implements OnInit {
   }
   typeName(id: string): string { return this.types().find((t) => t.id === id)?.name_ar || '—'; }
 
-  private cols(): ExportColumn[] {
+  cols(): ExportColumn[] {
     return [
       { key: 'code', label: 'الرمز' },
       { key: 'name_ar', label: 'اسم الحساب' },
@@ -187,8 +186,6 @@ export class ChartOfAccountsComponent implements OnInit {
       { key: 'status', label: 'الحالة', map: (r) => (r.status === 'active' ? 'نشط' : 'غير نشط') },
     ];
   }
-  exportFile() { exportCsv('شجرة-الحسابات', this.cols(), this.filtered()); }
-  print() { printTable('شجرة الحسابات', this.cols(), this.filtered(), 'دليل الحسابات المعتمد'); }
 
   save() {
     if (!this.form.code || !this.form.name_ar || !this.form.account_type) {

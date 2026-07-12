@@ -6,7 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
  * الضرائب (Taxes) — ضريبة القيمة المضافة والاستقطاع والرسوم،
@@ -16,13 +16,12 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
   selector: 'app-taxes',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الضرائب" subtitle="تعريف الضرائب المعتمدة (القيمة المضافة، الاستقطاع، الرسوم) وربطها بالحسابات المحاسبية.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="cols()" [rows]="taxes()" title="الضرائب" subtitle="الضرائب المعتمدة" filename="الضرائب"></nb-export-menu>
         <button class="btn primary" (click)="showForm.set(!showForm())">＋ ضريبة جديدة</button>
       </nb-page-header>
 
@@ -109,16 +108,14 @@ export class TaxesComponent implements OnInit {
       error: (e) => this.notify.error(e?.error?.message || 'حدث خطأ أثناء الاتصال بالخادم.'),
     });
   }
-  private cols(): ExportColumn[] {
+  cols(): ExportColumn[] {
     return [
       { key: 'code', label: 'الرمز' },
       { key: 'name_ar', label: 'الاسم' },
       { key: 'type', label: 'النوع', map: (r) => this.typeLabel(r.type) },
-      { key: 'rate_percentage', label: 'النسبة %' },
+      { key: 'rate_percentage', label: 'النسبة %', align: 'end' },
     ];
   }
-  exportFile() { exportCsv('الضرائب', this.cols(), this.taxes()); }
-  print() { printTable('الضرائب', this.cols(), this.taxes(), 'الضرائب المعتمدة'); }
   typeLabel(t: string) { return ({ vat: 'قيمة مضافة', withholding: 'استقطاع', custom: 'رسوم' } as any)[t] || t; }
   back() { this.router.navigateByUrl('/finance/dashboard'); }
 }

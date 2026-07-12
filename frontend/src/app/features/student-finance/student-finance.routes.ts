@@ -3,7 +3,7 @@ import { Routes } from '@angular/router';
 export const STUDENT_FINANCE_ROUTES: Routes = [
   {
     path: '',
-    redirectTo: 'accounts',
+    redirectTo: 'dashboard',
     pathMatch: 'full'
   },
   {

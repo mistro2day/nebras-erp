@@ -6,7 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
  * مراكز التكلفة (Cost Centers) — الأبعاد المالية والفروع والأقسام،
@@ -16,13 +16,12 @@ import { exportCsv, printTable, ExportColumn } from '../finance-export.util';
   selector: 'app-cost-centers',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="مراكز التكلفة" subtitle="هيكل مراكز التكلفة والأبعاد المالية لتوزيع المصروفات على الفروع والأقسام والمشاريع.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
-        <button class="btn ghost" (click)="print()">🖨️ طباعة</button>
-        <button class="btn ghost" (click)="exportFile()">⬇️ تصدير CSV</button>
+        <nb-export-menu [columns]="cols()" [rows]="centers()" title="مراكز التكلفة" subtitle="هيكل مراكز التكلفة والأبعاد المالية" filename="مراكز-التكلفة"></nb-export-menu>
         <button class="btn primary" (click)="showForm.set(!showForm())">＋ مركز تكلفة</button>
       </nb-page-header>
 
@@ -112,17 +111,15 @@ export class CostCentersComponent implements OnInit {
       error: (e) => this.notify.error(e?.error?.message || 'حدث خطأ أثناء الاتصال بالخادم.'),
     });
   }
-  private cols(): ExportColumn[] {
+  cols(): ExportColumn[] {
     return [
       { key: 'code', label: 'الرمز' },
       { key: 'name_ar', label: 'الاسم' },
       { key: 'type', label: 'النوع', map: (r) => this.typeLabel(r.type) },
-      { key: 'budget_allocated', label: 'الميزانية المخصصة' },
+      { key: 'budget_allocated', label: 'الميزانية المخصصة', align: 'end' },
       { key: 'status', label: 'الحالة', map: (r) => (r.status === 'active' ? 'نشط' : 'غير نشط') },
     ];
   }
-  exportFile() { exportCsv('مراكز-التكلفة', this.cols(), this.centers()); }
-  print() { printTable('مراكز التكلفة', this.cols(), this.centers(), 'هيكل مراكز التكلفة والأبعاد المالية'); }
   typeLabel(t: string) { return ({ branch: 'فرع', campus: 'حرم', department: 'قسم', project: 'مشروع', activity: 'نشاط', custom: 'مخصص' } as any)[t] || t; }
   back() { this.router.navigateByUrl('/finance/dashboard'); }
 }

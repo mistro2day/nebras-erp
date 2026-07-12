@@ -5,23 +5,28 @@ class SalaryStructureSerializer(serializers.ModelSerializer):
     class Meta:
         model = SalaryStructure
         fields = '__all__'
+        read_only_fields = ['id', 'tenant_id']
 
 class EmployeeLoanSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeLoan
         fields = '__all__'
+        read_only_fields = ['id', 'tenant_id']
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollPeriod
         fields = '__all__'
+        read_only_fields = ['id', 'tenant_id']
 
 class PayrollRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollRun
         fields = '__all__'
+        read_only_fields = ['id', 'tenant_id']
 
 class PayslipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payslip
         fields = '__all__'
+        read_only_fields = ['id', 'tenant_id']

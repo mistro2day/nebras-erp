@@ -69,11 +69,18 @@ class FinanceConfig(AppConfig):
     label = 'finance'
     verbose_name = "إدارة الحسابات والمالية"
 
+    def ready(self):
+        # تسجيل إشارة تهيئة الدليل المحاسبي القياسي لكل مستأجر جديد
+        from apps.finance import signals  # noqa: F401
+
 class StudentFinanceConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.student_finance'
     label = 'student_finance'
     verbose_name = "إدارة فوترة الطلاب وحسابات القبض"
+
+    def ready(self):
+        from apps.student_finance import signals  # noqa: F401
 
 class ProcurementConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'

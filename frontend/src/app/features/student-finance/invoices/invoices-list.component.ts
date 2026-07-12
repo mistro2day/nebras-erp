@@ -6,7 +6,7 @@ import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-import { downloadCsv } from '../accounts/accounts-list.component';
+import { downloadCsv } from '../../../shared/export';
 
 /**
  * فواتير الطلاب — وحدة عاملة (Nebras OS).

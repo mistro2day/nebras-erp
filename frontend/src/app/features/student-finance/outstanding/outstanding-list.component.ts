@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { downloadCsv } from '../accounts/accounts-list.component';
+import { downloadCsv } from '../../../shared/export';
 
 /**
  * الأرصدة المستحقة (المديونيات) — وحدة عاملة (Nebras OS).
