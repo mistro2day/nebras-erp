@@ -54,9 +54,11 @@ class TenantMiddleware(MiddlewareMixin):
 
         if tenant:
             request.tenant = tenant
+            request.tenant_id = tenant.id
             set_current_tenant_id(tenant.id)
         else:
             request.tenant = None
+            request.tenant_id = None
             clear_current_tenant()
 
     def process_response(self, request, response):

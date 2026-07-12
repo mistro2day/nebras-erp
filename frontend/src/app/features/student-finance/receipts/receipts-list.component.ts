@@ -5,6 +5,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { downloadCsv } from '../../../shared/export';
 
 /**
@@ -16,7 +17,7 @@ import { downloadCsv } from '../../../shared/export';
   selector: 'app-sf-receipts-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -99,7 +100,7 @@ import { downloadCsv } from '../../../shared/export';
             <span>الحالة</span>
           </div>
           @if (loading()) {
-            <div class="tbl-empty">جارٍ تحميل السندات…</div>
+            <nb-loading message="جارٍ تحميل السندات…"></nb-loading>
           } @else {
             @for (r of paged(); track r.id) {
               <div class="tbl-row">

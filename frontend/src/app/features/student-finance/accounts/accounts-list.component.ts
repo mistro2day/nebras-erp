@@ -9,6 +9,7 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /**
@@ -23,7 +24,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent,
-    NbDrawerComponent, NbDatepickerComponent, NbExportMenuComponent,
+    NbDrawerComponent, NbDatepickerComponent, NbExportMenuComponent, NbLoadingComponent,
   ],
   template: `
     <div class="page" dir="rtl">
@@ -84,11 +85,13 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
       </div>
 
       <nb-panel [flush]="true">
+       @if (loading() || !studentsLoaded()) {
+         <nb-loading message="جارٍ تحميل حسابات الطلاب…"></nb-loading>
+       } @else {
         <div class="table-wrap">
           <table class="nb-table">
             <thead><tr><th>الطالب</th><th>رقم الحساب</th><th class="end">الرصيد الحالي</th><th class="end">المستحق</th><th class="end">دائن</th><th>الحالة</th></tr></thead>
             <tbody>
-              @if (loading()) { <tr><td colspan="6" class="empty">جارٍ تحميل الحسابات…</td></tr> }
               @for (a of filtered(); track a.id) {
                 <tr class="clickable" (click)="openAccount(a)">
                   <td><strong>{{ studentName(a.student_id) }}</strong> <span class="nm">{{ studentNumber(a.student_id) }}</span></td>
@@ -103,10 +106,11 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
                   </td>
                 </tr>
               }
-              @if (!loading() && !filtered().length) { <tr><td colspan="6" class="empty">لا توجد حسابات مطابقة.</td></tr> }
+              @if (!filtered().length) { <tr><td colspan="6" class="empty">لا توجد حسابات مطابقة.</td></tr> }
             </tbody>
           </table>
         </div>
+       }
       </nb-panel>
 
       <!-- لوح 360° لحساب الطالب -->
@@ -185,6 +189,9 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
           }
 
           <!-- تبويبات القوائم الفرعية -->
+          @if (bundleLoading()) {
+            <nb-loading message="جارٍ تحميل بيانات الحساب…"></nb-loading>
+          } @else {
           <div class="subtabs">
             <button class="stab" [class.on]="tab()==='invoices'" (click)="tab.set('invoices')">الفواتير ({{ invoices().length }})</button>
             <button class="stab" [class.on]="tab()==='receipts'" (click)="tab.set('receipts')">التحصيلات ({{ receipts().length }})</button>
@@ -232,6 +239,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
               } @empty { <div class="empty sm">لا يوجد حظر.</div> }
             }
           </div>
+          }
         }
       </nb-drawer>
 
@@ -382,6 +390,7 @@ export class SfAccountsListComponent implements OnInit {
   pane = signal<'' | 'invoice' | 'pay' | 'scholarship' | 'hold'>('');
   tab = signal<'invoices' | 'receipts' | 'receivables' | 'scholarships' | 'holds'>('invoices');
   busy = signal(false);
+  bundleLoading = signal(false);
   invoices = signal<any[]>([]);
   receipts = signal<any[]>([]);
   receivables = signal<any[]>([]);
@@ -449,6 +458,7 @@ export class SfAccountsListComponent implements OnInit {
         this.studentsMap.set(m);
         this.studentsLoaded.set(true);
       },
+      error: () => this.studentsLoaded.set(true),
     });
   }
 
@@ -501,11 +511,14 @@ export class SfAccountsListComponent implements OnInit {
     this.loadAccountBundle(a.id);
   }
   loadAccountBundle(id: string) {
-    this.svc.invoicesForAccount(id).subscribe((r) => this.invoices.set(r?.data ?? []));
-    this.svc.receiptsForAccount(id).subscribe((r) => this.receipts.set(r?.data ?? []));
-    this.svc.receivablesForAccount(id).subscribe((r) => this.receivables.set(r?.data ?? []));
-    this.svc.scholarshipsForAccount(id).subscribe((r) => this.scholarships.set(r?.data ?? []));
-    this.svc.holdsForAccount(id).subscribe((r) => this.holds.set(r?.data ?? []));
+    this.bundleLoading.set(true);
+    let pending = 5;
+    const done = () => { if (--pending <= 0) this.bundleLoading.set(false); };
+    this.svc.invoicesForAccount(id).subscribe({ next: (r) => this.invoices.set(r?.data ?? []), error: done, complete: done });
+    this.svc.receiptsForAccount(id).subscribe({ next: (r) => this.receipts.set(r?.data ?? []), error: done, complete: done });
+    this.svc.receivablesForAccount(id).subscribe({ next: (r) => this.receivables.set(r?.data ?? []), error: done, complete: done });
+    this.svc.scholarshipsForAccount(id).subscribe({ next: (r) => this.scholarships.set(r?.data ?? []), error: done, complete: done });
+    this.svc.holdsForAccount(id).subscribe({ next: (r) => this.holds.set(r?.data ?? []), error: done, complete: done });
   }
   setPane(p: any) { this.pane.set(this.pane() === p ? '' : p); }
   togglePick(id: string) { this.picked.has(id) ? this.picked.delete(id) : this.picked.add(id); }

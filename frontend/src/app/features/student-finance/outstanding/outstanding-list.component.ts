@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { downloadCsv } from '../../../shared/export';
 
 /**
@@ -15,7 +16,7 @@ import { downloadCsv } from '../../../shared/export';
   selector: 'app-sf-outstanding-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -63,7 +64,7 @@ import { downloadCsv } from '../../../shared/export';
             <span>الحالة</span>
           </div>
           @if (loading()) {
-            <div class="tbl-empty">جارٍ تحميل المطالبات…</div>
+            <nb-loading message="جارٍ تحميل المطالبات…"></nb-loading>
           } @else {
             @for (r of paged(); track r.id) {
               <div class="tbl-row">
