@@ -43,8 +43,11 @@ class PayrollPeriod(CombinedSharedModel):
 class PayrollRun(CombinedSharedModel):
     period = models.ForeignKey(PayrollPeriod, on_delete=models.CASCADE, related_name='runs')
     run_date = models.DateTimeField(default=timezone.now)
-    status = models.CharField(max_length=30, default='draft') # draft, approved, paid
+    status = models.CharField(max_length=30, default='draft') # draft, approved, paid, review
     total_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+    approvers_chain = models.JSONField(default=list, blank=True)
+    current_approval_step = models.IntegerField(default=0)
+    approval_request_id = models.UUIDField(null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_payroll_runs'

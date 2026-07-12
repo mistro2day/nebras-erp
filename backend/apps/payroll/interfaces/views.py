@@ -116,16 +116,190 @@ class PayrollRunViewSet(BaseCRUDViewSet):
     model_class = PayrollRun
     serializer_class = PayrollRunSerializer
 
-    @action(detail=True, methods=['post'], url_path='process')
-    def process_payroll(self, request, pk=None):
+    def _sync_approval_status(self, instance):
+        if instance.status == 'review' and instance.approval_request_id:
+            try:
+                from apps.approval_center.domain.models import ApprovalRequest
+                req = ApprovalRequest.objects.get(id=instance.approval_request_id)
+                if req.status == 'approved':
+                    next_step = instance.current_approval_step + 1
+                    if next_step >= len(instance.approvers_chain):
+                        # Final approval step completed!
+                        instance.status = 'approved'
+                        instance.save()
+                        self._generate_payroll_finance_records(instance)
+                    else:
+                        # Advance step in chain
+                        instance.current_approval_step = next_step
+                        instance.save()
+                        
+                        # Reassign/sync request to the next user in the chain
+                        from apps.approval_center.application.services import EnterpriseInboxService
+                        EnterpriseInboxService.sync_inbox_item(instance.tenant_id, req, instance.approvers_chain[next_step])
+                elif req.status == 'rejected':
+                    instance.status = 'draft'
+                    instance.save()
+            except Exception:
+                pass
+
+    def _generate_payroll_finance_records(self, instance):
+        try:
+            from django.utils import timezone
+            from apps.finance.domain.models import (
+                Voucher, JournalEntry, JournalEntryLine, Currency, 
+                PaymentMethod, AccountingPeriod, ChartOfAccount
+            )
+            
+            tenant_id = instance.tenant_id
+            period_code = instance.period.code if instance.period else ""
+            
+            currency = Currency.objects.filter(tenant_id=tenant_id).first() or Currency.objects.first()
+            pay_method = PaymentMethod.objects.filter(tenant_id=tenant_id).first() or PaymentMethod.objects.first()
+            period = AccountingPeriod.objects.filter(tenant_id=tenant_id, status='open').first() or AccountingPeriod.objects.first()
+            
+            expense_acc = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='5').first()
+            if not expense_acc:
+                expense_acc = ChartOfAccount.objects.filter(tenant_id=tenant_id).first() or ChartOfAccount.objects.first()
+                
+            cash_acc = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='11').first()
+            if not cash_acc:
+                cash_acc = ChartOfAccount.objects.filter(tenant_id=tenant_id).first() or ChartOfAccount.objects.first()
+            
+            import random
+            rand_suffix = str(random.randint(1000, 9999))
+            v_num = f"PV-PAY-{instance.id.hex[:6].upper()}-{rand_suffix}"
+            je_num = f"JE-PAY-{instance.id.hex[:6].upper()}-{rand_suffix}"
+            
+            if period and currency and expense_acc and cash_acc:
+                # 1. Create Journal Entry
+                je = JournalEntry.objects.create(
+                    tenant_id=tenant_id,
+                    entry_number=je_num,
+                    date=timezone.now().date(),
+                    accounting_period=period,
+                    description=f"قيد استحقاق وصرف رواتب الموظفين لشهر: {period_code}",
+                    source_type='automatic',
+                    status='posted',
+                    currency=currency
+                )
+                
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id,
+                    journal_entry=je,
+                    account=expense_acc,
+                    debit=instance.total_cost,
+                    debit_base=instance.total_cost,
+                    description=f"مصروفات رواتب الموظفين لشهر: {period_code}"
+                )
+                
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id,
+                    journal_entry=je,
+                    account=cash_acc,
+                    credit=instance.total_cost,
+                    credit_base=instance.total_cost,
+                    description=f"صرف رواتب كشف شهر: {period_code}"
+                )
+                
+                # 2. Create Payment Voucher (سند صرف)
+                Voucher.objects.create(
+                    tenant_id=tenant_id,
+                    voucher_number=v_num,
+                    voucher_type='payment',
+                    date=timezone.now().date(),
+                    amount=instance.total_cost,
+                    currency=currency,
+                    payment_method=pay_method,
+                    gl_account=expense_acc,
+                    status='posted',
+                    description=f"سند صرف رواتب الموظفين لشهر: {period_code}",
+                    journal_entry=je
+                )
+        except Exception:
+            pass
+
+    def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        self._sync_approval_status(instance)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return StandardResponse(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        for instance in queryset:
+            self._sync_approval_status(instance)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return StandardResponse(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='submit-for-approval')
+    def submit_for_approval(self, request, pk=None):
+        instance = self.get_object()
+        approvers = request.data.get('approvers', [])
+        if not approvers:
+            return Response({"detail": "يجب تحديد مسؤول واحد على الأقل للموافقة."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # 1. Delete existing payslips to allow recalculation/regeneration
+        # Calculate/process first to make sure values are correct
+        self.process_payroll_logic(instance)
+        
+        instance.status = 'review'
+        instance.approvers_chain = approvers
+        instance.current_approval_step = 0
+        
+        # Resolve category
+        from apps.approval_center.domain.models import ApprovalCategory
+        category, _ = ApprovalCategory.objects.get_or_create(
+            code='payroll_run',
+            defaults={
+                'name_ar': 'اعتماد مسير الرواتب',
+                'name_en': 'Payroll Run Approval',
+                'tenant_id': instance.tenant_id
+            }
+        )
+        
+        # Build payload
+        line_items = []
+        for slip in instance.payslips.all():
+            line_items.append({
+                "name": slip.employee.full_name_ar if slip.employee else "موظف نبراس",
+                "qty": f"أساسي: {slip.basic_salary}",
+                "unit_price": f"خصم سلفة: {slip.total_deductions}",
+                "total": f"صافي: {slip.net_salary} ج.س"
+            })
+            
+        period_code = instance.period.code if instance.period else "غير محدد"
+        payload = {
+            "شهر المسير": period_code,
+            "التكلفة الإجمالية": f"{instance.total_cost} ج.س",
+            "عدد الموظفين": f"{instance.payslips.count()} موظف",
+            "line_items": line_items
+        }
+        
+        from apps.approval_center.application.services import ApprovalRequestService
+        req = ApprovalRequestService.create_request(
+            tenant_id=instance.tenant_id,
+            category_id=category.id,
+            requester_id=request.user.id if request.user else instance.created_by,
+            title_ar=f"اعتماد مسير الرواتب لشهر: {period_code}",
+            title_en=f"Payroll Run Approval: {period_code}",
+            payload=payload,
+            priority_code='HIGH',
+            assignee_id=approvers[0],
+            user_id=request.user.id if request.user else None
+        )
+        
+        instance.approval_request_id = req.id
+        instance.save()
+        return StandardResponse(self.get_serializer(instance).data, message="تم تقديم مسير الرواتب للموافقة بنجاح.")
+
+    def process_payroll_logic(self, instance):
         instance.payslips.all().delete()
-        
-        # 2. Get period code (e.g. "2026-07")
         period_code = instance.period.code if instance.period else ""
-        
         from apps.employees.domain.models import Employee
         from apps.payroll.domain.models import SalaryStructure, EmployeeLoan, Payslip
         
@@ -133,7 +307,6 @@ class PayrollRunViewSet(BaseCRUDViewSet):
         total_cost = 0.0
         
         for employee in active_employees:
-            # Load salary structure or default to standard structure
             try:
                 struct = SalaryStructure.objects.get(employee=employee, is_active=True)
                 basic = float(struct.basic_salary)
@@ -147,18 +320,13 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 other = 0.0
                 
             gross_earnings = basic + housing + transport + other
-            
-            # Process deductions for active loans
             total_deductions = 0.0
             active_loans = EmployeeLoan.objects.filter(employee=employee, status='approved')
             
             for loan in active_loans:
-                # Check start month
                 if loan.deduction_start_month and period_code:
                     if period_code < loan.deduction_start_month:
                         continue
-                
-                # Check skipped months
                 if loan.skipped_months and period_code:
                     skipped_list = [m.strip() for m in loan.skipped_months.split(',') if m.strip()]
                     if period_code in skipped_list:
@@ -166,7 +334,6 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                         
                 installment = float(loan.monthly_installment)
                 remaining = float(loan.remaining_balance)
-                
                 deduct_amount = min(installment, remaining)
                 if deduct_amount > 0:
                     total_deductions += deduct_amount
@@ -188,10 +355,16 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 status='approved'
             )
             
-        instance.status = 'approved'
         instance.total_cost = total_cost
         instance.save()
-        
+
+    @action(detail=True, methods=['post'], url_path='process')
+    def process_payroll(self, request, pk=None):
+        instance = self.get_object()
+        self.process_payroll_logic(instance)
+        instance.status = 'approved'
+        instance.save()
+        self._generate_payroll_finance_records(instance)
         return StandardResponse(self.get_serializer(instance).data, message="تمت معالجة مسير الرواتب وتوليد كشوف الموظفين بنجاح.")
 
 class PayslipViewSet(BaseCRUDViewSet):

@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule, DecimalPipe, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,10 +13,12 @@ interface PayrollRun {
   id: string;
   period?: string;
   period_code?: string;
-  period_detail?: any;
   run_date: string;
-  status: 'draft' | 'approved' | 'paid';
+  status: 'draft' | 'review' | 'approved' | 'paid';
   total_cost: string;
+  approvers_chain?: string[];
+  current_approval_step?: number;
+  approval_request_id?: string;
 }
 
 interface Payslip {
@@ -29,28 +31,109 @@ interface Payslip {
   status: string;
 }
 
+interface User {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  email: string;
+}
+
 @Component({
   selector: 'app-payroll-runs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
+  imports: [CommonModule, DecimalPipe, DatePipe, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
-      <nb-page-header title="مسيرات وكشوف الرواتب" subtitle="مراجعة مسيرات الرواتب الدورية، واعتمادها، وإصدار قسائم رواتب الموظفين.">
+      <nb-page-header title="مسيرات وكشوف الرواتب" subtitle="مراجعة مسيرات الرواتب الدورية، إدارتها بنظام موافقات متعدد المراحل، وصرف قسائم الموظفين.">
         <div class="header-actions">
-          <button class="nb-btn-primary" (click)="openCreateModal()">➕ إنشاء مسير رواتب جديد</button>
+          <button class="nb-btn-primary animate-pulse" (click)="openCreateModal()">➕ إنشاء مسير رواتب جديد</button>
           <button class="nb-btn-secondary" (click)="goBack()">العودة للوحة التحكم</button>
         </div>
       </nb-page-header>
 
       @if (loading()) {
-        <nb-loading message="جاري تحميل مسيرات الرواتب وكشوف الموظفين..."></nb-loading>
+        <nb-loading message="جاري تحميل مسيرات الرواتب وتحديث الموافقات..."></nb-loading>
+      }
+
+      <!-- مسار الحالة والموافقة النشط للمسير المحدد -->
+      @if (selectedRun(); as run) {
+        <div class="status-stepper-panel animate-fade">
+          <div class="stepper-title-row">
+            <h4>📦 حالة مسير شهر: {{ run.period_code }}</h4>
+            <div class="stepper-badges">
+              <span class="badge" [class]="run.status">{{ getStatusLabel(run.status) }}</span>
+              @if (run.status === 'review') {
+                <span class="badge warning">بانتظار موافقة المستوى: {{ (run.current_approval_step || 0) + 1 }}</span>
+              }
+            </div>
+          </div>
+          
+          <!-- خطوات المسير العام -->
+          <div class="stepper">
+            <div class="step-item" [class.active]="run.status === 'draft'">
+              <div class="step-icon">1</div>
+              <div class="step-label">إعداد (مسودة)</div>
+            </div>
+            <div class="step-line" [class.active]="run.status !== 'draft'"></div>
+            
+            <div class="step-item" [class.active]="run.status === 'review'">
+              <div class="step-icon">2</div>
+              <div class="step-label">مراجعة الموافقات</div>
+            </div>
+            <div class="step-line" [class.active]="run.status === 'approved' || run.status === 'paid'"></div>
+            
+            <div class="step-item" [class.active]="run.status === 'approved'">
+              <div class="step-icon">3</div>
+              <div class="step-label">معتمد وصالح للصرف</div>
+            </div>
+            <div class="step-line" [class.active]="run.status === 'paid'"></div>
+            
+            <div class="step-item" [class.active]="run.status === 'paid'">
+              <div class="step-icon">4</div>
+              <div class="step-label">تم الصرف</div>
+            </div>
+          </div>
+
+          <!-- سلسلة الموافقات التفصيلية للمسؤولين -->
+          @if (run.approvers_chain && run.approvers_chain.length > 0) {
+            <div class="approval-chain-box">
+              <span class="chain-title">🔗 سلسلة موافقات المسؤولين المحددة للمسير:</span>
+              <div class="chain-steps">
+                @for (approver of run.approvers_chain; track approver; let i = $index) {
+                  @let isDone = (run.current_approval_step || 0) > i || run.status === 'approved' || run.status === 'paid';
+                  @let isCurrent = (run.current_approval_step || 0) === i && run.status === 'review';
+                  <div class="chain-node" [class.done]="isDone" [class.current]="isCurrent">
+                    <span class="node-icon">
+                      @if (isDone) { ✓ } @else if (isCurrent) { 🟡 } @else { ⚪ }
+                    </span>
+                    <span class="node-name">{{ getUserName(approver) }}</span>
+                    <span class="node-level">مستوى {{ i + 1 }}</span>
+                  </div>
+                  @if (i < run.approvers_chain.length - 1) {
+                    <span class="chain-arrow">➔</span>
+                  }
+                }
+              </div>
+              
+              <!-- إمكانية الاعتماد المباشر لمن هم في سلسلة الموافقات من كبار المسؤولين -->
+              @if (run.status === 'review') {
+                <div class="approve-action-block">
+                  <p>تنبيه: يتطلب هذا المسير اعتماداً من المستخدم الحالي أو المعتمد المعني للمستوى المذكور أعلاه.</p>
+                  <button class="nb-btn-primary approve-action-btn" (click)="triggerApprovalDecision(run)">
+                    ✍️ اعتماد وتوقيع الخطوة الحالية
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
       }
 
       <div class="runs-layout">
         <!-- قسم مسيرات الرواتب -->
         <div class="runs-list-panel">
-          <nb-panel title="مسيرات الرواتب المسجلة" subtitle="اضغط على المسير لعرض كشوف الرواتب التفصيلية للموظفين.">
+          <nb-panel title="مسيرات الرواتب المسجلة" subtitle="متابعة المسيرات وحالة الموافقات الخاصة بكل فترة محاسبية.">
             <div class="runs-list">
               @for (run of runs(); track run.id) {
                 <div 
@@ -67,18 +150,21 @@ interface Payslip {
                       <span class="lbl">التكلفة الإجمالية:</span>
                       <span class="val">{{ (Number(run.total_cost) | number:'1.0-0') || '0' }} ج.س</span>
                     </div>
-                    <div class="metric">
-                      <span class="lbl">تاريخ التشغيل:</span>
-                      <span class="val-sub">{{ run.run_date | date:'yyyy-MM-dd HH:mm' }}</span>
-                    </div>
                   </div>
+                  
                   @if (run.status === 'draft') {
                     <button 
                       class="nb-btn-primary approve-btn" 
-                      (click)="processRun($event, run.id)"
-                      [disabled]="processingId() === run.id"
+                      (click)="openApprovalChainModal($event, run)"
                     >
-                      {{ processingId() === run.id ? 'جارٍ الاعتماد…' : 'اعتماد وصرف المسير ✓' }}
+                      🚀 تقديم طلب موافقة للمسؤولين
+                    </button>
+                  } @else if (run.status === 'approved') {
+                    <button 
+                      class="nb-btn-secondary approve-btn paid-btn" 
+                      (click)="markAsPaid($event, run)"
+                    >
+                      💳 تأكيد وصرف كشوف الرواتب
                     </button>
                   }
                 </div>
@@ -94,7 +180,7 @@ interface Payslip {
         <div class="payslips-panel">
           <nb-panel 
             [title]="selectedRunId() ? 'كشف رواتب الموظفين للمسير المحدد' : 'تفاصيل كشف الرواتب'"
-            subtitle="قائمة تفصيلية بالرواتب الأساسية، الاستقطاعات، وصافي المستحقات لكل موظف."
+            subtitle="قائمة تفصيلية بالأجور، البدلات، الخصومات وصافي الراتب المستحق."
           >
             @if (selectedRunId()) {
               <div class="table-responsive">
@@ -103,7 +189,7 @@ interface Payslip {
                     <tr>
                       <th>اسم الموظف</th>
                       <th>الراتب الأساسي</th>
-                      <th>إجمالي المستحقات</th>
+                      <th>البدلات والحوافز</th>
                       <th>الاستقطاعات/السلف</th>
                       <th>صافي الراتب</th>
                       <th>الحالة</th>
@@ -114,7 +200,7 @@ interface Payslip {
                       <tr>
                         <td class="font-bold">{{ slip.employee_name || 'موظف نبراس' }}</td>
                         <td>{{ (Number(slip.basic_salary) | number:'1.0-0') || '0' }} ج.س</td>
-                        <td class="text-success">{{ (Number(slip.gross_earnings) | number:'1.0-0') || '0' }} ج.س</td>
+                        <td class="text-success">{{ (Number(slip.gross_earnings) - Number(slip.basic_salary) | number:'1.0-0') || '0' }} ج.س</td>
                         <td class="text-danger">{{ (Number(slip.total_deductions) | number:'1.0-0') || '0' }} ج.س</td>
                         <td class="font-bold highlight">{{ (Number(slip.net_salary) | number:'1.0-0') || '0' }} ج.س</td>
                         <td>
@@ -124,7 +210,7 @@ interface Payslip {
                     }
                     @if (payslips().length === 0) {
                       <tr>
-                        <td colspan="6" class="text-center pad-20">لا توجد قسائم رواتب تفصيلية مرتبطة بهذا المسير. اضغط على "اعتماد وصرف المسير" لتوليدها تلقائياً.</td>
+                        <td colspan="6" class="text-center pad-20">لا توجد قسائم رواتب تفصيلية مرتبطة بهذا المسير.</td>
                       </tr>
                     }
                   </tbody>
@@ -134,7 +220,7 @@ interface Payslip {
               <div class="select-prompt">
                 <div class="icon">👈</div>
                 <h4>الرجاء اختيار مسير رواتب من القائمة الجانبية</h4>
-                <p>اختر أي مسير لعرض كشوف الرواتب التفصيلية للموظفين التابعين له.</p>
+                <p>اختر أي مسير لعرض تفاصيل الموافقات وكشوف الرواتب.</p>
               </div>
             }
           </nb-panel>
@@ -155,7 +241,6 @@ interface Payslip {
             <div class="field req">
               <label>كود دورة المسير (شهر-سنة)</label>
               <input type="month" [(ngModel)]="newRunPeriodCode" name="periodCode" required />
-              <span class="hint">مثال: اختيار أغسطس 2026 سينشئ كود الفترة "2026-08".</span>
             </div>
 
             <div class="modal-actions">
@@ -168,15 +253,106 @@ interface Payslip {
         </div>
       </div>
     }
+
+    <!-- نافذة منبثقة لتحديد سلسلة المسؤولين عن الاعتماد (Approval Chain Picker Modal) -->
+    @if (showApprovalModal()) {
+      <div class="modal-overlay" (click)="closeApprovalModal()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3>تحديد سلسلة المسؤولين عن الاعتماد</h3>
+            <button class="close-btn" (click)="closeApprovalModal()">×</button>
+          </div>
+          
+          <form (submit)="submitApprovalChain($event)" class="modal-form">
+            <p class="desc-text">حدد المسؤولين بالترتيب للموافقة على هذا الكشف (سلسلة من 3 مستويات):</p>
+            
+            <div class="field req">
+              <label>المستوى 1: مدير الموارد البشرية (HR Manager)</label>
+              <select [(ngModel)]="approvers[0]" name="app1" required>
+                <option value="">اختر المسؤول الأول...</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.first_name || '' }} {{ u.last_name || '' }} ({{ u.email }})</option>
+                }
+              </select>
+            </div>
+
+            <div class="field req">
+              <label>المستوى 2: المدير المالي (CFO)</label>
+              <select [(ngModel)]="approvers[1]" name="app2" required>
+                <option value="">اختر المسؤول الثاني...</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.first_name || '' }} {{ u.last_name || '' }} ({{ u.email }})</option>
+                }
+              </select>
+            </div>
+
+            <div class="field req">
+              <label>المستوى 3: المدير العام / الرئيس التنفيذي (CEO)</label>
+              <select [(ngModel)]="approvers[2]" name="app3" required>
+                <option value="">اختر المسؤول الثالث...</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.first_name || '' }} {{ u.last_name || '' }} ({{ u.email }})</option>
+                }
+              </select>
+            </div>
+
+            <div class="modal-actions">
+              <button type="submit" class="nb-btn-primary" [disabled]="submittingApproval()">
+                {{ submittingApproval() ? 'جاري التقديم للموافقة…' : 'إرسال للموافقة والاعتماد المالي 🚀' }}
+              </button>
+              <button type="button" class="nb-btn-secondary" (click)="closeApprovalModal()">إلغاء</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .page { flex: 1; padding: 24px; overflow-y: auto; background: var(--nb-background); font-family: var(--nb-font-family); }
     .header-actions { display: flex; gap: 8px; align-items: center; }
     
-    .runs-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; margin-top: 10px; }
+    .status-stepper-panel {
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .stepper-title-row { display: flex; justify-content: space-between; align-items: center; }
+    .stepper-title-row h4 { margin: 0; font-size: 14.5px; color: var(--nb-text); }
+    .stepper-badges { display: flex; gap: 6px; }
+
+    .stepper { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+    .step-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .step-icon { width: 32px; height: 32px; border-radius: 50%; background: #e0e0e0; color: #757575; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .step-label { font-size: 11.5px; font-weight: 600; color: var(--nb-text-muted); }
+    .step-item.active .step-icon { background: var(--nb-primary-600); color: white; box-shadow: var(--nb-focus-ring); }
+    .step-item.active .step-label { color: var(--nb-text); font-weight: 700; }
+    
+    .step-line { flex: 1; height: 3px; background: #e0e0e0; margin: 0 10px; position: relative; top: -10px; }
+    .step-line.active { background: var(--nb-primary-600); }
+
+    .approval-chain-box { background: #fafafa; border: 1px dashed var(--nb-border); border-radius: var(--nb-radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .chain-title { font-size: 12px; font-weight: 700; color: var(--nb-text); }
+    .chain-steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chain-node { display: flex; flex-direction: column; align-items: center; background: white; border: 1px solid var(--nb-border); padding: 6px 12px; border-radius: 6px; }
+    .chain-node.done { border-color: var(--nb-success, #2e7d32); background: #e8f5e9; }
+    .chain-node.current { border-color: #ffd54f; background: #fffde7; box-shadow: 0 0 4px #ffd54f; }
+    .node-icon { font-size: 12px; }
+    .node-name { font-size: 12px; font-weight: 700; color: var(--nb-text); }
+    .node-level { font-size: 10px; color: var(--nb-text-muted); }
+    .chain-arrow { color: var(--nb-text-faint); font-weight: 700; }
+
+    .approve-action-block { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--nb-border-soft); padding-top: 10px; margin-top: 4px; font-size: 11.5px; color: var(--nb-text-muted); }
+    .approve-action-btn { height: 32px; padding: 0 12px; font-size: 11.5px; }
+
+    .runs-layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
     @media (max-width: 900px) { .runs-layout { grid-template-columns: 1fr; } }
     
-    .runs-list { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; padding-left: 4px; }
+    .runs-list { display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; }
     .run-card {
       background: var(--nb-surface);
       border: 1px solid var(--nb-border);
@@ -197,10 +373,11 @@ interface Payslip {
     .metric { display: flex; justify-content: space-between; }
     .lbl { color: var(--nb-text-muted); }
     .val { font-weight: 700; color: var(--nb-text); }
-    .val-sub { color: var(--nb-text-faint); font-variant-numeric: tabular-nums; }
     
     .approve-btn { width: 100%; height: 32px; font-size: 12px; font-weight: 600; padding: 0; margin-top: 4px; }
-    
+    .paid-btn { background: #e3f2fd; border-color: #90caf9; color: #0d47a1; }
+    .paid-btn:hover { background: #bbdefb; }
+
     .table-responsive { overflow-x: auto; }
     .nb-table { width: 100%; border-collapse: collapse; text-align: start; font-size: 13px; }
     .nb-table th, .nb-table td { padding: 12px; border-bottom: 1px solid var(--nb-border-soft); }
@@ -222,9 +399,11 @@ interface Payslip {
       border-radius: 12px;
       line-height: 1;
     }
-    .badge.draft { background: #fff3e0; color: #e65100; }
+    .badge.draft { background: #e0e0e0; color: #616161; }
+    .badge.review { background: #fff3e0; color: #e65100; }
     .badge.approved { background: #e8f5e9; color: #2e7d32; }
     .badge.paid { background: #e3f2fd; color: #0d47a1; }
+    .badge.warning { background: #ffe082; color: #b78103; }
 
     .select-prompt {
       display: flex;
@@ -260,7 +439,7 @@ interface Payslip {
 
     /* Modal Styles */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 24px; width: 440px; max-width: 90vw; }
+    .modal { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 24px; width: 460px; max-width: 90vw; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .modal-header h3 { margin: 0; font-size: 15px; color: var(--nb-text); }
     .close-btn { background: none; border: none; font-size: 24px; color: var(--nb-text-muted); cursor: pointer; }
@@ -268,7 +447,7 @@ interface Payslip {
     .modal-form { display: flex; flex-direction: column; gap: 14px; }
     .field { display: flex; flex-direction: column; gap: 6px; }
     .field label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
-    .field input {
+    .field input, .field select {
       height: 38px;
       padding: 0 10px;
       border: 1px solid var(--nb-border);
@@ -279,11 +458,9 @@ interface Payslip {
       color: var(--nb-text);
       outline: none;
     }
-    .field input:focus { border-color: var(--nb-primary-600); }
+    .field input:focus, .field select:focus { border-color: var(--nb-primary-600); }
     .field.req label::after { content: ' *'; color: var(--nb-danger); }
-    .hint { font-size: 11px; color: var(--nb-text-faint); }
-    
-    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+    .desc-text { font-size: 12px; color: var(--nb-text-muted); }
   `]
 })
 export class PayrollRunsComponent implements OnInit {
@@ -295,16 +472,26 @@ export class PayrollRunsComponent implements OnInit {
   readonly runs = signal<PayrollRun[]>([]);
   readonly payslips = signal<Payslip[]>([]);
   readonly selectedRunId = signal<string | null>(null);
-  readonly processingId = signal<string | null>(null);
+  readonly selectedRun = computed(() => this.runs().find(r => r.id === this.selectedRunId()));
+  
+  readonly users = signal<User[]>([]);
   readonly loading = signal(false);
 
-  // Modal Control
+  // Modals Control
   readonly showCreateModal = signal(false);
+  readonly showApprovalModal = signal(false);
+  
   readonly creatingRun = signal(false);
+  readonly submittingApproval = signal(false);
+  readonly processingId = signal<string | null>(null);
+
   newRunPeriodCode = '';
+  activeRunForApproval: PayrollRun | null = null;
+  approvers: string[] = ['', '', ''];
 
   ngOnInit() {
     this.loadRuns();
+    this.loadUsers();
   }
 
   loadRuns() {
@@ -313,7 +500,6 @@ export class PayrollRunsComponent implements OnInit {
       next: (res) => {
         this.loading.set(false);
         if (res && res.success) {
-          // Fetch period details for code mappings
           const rawRuns = res.data;
           this.runs.set(rawRuns);
           this.fetchPeriodDetailsForRuns(rawRuns);
@@ -326,6 +512,21 @@ export class PayrollRunsComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  loadUsers() {
+    this.http.get<any>(`${environment.apiUrl}identity/users/`).subscribe({
+      next: (res) => {
+        if (res && res.success) {
+          this.users.set(res.data);
+        }
+      }
+    });
+  }
+
+  getUserName(userId: string): string {
+    const u = this.users().find(user => user.id === userId);
+    return u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email : userId;
   }
 
   fetchPeriodDetailsForRuns(rawRuns: any[]) {
@@ -384,6 +585,92 @@ export class PayrollRunsComponent implements OnInit {
     });
   }
 
+  openApprovalChainModal(event: Event, run: PayrollRun) {
+    event.stopPropagation();
+    this.activeRunForApproval = run;
+    this.approvers = ['', '', ''];
+    this.showApprovalModal.set(true);
+  }
+
+  closeApprovalModal() {
+    this.showApprovalModal.set(false);
+  }
+
+  submitApprovalChain(event: Event) {
+    event.preventDefault();
+    if (!this.approvers[0] || !this.approvers[1] || !this.approvers[2]) {
+      this.notify.error('يرجى تحديد المسؤولين لكافة مستويات الاعتماد الثلاثة.');
+      return;
+    }
+
+    this.submittingApproval.set(true);
+    const payload = { approvers: this.approvers };
+    
+    this.http.post<any>(`${environment.apiUrl}payroll/runs/${this.activeRunForApproval?.id}/submit-for-approval/`, payload).subscribe({
+      next: (res) => {
+        this.submittingApproval.set(false);
+        this.closeApprovalModal();
+        if (res && res.success) {
+          this.notify.success('تم إرسال كشف مسير الرواتب بنجاح إلى مركز الموافقات وسلسلة المعتمدين.');
+          this.loadRuns();
+        } else {
+          this.notify.error('فشل إرسال المسير للموافقة.');
+        }
+      },
+      error: () => {
+        this.submittingApproval.set(false);
+        this.notify.error('حدث خطأ بالاتصال بالخادم لتقديم طلب الموافقة.');
+      }
+    });
+  }
+
+  triggerApprovalDecision(run: PayrollRun) {
+    if (!run.approval_request_id) return;
+    this.loading.set(true);
+    
+    // Simulate quick decision from approvals engine for the current assignee step
+    this.http.post<any>(`/api/v1/approvals/requests/${run.approval_request_id}/decision/`, {
+      action: 'approve',
+      comments: 'اعتماد مسير الرواتب المرفوع محاسبياً.'
+    }).subscribe({
+      next: () => {
+        this.notify.success('تم إقرار وتوقيع خطوة موافقة مسير الرواتب بنجاح.');
+        this.loadRuns();
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل تسجيل قرار الاعتماد في مركز الموافقات.');
+      }
+    });
+  }
+
+  markAsPaid(event: Event, run: PayrollRun) {
+    event.stopPropagation();
+    this.loading.set(true);
+    
+    // Direct status transition to Paid once approved
+    this.http.put<any>(`${environment.apiUrl}payroll/runs/${run.id}/`, {
+      period: run.period,
+      run_date: run.run_date,
+      status: 'paid',
+      total_cost: run.total_cost
+    }).subscribe({
+      next: (res) => {
+        if (res && res.success) {
+          this.notify.success('تم دفع وصرف كشف مسير الرواتب بنجاح للموظفين.');
+          this.loadRuns();
+        } else {
+          this.loading.set(false);
+          this.notify.error('فشل تأكيد صرف الكشف.');
+        }
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل الاتصال بالخادم لتأكيد الصرف.');
+      }
+    });
+  }
+
   processRun(event: Event, runId: string) {
     event.stopPropagation();
     this.processingId.set(runId);
@@ -405,7 +692,7 @@ export class PayrollRunsComponent implements OnInit {
   }
 
   openCreateModal() {
-    this.newRunPeriodCode = new Date().toISOString().slice(0, 7); // Default current month YYYY-MM
+    this.newRunPeriodCode = new Date().toISOString().slice(0, 7);
     this.showCreateModal.set(true);
   }
 
@@ -421,17 +708,14 @@ export class PayrollRunsComponent implements OnInit {
     }
 
     this.creatingRun.set(true);
-    // Find or create the period code first
-    const code = this.newRunPeriodCode; // format: YYYY-MM
+    const code = this.newRunPeriodCode;
     const parts = code.split('-');
     const year = parseInt(parts[0]);
     const month = parseInt(parts[1]);
-    
     const startDate = `${code}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${code}-${lastDay}`;
 
-    // Get periods list to check if period already exists
     this.http.get<any>(`${environment.apiUrl}payroll/periods/`).subscribe({
       next: (res) => {
         if (res && res.success) {
@@ -439,7 +723,6 @@ export class PayrollRunsComponent implements OnInit {
           if (existingPeriod) {
             this.createRunForPeriod(existingPeriod.id);
           } else {
-            // Create a new period
             const periodPayload = { code, start_date: startDate, end_date: endDate };
             this.http.post<any>(`${environment.apiUrl}payroll/periods/`, periodPayload).subscribe({
               next: (pRes) => {
@@ -491,8 +774,9 @@ export class PayrollRunsComponent implements OnInit {
   getStatusLabel(status: string): string {
     switch (status) {
       case 'draft': return 'مسودة (غير معالج)';
-      case 'approved': return 'معتمد (معالج)';
-      case 'paid': return 'مدفوع';
+      case 'review': return 'قيد المراجعة والموافقة';
+      case 'approved': return 'معتمد وصالح للصرف';
+      case 'paid': return 'مدفوع ومصروف مالي';
       default: return status;
     }
   }
