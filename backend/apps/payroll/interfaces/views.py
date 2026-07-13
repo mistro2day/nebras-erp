@@ -297,16 +297,25 @@ class PayrollRunViewSet(BaseCRUDViewSet):
         instance.save()
         return StandardResponse(self.get_serializer(instance).data, message="تم تقديم مسير الرواتب للموافقة بنجاح.")
 
-    def process_payroll_logic(self, instance):
+    def process_payroll_logic(self, instance, preview_only=False):
+        """
+        احتساب كشوف الرواتب لجميع الموظفين النشطين.
+        preview_only=True: يُنشئ الكشوف لعرضها فقط بدون خصم السلف من أرصدتها.
+        """
         instance.payslips.all().delete()
         period_code = instance.period.code if instance.period else ""
+        tenant_id = instance.tenant_id
         from apps.employees.domain.models import Employee
         from apps.payroll.domain.models import SalaryStructure, EmployeeLoan, Payslip
         
-        active_employees = Employee.objects.filter(status='active')
+        # تصفية الموظفين حسب المستأجر والحالة النشطة
+        emp_qs = Employee.objects.filter(status='active', deleted_at__isnull=True)
+        if tenant_id:
+            emp_qs = emp_qs.filter(tenant_id=tenant_id)
+        
         total_cost = 0.0
         
-        for employee in active_employees:
+        for employee in emp_qs:
             try:
                 struct = SalaryStructure.objects.get(employee=employee, is_active=True)
                 basic = float(struct.basic_salary)
@@ -314,16 +323,17 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 transport = float(struct.transport_allowance)
                 other = float(struct.other_allowances)
             except SalaryStructure.DoesNotExist:
-                basic = 250000.0
-                housing = 50000.0
-                transport = 20000.0
-                other = 0.0
+                # إذا لم يكن هناك هيكل رواتب معرف — تخطي الموظف بدلاً من استخدام قيم افتراضية
+                continue
                 
             gross_earnings = basic + housing + transport + other
             total_deductions = 0.0
-            active_loans = EmployeeLoan.objects.filter(employee=employee, status='approved')
             
-            for loan in active_loans:
+            loan_qs = EmployeeLoan.objects.filter(employee=employee, status='approved')
+            if tenant_id:
+                loan_qs = loan_qs.filter(tenant_id=tenant_id)
+            
+            for loan in loan_qs:
                 if loan.deduction_start_month and period_code:
                     if period_code < loan.deduction_start_month:
                         continue
@@ -337,31 +347,43 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 deduct_amount = min(installment, remaining)
                 if deduct_amount > 0:
                     total_deductions += deduct_amount
-                    loan.remaining_balance = remaining - deduct_amount
-                    if loan.remaining_balance <= 0:
-                        loan.status = 'settled'
-                    loan.save()
+                    if not preview_only:
+                        loan.remaining_balance = remaining - deduct_amount
+                        if loan.remaining_balance <= 0:
+                            loan.status = 'settled'
+                        loan.save()
                     
             net_salary = max(0.0, gross_earnings - total_deductions)
             total_cost += net_salary
             
             Payslip.objects.create(
+                tenant_id=tenant_id,
                 payroll_run=instance,
                 employee=employee,
                 basic_salary=basic,
                 gross_earnings=gross_earnings,
                 total_deductions=total_deductions,
                 net_salary=net_salary,
-                status='approved'
+                status='draft' if preview_only else 'approved'
             )
             
         instance.total_cost = total_cost
         instance.save()
 
+    @action(detail=True, methods=['post'], url_path='preview')
+    def preview_payroll(self, request, pk=None):
+        """
+        معاينة كشوف الرواتب بدون خصم السلف فعلياً (للمسودات).
+        """
+        instance = self.get_object()
+        if instance.payslips.count() == 0:
+            self.process_payroll_logic(instance, preview_only=True)
+        return StandardResponse(self.get_serializer(instance).data, message="تمت معاينة كشوف الرواتب بنجاح.")
+
     @action(detail=True, methods=['post'], url_path='process')
     def process_payroll(self, request, pk=None):
         instance = self.get_object()
-        self.process_payroll_logic(instance)
+        self.process_payroll_logic(instance, preview_only=False)
         instance.status = 'approved'
         instance.save()
         self._generate_payroll_finance_records(instance)

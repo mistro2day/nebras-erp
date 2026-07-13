@@ -131,9 +131,9 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               @for (element of paged(); track element.id) {
                 <div class="tbl-row">
                   <span class="mono">{{ element.student_number }}</span>
-                  <span class="strong">{{ element.profile?.arabic_name || '—' }}</span>
-                  <span>{{ element.profile?.gender === 'male' ? 'ذكر' : element.profile?.gender === 'female' ? 'أنثى' : '—' }}</span>
-                  <span>{{ element.profile?.nationality || '—' }}</span>
+                  <span class="strong">{{ element.profile.arabic_name || '—' }}</span>
+                  <span>{{ element.profile.gender === 'male' ? 'ذكر' : element.profile.gender === 'female' ? 'أنثى' : '—' }}</span>
+                  <span>{{ element.profile.nationality || '—' }}</span>
                   <span><span [class]="statusBadge(element.status)">{{ statusText(element.status) }}</span></span>
                   <span class="row-actions">
                     <button class="nb-btn-ghost sm" (click)="viewDetails(element.id)">عرض</button>
@@ -156,18 +156,18 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               <div class="card-status-accent" [class]="student.status"></div>
               
               <div class="student-avatar-container">
-                <div class="student-avatar" [class]="student.profile?.gender">
-                  {{ getInitials(student.profile?.arabic_name) }}
+                <div class="student-avatar" [class]="student.profile.gender">
+                  {{ getInitials(student.profile.arabic_name) }}
                 </div>
               </div>
               
               <div class="student-info">
-                <h3 class="student-name">{{ student.profile?.arabic_name || 'طالب نبراس' }}</h3>
+                <h3 class="student-name">{{ student.profile.arabic_name || 'طالب نبراس' }}</h3>
                 <span class="student-id">{{ student.student_number }}</span>
                 
                 <div class="meta-row">
-                  <span class="meta-item">📍 {{ student.profile?.nationality || 'سوداني' }}</span>
-                  <span class="meta-item">🚻 {{ student.profile?.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
+                  <span class="meta-item">📍 {{ student.profile.nationality || 'سوداني' }}</span>
+                  <span class="meta-item">🚻 {{ student.profile.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
                 </div>
               </div>
               

@@ -11,6 +11,7 @@ import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
 
 /**
  * حسابات الطلاب المالية — عرض 360° لحساب الطالب.
@@ -24,7 +25,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent,
-    NbDrawerComponent, NbDatepickerComponent, NbExportMenuComponent, NbLoadingComponent,
+    NbDrawerComponent, NbDatepickerComponent, NbExportMenuComponent, NbLoadingComponent, SfDocumentDrawerComponent,
   ],
   template: `
     <div class="page" dir="rtl">
@@ -156,7 +157,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
             <div class="action-box">
               <h4>تحصيل دفعة</h4>
               <div class="grid3">
-                <label>المبلغ<input class="fld num" type="number" [(ngModel)]="payForm.amount" /></label>
+                <label>المبلغ<input class="fld num" type="number" min="0" step="0.01" placeholder="0.00" [(ngModel)]="payForm.amount" /></label>
                 <label>طريقة الدفع<select class="fld" [(ngModel)]="payForm.payment_method_id">@for (m of methods(); track m.id) { <option [value]="m.id">{{ m.name_ar }}</option> }</select></label>
                 <label>الصندوق<select class="fld" [(ngModel)]="payForm.cash_box_id">@for (c of cashBoxes(); track c.id) { <option [value]="c.id">{{ c.name_ar }}</option> }</select></label>
               </div>
@@ -243,41 +244,9 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         }
       </nb-drawer>
 
-      <!-- لوح تفاصيل المستند (فاتورة / تحصيل / مستحق) -->
-      <nb-drawer [open]="!!doc()" [width]="620" [title]="docMeta().title" [subtitle]="docMeta().subtitle" (closed)="doc.set(null)">
-        @if (doc(); as d) {
-          <!-- الحقول الرئيسية -->
-          <div class="dl">
-            @for (f of docFields(); track f.k) {
-              <div class="dl-row" [class.total]="f.total"><span class="k">{{ f.k }}</span><span class="v" [class]="f.cls || ''">{{ f.v }}</span></div>
-            }
-          </div>
-
-          <!-- بنود الفاتورة -->
-          @if (d.type === 'invoice' && (d.data.items?.length)) {
-            <h4 class="dh">بنود الفاتورة</h4>
-            <div class="table-wrap">
-              <table class="nb-table dlines">
-                <thead><tr><th>البند</th><th class="end">المبلغ</th></tr></thead>
-                <tbody>
-                  @for (it of d.data.items; track it.id) {
-                    <tr><td>{{ it.description || 'بند رسوم' }}</td><td class="end mono">{{ it.amount | number:'1.2-2' }}</td></tr>
-                  }
-                  @if (d.data.discounts?.length) {
-                    @for (dc of d.data.discounts; track dc.id) {
-                      <tr><td class="disc">{{ dc.discount_reason }}</td><td class="end mono disc">- {{ dc.amount | number:'1.2-2' }}</td></tr>
-                    }
-                  }
-                  <tr class="sum"><td>الإجمالي</td><td class="end mono">{{ d.data.total_amount | number:'1.2-2' }} ر.س</td></tr>
-                </tbody>
-              </table>
-            </div>
-          }
-        }
-        <div drawer-actions>
-          <nb-export-menu [columns]="docExportCols()" [rows]="docExportRows()" [title]="docMeta().title" [subtitle]="docMeta().subtitle" [filename]="docMeta().title"></nb-export-menu>
-        </div>
-      </nb-drawer>
+      <!-- نافذة تفاصيل المستند (فاتورة / تحصيل / مستحق) — مشتركة مع صفحة تفاصيل الطالب -->
+      <sf-document-drawer [doc]="doc()" [studentName]="sel() ? studentName(sel().student_id) : ''"
+        [methods]="methods()" (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -396,7 +365,7 @@ export class SfAccountsListComponent implements OnInit {
   receivables = signal<any[]>([]);
   scholarships = signal<any[]>([]);
   holds = signal<any[]>([]);
-  doc = signal<{ type: 'invoice' | 'receipt' | 'receivable'; data: any } | null>(null);
+  doc = signal<SfDoc>(null);
 
   creating = signal(false);
   createBusy = signal(false);
@@ -404,7 +373,7 @@ export class SfAccountsListComponent implements OnInit {
 
   picked = new Set<string>();
   invForm = { due_date: '' };
-  payForm: any = { amount: 0, payment_method_id: '', cash_box_id: '' };
+  payForm: any = { amount: null, payment_method_id: '', cash_box_id: '' };
   schForm: any = { name: '', type: 'merit', amount_percentage: 25 };
   holdForm: any = { hold_type: 'exam', reason: '' };
 
@@ -506,7 +475,7 @@ export class SfAccountsListComponent implements OnInit {
   // ---- درج الحساب ----
   openAccount(a: any) {
     this.sel.set(a); this.pane.set(''); this.tab.set('invoices');
-    this.payForm = { amount: 0, payment_method_id: this.methods()[0]?.id || '', cash_box_id: this.cashBoxes()[0]?.id || '' };
+    this.payForm = { amount: null, payment_method_id: this.methods()[0]?.id || '', cash_box_id: this.cashBoxes()[0]?.id || '' };
     this.invForm = { due_date: '' }; this.picked = new Set();
     this.loadAccountBundle(a.id);
   }
@@ -523,67 +492,8 @@ export class SfAccountsListComponent implements OnInit {
   setPane(p: any) { this.pane.set(this.pane() === p ? '' : p); }
   togglePick(id: string) { this.picked.has(id) ? this.picked.delete(id) : this.picked.add(id); }
 
-  // ---- تفاصيل المستند (فاتورة/تحصيل/مستحق) ----
+  // ---- تفاصيل المستند (فاتورة/تحصيل/مستحق) — عبر المكوّن المشترك sf-document-drawer ----
   openDoc(type: 'invoice' | 'receipt' | 'receivable', data: any) { this.doc.set({ type, data }); }
-  methodName(id: string) { return this.methods().find((m) => m.id === id)?.name_ar || '—'; }
-  private money(v: any) { return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ر.س'; }
-
-  docMeta(): { title: string; subtitle: string } {
-    const d = this.doc();
-    if (!d) return { title: '', subtitle: '' };
-    const who = this.sel() ? this.studentName(this.sel().student_id) : '';
-    if (d.type === 'invoice') return { title: `فاتورة ${d.data.invoice_number}`, subtitle: who };
-    if (d.type === 'receipt') return { title: `سند قبض ${d.data.receipt_number}`, subtitle: who };
-    return { title: 'مستحق فاتورة', subtitle: who };
-  }
-  docFields(): { k: string; v: string; cls?: string; total?: boolean }[] {
-    const d = this.doc();
-    if (!d) return [];
-    const x = d.data;
-    if (d.type === 'invoice') {
-      return [
-        { k: 'رقم الفاتورة', v: x.invoice_number },
-        { k: 'تاريخ الإصدار', v: x.issue_date },
-        { k: 'تاريخ الاستحقاق', v: x.due_date },
-        { k: 'الحالة', v: x.status === 'posted' ? 'مرحلة ومسجلة' : x.status },
-        { k: 'المدفوع', v: this.money(x.paid_amount), cls: 'success' },
-        { k: 'المتبقّي', v: this.money(x.outstanding_amount), cls: 'danger' },
-        { k: 'قيد المالية', v: x.journal_entry_id ? 'مُرحّل في دفتر الأستاذ ✓' : '—' },
-        { k: 'الإجمالي', v: this.money(x.total_amount), total: true },
-      ];
-    }
-    if (d.type === 'receipt') {
-      return [
-        { k: 'رقم الإيصال', v: x.receipt_number },
-        { k: 'تاريخ الدفع', v: x.payment_date },
-        { k: 'طريقة الدفع', v: this.methodName(x.payment_method_id) },
-        { k: 'الحالة', v: x.status === 'posted' ? 'مرحل ومقفل بالصندوق' : x.status },
-        { k: 'سند المالية', v: x.voucher_id ? 'سند قبض مُرحّل ✓' : '—' },
-        { k: 'المبلغ المحصّل', v: this.money(x.amount), total: true, cls: 'success' },
-      ];
-    }
-    return [
-      { k: 'الحالة', v: x.status === 'paid' ? 'مسدد بالكامل' : 'مستحق' },
-      { k: 'المدفوع', v: this.money(x.paid_amount), cls: 'success' },
-      { k: 'المتبقّي', v: this.money(x.outstanding_amount), cls: 'danger' },
-      { k: 'أصل المستحق', v: this.money(x.amount), total: true },
-    ];
-  }
-  docExportCols(): ExportColumn[] {
-    if (this.doc()?.type === 'invoice') return [{ key: 'description', label: 'البند' }, { key: 'amount', label: 'المبلغ', align: 'end' }];
-    return [{ key: 'k', label: 'البيان' }, { key: 'v', label: 'القيمة', align: 'end' }];
-  }
-  docExportRows(): any[] {
-    const d = this.doc();
-    if (!d) return [];
-    if (d.type === 'invoice') {
-      const rows = (d.data.items || []).map((i: any) => ({ description: i.description || 'بند رسوم', amount: Number(i.amount).toFixed(2) }));
-      (d.data.discounts || []).forEach((dc: any) => rows.push({ description: dc.discount_reason, amount: '-' + Number(dc.amount).toFixed(2) }));
-      rows.push({ description: 'الإجمالي', amount: Number(d.data.total_amount).toFixed(2) });
-      return rows;
-    }
-    return this.docFields().map((f) => ({ k: f.k, v: f.v }));
-  }
 
   private refreshAfter(a: any) {
     this.loadAccountBundle(a.id);
@@ -628,7 +538,7 @@ export class SfAccountsListComponent implements OnInit {
       error: (e) => this.notify.error(e?.error?.message || 'تعذّر رفع الحظر.'),
     });
   }
-  openStudent(studentId: string) { this.router.navigate(['/students', studentId]); }
+  openStudent(studentId: string) { this.router.navigate(['/students/details', studentId]); }
   goDashboard() { this.router.navigateByUrl('/student-finance/dashboard'); }
   holdLabel(t: string) { return ({ exam: 'حجب الامتحانات', registration: 'منع التسجيل', certificate: 'منع الشهادات', graduation: 'حظر التخرج', library: 'حظر المكتبة', custom: 'مخصص' } as any)[t] || t; }
 }

@@ -4,6 +4,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { StudentsService } from '../students.service';
+import { StudentFinanceService } from '../../student-finance/student-finance.service';
+import { SfDocumentDrawerComponent, SfDoc } from '../../student-finance/shared/sf-document-drawer.component';
 import { HttpClient } from '@angular/common/http';
 import {
   ConfirmDialogComponent, ConfirmDialogData,
@@ -15,7 +17,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, NbLoadingComponent],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, NbLoadingComponent, SfDocumentDrawerComponent],
   template: `
     @if (student(); as s) {
       <div class="page" dir="rtl">
@@ -118,9 +120,14 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                     <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ر.س</span>
                   </div>
                   <div class="fin-stat-card">
-                    <span class="fin-label">إجمالي المدفوعات</span>
-                    <span class="fin-value text-success">{{ billingAccount().total_paid | number:'1.2-2' }} ر.س</span>
+                    <span class="fin-label">إجمالي المُحصّل</span>
+                    <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ر.س</span>
                   </div>
+                  <div class="fin-stat-card">
+                    <span class="fin-label">الرصيد الدائن</span>
+                    <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ر.س</span>
+                  </div>
+                  <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
                 </div>
 
                 <h3 style="margin-top: 20px;">الفواتير الصادرة</h3>
@@ -133,13 +140,13 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                     <span>تاريخ الاستحقاق</span>
                   </div>
                   @for (inv of invoices(); track inv.id) {
-                    <div class="tbl-row finance-tbl">
+                    <div class="tbl-row finance-tbl clickable" (click)="openDoc('invoice', inv)">
                       <span class="strong">{{ inv.invoice_number }}</span>
                       <span>{{ inv.total_amount | number:'1.2-2' }} ر.س</span>
                       <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ر.س</span>
                       <span>
-                        <span class="badge" [class.success]="inv.status === 'paid'" [class.warning]="inv.status === 'partially_paid'" [class.danger]="inv.status === 'unpaid'">
-                          {{ inv.status === 'paid' ? 'مدفوعة' : inv.status === 'partially_paid' ? 'مدفوعة جزئياً' : 'غير مدفوعة' }}
+                        <span class="badge" [class.success]="+inv.outstanding_amount === 0" [class.warning]="+inv.outstanding_amount > 0 && +inv.paid_amount > 0" [class.danger]="+inv.outstanding_amount > 0 && +inv.paid_amount === 0">
+                          {{ +inv.outstanding_amount === 0 ? 'مدفوعة بالكامل' : (+inv.paid_amount > 0 ? 'مدفوعة جزئياً' : 'مستحقة') }}
                         </span>
                       </span>
                       <span>{{ inv.due_date }}</span>
@@ -150,6 +157,34 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                 <ng-template #noInvoices>
                   <div class="tbl-empty">لا توجد فواتير صادرة لهذا الطالب حالياً.</div>
                 </ng-template>
+
+                <!-- سندات القبض / التحصيلات المالية -->
+                <div *ngIf="billingAccount()">
+                  <h3 style="margin-top: 24px;">السندات المالية (سندات القبض)</h3>
+                  <div class="tbl" *ngIf="receipts().length > 0; else noReceipts">
+                    <div class="tbl-head receipts-tbl">
+                      <span>رقم السند</span>
+                      <span>تاريخ الدفع</span>
+                      <span>المبلغ المحصّل</span>
+                      <span>الحالة</span>
+                    </div>
+                    @for (r of receipts(); track r.id) {
+                      <div class="tbl-row receipts-tbl clickable" (click)="openDoc('receipt', r)">
+                        <span class="strong">{{ r.receipt_number }}</span>
+                        <span>{{ r.payment_date }}</span>
+                        <span class="text-success">{{ r.amount | number:'1.2-2' }} ر.س</span>
+                        <span>
+                          <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'">
+                            {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
+                          </span>
+                        </span>
+                      </div>
+                    }
+                  </div>
+                  <ng-template #noReceipts>
+                    <div class="tbl-empty">لا توجد سندات قبض (تحصيلات) لهذا الطالب حالياً.</div>
+                  </ng-template>
+                </div>
 
                 <ng-template #noFinance>
                   <div class="no-data-box">
@@ -232,10 +267,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <div class="info-item">
                     <strong>الحساسية</strong>
                     <div class="tag-list">
-                      @for (allergy of s.medical_profile?.allergies || []; track allergy) {
+                      @for (allergy of s.medical_profile.allergies || []; track allergy) {
                         <span class="tag danger">{{ allergy }}</span>
                       }
-                      @if (!(s.medical_profile?.allergies?.length)) {
+                      @if (!(s.medical_profile.allergies?.length)) {
                         <span>لا توجد حساسية مسجلة.</span>
                       }
                     </div>
@@ -243,10 +278,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <div class="info-item">
                     <strong>الأمراض المزمنة</strong>
                     <div class="tag-list">
-                      @for (disease of s.medical_profile?.chronic_diseases || []; track disease) {
+                      @for (disease of s.medical_profile.chronic_diseases || []; track disease) {
                         <span class="tag warning">{{ disease }}</span>
                       }
-                      @if (!(s.medical_profile?.chronic_diseases?.length)) {
+                      @if (!(s.medical_profile.chronic_diseases?.length)) {
                         <span>سليم.</span>
                       }
                     </div>
@@ -254,15 +289,15 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <div class="info-item">
                     <strong>الأدوية المنتظمة</strong>
                     <div class="tag-list">
-                      @for (med of s.medical_profile?.medication || []; track med) {
+                      @for (med of s.medical_profile.medication || []; track med) {
                         <span class="tag info">{{ med }}</span>
                       }
-                      @if (!(s.medical_profile?.medication?.length)) {
+                      @if (!(s.medical_profile.medication?.length)) {
                         <span>لا يوجد.</span>
                       }
                     </div>
                   </div>
-                  <div class="info-item"><strong>طبيب العائلة المفضل</strong>{{ s.medical_profile?.doctor || '—' }}</div>
+                  <div class="info-item"><strong>طبيب العائلة المفضل</strong>{{ s.medical_profile.doctor || '—' }}</div>
                 </div>
 
                 <hr class="nb-divider" />
@@ -401,6 +436,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           </mat-tab-group>
         </div>
 
+        <!-- نافذة تفاصيل المستند (فاتورة / سند قبض) — عرض وطباعة وتصدير -->
+        <sf-document-drawer [doc]="doc()" [studentName]="student()?.profile?.arabic_name || ''"
+          [methods]="paymentMethods()" (closed)="doc.set(null)"></sf-document-drawer>
+
         <!-- حاوية الطباعة الخاصة بـ A4 (مخفية في المتصفح وتظهر فقط عند الطباعة) -->
         <div class="print-only-container" *ngIf="student() && schoolInfo()" dir="rtl">
           <!-- إطار الشهادة المزدوج الفاخر والمائي -->
@@ -441,10 +480,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 
             <!-- تفاصيل الطالب -->
             <div class="print-student-info">
-              <div class="info-item"><strong>اسم الطالب:</strong> {{ student().profile?.arabic_name }}</div>
+              <div class="info-item"><strong>اسم الطالب:</strong> {{ student().profile.arabic_name }}</div>
               <div class="info-item"><strong>الرقم الأكاديمي:</strong> {{ student().student_number }}</div>
               <div class="info-item"><strong>المرحلة/الصف:</strong> {{ $any(student())?.enrollments?.[0]?.grade_level || 'الصف العاشر' }}</div>
-              <div class="info-item"><strong>الجنسية:</strong> {{ student().profile?.nationality || '—' }}</div>
+              <div class="info-item"><strong>الجنسية:</strong> {{ student().profile.nationality || '—' }}</div>
               <div class="info-item"><strong>العام الدراسي:</strong> {{ academicYearLabel() }}</div>
               <div class="info-item"><strong>تاريخ الإصدار:</strong> {{ today() }}</div>
             </div>
@@ -639,6 +678,15 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
       flex-direction: column;
       gap: 4px;
     }
+    .fin-link {
+      grid-column: 1 / -1;
+      align-self: start;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--nb-primary-600);
+      cursor: pointer;
+    }
+    .fin-link:hover { color: var(--nb-primary-700); text-decoration: underline; }
     .fin-label { font-size: 11.5px; color: var(--nb-text-muted); }
     .fin-value { font-size: 18px; font-weight: 700; color: var(--nb-text); }
     .text-danger { color: #ef4444; }
@@ -713,6 +761,9 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .tbl-head, .tbl-row { display: grid; gap: 12px; padding: 12px 18px; align-items: center; }
     .tbl-head.doc, .tbl-row.doc { grid-template-columns: 1.4fr 1.4fr 1fr; }
     .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr; }
+    .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr; }
+    .tbl-row.clickable { cursor: pointer; }
+    .tbl-row.clickable:hover { background: var(--nb-surface-raised); }
     .tbl-head.library-tbl, .tbl-row.library-tbl { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
     .tbl-head.clinic-tbl, .tbl-row.clinic-tbl { grid-template-columns: 1.2fr 1.8fr 1.8fr 1fr; }
     
@@ -827,6 +878,7 @@ export class StudentDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private studentsService = inject(StudentsService);
+  private sfService = inject(StudentFinanceService);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
 
@@ -834,6 +886,13 @@ export class StudentDetailsComponent implements OnInit {
   timeline = signal<any[]>([]);
   billingAccount = signal<any | null>(null);
   invoices = signal<any[]>([]);
+  receipts = signal<any[]>([]);
+  paymentMethods = signal<any[]>([]);
+  doc = signal<SfDoc>(null);
+  totalPaid = computed(() => this.invoices().reduce((s, i) => s + (Number(i.paid_amount) || 0), 0));
+  totalCollected = computed(() => this.receipts().reduce((s, r) => s + (Number(r.amount) || 0), 0));
+
+  openDoc(type: 'invoice' | 'receipt' | 'receivable', data: any) { this.doc.set({ type, data }); }
 
   studentGrades = signal<any[]>([
     { subject: 'اللغة العربية', score: 96, classwork: 28, finalExam: 68 },
@@ -879,6 +938,13 @@ export class StudentDetailsComponent implements OnInit {
     });
   }
 
+  /** فتح لوح الحساب المالي الكامل (360°) في وحدة فوترة الطلاب. */
+  openFinanceAccount(): void {
+    const acc = this.billingAccount();
+    const q = acc?.account_number || this.student()?.student_number || '';
+    this.router.navigate(['/student-finance/accounts'], { queryParams: q ? { q } : {} });
+  }
+
   private reload(): void {
     this.studentsService.getStudentById(this.id).subscribe();
     this.studentsService.getTimeline(this.id).subscribe((res) => {
@@ -891,21 +957,19 @@ export class StudentDetailsComponent implements OnInit {
       }
     });
     
-    // جلب الحساب المالي والفواتير الصادرة للطالب (حقيقي)
-    this.http.get<any>('/api/v1/student-finance/billing-accounts/').subscribe((res) => {
-      if (res && res.success) {
-        const accounts = res.data?.results || res.data || [];
-        // البحث عن الحساب المرتبط بالطالب
-        const account = accounts.find((a: any) => a.student === this.id);
-        if (account) {
-          this.billingAccount.set(account);
-          // جلب الفواتير المرتبطة بهذا الحساب
-          this.http.get<any>(`/api/v1/student-finance/invoices/?billing_account=${account.id}`).subscribe((invRes) => {
-            if (invRes && invRes.success) {
-              this.invoices.set(invRes.data?.results || invRes.data || []);
-            }
-          });
-        }
+    // جلب الحساب المالي والفواتير الصادرة للطالب (عبر خدمة فوترة الطلاب — المسار الصحيح مع المعترضات)
+    this.billingAccount.set(null);
+    this.invoices.set([]);
+    this.receipts.set([]);
+    this.sfService.listBillingAccounts({ page_size: 500 }).subscribe((res) => {
+      const accounts = res?.data || [];
+      // الربط عبر معرّف الطالب (student_id) في حساب الفوترة
+      const account = accounts.find((a: any) => a.student_id === this.id);
+      if (account) {
+        this.billingAccount.set(account);
+        this.sfService.invoicesForAccount(account.id).subscribe((invRes) => this.invoices.set(invRes?.data || []));
+        this.sfService.receiptsForAccount(account.id).subscribe((rcpRes) => this.receipts.set(rcpRes?.data || []));
+        this.sfService.listPaymentMethods().subscribe((pmRes) => this.paymentMethods.set(pmRes?.data || []));
       }
     });
   }

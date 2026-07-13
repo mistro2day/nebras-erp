@@ -33,6 +33,7 @@ class CanDecide(BasePermission):
     """
     السماح باتخاذ قرار اعتماد إذا كان المستخدم يملك صلاحية القرار المباشرة، أو كان هو
     المُكلَّف الحالي بالطلب، أو كان مفوَّضاً حالياً من قبل المُكلَّف الحالي.
+    المستخدم الخارق (superuser) مسموح له باتخاذ القرار نيابة عن الجميع دائماً.
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -40,6 +41,9 @@ class CanDecide(BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+
         guard = HasPermission('approval_center:requests:decide')
         if guard.has_permission(request, view):
             return True
