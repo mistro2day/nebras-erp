@@ -116,6 +116,21 @@ class PayrollRunViewSet(BaseCRUDViewSet):
     model_class = PayrollRun
     serializer_class = PayrollRunSerializer
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        old_status = instance.status
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save(updated_by=request.user.id if request.user else None)
+        
+        # Check if transitioned to approved or paid
+        if old_status not in ('approved', 'paid') and instance.status in ('approved', 'paid'):
+            self._generate_payroll_finance_records(instance)
+            
+        return StandardResponse(self.get_serializer(instance).data)
+
     def _sync_approval_status(self, instance):
         if instance.status == 'review' and instance.approval_request_id:
             try:
@@ -152,6 +167,10 @@ class PayrollRunViewSet(BaseCRUDViewSet):
             
             tenant_id = instance.tenant_id
             period_code = instance.period.code if instance.period else ""
+            
+            # Prevent double posting
+            if Voucher.objects.filter(tenant_id=tenant_id, voucher_number__startswith=f"PV-PAY-{instance.id.hex[:6].upper()}").exists():
+                return
             
             currency = Currency.objects.filter(tenant_id=tenant_id).first() or Currency.objects.first()
             pay_method = PaymentMethod.objects.filter(tenant_id=tenant_id).first() or PaymentMethod.objects.first()

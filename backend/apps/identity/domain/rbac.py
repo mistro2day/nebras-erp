@@ -95,3 +95,66 @@ class UserRole(CombinedBaseModel):
     class Meta:
         db_table = 'user_roles'
         unique_together = ('tenant_id', 'user', 'role')
+
+
+# ============================================================
+# تهيئة الأدوار والصلاحيات النظامية (idempotent)
+# ============================================================
+def ensure_system_roles(tenant_id, created_by=None):
+    """
+    يضمن وجود كتالوج الصلاحيات والأدوار النظامية وربطها للمستأجر المحدد.
+
+    - ينشئ سجلات `Permission` العامة (مشتركة بين المستأجرين، code فريد عالمياً).
+    - ينشئ أدوار `Role` النظامية لهذا المستأجر (administrator/teacher/parent/student).
+    - يربط كل دور بصلاحياته عبر `RolePermission`.
+
+    آمن للاستدعاء المتكرر — لا ينشئ تكراراً. يُعيد dict: {role_code: Role}.
+    """
+    from apps.identity.domain.rbac_catalog import (
+        PERMISSION_CATALOG, SYSTEM_ROLES, resolve_role_permissions,
+    )
+    from django.db import transaction
+
+    with transaction.atomic():
+        # 1. كتالوج الصلاحيات (عام)
+        perm_by_code = {}
+        for code, name, module, resource, action in PERMISSION_CATALOG:
+            perm, _ = Permission.objects.get_or_create(
+                code=code,
+                defaults={
+                    'name': name,
+                    'module': module,
+                    'resource': resource,
+                    'action': action if action in dict(Permission.ACTIONS) else 'custom',
+                    'type': 'api',
+                },
+            )
+            perm_by_code[code] = perm
+
+        # 2. الأدوار النظامية + ربط الصلاحيات
+        roles = {}
+        for role_code, spec in SYSTEM_ROLES.items():
+            role, _ = Role.objects.get_or_create(
+                tenant_id=tenant_id,
+                code=role_code,
+                defaults={
+                    'name': spec['name'],
+                    'category': 'system',
+                    'is_system': True,
+                    'created_by': created_by,
+                },
+            )
+            roles[role_code] = role
+
+            existing = set(
+                RolePermission.objects.filter(role=role).values_list('permission__code', flat=True)
+            )
+            to_link = [
+                RolePermission(role=role, permission=perm_by_code[code])
+                for code in resolve_role_permissions(role_code)
+                if code in perm_by_code and code not in existing
+            ]
+            if to_link:
+                RolePermission.objects.bulk_create(to_link, ignore_conflicts=True)
+
+        return roles

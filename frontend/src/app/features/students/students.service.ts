@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ApiClientService } from '../../core/services/api-client.service';
 import { environment } from '../../../environments/environment';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, map } from 'rxjs';
 
 export interface Student {
   id: string;
@@ -197,14 +197,6 @@ export class StudentsService {
     return this.http.post<any>(`${environment.apiUrl}platform/storage/upload/`, formData);
   }
 
-  /** تصدير قائمة الطلاب CSV (نقطة نهاية حقيقية bulk-export؛ المصادقة والمستأجر يُحقنان عبر الـ interceptor) */
-  bulkExport(params?: Record<string, string>): Observable<Blob> {
-    return this.http.get(`${environment.apiUrl}students/students/bulk-export/`, {
-      params: params ?? {},
-      responseType: 'blob',
-    });
-  }
-
   saveRelation(studentId: string, relationData: any): Observable<any> {
     return this.apiClient.post(`students/students/${studentId}/save-relation/`, relationData);
   }
@@ -213,11 +205,20 @@ export class StudentsService {
     return this.apiClient.post(`students/students/${studentId}/delete-relation/`, { relation_id: relationId });
   }
 
+  /** تفعيل حساب بوابة ولي الأمر وإرسال بيانات الدخول عبر البريد وواتساب */
   activateGuardianPortal(studentId: string, relationId: string): Observable<any> {
     return this.apiClient.post(`students/students/${studentId}/activate-guardian/`, { relation_id: relationId });
   }
 
+  /** تفعيل حساب بوابة الطالب وإرسال بيانات الدخول عبر البريد وواتساب */
+  activateStudentPortal(studentId: string): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/activate-student/`, {});
+  }
+
+  /** جلب بيانات هوية المدرسة (الشعار والاسم) للمستأجر الحالي — تُستخدم في ترويسة ملف الطالب */
   getBranding(): Observable<any> {
-    return this.apiClient.get('tenants/branding/current/');
+    return this.apiClient.get(`tenants/branding/current/`).pipe(
+      map((res: any) => res?.data ?? res)
+    );
   }
 }

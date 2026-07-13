@@ -152,16 +152,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                     <span class="status-indicator" [class.active]="rel.is_portal_active"></span>
                     <span class="status-text">{{ rel.is_portal_active ? 'حساب البوابة مفعل ونشط' : 'حساب البوابة غير مفعل' }}</span>
                   </div>
-                  <button 
-                    *ngIf="!rel.is_portal_active" 
-                    type="button" 
-                    class="nb-btn-primary sm active-btn" 
-                    [disabled]="!rel.email"
-                    [title]="!rel.email ? 'يجب إدخال البريد الإلكتروني أولاً لتفعيل الحساب' : 'تفعيل حساب البوابة'"
-                    (click)="activateGuardian(rel.id)"
-                  >
-                    🔑 تفعيل حساب البوابة
-                  </button>
+                  <span class="portal-hint">لتفعيل حساب البوابة استخدم شاشة عرض ملف الطالب</span>
                 </div>
               </div>
 
@@ -486,18 +477,6 @@ export class StudentEditComponent implements OnInit {
         }
       });
     }
-  }
-
-  activateGuardian(relationId: string): void {
-    this.studentsService.activateGuardianPortal(this.id, relationId).subscribe({
-      next: (res) => {
-        alert(res.message || 'تم تفعيل حساب البوابة بنجاح.');
-        this.reloadRelations();
-      },
-      error: (err) => {
-        this.error.set(err?.error?.error?.message || 'فشل تفعيل الحساب لولي الأمر.');
-      }
-    });
   }
 
   private reloadRelations(): void {

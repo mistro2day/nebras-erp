@@ -16,11 +16,15 @@ interface NavItem {
   match?: string;
   /** عناصر فرعية — تُعرض كقائمة متفرعة قابلة للطي في الشريط الجانبي */
   children?: NavItem[];
+  /** صلاحية مطلوبة لإظهار العنصر (اختياري) — يُخفى إن لم يمتلكها المستخدم */
+  permission?: string;
 }
 
 interface NavGroup {
   label?: string;
   items: NavItem[];
+  /** صلاحية مطلوبة لإظهار المجموعة كاملة (اختياري) */
+  permission?: string;
 }
 
 /**
@@ -42,7 +46,7 @@ interface NavGroup {
         </a>
 
         <nav class="sidebar-nav">
-          @for (group of navGroups; track group.label ?? 'root') {
+          @for (group of filteredNavGroups(); track group.label ?? 'root') {
             @if (group.label) {
               <div class="nav-group-label">{{ group.label }}</div>
             }
@@ -557,6 +561,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'الموارد البشرية',
+      permission: 'employees:read',
       items: [
         { label: 'الموارد البشرية', link: '/hr' },
         { label: 'الرواتب', link: '/payroll' },
@@ -565,6 +570,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'المالية والمشتريات',
+      permission: 'finance:read',
       items: [
         { label: 'المالية', link: '/finance' },
         {
@@ -583,6 +589,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'سلسلة الإمداد والخدمات',
+      permission: 'settings:read',
       items: [
         { label: 'المخزون', link: '/inventory' },
         { label: 'الأصول', link: '/assets' },
@@ -594,6 +601,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'العلاقات والاتصال',
+      permission: 'settings:read',
       items: [
         { label: 'إدارة علاقات العملاء', link: '/crm' },
         { label: 'الاتصالات', link: '/communications' },
@@ -602,6 +610,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'المعرفة والأتمتة',
+      permission: 'settings:read',
       items: [
         { label: 'التقارير والتحليلات', link: '/reporting' },
         { label: 'إدارة المستندات', link: '/documents' },
@@ -612,6 +621,7 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'النظام والإدارة',
+      permission: 'settings:read',
       items: [
         { label: 'منصة النظام', link: '/platform' },
         { label: 'الإعدادات والميزات', link: '/config' },
@@ -623,6 +633,30 @@ export class DashboardLayoutComponent {
       ],
     },
   ];
+
+  /**
+   * القوائم المفلترة حسب صلاحيات المستخدم الحالي.
+   * تعتمد على إشارة الصلاحيات في AuthService فتتحدث تلقائياً بعد تسجيل الدخول.
+   */
+  readonly filteredNavGroups = computed<NavGroup[]>(() => {
+    // قراءة إشارة الصلاحيات لجعل الحساب تفاعلياً
+    this.authService.userPermissions();
+
+    const canSee = (perm?: string) => !perm || this.authService.hasPermission(perm);
+
+    return this.navGroups
+      .filter((group) => canSee(group.permission))
+      .map((group) => ({
+        ...group,
+        items: group.items
+          .filter((item) => canSee(item.permission))
+          .map((item) => ({
+            ...item,
+            children: item.children?.filter((child) => canSee(child.permission)),
+          })),
+      }))
+      .filter((group) => group.items.length > 0);
+  });
 
   private readonly pageTitles: Record<string, string> = {
     dashboard: 'لوحة القيادة التنفيذية',
@@ -663,7 +697,16 @@ export class DashboardLayoutComponent {
     return u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'د. عبدالله المطيري' : 'د. عبدالله المطيري';
   });
 
-  readonly userRole = computed(() => 'المدير التنفيذي');
+  readonly userRole = computed(() => {
+    // قراءة إشارة الصلاحيات لجعل الحساب تفاعلياً
+    this.authService.userPermissions();
+    if (this.authService.isSuperuser()) return 'مدير النظام';
+    if (this.authService.hasPermission('settings:read')) return 'إداري';
+    if (this.authService.hasPermission('grades:update')) return 'معلم';
+    if (this.authService.hasPermission('portal:parent')) return 'ولي أمر';
+    if (this.authService.hasPermission('portal:student')) return 'طالب';
+    return 'مستخدم';
+  });
 
   readonly userInitials = computed(() => {
     const u = this.authService.currentUser();

@@ -60,6 +60,9 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             </button>
             <div class="spacer"></div>
             <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">تعديل الملف</button>
+            <button class="nb-btn-primary" (click)="activateStudent(s)" [disabled]="activatingStudent()" title="إنشاء حساب بوابة الطالب وإرسال بيانات الدخول عبر البريد وواتساب">
+              {{ activatingStudent() ? 'جارٍ التفعيل…' : '🎓 تفعيل حساب الطالب' }}
+            </button>
             <button class="nb-btn-secondary" (click)="graduate(s)" [disabled]="s.status === 'graduated'">تخريج</button>
             <button class="nb-btn-secondary" (click)="withdraw(s)" [disabled]="s.status === 'withdrawn'">تسجيل انسحاب</button>
             <button class="nb-btn-danger" (click)="archive(s)">أرشفة</button>
@@ -98,6 +101,11 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                       <p><strong>الهاتف:</strong> {{ member.phone || '—' }}</p>
                       <p><strong>البريد الإلكتروني:</strong> {{ member.email || 'غير متوفر' }}</p>
                       <p><strong>الرقم الوطني / الجواز:</strong> {{ member.national_id || 'غير متوفر' }}</p>
+                      <button class="nb-btn-primary sm" (click)="activateGuardian(s, member.id)"
+                        [disabled]="!member.email || activatingGuardianId() === member.id"
+                        [title]="!member.email ? 'يجب إدخال البريد الإلكتروني أولاً لتفعيل الحساب' : 'تفعيل حساب البوابة وإرسال بيانات الدخول'">
+                        {{ activatingGuardianId() === member.id ? 'جارٍ التفعيل…' : '🔑 تفعيل حساب ولي الأمر' }}
+                      </button>
                     </div>
                   }
                   @if (!s.family_relations || s.family_relations.length === 0) {
@@ -912,8 +920,40 @@ export class StudentDetailsComponent implements OnInit {
 
   readonly documents = computed(() => this.timeline().filter((e) => e.type === 'document_upload'));
   schoolInfo = signal<any>(null);
+  readonly activatingStudent = signal(false);
+  readonly activatingGuardianId = signal<string | null>(null);
 
   private id = '';
+
+  activateStudent(s: any): void {
+    if (this.activatingStudent()) return;
+    this.activatingStudent.set(true);
+    this.studentsService.activateStudentPortal(s.id).subscribe({
+      next: (res) => {
+        this.activatingStudent.set(false);
+        alert(res?.message || 'تم تفعيل حساب الطالب وإرسال بيانات الدخول بنجاح.');
+      },
+      error: (err) => {
+        this.activatingStudent.set(false);
+        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل حساب الطالب.');
+      }
+    });
+  }
+
+  activateGuardian(s: any, relationId: string): void {
+    if (this.activatingGuardianId()) return;
+    this.activatingGuardianId.set(relationId);
+    this.studentsService.activateGuardianPortal(s.id, relationId).subscribe({
+      next: (res) => {
+        this.activatingGuardianId.set(null);
+        alert(res?.message || 'تم تفعيل حساب ولي الأمر وإرسال بيانات الدخول بنجاح.');
+      },
+      error: (err) => {
+        this.activatingGuardianId.set(null);
+        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل الحساب لولي الأمر.');
+      }
+    });
+  }
 
   statusBadge(status: string): string {
     const map: Record<string, string> = {

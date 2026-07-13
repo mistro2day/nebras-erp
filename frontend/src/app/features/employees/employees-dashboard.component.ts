@@ -13,6 +13,7 @@ export interface EmployeeInfo {
   department: string;
   employment_type: string;
   status: string;
+  email?: string;
 }
 
 /**
@@ -45,6 +46,7 @@ export interface EmployeeInfo {
             <span>المسمى الوظيفي</span>
             <span>نوع التوظيف</span>
             <span>الحالة</span>
+            <span>الحساب</span>
           </div>
           @for (emp of employees(); track emp.id) {
             <div class="tbl-row">
@@ -55,6 +57,13 @@ export interface EmployeeInfo {
               <span>{{ emp.employment_type }}</span>
               <span>
                 <span [class]="emp.status === 'active' ? 'nb-badge-success' : 'nb-badge-neutral'">{{ emp.status === 'active' ? 'نشط' : emp.status }}</span>
+              </span>
+              <span>
+                <button class="nb-btn-primary sm" (click)="activateAccount(emp)"
+                  [disabled]="!emp.email || activatingId() === emp.id"
+                  [title]="!emp.email ? 'يجب توفّر البريد الإلكتروني لتفعيل الحساب' : 'تفعيل دخول النظام + بوابة الخدمة الذاتية وإرسال بيانات الدخول'">
+                  {{ activatingId() === emp.id ? 'جارٍ التفعيل…' : '🔑 تفعيل الحساب' }}
+                </button>
               </span>
             </div>
           }
@@ -76,7 +85,7 @@ export interface EmployeeInfo {
     .tbl { display: flex; flex-direction: column; }
     .tbl-head, .tbl-row {
       display: grid;
-      grid-template-columns: 1fr 1.6fr 1fr 1.2fr 1fr 0.9fr;
+      grid-template-columns: 1fr 1.6fr 1fr 1.2fr 1fr 0.9fr 1.2fr;
       gap: 8px;
       padding: 9px 16px;
       align-items: center;
@@ -105,9 +114,25 @@ export class EmployeesDashboardComponent implements OnInit {
   http = inject(HttpClient);
 
   employees = signal<EmployeeInfo[]>([]);
+  activatingId = signal<string | null>(null);
 
   ngOnInit() {
     this.loadEmployees();
+  }
+
+  activateAccount(emp: EmployeeInfo) {
+    if (this.activatingId()) return;
+    this.activatingId.set(emp.id);
+    this.http.post<any>(`/api/v1/employees/employees/${emp.id}/activate-account/`, {}).subscribe({
+      next: (res) => {
+        this.activatingId.set(null);
+        alert(res?.message || 'تم تفعيل حساب الموظف وإرسال بيانات الدخول بنجاح.');
+      },
+      error: (err) => {
+        this.activatingId.set(null);
+        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل حساب الموظف.');
+      }
+    });
   }
 
   loadEmployees() {

@@ -26,7 +26,7 @@ class CommunicationChannel(CombinedSharedModel):
     )
 
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50, unique=True, db_index=True)
+    code = models.CharField(max_length=50, db_index=True)
     channel_type = models.CharField(max_length=30, choices=CHANNEL_TYPES, db_index=True)
     description = models.TextField(blank=True, null=True)
     icon = models.CharField(max_length=50, blank=True, null=True, help_text="اسم الأيقونة (Material Icon)")

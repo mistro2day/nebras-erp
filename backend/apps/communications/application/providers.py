@@ -264,12 +264,42 @@ class WebhookProvider(BaseProvider):
 # ============================================================
 # مصنع المزودين — Provider Factory
 # ============================================================
+# ============================================================
+# مزود المحاكاة — Mock Provider (للتطوير والاختبار)
+# ============================================================
+class MockProvider(BaseProvider):
+    """
+    مزود محاكاة لا يرسل خارجياً — يسجّل الرسالة فقط ويعيد نجاحاً.
+    يُستخدم في بيئات التطوير قبل ربط مزود حقيقي.
+    """
+
+    def _validate_config(self):
+        pass
+
+    def send(self, to, subject=None, body=None, html_body=None,
+             attachments=None, metadata=None) -> dict:
+        logger.info(f"[MOCK] رسالة محاكاة إلى {to} | الموضوع: {subject or '—'} | المحتوى: {(body or '')[:80]}")
+        import uuid as _uuid
+        return {
+            'success': True,
+            'external_id': f'mock-{_uuid.uuid4().hex[:12]}',
+            'response': {'provider': 'mock', 'to': to},
+        }
+
+    def check_status(self, external_id: str) -> dict:
+        return {'status': 'delivered', 'external_id': external_id}
+
+    def test_connection(self) -> dict:
+        return {'success': True, 'message': 'مزود المحاكاة جاهز.'}
+
+
 class ProviderFactory:
     """
     مصنع المزودين. ينشئ المزود المناسب بناءً على نوع القناة والمزود.
     """
 
     _provider_map = {
+        'mock': MockProvider,
         'email': EmailProvider,
         'smtp': EmailProvider,
         'microsoft365': EmailProvider,
