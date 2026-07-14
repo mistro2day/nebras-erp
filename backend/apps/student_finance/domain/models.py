@@ -472,3 +472,47 @@ class StudentFinanceSettings(CombinedSharedModel):
         db_table = 'nebras_student_finance_settings'
         verbose_name = "إعدادات مالية الطلاب"
         verbose_name_plural = "إعدادات مالية الطلاب"
+
+
+# 29. OnlinePaymentRequest (طلب سداد أونلاين من ولي الأمر عبر تحويل بنكي)
+class OnlinePaymentRequest(CombinedSharedModel):
+    """
+    طلب سداد يقدّمه ولي الأمر عبر التحويل البنكي (بنك الخرطوم / تطبيق بنكك).
+
+    يرفق ولي الأمر إيصال التحويل ويبقى الطلب «معلّقاً» حتى يراجعه المحاسب
+    فيعتمده (يولّد إيصال قبض مرحّل ويخصم من مستحقات الطالب) أو يرفضه بسبب.
+    """
+    STATUS_CHOICES = (
+        ('pending', 'معلّق قيد المراجعة'),
+        ('approved', 'معتمد'),
+        ('rejected', 'مرفوض'),
+    )
+    student_billing_account = models.ForeignKey(
+        StudentBillingAccount, on_delete=models.PROTECT, related_name='online_payment_requests'
+    )
+    student_id = models.UUIDField(db_index=True)
+    submitted_by_user_id = models.UUIDField(null=True, blank=True, help_text="مستخدم ولي الأمر مقدّم الطلب")
+
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    bank_name = models.CharField(max_length=100, default='بنك الخرطوم')
+    transfer_reference = models.CharField(max_length=50, help_text="الرقم المرجعي للتحويل (عبر بنكك)")
+    transfer_date = models.DateField()
+    sender_name = models.CharField(max_length=150, blank=True, null=True, help_text="اسم صاحب الحساب المُحوِّل")
+    note = models.TextField(blank=True, null=True)
+    receipt_attachment = models.FileField(upload_to='student_finance/online_payments/%Y/%m/')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    reviewed_by = models.UUIDField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    receipt_id = models.UUIDField(null=True, blank=True, help_text="إيصال القبض المُنشأ عند الاعتماد")
+    posted_to_gl = models.BooleanField(default=False, help_text="هل رُحّل القيد المحاسبي في دفتر الأستاذ")
+
+    class Meta:
+        db_table = 'nebras_online_payment_requests'
+        ordering = ['-created_at']
+        verbose_name = "طلب سداد أونلاين"
+        verbose_name_plural = "طلبات السداد الأونلاين"
+
+    def __str__(self):
+        return f"{self.transfer_reference} - {self.amount} ({self.status})"

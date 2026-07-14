@@ -55,6 +55,19 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/receivables/', params);
   }
 
+  // ---- طلبات السداد الأونلاين (مراجعة المحاسب) ----
+  listOnlinePayments(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/online-payments/', params);
+  }
+
+  approveOnlinePayment(id: string): Observable<any> {
+    return this.api.post<any>(`student-finance/online-payments/${id}/approve/`, {});
+  }
+
+  rejectOnlinePayment(id: string, reason: string): Observable<any> {
+    return this.api.post<any>(`student-finance/online-payments/${id}/reject/`, { reason });
+  }
+
   listScholarships(params?: ListParams): Observable<PagedResponse<any>> {
     return this.api.get<PagedResponse<any>>('student-finance/scholarships/', params);
   }

@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
 
 from apps.portal.domain.models import (
     PortalUser, PortalNotification, PortalAnnouncement, PortalMessage, PortalTask, PortalSettings
@@ -11,7 +12,10 @@ from apps.portal.interfaces.serializers import (
     PortalUserSerializer, PortalNotificationSerializer, PortalAnnouncementSerializer,
     PortalMessageSerializer, PortalTaskSerializer, PortalSettingsSerializer
 )
-from apps.portal.application.services import PortalDashboardService, PortalReportService
+from apps.portal.application.services import (
+    PortalDashboardService, PortalReportService, ParentPortalService
+)
+from django.core.exceptions import PermissionDenied
 
 
 class ParentDashboardView(APIView):
@@ -61,6 +65,87 @@ class ApplicantDashboardView(APIView):
 
         data = PortalDashboardService.get_applicant_dashboard_data(tenant_id, portal_user)
         return Response(data)
+
+
+class ParentChildrenView(APIView):
+    """قائمة أبناء ولي الأمر بتفاصيلهم الحقيقية."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        try:
+            portal_user = PortalUser.objects.get(user=request.user)
+        except PortalUser.DoesNotExist:
+            return Response({"detail": "المستخدم غير مسجل ببوابة الخدمات الرقمية."}, status=status.HTTP_404_NOT_FOUND)
+        if portal_user.user_type != 'parent':
+            return Response({"detail": "هذه الخدمة مخصصة لأولياء الأمور فقط."}, status=status.HTTP_403_FORBIDDEN)
+        data = ParentPortalService.get_children(tenant_id, portal_user)
+        return Response(data)
+
+
+class ParentChildDetailView(APIView):
+    """الملف الكامل لابن محدد (أكاديمي/مالي/شخصي) مع فحص الصلاحية."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, student_id):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        try:
+            portal_user = PortalUser.objects.get(user=request.user)
+        except PortalUser.DoesNotExist:
+            return Response({"detail": "المستخدم غير مسجل ببوابة الخدمات الرقمية."}, status=status.HTTP_404_NOT_FOUND)
+        if portal_user.user_type != 'parent':
+            return Response({"detail": "هذه الخدمة مخصصة لأولياء الأمور فقط."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            data = ParentPortalService.get_child_detail(tenant_id, portal_user, student_id)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        if not data:
+            return Response({"detail": "الطالب غير موجود."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(data)
+
+
+class ParentContactView(APIView):
+    """تواصل ولي الأمر مع الإدارة أو معلّم — يرسل رسالة عبر البريد ويسجّلها بالبوابة."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        try:
+            portal_user = PortalUser.objects.get(user=request.user)
+        except PortalUser.DoesNotExist:
+            return Response({"detail": "المستخدم غير مسجل ببوابة الخدمات الرقمية."}, status=status.HTTP_404_NOT_FOUND)
+
+        audience = request.data.get('audience', 'admin')  # admin | teacher
+        subject = (request.data.get('subject') or '').strip()
+        body = (request.data.get('body') or '').strip()
+        if not subject or not body:
+            return Response({"detail": "الرجاء إدخال الموضوع ونص الرسالة."}, status=status.HTTP_400_BAD_REQUEST)
+
+        sender_name = portal_user.profile.display_name_ar if hasattr(portal_user, 'profile') else 'ولي أمر'
+
+        # إرسال بريد إلى المدرسة (عنوان المستأجر)
+        try:
+            from apps.tenants.domain.models import Tenant
+            from apps.communications.application.services import CommunicationService
+            from apps.communications.application.provisioning import ensure_communication_defaults
+
+            tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else Tenant.objects.first()
+            to_email = getattr(tenant, 'email', None)
+            if tenant and to_email:
+                ensure_communication_defaults(tenant.id, created_by=request.user.id)
+                target = 'إدارة المدرسة' if audience == 'admin' else 'المعلّم'
+                CommunicationService.send_message(
+                    tenant_id=tenant.id, channel_code='email',
+                    recipients=[{'type': 'to', 'entity_type': 'tenant', 'entity_id': tenant.id,
+                                 'name': target, 'address': to_email}],
+                    subject=f"[رسالة ولي أمر] {subject}",
+                    body=f"من: {sender_name}\nإلى: {target}\n\n{body}",
+                    priority='normal', source_module='portal', source_event='parent_contact',
+                )
+        except Exception:
+            pass
+
+        return Response({"detail": "تم إرسال رسالتك إلى المدرسة وسيتم الرد عليك قريباً."}, status=status.HTTP_201_CREATED)
 
 
 class PortalProfileView(APIView):

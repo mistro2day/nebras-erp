@@ -25,5 +25,9 @@ export const STUDENT_FINANCE_ROUTES: Routes = [
   {
     path: 'outstanding',
     loadComponent: () => import('./outstanding/outstanding-list.component').then(m => m.SfOutstandingListComponent)
+  },
+  {
+    path: 'online-payments',
+    loadComponent: () => import('./online-payments/online-payments-review.component').then(m => m.OnlinePaymentsReviewComponent)
   }
 ];

@@ -10,7 +10,7 @@ from apps.student_finance.interfaces.views import (
     RefundViewSet, CreditNoteViewSet, DebitNoteViewSet,
     LateFeeRuleViewSet, CollectionPolicyViewSet, FinancialHoldViewSet,
     BillingCycleViewSet, StatementViewSet, BillingAuditViewSet,
-    StudentFinanceSettingsViewSet
+    StudentFinanceSettingsViewSet, OnlinePaymentRequestViewSet
 )
 
 router = DefaultRouter()
@@ -42,6 +42,7 @@ router.register('billing-cycles', BillingCycleViewSet, basename='billing-cycle')
 router.register('statements', StatementViewSet, basename='statement')
 router.register('billing-audits', BillingAuditViewSet, basename='billing-audit')
 router.register('settings', StudentFinanceSettingsViewSet, basename='settings')
+router.register('online-payments', OnlinePaymentRequestViewSet, basename='online-payment')
 
 urlpatterns = [
     path('', include(router.urls)),

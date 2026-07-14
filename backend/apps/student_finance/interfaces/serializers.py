@@ -5,7 +5,8 @@ from apps.student_finance.domain.models import (
     InvoiceDiscount, Scholarship, ScholarshipRule, FinancialAid,
     InstallmentPlan, Installment, StudentReceivable, PaymentAllocation,
     Receipt, Refund, CreditNote, DebitNote, LateFeeRule, CollectionPolicy,
-    FinancialHold, BillingCycle, Statement, BillingAudit, StudentFinanceSettings
+    FinancialHold, BillingCycle, Statement, BillingAudit, StudentFinanceSettings,
+    OnlinePaymentRequest
 )
 
 class BaseStudentFinanceSerializer(serializers.ModelSerializer):
@@ -155,3 +156,32 @@ class StudentFinanceSettingsSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = StudentFinanceSettings
         fields = '__all__'
+
+
+class OnlinePaymentRequestSerializer(BaseStudentFinanceSerializer):
+    student_name = serializers.SerializerMethodField()
+    receipt_url = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta(BaseStudentFinanceSerializer.Meta):
+        model = OnlinePaymentRequest
+        fields = '__all__'
+        read_only_fields = BaseStudentFinanceSerializer.Meta.read_only_fields + (
+            'status', 'reviewed_by', 'reviewed_at', 'rejection_reason',
+            'receipt_id', 'posted_to_gl', 'submitted_by_user_id', 'student_id',
+        )
+
+    def get_student_name(self, obj):
+        try:
+            from apps.students.domain.models import Student
+            s = Student.objects.filter(id=obj.student_id).select_related('profile').first()
+            return getattr(getattr(s, 'profile', None), 'arabic_name', None)
+        except Exception:
+            return None
+
+    def get_receipt_url(self, obj):
+        if not obj.receipt_attachment:
+            return None
+        request = self.context.get('request')
+        url = obj.receipt_attachment.url
+        return request.build_absolute_uri(url) if request else url

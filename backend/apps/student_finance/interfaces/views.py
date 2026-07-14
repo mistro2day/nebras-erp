@@ -32,6 +32,11 @@ from apps.student_finance.interfaces.serializers import (
 from apps.student_finance.application.services import (
     BillingService, PaymentService, ScholarshipService, HoldService
 )
+from apps.student_finance.application import online_payment as online_payment_service
+from apps.student_finance.domain.models import OnlinePaymentRequest
+from apps.student_finance.interfaces.serializers import OnlinePaymentRequestSerializer
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 
 class FeeCategoryViewSet(BaseCRUDViewSet):
@@ -378,3 +383,90 @@ class BillingAuditViewSet(BaseCRUDViewSet):
 class StudentFinanceSettingsViewSet(BaseCRUDViewSet):
     model_class = StudentFinanceSettings
     serializer_class = StudentFinanceSettingsSerializer
+
+
+class OnlinePaymentRequestViewSet(BaseCRUDViewSet):
+    """طلبات السداد الأونلاين لأولياء الأمور (تحويل بنكي + مراجعة المحاسب)."""
+    model_class = OnlinePaymentRequest
+    serializer_class = OnlinePaymentRequestSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [filters.OrderingFilter]
+    ordering = ['-created_at']
+
+    def _tenant(self, request):
+        return request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_param = self.request.query_params.get('status')
+        account = self.request.query_params.get('student_billing_account')
+        student = self.request.query_params.get('student_id')
+        mine = self.request.query_params.get('mine')
+        if status_param:
+            qs = qs.filter(status=status_param)
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        if student:
+            qs = qs.filter(student_id=student)
+        if mine in ('1', 'true', 'yes') and self.request.user:
+            qs = qs.filter(submitted_by_user_id=self.request.user.id)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        """تقديم طلب سداد جديد من ولي الأمر (multipart مع إيصال التحويل)."""
+        tenant_id = self._tenant(request)
+        data = request.data
+        try:
+            req = online_payment_service.submit_payment_request(
+                tenant_id=tenant_id,
+                billing_account_id=data.get('student_billing_account') or data.get('billing_account_id'),
+                amount=data.get('amount'),
+                transfer_reference=data.get('transfer_reference'),
+                transfer_date=data.get('transfer_date'),
+                receipt_attachment=request.FILES.get('receipt_attachment'),
+                sender_name=data.get('sender_name'),
+                note=data.get('note'),
+                bank_name=data.get('bank_name', 'بنك الخرطوم'),
+                submitted_by_user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': str(e.message if hasattr(e, 'message') else e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(req)
+        return StandardResponse(serializer.data,
+                                message="تم استلام طلب السداد وهو الآن قيد مراجعة المحاسبة.",
+                                status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        tenant_id = self._tenant(request)
+        try:
+            req = online_payment_service.approve_payment_request(
+                tenant_id=tenant_id, request_id=pk,
+                reviewer_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': str(e.message if hasattr(e, 'message') else e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(req).data,
+                                message="تم اعتماد السداد وتحديث حساب الطالب المالي.")
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        tenant_id = self._tenant(request)
+        try:
+            req = online_payment_service.reject_payment_request(
+                tenant_id=tenant_id, request_id=pk,
+                reviewer_id=request.user.id if request.user else None,
+                reason=request.data.get('reason'),
+            )
+        except DjangoValidationError as e:
+            return Response({'error': str(e.message if hasattr(e, 'message') else e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(req).data,
+                                message="تم رفض طلب السداد وإشعار ولي الأمر.")
+
+    @action(detail=False, methods=['get'], url_path='pending-count')
+    def pending_count(self, request):
+        n = self.get_queryset().filter(status='pending').count()
+        return StandardResponse({'pending': n}, message="عدد الطلبات المعلقة.")

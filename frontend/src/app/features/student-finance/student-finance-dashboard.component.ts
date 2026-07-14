@@ -132,6 +132,7 @@ export class StudentFinanceDashboardComponent implements OnInit {
     { key: 'invoices', title: 'الفواتير', desc: 'فواتير الرسوم الصادرة وحالاتها.', icon: '🧾', route: '/student-finance/invoices' },
     { key: 'receipts', title: 'التحصيلات', desc: 'إيصالات السداد وسندات القبض.', icon: '💵', route: '/student-finance/receipts' },
     { key: 'outstanding', title: 'المستحقات والقبض', desc: 'الأرصدة المستحقة غير المدفوعة.', icon: '⏳', route: '/student-finance/outstanding' },
+    { key: 'online-payments', title: 'مدفوعات أولياء الأمور', desc: 'مراجعة تحويلات أولياء الأمور واعتمادها.', icon: '🏦', route: '/student-finance/online-payments' },
   ];
 
   ngOnInit() { this.load(); }

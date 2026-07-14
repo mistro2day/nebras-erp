@@ -143,6 +143,146 @@ class PortalDashboardService:
         }
 
 
+class ParentPortalService:
+    """
+    خدمة بيانات بوابة ولي الأمر: قائمة الأبناء بتفاصيلهم الحقيقية،
+    والملف الكامل لكل ابن (أكاديمي/مالي/شخصي).
+    """
+
+    @staticmethod
+    def _linked_student_ids(portal_user):
+        try:
+            return [str(sid) for sid in portal_user.profile.parent_profile.linked_students or []]
+        except Exception:
+            return []
+
+    @staticmethod
+    def _finance_summary(tenant_id, student_id):
+        """ملخص مالي للطالب من وحدة مالية الطلاب."""
+        from apps.student_finance.domain.models import StudentBillingAccount
+        acc = StudentBillingAccount.objects.filter(
+            tenant_id=tenant_id, student_id=student_id, deleted_at__isnull=True
+        ).first()
+        if not acc:
+            return {'billing_account_id': None, 'account_number': None,
+                    'outstanding_balance': 0.0, 'credit_balance': 0.0}
+        return {
+            'billing_account_id': str(acc.id),
+            'account_number': acc.account_number,
+            'outstanding_balance': float(acc.outstanding_balance),
+            'credit_balance': float(acc.credit_balance),
+            'financial_hold': acc.financial_hold,
+        }
+
+    @staticmethod
+    def _grade_label(portal_user, student):
+        """محاولة جلب اسم الصف من ملف بوابة الطالب إن وُجد."""
+        try:
+            from apps.portal.domain.models import StudentProfile as PortalStudentProfile
+            sp = PortalStudentProfile.objects.filter(student_id=student.id).first()
+            if sp and sp.grade_level:
+                return sp.grade_level
+        except Exception:
+            pass
+        return None
+
+    @classmethod
+    def get_children(cls, tenant_id, portal_user):
+        from apps.students.domain.models import Student
+        ids = cls._linked_student_ids(portal_user)
+        children = []
+        students = Student.objects.filter(id__in=ids, deleted_at__isnull=True).select_related('profile')
+        for s in students:
+            profile = getattr(s, 'profile', None)
+            fin = cls._finance_summary(tenant_id, s.id)
+            children.append({
+                'student_id': str(s.id),
+                'student_number': s.student_number,
+                'status': s.status,
+                'name': getattr(profile, 'arabic_name', '') or '—',
+                'gender': getattr(profile, 'gender', '') or '',
+                'grade_level': cls._grade_label(portal_user, s),
+                'outstanding_balance': fin['outstanding_balance'],
+                'billing_account_id': fin['billing_account_id'],
+            })
+        return {'children': children, 'count': len(children)}
+
+    @classmethod
+    def get_child_detail(cls, tenant_id, portal_user, student_id):
+        # التحقق من الصلاحية
+        PortalAccessRuleService.validate_parent_student_access(portal_user, student_id)
+
+        from apps.students.domain.models import Student
+        from apps.student_finance.domain.models import (
+            StudentInvoice, Receipt, StudentReceivable, OnlinePaymentRequest,
+        )
+        s = Student.objects.filter(id=student_id, deleted_at__isnull=True).select_related('profile').first()
+        if not s:
+            return None
+        profile = getattr(s, 'profile', None)
+        fin = cls._finance_summary(tenant_id, s.id)
+
+        # المالية التفصيلية
+        invoices, receipts, payments = [], [], []
+        if fin['billing_account_id']:
+            acc_id = fin['billing_account_id']
+            for inv in StudentInvoice.objects.filter(
+                student_billing_account_id=acc_id, deleted_at__isnull=True
+            ).order_by('-issue_date')[:20]:
+                invoices.append({
+                    'id': str(inv.id), 'invoice_number': inv.invoice_number,
+                    'issue_date': inv.issue_date, 'due_date': inv.due_date,
+                    'total_amount': float(inv.total_amount), 'paid_amount': float(inv.paid_amount),
+                    'outstanding_amount': float(inv.outstanding_amount), 'status': inv.status,
+                })
+            for r in Receipt.objects.filter(
+                student_billing_account_id=acc_id, deleted_at__isnull=True
+            ).order_by('-payment_date')[:20]:
+                receipts.append({
+                    'id': str(r.id), 'receipt_number': r.receipt_number,
+                    'payment_date': r.payment_date, 'amount': float(r.amount), 'status': r.status,
+                })
+            for p in OnlinePaymentRequest.objects.filter(
+                student_billing_account_id=acc_id, deleted_at__isnull=True
+            ).order_by('-created_at')[:20]:
+                payments.append({
+                    'id': str(p.id), 'amount': float(p.amount), 'status': p.status,
+                    'transfer_reference': p.transfer_reference, 'transfer_date': p.transfer_date,
+                    'bank_name': p.bank_name, 'created_at': p.created_at,
+                    'rejection_reason': p.rejection_reason,
+                })
+
+        # جهات العائلة
+        family = [{
+            'id': str(rel.id), 'relationship': rel.relationship, 'full_name': rel.full_name,
+            'phone': rel.phone, 'email': rel.email,
+        } for rel in s.family_relations.all()]
+
+        return {
+            'student_id': str(s.id),
+            'student_number': s.student_number,
+            'status': s.status,
+            'profile': {
+                'name': getattr(profile, 'arabic_name', '') or '—',
+                'english_name': getattr(profile, 'english_name', '') or '',
+                'gender': getattr(profile, 'gender', '') or '',
+                'date_of_birth': getattr(profile, 'date_of_birth', None),
+                'nationality': getattr(profile, 'nationality', '') or '',
+                'national_id': getattr(profile, 'national_id', '') or '',
+                'blood_group': getattr(profile, 'blood_group', '') or '',
+                'religion': getattr(profile, 'religion', '') or '',
+            },
+            'grade_level': cls._grade_label(portal_user, s),
+            'finance': {
+                **fin,
+                'invoices': invoices,
+                'receipts': receipts,
+                'online_payments': payments,
+            },
+            'family_relations': family,
+        }
+
+
 class PortalReportService:
     """
     توليد تقارير مؤشرات الأداء وجلسات استخدام البوابات

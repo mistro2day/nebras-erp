@@ -23,6 +23,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/admissions/public/public-track.component').then((m) => m.PublicTrackComponent),
   },
+  // بوابة ولي الأمر — قشرة مستقلة هاتف أولاً خارج واجهة الإدارة.
+  {
+    path: 'parent',
+    canActivate: [authGuard],
+    loadChildren: () => import('./features/portal/parent/parent.routes').then((m) => m.PARENT_ROUTES),
+  },
   {
     path: '',
     component: DashboardLayoutComponent,
