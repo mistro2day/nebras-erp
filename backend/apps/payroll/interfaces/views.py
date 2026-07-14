@@ -121,6 +121,14 @@ class PayrollRunViewSet(BaseCRUDViewSet):
         instance = self.get_object()
         old_status = instance.status
         
+        # Block modifying the payroll run details or payslips if it's already sent for review/approval or closed
+        # Allow transition status modifications (like submitting for approval or confirming payment)
+        new_status = request.data.get('status', old_status)
+        
+        # If trying to update data (not just changing status) and current status is not draft, raise validation error
+        if old_status in ('review', 'approved', 'paid') and request.data.get('payslips') is not None:
+            raise ValidationError("لا يمكن تعديل البيانات المالية لمسير رواتب قيد المراجعة أو معتمد أو تم صرفه.")
+            
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save(updated_by=request.user.id if request.user else None)

@@ -10,6 +10,9 @@ import { HttpClient } from '@angular/common/http';
 import {
   ConfirmDialogComponent, ConfirmDialogData,
 } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import {
+  AccountActionDialogComponent,
+} from '../../../shared/components/account-action-dialog/account-action-dialog.component';
 
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
@@ -928,31 +931,30 @@ export class StudentDetailsComponent implements OnInit {
   activateStudent(s: any): void {
     if (this.activatingStudent()) return;
     this.activatingStudent.set(true);
-    this.studentsService.activateStudentPortal(s.id).subscribe({
-      next: (res) => {
-        this.activatingStudent.set(false);
-        alert(res?.message || 'تم تفعيل حساب الطالب وإرسال بيانات الدخول بنجاح.');
+    this.dialog.open(AccountActionDialogComponent, {
+      disableClose: true,
+      data: {
+        title: 'تفعيل حساب الطالب',
+        targetName: s.profile?.arabic_name || s.student_number,
+        processingHint: 'جارٍ إنشاء حساب البوابة وإرسال بيانات الدخول عبر البريد وواتساب…',
+        action$: this.studentsService.activateStudentPortal(s.id),
       },
-      error: (err) => {
-        this.activatingStudent.set(false);
-        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل حساب الطالب.');
-      }
-    });
+    }).afterClosed().subscribe(() => this.activatingStudent.set(false));
   }
 
   activateGuardian(s: any, relationId: string): void {
     if (this.activatingGuardianId()) return;
     this.activatingGuardianId.set(relationId);
-    this.studentsService.activateGuardianPortal(s.id, relationId).subscribe({
-      next: (res) => {
-        this.activatingGuardianId.set(null);
-        alert(res?.message || 'تم تفعيل حساب ولي الأمر وإرسال بيانات الدخول بنجاح.');
+    const member = (s.family_relations || []).find((m: any) => m.id === relationId);
+    this.dialog.open(AccountActionDialogComponent, {
+      disableClose: true,
+      data: {
+        title: 'تفعيل حساب ولي الأمر',
+        targetName: member?.full_name || '',
+        processingHint: 'جارٍ إنشاء حساب البوابة وإرسال بيانات الدخول عبر البريد وواتساب…',
+        action$: this.studentsService.activateGuardianPortal(s.id, relationId),
       },
-      error: (err) => {
-        this.activatingGuardianId.set(null);
-        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل الحساب لولي الأمر.');
-      }
-    });
+    }).afterClosed().subscribe(() => this.activatingGuardianId.set(null));
   }
 
   statusBadge(status: string): string {

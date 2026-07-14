@@ -46,7 +46,7 @@ interface User {
   selector: 'app-payroll-runs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, DatePipe, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent, NbDatepickerComponent],
+  imports: [CommonModule, DecimalPipe, DatePipe, FormsModule, NbPageHeaderComponent, NbLoadingComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
 
@@ -168,8 +168,11 @@ interface User {
                 }
               }
               @if (run.status === 'review') {
-                <button class="nb-btn nb-btn-sm nb-btn-accent chain-approve-btn" (click)="triggerApprovalDecision(run)">
-                  ✍️ اعتماد الخطوة الحالية
+                <button class="nb-btn nb-btn-sm nb-btn-success chain-approve-btn" (click)="triggerApprovalDecision(run, 'approve')">
+                  ✓ اعتماد الخطوة الحالية
+                </button>
+                <button class="nb-btn nb-btn-sm nb-btn-accent chain-reject-btn" (click)="openRejectModal(run)">
+                  ✕ رفض وإرجاع لمسودة
                 </button>
               }
             </div>
@@ -326,8 +329,11 @@ interface User {
                       <!-- Dynamic Earnings cells -->
                       @for (col of availableCols(); track col.key) {
                         @if (col.type === 'earning' && col.visible) {
-                          <td class="col-num bg-light-green cursor-pointer cell-editable" (click)="openQuickEditModal(slip, col)">
-                            <span class="btn-cell-add">+</span>
+                          <td class="col-num bg-light-green text-center"
+                              [class.cursor-pointer]="run.status === 'draft'"
+                              [class.cell-editable]="run.status === 'draft'"
+                              (click)="run.status === 'draft' && openQuickEditModal(slip, col)">
+                            @if (run.status === 'draft') { <span class="btn-cell-add">+</span> }
                             {{ getDynamicVal(slip, col.key) | number:'1.0-0' }}
                           </td>
                         }
@@ -339,8 +345,11 @@ interface User {
                       <!-- Dynamic Deductions cells -->
                       @for (col of availableCols(); track col.key) {
                         @if (col.type === 'deduction' && col.visible) {
-                          <td class="col-num bg-light-red cursor-pointer cell-editable" (click)="openQuickEditModal(slip, col)">
-                            <span class="btn-cell-add btn-cell-sub">-</span>
+                          <td class="col-num bg-light-red text-center"
+                              [class.cursor-pointer]="run.status === 'draft'"
+                              [class.cell-editable]="run.status === 'draft'"
+                              (click)="run.status === 'draft' && openQuickEditModal(slip, col)">
+                            @if (run.status === 'draft') { <span class="btn-cell-add btn-cell-sub">-</span> }
                             {{ getDynamicVal(slip, col.key) | number:'1.0-0' }}
                           </td>
                         }
@@ -512,6 +521,38 @@ interface User {
                 حفظ التعديل
               </button>
               <button type="button" class="nb-btn nb-btn-ghost" (click)="closeQuickEditModal()">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+    <!-- ════════ Modal: الرفض مع كتابة الملاحظات ════════ -->
+    @if (showRejectModal()) {
+      <div class="overlay" (click)="closeRejectModal()">
+        <div class="dialog" (click)="$event.stopPropagation()">
+          <div class="dialog-head">
+            <h3>📝 تسجيل ملاحظات وسبب الرفض</h3>
+            <button class="x-btn" (click)="closeRejectModal()">✕</button>
+          </div>
+          <div class="dialog-body">
+            <p class="dialog-desc" style="margin-bottom: 12px; font-size: 13px; color: #555;">
+              سيتم رفض الخطوة الحالية وإرجاع مسير الرواتب إلى حالة <strong>مسودة</strong> ليتمكن الموظف من تعديله.
+            </p>
+            
+            <label class="form-label req" style="margin-bottom: 6px; display: block;">سبب الرفض / الملاحظات</label>
+            <textarea
+              class="form-input"
+              style="height: 100px; padding: 10px; resize: none; width: 100%; border: 1px solid var(--nb-border);"
+              [(ngModel)]="rejectComments"
+              placeholder="اكتب تفاصيل سبب الرفض أو التعديلات المطلوبة من المحاسب..."
+              required
+            ></textarea>
+
+            <div class="dialog-foot" style="margin-top: 16px; display: flex; gap: 8px;">
+              <button type="button" class="nb-btn nb-btn-accent" [disabled]="!rejectComments.trim()" (click)="confirmRejectDecision()">
+                ✕ تأكيد الرفض والإرجاع
+              </button>
+              <button type="button" class="nb-btn nb-btn-ghost" (click)="closeRejectModal()">إلغاء</button>
             </div>
           </div>
         </div>
@@ -934,6 +975,10 @@ export class PayrollRunsComponent implements OnInit {
   newRunPeriodCode = '';
   activeRunForApproval: PayrollRun | null = null;
   approvers: string[] = ['', '', ''];
+
+  readonly showRejectModal = signal(false);
+  rejectComments = '';
+  activeRejectRun: PayrollRun | null = null;
 
   readonly steps = [
     { key: 'draft', label: 'إعداد' },
@@ -1400,21 +1445,45 @@ export class PayrollRunsComponent implements OnInit {
     });
   }
 
-  triggerApprovalDecision(run: PayrollRun) {
+  triggerApprovalDecision(run: PayrollRun, actionCode: 'approve' | 'reject' = 'approve', comments: string = 'اعتماد خطوة مسير الرواتب.') {
     if (!run.approval_request_id) return;
     this.loading.set(true);
-    this.http.post<any>(`/api/v1/approvals/requests/${run.approval_request_id}/decision/`, {
-      action: 'approve', comments: 'اعتماد مسير الرواتب.',
+    this.http.post<any>(`${environment.apiUrl}approvals/requests/${run.approval_request_id}/decision/`, {
+      action: actionCode, comments: comments,
     }).subscribe({
       next: () => {
-        this.notify.success('تم اعتماد الخطوة الحالية.');
+        this.loading.set(false);
+        this.notify.success(actionCode === 'approve' ? 'تم اعتماد الخطوة بنجاح.' : 'تم رفض المسير وإرجاعه لمسودة.');
         this.loadRuns();
+        if (this.selectedRunId() === run.id) {
+          this.goToStep1();
+        }
       },
       error: () => {
         this.loading.set(false);
         this.notify.error('فشل تسجيل قرار الاعتماد.');
       },
     });
+  }
+
+  openRejectModal(run: PayrollRun) {
+    this.activeRejectRun = run;
+    this.rejectComments = '';
+    this.showRejectModal.set(true);
+  }
+
+  closeRejectModal() {
+    this.showRejectModal.set(false);
+    this.rejectComments = '';
+    this.activeRejectRun = null;
+  }
+
+  confirmRejectDecision() {
+    const run = this.activeRejectRun;
+    const comments = this.rejectComments.trim();
+    if (!run || !comments) return;
+    this.closeRejectModal();
+    this.triggerApprovalDecision(run, 'reject', comments);
   }
 
   markAsPaid(run: PayrollRun) {

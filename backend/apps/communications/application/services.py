@@ -25,6 +25,11 @@ from apps.communications.domain.models import (
     Notification,
 )
 
+from apps.communications.application.email_templates import (
+    wrap_branded_html as _branded_email_html,
+    build_brand_context as _build_brand_context,
+)
+
 logger = logging.getLogger('nebras.communications')
 
 
@@ -71,9 +76,14 @@ class CommunicationService:
                 if template:
                     actual_subject = actual_subject or template.subject
                     actual_body = actual_body or template.body
-                    if variables:
-                        actual_subject = cls._render_template(actual_subject, variables)
-                        actual_body = cls._render_template(actual_body, variables)
+
+            # دمج المتغيرات دائماً — سواء جاء النص من قالب أو مباشرة عبر body/subject
+            # (استدعاءات التفعيل تمرّر body يحوي {{...}} بدون template_code)
+            if variables:
+                if actual_subject:
+                    actual_subject = cls._render_template(actual_subject, variables)
+                if actual_body:
+                    actual_body = cls._render_template(actual_body, variables)
 
             if not actual_body:
                 raise ValueError("يجب توفير محتوى الرسالة أو كود القالب.")
@@ -86,7 +96,10 @@ class CommunicationService:
                 template=template,
                 subject=actual_subject,
                 body=actual_body,
-                body_html=actual_body if channel.channel_type == 'email' else None,
+                body_html=(
+                    _branded_email_html(actual_body, actual_subject, _build_brand_context(tenant_id))
+                    if channel.channel_type == 'email' and actual_body else None
+                ),
                 variables_data=variables or {},
                 status='queued' if not scheduled_at else 'draft',
                 priority=priority,

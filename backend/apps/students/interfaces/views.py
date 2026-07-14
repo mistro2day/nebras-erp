@@ -607,56 +607,34 @@ class StudentViewSet(viewsets.ModelViewSet):
                 parent_profile.linked_students = students_list
                 parent_profile.save(update_fields=['linked_students'])
                 
-        # 5. إرسال بريد إلكتروني وواتساب تفاعلي تلقائي
-        from apps.communications.application.services import CommunicationService
-        from apps.communications.application.provisioning import ensure_communication_defaults
-        ensure_communication_defaults(tenant_id, created_by=user_id)
+        # 5. إرسال بيانات الدخول — فقط عند إنشاء حساب جديد (كلمة مرور صالحة).
+        #    إذا كان الحساب موجوداً مسبقاً لا نرسل كلمة مرور وهمية.
+        if created:
+            from apps.communications.application.services import CommunicationService
+            from apps.communications.application.provisioning import ensure_communication_defaults
+            ensure_communication_defaults(tenant_id, created_by=user_id)
 
-        variables = {
-            'parent_name': relation.full_name,
-            'email': user.email,
-            'password': temp_password,
-            'portal_url': 'https://portal.nebras.edu/login'
-        }
-        
-        # إرسال البريد الإلكتروني
-        try:
-            CommunicationService.send_message(
-                tenant_id=tenant_id,
-                channel_code='email',
-                recipients=[{
-                    'type': 'to',
-                    'entity_type': 'user',
-                    'entity_id': user.id,
-                    'name': relation.full_name,
-                    'address': user.email
-                }],
-                subject="تفعيل حساب ولي الأمر - منصة نبراس التعليمية",
-                body="مرحباً {{parent_name}}، تم تفعيل حساب ولي الأمر الخاص بك. بريدك الإلكتروني: {{email}} وكلمة المرور المؤقتة: {{password}}. يمكنك الدخول عبر الرابط: {{portal_url}}",
-                variables=variables,
-                priority='high',
-                source_module='students',
-                source_event='guardian_activated'
-            )
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"فشل إرسال بريد تفعيل حساب ولي الأمر: {e}")
+            variables = {
+                'parent_name': relation.full_name,
+                'email': user.email,
+                'password': temp_password,
+                'portal_url': 'https://portal.nebras.edu/login'
+            }
 
-        # إرسال رسالة واتساب إذا توفر رقم الهاتف
-        if relation.phone:
+            # إرسال البريد الإلكتروني
             try:
                 CommunicationService.send_message(
                     tenant_id=tenant_id,
-                    channel_code='whatsapp',
+                    channel_code='email',
                     recipients=[{
                         'type': 'to',
                         'entity_type': 'user',
                         'entity_id': user.id,
                         'name': relation.full_name,
-                        'address': relation.phone
+                        'address': user.email
                     }],
-                    body="مرحباً بك يا {{parent_name}} في منصة نبراس. تم تفعيل حسابك. اسم المستخدم: {{email}} وكلمة المرور: {{password}}. رابط المنصة: {{portal_url}}",
+                    subject="تفعيل حساب ولي الأمر - منصة نبراس التعليمية",
+                    body="مرحباً {{parent_name}}، تم تفعيل حساب ولي الأمر الخاص بك. بريدك الإلكتروني: {{email}} وكلمة المرور المؤقتة: {{password}}. يمكنك الدخول عبر الرابط: {{portal_url}}",
                     variables=variables,
                     priority='high',
                     source_module='students',
@@ -665,14 +643,44 @@ class StudentViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"فشل إرسال واتساب تفعيل حساب ولي الأمر: {e}")
-                
+                logger.error(f"فشل إرسال بريد تفعيل حساب ولي الأمر: {e}")
+
+            # إرسال رسالة واتساب إذا توفر رقم الهاتف
+            if relation.phone:
+                try:
+                    CommunicationService.send_message(
+                        tenant_id=tenant_id,
+                        channel_code='whatsapp',
+                        recipients=[{
+                            'type': 'to',
+                            'entity_type': 'user',
+                            'entity_id': user.id,
+                            'name': relation.full_name,
+                            'address': relation.phone
+                        }],
+                        body="مرحباً بك يا {{parent_name}} في منصة نبراس. تم تفعيل حسابك. اسم المستخدم: {{email}} وكلمة المرور: {{password}}. رابط المنصة: {{portal_url}}",
+                        variables=variables,
+                        priority='high',
+                        source_module='students',
+                        source_event='guardian_activated'
+                    )
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"فشل إرسال واتساب تفعيل حساب ولي الأمر: {e}")
+
+        message = (
+            "تم تفعيل حساب ولي الأمر بنجاح وإرسال بيانات الدخول عبر البريد الإلكتروني وواتساب."
+            if created else
+            "هذا الحساب مفعّل مسبقاً لولي الأمر، وتم ربطه بالطالب. لم تُرسَل بيانات دخول جديدة."
+        )
         return StandardResponse({
             'user_id': str(user.id),
             'email': user.email,
             'created': created,
+            'already_active': not created,
             'portal_user_id': str(portal_user.id)
-        }, message="تم تفعيل حساب ولي الأمر بنجاح وإرسال بيانات الدخول عبر البريد الإلكتروني وواتساب.")
+        }, message=message)
 
     @action(detail=True, methods=['post'], url_path='save-relation')
     def save_relation(self, request, pk=None):
@@ -809,52 +817,32 @@ class StudentViewSet(viewsets.ModelViewSet):
             }
         )
 
-        # 5. إرسال بيانات الدخول عبر البريد الإلكتروني وواتساب
-        from apps.communications.application.services import CommunicationService
-        from apps.communications.application.provisioning import ensure_communication_defaults
-        ensure_communication_defaults(tenant_id, created_by=user_id)
+        # 5. إرسال بيانات الدخول — فقط عند إنشاء حساب جديد (كلمة مرور صالحة).
+        if created:
+            from apps.communications.application.services import CommunicationService
+            from apps.communications.application.provisioning import ensure_communication_defaults
+            ensure_communication_defaults(tenant_id, created_by=user_id)
 
-        variables = {
-            'student_name': profile.arabic_name,
-            'email': user.email,
-            'password': temp_password,
-            'portal_url': 'https://portal.nebras.edu/login'
-        }
-        
-        try:
-            CommunicationService.send_message(
-                tenant_id=tenant_id,
-                channel_code='email',
-                recipients=[{
-                    'type': 'to',
-                    'entity_type': 'user',
-                    'entity_id': user.id,
-                    'name': profile.arabic_name,
-                    'address': user.email
-                }],
-                subject="تفعيل حساب الطالب - منصة نبراس التعليمية",
-                body="مرحباً {{student_name}}، تم تفعيل حساب البوابة الطلابية الخاص بك. بريدك الإلكتروني: {{email}} وكلمة المرور المؤقتة: {{password}}. يمكنك الدخول عبر الرابط: {{portal_url}}",
-                variables=variables,
-                priority='high',
-                source_module='students',
-                source_event='student_activated'
-            )
-        except Exception:
-            pass
+            variables = {
+                'student_name': profile.arabic_name,
+                'email': user.email,
+                'password': temp_password,
+                'portal_url': 'https://portal.nebras.edu/login'
+            }
 
-        if phone:
             try:
                 CommunicationService.send_message(
                     tenant_id=tenant_id,
-                    channel_code='whatsapp',
+                    channel_code='email',
                     recipients=[{
                         'type': 'to',
                         'entity_type': 'user',
                         'entity_id': user.id,
                         'name': profile.arabic_name,
-                        'address': phone
+                        'address': user.email
                     }],
-                    body="مرحباً بك يا {{student_name}} في منصة نبراس. تم تفعيل حساب الطالب الخاص بك. اسم المستخدم: {{email}} وكلمة المرور: {{password}}. رابط المنصة: {{portal_url}}",
+                    subject="تفعيل حساب الطالب - منصة نبراس التعليمية",
+                    body="مرحباً {{student_name}}، تم تفعيل حساب البوابة الطلابية الخاص بك. بريدك الإلكتروني: {{email}} وكلمة المرور المؤقتة: {{password}}. يمكنك الدخول عبر الرابط: {{portal_url}}",
                     variables=variables,
                     priority='high',
                     source_module='students',
@@ -862,13 +850,40 @@ class StudentViewSet(viewsets.ModelViewSet):
                 )
             except Exception:
                 pass
-                
+
+            if phone:
+                try:
+                    CommunicationService.send_message(
+                        tenant_id=tenant_id,
+                        channel_code='whatsapp',
+                        recipients=[{
+                            'type': 'to',
+                            'entity_type': 'user',
+                            'entity_id': user.id,
+                            'name': profile.arabic_name,
+                            'address': phone
+                        }],
+                        body="مرحباً بك يا {{student_name}} في منصة نبراس. تم تفعيل حساب الطالب الخاص بك. اسم المستخدم: {{email}} وكلمة المرور: {{password}}. رابط المنصة: {{portal_url}}",
+                        variables=variables,
+                        priority='high',
+                        source_module='students',
+                        source_event='student_activated'
+                    )
+                except Exception:
+                    pass
+
+        message = (
+            "تم تفعيل حساب الطالب بنجاح وإرسال تفاصيل الدخول عبر البريد الإلكتروني وواتساب."
+            if created else
+            "هذا الطالب لديه حساب بوابة مفعّل مسبقاً. لم تُرسَل بيانات دخول جديدة."
+        )
         return StandardResponse({
             'user_id': str(user.id),
             'email': user.email,
             'created': created,
+            'already_active': not created,
             'portal_user_id': str(portal_user.id)
-        }, message="تم تفعيل حساب الطالب بنجاح وإرسال تفاصيل الدخول عبر البريد الإلكتروني وواتساب.")
+        }, message=message)
 
     @action(detail=True, methods=['post'], url_path='delete-relation')
     def delete_relation(self, request, pk=None):

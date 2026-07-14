@@ -9,6 +9,10 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { AcademicsService } from '../academics/academics.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {
+  AccountActionDialogComponent,
+} from '../../shared/components/account-action-dialog/account-action-dialog.component';
 import { forkJoin } from 'rxjs';
 
 export function pickList<T = any>(res: any): T[] {
@@ -42,7 +46,7 @@ interface DBTeacherAssignment {
   selector: 'app-faculty-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Default,
-  imports: [CommonModule, FormsModule, TeacherCardComponent, NbPageHeaderComponent, NbStatCardComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, TeacherCardComponent, NbPageHeaderComponent, NbStatCardComponent, NbPanelComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -265,6 +269,23 @@ interface DBTeacherAssignment {
                 <strong class="salary">{{ (selectedFaculty()!.salary! + selectedFaculty()!.allowance!) | number }} ج.س</strong>
               </div>
             </div>
+
+            <div class="detail-section">
+              <h5>🔐 حساب المعلم والدخول للنظام</h5>
+              <p class="account-hint">تفعيل حساب المعلم ينشئ صلاحية الدخول للنظام (لوحة المعلم) مع بوابة الخدمة الذاتية، ويرسل بيانات الدخول عبر البريد الإلكتروني وواتساب.</p>
+              <button class="nb-btn-primary" style="width:100%; margin-top:8px;"
+                (click)="activateAccount(selectedFaculty()!)"
+                [disabled]="!selectedFaculty()!.email || activatingId() === selectedFaculty()!.id"
+                [title]="!selectedFaculty()!.email ? 'يجب توفّر البريد الإلكتروني لتفعيل الحساب' : 'تفعيل حساب المعلم'">
+                {{ activatingId() === selectedFaculty()!.id ? 'جارٍ التنفيذ…' : '🔑 تفعيل حساب المعلم / الموظف' }}
+              </button>
+              <button class="nb-btn-secondary" style="width:100%; margin-top:8px;"
+                (click)="resetPassword(selectedFaculty()!)"
+                [disabled]="!selectedFaculty()!.email || activatingId() === selectedFaculty()!.id"
+                title="توليد كلمة مرور جديدة لحساب المعلم وإرسالها عبر البريد وواتساب">
+                ♻️ إعادة تعيين كلمة المرور
+              </button>
+            </div>
           </div>
           <div class="modal-actions">
             <button class="nb-btn-primary" (click)="selectedFaculty.set(null)">إغلاق</button>
@@ -353,11 +374,13 @@ interface DBTeacherAssignment {
     .detail-row strong { color: var(--nb-text); }
     .detail-row strong.salary { color: var(--nb-primary-700); font-weight: 700; }
     .detail-row.total { border-top: 1px dashed var(--nb-border); padding-top: 8px; font-weight: 700; font-size: 13.5px; }
+    .account-hint { font-size: 11.5px; color: var(--nb-text-muted); line-height: 1.6; margin: 0; }
   `]
 })
 export class FacultyDashboardComponent implements OnInit {
   tenantService = inject(TenantService);
   http = inject(HttpClient);
+  private dialog = inject(MatDialog);
   academicsSvc = inject(AcademicsService);
   notify = inject(NotificationService);
 
@@ -538,6 +561,36 @@ export class FacultyDashboardComponent implements OnInit {
 
   viewHRDetails(t: DetailedFaculty) {
     this.selectedFaculty.set(t);
+  }
+
+  readonly activatingId = signal<string | null>(null);
+
+  activateAccount(t: DetailedFaculty) {
+    if (this.activatingId()) return;
+    this.activatingId.set(t.id);
+    this.dialog.open(AccountActionDialogComponent, {
+      disableClose: true,
+      data: {
+        title: 'تفعيل حساب المعلم',
+        targetName: t.full_name_ar,
+        processingHint: 'جارٍ إنشاء صلاحية الدخول وبوابة الخدمة الذاتية وإرسال بيانات الدخول…',
+        action$: this.http.post<any>(`/api/v1/faculty/members/${t.id}/activate-account/`, {}),
+      },
+    }).afterClosed().subscribe(() => this.activatingId.set(null));
+  }
+
+  resetPassword(t: DetailedFaculty) {
+    if (this.activatingId()) return;
+    this.activatingId.set(t.id);
+    this.dialog.open(AccountActionDialogComponent, {
+      disableClose: true,
+      data: {
+        title: 'إعادة تعيين كلمة المرور',
+        targetName: t.full_name_ar,
+        processingHint: 'جارٍ توليد كلمة مرور جديدة وإرسالها عبر البريد الإلكتروني وواتساب…',
+        action$: this.http.post<any>(`/api/v1/faculty/members/${t.id}/reset-password/`, {}),
+      },
+    }).afterClosed().subscribe(() => this.activatingId.set(null));
   }
 
   getPendingCount(): number {

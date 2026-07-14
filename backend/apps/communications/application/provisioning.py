@@ -7,6 +7,7 @@
 
 آمن للاستدعاء المتكرر (idempotent).
 """
+from django.conf import settings
 from django.db import transaction
 
 from apps.communications.domain.models import (
@@ -77,16 +78,40 @@ def ensure_communication_defaults(tenant_id, created_by=None):
             )
             channels[ch_type] = channel
 
-            # مزوّد محاكاة افتراضي لكل قناة
-            CommunicationProvider.objects.get_or_create(
+            # هل قناة البريد لديها بيانات SMTP حقيقية مضبوطة؟
+            email_smtp_ready = (
+                ch_type == 'email' and getattr(settings, 'EMAIL_SMTP_CONFIGURED', False)
+            )
+
+            # مزوّد المحاكاة (mock): افتراضي فقط ما لم يوجد مزوّد حقيقي
+            CommunicationProvider.objects.update_or_create(
                 tenant_id=tenant_id, channel=channel, code=f'{code}_mock',
                 defaults={
                     'name': f'{name} (محاكاة)',
                     'provider_type': 'mock',
-                    'is_active': True, 'is_default': True,
+                    'is_active': True,
+                    'is_default': not email_smtp_ready,
                     'created_by': created_by,
                 },
             )
+
+            # مزوّد SMTP حقيقي لقناة البريد عند توفّر الإعدادات، ويصبح الافتراضي
+            if email_smtp_ready:
+                CommunicationProvider.objects.update_or_create(
+                    tenant_id=tenant_id, channel=channel, code='email_smtp',
+                    defaults={
+                        'name': 'البريد الإلكتروني (SMTP)',
+                        'provider_type': 'smtp',
+                        'is_active': True,
+                        'is_default': True,
+                        'config': {
+                            'from_email': settings.DEFAULT_FROM_EMAIL,
+                            'host': settings.EMAIL_HOST,
+                            'port': settings.EMAIL_PORT,
+                        },
+                        'created_by': created_by,
+                    },
+                )
 
         # قوالب الترحيب
         created_templates = 0

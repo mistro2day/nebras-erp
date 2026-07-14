@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { StudentFinanceService } from './student-finance.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
-import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
 interface Tile { key: string; title: string; desc: string; icon: string; route: string; }
 
@@ -16,7 +15,7 @@ interface Tile { key: string; title: string; desc: string; icon: string; route: 
   selector: 'app-student-finance-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, NbPageHeaderComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="المنصة المالية للطلاب وحسابات القبض"

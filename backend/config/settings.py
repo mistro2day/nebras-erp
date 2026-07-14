@@ -212,9 +212,26 @@ CELERY_TASK_TIME_LIMIT = int(os.environ.get('CELERY_TASK_TIME_LIMIT', '600'))
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
-# تشغيل متزامن للمهام في الاختبارات/التطوير بدون وسيط (broker) عبر متغير بيئة
-CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'
-CELERY_TASK_EAGER_PROPAGATES = True
+# تشغيل متزامن للمهام في الاختبارات/التطوير بدون وسيط (broker).
+# إذا لم يُشغَّل Redis/Celery worker، تُنفَّذ المهام (مثل إرسال رسائل تفعيل
+# حسابات الطلاب وأولياء الأمور) فوراً داخل نفس الطلب بدل وضعها في طابور معلّق.
+# يُتحكَّم به عبر CELERY_TASK_ALWAYS_EAGER؛ الافتراضي: مُفعَّل عند DEBUG.
+CELERY_TASK_ALWAYS_EAGER = os.environ.get(
+    'CELERY_TASK_ALWAYS_EAGER', 'true' if DEBUG else 'false'
+).lower() in ('1', 'true', 'yes')
+# في الوضع المتزامن لا نرفع استثناءات المهمة إلى الطلب حتى لا يفشل التفعيل بأكمله
+CELERY_TASK_EAGER_PROPAGATES = False
+# لا نخزّن نتائج المهام المتزامنة في Redis (يتجنّب محاولات الاتصال بالوسيط)
+CELERY_TASK_STORE_EAGER_RESULT = False
+
+# فشل سريع عند تعذّر الاتصال بالوسيط بدل التعليق على 20 محاولة إعادة اتصال
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'socket_connect_timeout': 2,
+    'socket_timeout': 2,
+    'max_retries': 1,
+}
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 1
 
 # طوابير المهام + طابور الرسائل الميتة (Dead Letter Queue placeholder)
 CELERY_TASK_DEFAULT_QUEUE = 'default'
@@ -240,6 +257,38 @@ try:
 except Exception:  # noqa: BLE001
     CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
     DJANGO_CELERY_BEAT_AVAILABLE = False
+
+# ==========================================================
+# إعدادات البريد الإلكتروني (SMTP) — يدعم SendGrid / Mailgun / Amazon SES
+# ==========================================================
+# جميع القيم من متغيرات البيئة. عند ضبط EMAIL_HOST_USER + EMAIL_HOST_PASSWORD
+# يُفعَّل الإرسال الفعلي عبر SMTP؛ خلاف ذلك تُطبع الرسائل في الكونسول (تطوير).
+# أمثلة للمضيف:
+#   SendGrid : smtp.sendgrid.net           (المستخدم الحرفي: "apikey")
+#   Mailgun  : smtp.mailgun.org
+#   SES      : email-smtp.<region>.amazonaws.com
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@nebras.edu')
+
+# الرابط العام للمنصة — يُستخدم لبناء روابط مطلقة (مثل شعار المدرسة في البريد).
+# يجب أن يكون https ومتاحاً للعامة كي تظهر الصور في عملاء البريد (Gmail...).
+PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
+
+if EMAIL_HOST and EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_SMTP_CONFIGURED = True
+else:
+    # لا توجد بيانات SMTP: اطبع البريد في الكونسول بدل الفشل الصامت
+    EMAIL_BACKEND = os.environ.get(
+        'EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend'
+    )
+    EMAIL_SMTP_CONFIGURED = False
 
 # ==========================================================
 # تسجيل الأخطاء: طباعة تفاصيل أي استثناء (500) في الكونسول دائماً
