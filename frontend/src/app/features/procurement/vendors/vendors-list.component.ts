@@ -3,18 +3,26 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { VendorCreateFormComponent } from './vendor-create-form.component';
 
 /** سجل الموردين — التأهيل، الحالة، والتقييم. بنمط نبراس على غرار Odoo / D365. */
 @Component({
   selector: 'app-procurement-vendors',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, VendorCreateFormComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموردون" subtitle="سجل الموردين المعتمدين وحالات التأهيل والتقييم.">
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <button class="btn primary" (click)="creating.set(!creating())">
+          {{ creating() ? 'إغلاق' : '＋ مورّد جديد' }}
+        </button>
       </nb-page-header>
+
+      @if (creating()) {
+        <app-vendor-create-form (created)="onCreated()" (cancel)="creating.set(false)"></app-vendor-create-form>
+      }
 
       <div class="toolbar">
         <input class="search" [(ngModel)]="q" (ngModelChange)="q.set($event)" placeholder="بحث باسم المورّد…" />
@@ -55,8 +63,11 @@ export class ProcurementVendorsComponent implements OnInit {
   private svc = inject(ProcurementService);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
+  readonly creating = signal(false);
   readonly q = signal('');
   readonly filter = signal('');
+
+  onCreated() { this.creating.set(false); this.load(); }
 
   readonly filtered = computed(() => {
     const term = this.q().trim();

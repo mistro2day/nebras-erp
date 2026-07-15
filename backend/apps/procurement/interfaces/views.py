@@ -108,6 +108,34 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         }
         return Response(stats, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='reference-data')
+    def reference_data(self, request):
+        """بيانات مرجعية موحّدة لنموذج طلب الشراء: الأقسام + حسابات الموازنة + مراكز التكلفة.
+
+        تُجمَّع هنا (بصلاحية المشتريات) لتفادي اعتماد نموذج الطلب على صلاحيات وحدة المالية.
+        """
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        from apps.organization.domain.models import Department
+        from apps.finance.domain.models import ChartOfAccount, CostCenter
+
+        departments = [
+            {'id': str(d.id), 'name': d.name, 'code': d.code, 'type': d.type}
+            for d in Department.objects.filter(tenant_id=tenant_id, is_active=True, deleted_at__isnull=True)
+        ]
+        accounts = [
+            {'id': str(a.id), 'code': a.code, 'name': a.name_ar or a.name_en}
+            for a in ChartOfAccount.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)[:500]
+        ]
+        cost_centers = [
+            {'id': str(c.id), 'name': c.name_ar or c.name_en or c.code}
+            for c in CostCenter.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)
+        ]
+        return StandardResponse({
+            'departments': departments,
+            'accounts': accounts,
+            'cost_centers': cost_centers,
+        }, message="البيانات المرجعية لطلب الشراء.")
+
     @action(detail=False, methods=['post'], url_path='create-request')
     def create_request(self, request):
         tenant_id = request.tenant_id

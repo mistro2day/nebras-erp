@@ -81,6 +81,17 @@ interface Stage {
         </div>
       </div>
 
+      <!-- بطاقات التنقّل بين صفحات المشتريات -->
+      <div class="nav-tiles">
+        @for (t of navTiles; track t.route) {
+          <button class="nav-tile" (click)="go(t.route)">
+            <span class="nt-ic">{{ t.icon }}</span>
+            <span class="nt-label">{{ t.label }}</span>
+            <span class="nt-arrow">←</span>
+          </button>
+        }
+      </div>
+
       <!-- عمودان: الطلبات الأخيرة + أداء الموردين -->
       <div class="cols">
         <section class="card">
@@ -176,6 +187,19 @@ interface Stage {
     .kpi.good .kpi-value { color: var(--nb-success); }
     .kpi-unit { display: block; font-size: 11px; color: var(--nb-text-muted); margin-top: 4px; }
 
+    /* بطاقات التنقّل */
+    .nav-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+    @media (max-width: 820px) { .nav-tiles { grid-template-columns: repeat(2, 1fr); } }
+    .nav-tile { display: flex; align-items: center; gap: 10px; background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 13px 14px; cursor: pointer; font-family: inherit; text-align: start;
+      transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+    .nav-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(48,63,159,0.1); border-color: var(--nb-primary-400); }
+    .nav-tile:hover .nt-arrow { opacity: 1; transform: translateX(-3px); }
+    .nt-ic { font-size: 18px; width: 34px; height: 34px; display: grid; place-items: center; flex: none;
+      background: var(--nb-primary-50); border-radius: 10px; }
+    .nt-label { flex: 1; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .nt-arrow { color: var(--nb-primary-600); font-size: 15px; opacity: 0; transition: all .15s ease; }
+
     /* الأعمدة */
     .cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
     @media (max-width: 960px) { .cols { grid-template-columns: 1fr; } }
@@ -224,6 +248,14 @@ export class ProcurementDashboardComponent implements OnInit {
   readonly stats = this.svc.stats;
   readonly requests = signal<any[]>([]);
   readonly vendors = signal<any[]>([]);
+
+  readonly navTiles = [
+    { label: 'طلبات الشراء', icon: '📝', route: '/procurement/requests' },
+    { label: 'عروض الأسعار', icon: '📨', route: '/procurement/rfqs' },
+    { label: 'أوامر الشراء', icon: '📦', route: '/procurement/orders' },
+    { label: 'الموردون', icon: '🏭', route: '/procurement/vendors' },
+    { label: 'العقود', icon: '📄', route: '/procurement/contracts' },
+  ];
 
   readonly stages: Stage[] = [
     { key: 'req', label: 'طلبات الشراء', icon: '📝', countKey: 'open_requests', hint: 'واردة من الأقسام', route: '/procurement/requests' },

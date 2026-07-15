@@ -30,7 +30,7 @@ interface ItemRow {
         <label>القسم الطالب <span>*</span>
           <select [(ngModel)]="departmentId">
             <option value="">اختر القسم…</option>
-            @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name || d.name_ar }}</option> }
+            @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
           </select>
         </label>
         <label>سبب الطلب <span>*</span>
@@ -51,11 +51,11 @@ interface ItemRow {
             <input type="number" min="0" [(ngModel)]="it.estimated_unit_price" placeholder="0.00" />
             <select [(ngModel)]="it.budget_account_id">
               <option value="">—</option>
-              @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.code }} — {{ a.name_ar || a.name }}</option> }
+              @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.code }} — {{ a.name }}</option> }
             </select>
             <select [(ngModel)]="it.cost_center_id">
               <option value="">—</option>
-              @for (c of costCenters(); track c.id) { <option [value]="c.id">{{ c.name_ar || c.name }}</option> }
+              @for (c of costCenters(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
             </select>
             <button class="rm" (click)="removeItem($index)" [disabled]="items().length === 1" aria-label="حذف">✕</button>
           </div>
@@ -129,10 +129,15 @@ export class PrCreateFormComponent implements OnInit {
     this.items().reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.estimated_unit_price) || 0), 0));
 
   ngOnInit() {
-    const pick = (d: any) => Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
-    this.svc.getDepartments().subscribe({ next: d => this.departments.set(pick(d)), error: () => {} });
-    this.svc.getChartOfAccounts().subscribe({ next: d => this.accounts.set(pick(d)), error: () => {} });
-    this.svc.getCostCenters().subscribe({ next: d => this.costCenters.set(pick(d)), error: () => {} });
+    this.svc.getRequestReferenceData().subscribe({
+      next: (res: any) => {
+        const d = res?.data ?? res ?? {};
+        this.departments.set(d.departments || []);
+        this.accounts.set(d.accounts || []);
+        this.costCenters.set(d.cost_centers || []);
+      },
+      error: () => {},
+    });
   }
 
   blank(): ItemRow {

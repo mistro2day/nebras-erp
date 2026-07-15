@@ -74,17 +74,21 @@ export class ProcurementService {
     return this.http.get<any[]>(`${this.apiUrl}/contracts/`);
   }
 
-  // ---- بيانات مرجعية (ربط المالية والتنظيم) ----
-  getDepartments(): Observable<any> {
-    return this.http.get<any>(`/api/v1/organization/departments/`, { params: { page_size: 300 } as any });
+  // ---- بيانات مرجعية موحّدة لنموذج طلب الشراء (أقسام + حسابات + مراكز تكلفة) ----
+  getRequestReferenceData(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/requests/reference-data/`);
   }
 
-  getChartOfAccounts(): Observable<any> {
-    return this.http.get<any>(`/api/v1/finance/coa/`, { params: { page_size: 500 } as any });
+  createVendor(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/vendors/`, payload);
   }
 
-  getCostCenters(): Observable<any> {
-    return this.http.get<any>(`/api/v1/finance/cost-centers/`, { params: { page_size: 300 } as any });
+  getVendorCategories(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendor-categories/`, { params: { page_size: 100 } as any });
+  }
+
+  createContract(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/contracts/`, payload);
   }
 
   getQuotations(): Observable<any> {
