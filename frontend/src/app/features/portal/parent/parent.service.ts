@@ -76,4 +76,11 @@ export class ParentService {
   contact(payload: { audience: string; subject: string; body: string }): Observable<any> {
     return this.http.post<any>(`${this.base}portal/parent/contact/`, payload);
   }
+
+  /** تغيير كلمة مرور المستخدم الحالي (خدمة ذاتية). */
+  changePassword(oldPassword: string, newPassword: string): Observable<any> {
+    return this.http.post<any>(`${this.base}identity/change-my-password/`, {
+      old_password: oldPassword, new_password: newPassword,
+    });
+  }
 }

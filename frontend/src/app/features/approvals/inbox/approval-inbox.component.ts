@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { ApprovalCoreService, InboxItem } from '../approval-core.service';
+import { StudentFinanceService } from '../../student-finance/student-finance.service';
 import {
   ConfirmDialogComponent,
   ConfirmDialogData,
@@ -44,6 +45,14 @@ interface FilterChip {
           }
         </div>
       </div>
+
+      <!-- ربط مدفوعات أولياء الأمور المالية (تظهر مع تصفية المالية أو الكل) -->
+      @if (financePending() > 0 && (activeFilter() === 'FINANCE' || activeFilter() === null)) {
+        <button class="ac-finance-link" (click)="goOnlinePayments()">
+          🏦 {{ financePending() }} طلب سداد من أولياء الأمور بانتظار المراجعة
+          <span class="fl-cta">فتح المراجعة ←</span>
+        </button>
+      }
 
       <!-- القائمة -->
       <div class="ac-list">
@@ -270,6 +279,15 @@ interface FilterChip {
         font-size: 13px;
         color: var(--nb-text-muted);
       }
+      .ac-finance-link {
+        width: 100%; display: flex; align-items: center; gap: 8px; cursor: pointer;
+        background: linear-gradient(135deg, #fffaf0, #fff); border: 1px solid #fde9c8;
+        border-inline-start: 3px solid #F59E0B; border-radius: var(--nb-radius);
+        padding: 12px 14px; margin: 0 0 10px; font-family: inherit; font-size: 13px;
+        font-weight: 700; color: #92400e; text-align: start;
+      }
+      .ac-finance-link:hover { background: #fff7ea; }
+      .ac-finance-link .fl-cta { margin-inline-start: auto; color: #b45309; font-weight: 800; }
     `,
   ],
 })
@@ -278,8 +296,10 @@ export class ApprovalInboxComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
 
+  private readonly sfService = inject(StudentFinanceService);
   readonly activeFilter = signal<string | null>(null);
   readonly selectedId = signal<string | null>(null);
+  readonly financePending = signal<number>(0);
 
   readonly filterChips: FilterChip[] = [
     { code: null, label: 'الكل' },
@@ -303,6 +323,14 @@ export class ApprovalInboxComponent implements OnInit {
 
   load(): void {
     this.coreService.getMyInboxItems().subscribe();
+    this.sfService.onlinePaymentsPendingCount().subscribe({
+      next: (r: any) => this.financePending.set(r?.data?.pending ?? r?.pending ?? 0),
+      error: () => {},
+    });
+  }
+
+  goOnlinePayments(): void {
+    this.router.navigateByUrl('/student-finance/online-payments');
   }
 
   openRequest(item: InboxItem): void {

@@ -106,15 +106,55 @@ class LoginView(APIView):
             _log.exception('login: permissions fetch failed')
             user_perms = []
 
+        # نوع مستخدم البوابة (ولي أمر/طالب/متقدم) لتوجيه الواجهة بعد الدخول
+        portal_user_type = None
+        try:
+            from apps.portal.domain.models import PortalUser
+            pu = PortalUser.objects.filter(user=user).first()
+            if pu:
+                portal_user_type = pu.user_type
+        except Exception:
+            _log.exception('login: portal user type fetch failed')
+
         return StandardResponse({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
                 **UserSerializer(user).data,
-                'is_superuser': user.is_superuser
+                'is_superuser': user.is_superuser,
+                'portal_user_type': portal_user_type,
             },
             'permissions': list(user_perms)
         }, message="تم تسجيل الدخول بنجاح.")
+
+
+class ChangeMyPasswordView(APIView):
+    """تغيير المستخدم الحالي لكلمة مروره (خدمة ذاتية — تعمل لكل مستخدم بما فيهم البوابة)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from django.contrib.auth.hashers import check_password
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        if not old_password or not new_password:
+            return Response({'error': 'كلمة المرور الحالية والجديدة مطلوبتان.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        if not check_password(old_password, user.password):
+            return Response({'error': 'كلمة المرور الحالية غير صحيحة.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 8:
+            return Response({'error': 'يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل.'}, status=status.HTTP_400_BAD_REQUEST)
+        if old_password == new_password:
+            return Response({'error': 'يجب أن تختلف كلمة المرور الجديدة عن الحالية.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            PasswordPolicyService.validate_password_strength(new_password)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        return StandardResponse(None, message="تم تغيير كلمة المرور بنجاح.")
 
 
 class LogoutView(APIView):

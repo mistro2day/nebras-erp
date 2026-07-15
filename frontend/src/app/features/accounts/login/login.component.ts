@@ -58,7 +58,15 @@ export class LoginComponent {
     this.authService.login({ email: this.email, password: this.password }).subscribe({
       next: () => {
         this.isLoading.set(false);
-        this.router.navigate(['/dashboard']);
+        // توجيه حسب نوع المستخدم: ولي الأمر والطالب لبوابتهم، وبقية المستخدمين للوحة الإدارة
+        const type = this.authService.currentUser()?.portal_user_type;
+        if (type === 'parent') {
+          this.router.navigate(['/parent']);
+        } else if (type === 'student') {
+          this.router.navigate(['/portal/student/dashboard']);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       },
       error: (err: any) => {
         this.isLoading.set(false);

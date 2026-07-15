@@ -104,11 +104,18 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                       <p><strong>الهاتف:</strong> {{ member.phone || '—' }}</p>
                       <p><strong>البريد الإلكتروني:</strong> {{ member.email || 'غير متوفر' }}</p>
                       <p><strong>الرقم الوطني / الجواز:</strong> {{ member.national_id || 'غير متوفر' }}</p>
-                      <button class="nb-btn-primary sm" (click)="activateGuardian(s, member.id)"
-                        [disabled]="!member.email || activatingGuardianId() === member.id"
-                        [title]="!member.email ? 'يجب إدخال البريد الإلكتروني أولاً لتفعيل الحساب' : 'تفعيل حساب البوابة وإرسال بيانات الدخول'">
-                        {{ activatingGuardianId() === member.id ? 'جارٍ التفعيل…' : '🔑 تفعيل حساب ولي الأمر' }}
-                      </button>
+                      <div class="guardian-actions">
+                        <button class="nb-btn-primary sm" (click)="activateGuardian(s, member.id)"
+                          [disabled]="!member.email || activatingGuardianId() === member.id"
+                          [title]="!member.email ? 'يجب إدخال البريد الإلكتروني أولاً لتفعيل الحساب' : 'تفعيل حساب البوابة وإرسال بيانات الدخول'">
+                          {{ activatingGuardianId() === member.id ? 'جارٍ التفعيل…' : '🔑 تفعيل حساب ولي الأمر' }}
+                        </button>
+                        <button class="nb-btn-secondary sm" (click)="resetGuardianPassword(s, member.id)"
+                          [disabled]="!member.email || activatingGuardianId() === member.id"
+                          title="إعادة تعيين كلمة المرور وإرسال بيانات الدخول الجديدة عبر البريد وواتساب">
+                          🔄 إعادة إرسال بيانات الدخول
+                        </button>
+                      </div>
                     </div>
                   }
                   @if (!s.family_relations || s.family_relations.length === 0) {
@@ -665,6 +672,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 
     /* أولياء الأمور */
     .family-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .guardian-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
     .member-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 8px; }
     .member-header h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
     .badge { font-size: 10.5px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
@@ -953,6 +961,21 @@ export class StudentDetailsComponent implements OnInit {
         targetName: member?.full_name || '',
         processingHint: 'جارٍ إنشاء حساب البوابة وإرسال بيانات الدخول عبر البريد وواتساب…',
         action$: this.studentsService.activateGuardianPortal(s.id, relationId),
+      },
+    }).afterClosed().subscribe(() => this.activatingGuardianId.set(null));
+  }
+
+  resetGuardianPassword(s: any, relationId: string): void {
+    if (this.activatingGuardianId()) return;
+    this.activatingGuardianId.set(relationId);
+    const member = (s.family_relations || []).find((m: any) => m.id === relationId);
+    this.dialog.open(AccountActionDialogComponent, {
+      disableClose: true,
+      data: {
+        title: 'إعادة تعيين كلمة المرور',
+        targetName: member?.full_name || '',
+        processingHint: 'جارٍ توليد كلمة مرور جديدة وإرسال بيانات الدخول عبر البريد وواتساب…',
+        action$: this.studentsService.resetGuardianPassword(s.id, relationId),
       },
     }).afterClosed().subscribe(() => this.activatingGuardianId.set(null));
   }

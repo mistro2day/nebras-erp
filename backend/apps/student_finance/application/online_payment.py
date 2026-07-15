@@ -52,7 +52,59 @@ def submit_payment_request(tenant_id, billing_account_id, amount, transfer_refer
         status='pending',
         created_by=submitted_by_user_id,
     )
+    _notify_finance_new_request(req)
     return req
+
+
+def _finance_recipient_user_ids(tenant_id):
+    """معرّفات مستخدمي المالية/الإدارة الذين يستلمون إشعار طلب السداد."""
+    ids = set()
+    try:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        for uid in User.objects.filter(is_superuser=True, deleted_at__isnull=True).values_list('id', flat=True):
+            ids.add(uid)
+    except Exception:
+        pass
+    try:
+        from apps.identity.domain.rbac import Role, UserRole
+        roles = Role.objects.filter(tenant_id=tenant_id, code__in=['administrator', 'accountant', 'finance'])
+        for uid in UserRole.objects.filter(tenant_id=tenant_id, role__in=roles).values_list('user_id', flat=True):
+            ids.add(uid)
+    except Exception:
+        pass
+    return ids
+
+
+def _notify_finance_new_request(req):
+    """إشعار داخلي (مركز الإشعارات) لمستخدمي المالية بطلب سداد جديد قيد المراجعة."""
+    try:
+        from apps.communications.application.services import NotificationCenterService
+
+        student_name = 'طالب'
+        try:
+            from apps.students.domain.models import Student
+            s = Student.objects.filter(id=req.student_id).select_related('profile').first()
+            student_name = getattr(getattr(s, 'profile', None), 'arabic_name', '') or student_name
+        except Exception:
+            pass
+
+        title = "طلب سداد جديد قيد المراجعة"
+        body = (f"قدّم ولي أمر الطالب {student_name} طلب سداد بمبلغ {req.amount:,.2f} "
+                f"عبر {req.bank_name} (مرجع {req.transfer_reference}). بانتظار المراجعة والاعتماد.")
+        for uid in _finance_recipient_user_ids(req.tenant_id):
+            NotificationCenterService.create_notification(
+                tenant_id=req.tenant_id, user_id=uid,
+                title=title, body=body,
+                category='finance', priority='high', icon='payments',
+                action_url='/student-finance/online-payments',
+                action_label='مراجعة الطلب',
+                source_module='student_finance', source_event='online_payment_submitted',
+                source_reference_id=req.id,
+                group_key='online_payment_pending',
+            )
+    except Exception as e:
+        logger.warning(f"تعذّر إنشاء إشعار المالية لطلب السداد {req.id}: {e}")
 
 
 @transaction.atomic

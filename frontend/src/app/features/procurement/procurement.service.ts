@@ -34,12 +34,12 @@ export class ProcurementService {
     );
   }
 
-  getVendors(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/vendors/`);
+  getVendors(params?: any): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendors/`, { params: params || {} });
   }
 
-  getPurchaseRequests(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/requests/`);
+  getPurchaseRequests(params?: any): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/requests/`, { params: params || {} });
   }
 
   createPurchaseRequest(payload: { department_id: string; requested_by: string; items: any[]; reason: string }): Observable<any> {
@@ -50,8 +50,8 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/requests/${id}/approve/`, payload);
   }
 
-  getRFQs(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/rfqs/`);
+  getRFQs(params?: any): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/rfqs/`, { params: params || {} });
   }
 
   createRFQ(payload: { purchase_request_id: string; deadline: string; notes?: string }): Observable<any> {
@@ -62,8 +62,8 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/rfqs/compare-and-award/`, payload);
   }
 
-  getPurchaseOrders(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/orders/`);
+  getPurchaseOrders(params?: any): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/orders/`, { params: params || {} });
   }
 
   issuePurchaseOrder(id: string): Observable<any> {

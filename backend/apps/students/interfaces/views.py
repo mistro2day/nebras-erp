@@ -682,6 +682,82 @@ class StudentViewSet(viewsets.ModelViewSet):
             'portal_user_id': str(portal_user.id)
         }, message=message)
 
+    @action(detail=True, methods=['post'], url_path='reset-guardian-password')
+    def reset_guardian_password(self, request, pk=None):
+        """إعادة تعيين كلمة مرور حساب ولي الأمر وإرسال بيانات الدخول الجديدة.
+
+        تُستخدم لإعادة إرسال بيانات الدخول من قبل الإدارة (كلمة مرور جديدة، إذ
+        لا يمكن استرجاع الكلمة الحالية المشفّرة). يشترط وجود حساب مفعّل مسبقاً.
+        """
+        student = self.get_object()
+        relation_id = request.data.get('relation_id')
+        if not relation_id:
+            raise ValidationError("يجب توفير معرف ولي الأمر relation_id.")
+
+        try:
+            relation = student.family_relations.get(id=relation_id)
+        except StudentFamilyRelation.DoesNotExist:
+            raise ValidationError("ولي الأمر غير مرتبط بهذا الطالب.")
+        if not relation.email:
+            raise ValidationError("لا يوجد بريد إلكتروني لولي الأمر.")
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.filter(email=relation.email).first()
+        if not user:
+            raise ValidationError("لا يوجد حساب مفعّل لولي الأمر. يرجى تفعيل الحساب أولاً.")
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else student.tenant_id
+        user_id = request.user.id if request.user else None
+
+        from apps.common.security import generate_temp_password
+        temp_password = generate_temp_password()
+        user.set_password(temp_password)
+        user.save(update_fields=['password'])
+
+        from apps.communications.application.services import CommunicationService
+        from apps.communications.application.provisioning import ensure_communication_defaults
+        ensure_communication_defaults(tenant_id, created_by=user_id)
+
+        variables = {
+            'parent_name': relation.full_name,
+            'email': user.email,
+            'password': temp_password,
+            'portal_url': 'https://portal.nebras.edu/login'
+        }
+        try:
+            CommunicationService.send_message(
+                tenant_id=tenant_id, channel_code='email',
+                recipients=[{'type': 'to', 'entity_type': 'user', 'entity_id': user.id,
+                             'name': relation.full_name, 'address': user.email}],
+                subject="بيانات الدخول الجديدة - منصة نبراس التعليمية",
+                body="مرحباً {{parent_name}}، تم إعادة تعيين كلمة مرور حسابك. بريدك الإلكتروني: {{email}} وكلمة المرور الجديدة: {{password}}. يمكنك الدخول عبر الرابط: {{portal_url}}",
+                variables=variables, priority='high',
+                source_module='students', source_event='guardian_password_reset',
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"فشل إرسال بريد إعادة تعيين كلمة مرور ولي الأمر: {e}")
+
+        if relation.phone:
+            try:
+                CommunicationService.send_message(
+                    tenant_id=tenant_id, channel_code='whatsapp',
+                    recipients=[{'type': 'to', 'entity_type': 'user', 'entity_id': user.id,
+                                 'name': relation.full_name, 'address': relation.phone}],
+                    body="مرحباً {{parent_name}}، تم إعادة تعيين كلمة مرور حسابك في منصة نبراس. اسم المستخدم: {{email}} وكلمة المرور الجديدة: {{password}}. رابط المنصة: {{portal_url}}",
+                    variables=variables, priority='high',
+                    source_module='students', source_event='guardian_password_reset',
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"فشل إرسال واتساب إعادة تعيين كلمة مرور ولي الأمر: {e}")
+
+        return StandardResponse({
+            'user_id': str(user.id),
+            'email': user.email,
+        }, message="تم إعادة تعيين كلمة المرور وإرسال بيانات الدخول الجديدة عبر البريد وواتساب.")
+
     @action(detail=True, methods=['post'], url_path='save-relation')
     def save_relation(self, request, pk=None):
         """إضافة أو تحديث علاقة عائلية (ولي أمر) للطالب"""

@@ -1,8 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.identity.interfaces.views import (
-    LoginView, LogoutView, LogoutAllDevicesView, UserViewSet, 
-    RoleViewSet, PermissionMatrixView, SecurityDashboardView, TerminateSessionView
+    LoginView, LogoutView, LogoutAllDevicesView, UserViewSet,
+    RoleViewSet, PermissionMatrixView, SecurityDashboardView, TerminateSessionView,
+    ChangeMyPasswordView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -16,6 +17,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='auth-logout'),
     path('logout-all/', LogoutAllDevicesView.as_view(), name='auth-logout-all'),
     path('token/refresh/', TokenRefreshView.as_view(), name='auth-token-refresh'),
+    path('change-my-password/', ChangeMyPasswordView.as_view(), name='auth-change-my-password'),
     
     # الصلاحيات والأدوار والمستخدمين
     path('', include(router.urls)),

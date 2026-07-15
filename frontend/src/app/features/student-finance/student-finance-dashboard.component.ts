@@ -23,6 +23,18 @@ interface Tile { key: string; title: string; desc: string; icon: string; route: 
         <button class="btn ghost" (click)="load()">تحديث</button>
       </nb-page-header>
 
+      <!-- نداء العمل البارز: مدفوعات أولياء الأمور المعلّقة -->
+      @if (pendingPayments() > 0) {
+        <button class="pay-alert" (click)="go('/student-finance/online-payments')">
+          <span class="pa-ic">🏦</span>
+          <span class="pa-body">
+            <strong>{{ pendingPayments() }} طلب سداد بانتظار المراجعة</strong>
+            <small>حوّل أولياء الأمور رسوماً عبر البنك — راجع الإيصالات واعتمدها لتحديث حسابات الطلاب.</small>
+          </span>
+          <span class="pa-cta">مراجعة الآن ←</span>
+        </button>
+      }
+
       <!-- العنصر المميّز: أداء التحصيل -->
       <section class="hero">
         <div class="ring-wrap">
@@ -108,6 +120,21 @@ interface Tile { key: string; title: string; desc: string; icon: string; route: 
 
     .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--nb-radius); cursor: pointer; border: none; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+
+    /* نداء العمل البارز لمدفوعات أولياء الأمور */
+    .pay-alert {
+      width: 100%; display: flex; align-items: center; gap: 16px; text-align: start; cursor: pointer;
+      background: linear-gradient(135deg, #fffaf0, #fff); border: 1px solid #fde9c8;
+      border-inline-start: 4px solid #F59E0B; border-radius: var(--nb-radius-card);
+      padding: 16px 18px; margin-bottom: 14px; font-family: inherit;
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .pay-alert:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(245,158,11,0.15); }
+    .pa-ic { font-size: 30px; flex: none; }
+    .pa-body { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+    .pa-body strong { font-size: 15px; font-weight: 800; color: #92400e; }
+    .pa-body small { font-size: 12.5px; color: #a16207; }
+    .pa-cta { color: #b45309; font-weight: 800; font-size: 13px; flex: none; }
   `],
 })
 export class StudentFinanceDashboardComponent implements OnInit {
@@ -115,6 +142,7 @@ export class StudentFinanceDashboardComponent implements OnInit {
   private router = inject(Router);
 
   s = signal<any>({});
+  pendingPayments = signal<number>(0);
 
   collectionRate = computed(() => {
     const collected = Number(this.s().monthly_collections) || 0;
@@ -136,7 +164,13 @@ export class StudentFinanceDashboardComponent implements OnInit {
   ];
 
   ngOnInit() { this.load(); }
-  load() { this.svc.getDashboardStats().subscribe({ next: (d) => this.s.set(d), error: () => {} }); }
+  load() {
+    this.svc.getDashboardStats().subscribe({ next: (d) => this.s.set(d), error: () => {} });
+    this.svc.onlinePaymentsPendingCount().subscribe({
+      next: (r) => this.pendingPayments.set(r?.data?.pending ?? r?.pending ?? 0),
+      error: () => {},
+    });
+  }
   go(r: string) { this.router.navigateByUrl(r); }
   fmt(v: any): string { return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 }

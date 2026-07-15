@@ -5,6 +5,7 @@ import { filter, map } from 'rxjs';
 import { MatMenuModule } from '@angular/material/menu';
 import { TenantService } from '../../core/services/tenant.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { NotificationsService, AppNotification } from '../../core/services/notifications.service';
 
 interface NavItem {
   label: string;
@@ -142,15 +143,36 @@ interface NavGroup {
             />
             <span class="kbd">Ctrl K</span>
           </div>
-          <button class="topbar-icon" [matMenuTriggerFor]="notifMenu" aria-label="الإشعارات">🔔</button>
-          <mat-menu #notifMenu="matMenu">
-            <div class="notif-header">الإشعارات الواردة</div>
-            <button mat-menu-item>
-              <strong>طلب عطلة جديد</strong>
-            </button>
-            <button mat-menu-item>
-              <strong>تحديث كشف الرواتب</strong>
-            </button>
+          <button class="topbar-icon notif-btn" [matMenuTriggerFor]="notifMenu"
+                  (menuOpened)="reloadNotifications()" aria-label="الإشعارات">
+            🔔
+            @if (notifUnread() > 0) {
+              <span class="notif-badge">{{ notifUnread() > 99 ? '99+' : notifUnread() }}</span>
+            }
+          </button>
+          <mat-menu #notifMenu="matMenu" class="notif-menu-panel">
+            <div class="notif-header">
+              <span>الإشعارات</span>
+              @if (notifUnread() > 0) {
+                <button class="notif-mark-all" (click)="$event.stopPropagation(); markAllNotificationsRead()">
+                  تحديد الكل كمقروء
+                </button>
+              }
+            </div>
+            @if (notifItems().length === 0) {
+              <div class="notif-empty">لا توجد إشعارات.</div>
+            } @else {
+              @for (n of notifItems(); track n.id) {
+                <button mat-menu-item class="notif-item" [class.unread]="!n.is_read"
+                        (click)="openNotification(n)">
+                  <span class="notif-dot" [class.on]="!n.is_read"></span>
+                  <span class="notif-body">
+                    <strong>{{ n.title }}</strong>
+                    <small>{{ n.body }}</small>
+                  </span>
+                </button>
+              }
+            }
           </mat-menu>
           <div class="topbar-avatar" [matMenuTriggerFor]="userMenu">{{ userInitials() }}</div>
         </header>
@@ -444,12 +466,36 @@ interface NavGroup {
         cursor: pointer;
       }
 
-      .notif-header {
-        padding: 8px 16px;
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--nb-text-muted);
+      .notif-btn { position: relative; }
+      .notif-badge {
+        position: absolute; top: -6px; left: -6px; min-width: 16px; height: 16px;
+        padding: 0 4px; border-radius: 999px; background: var(--nb-danger, #dc2626);
+        color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+        box-sizing: border-box;
       }
+      .notif-header {
+        padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+        font-size: 12px; font-weight: 700; color: var(--nb-text-muted);
+        border-bottom: 1px solid var(--nb-border-soft);
+      }
+      .notif-mark-all {
+        background: none; border: none; color: var(--nb-primary-600); font-family: inherit;
+        font-size: 11px; font-weight: 700; cursor: pointer; padding: 0;
+      }
+      .notif-empty { padding: 24px 16px; text-align: center; color: var(--nb-text-muted); font-size: 13px; }
+      .notif-item {
+        display: flex; align-items: flex-start; gap: 10px; height: auto; line-height: 1.5;
+        padding: 10px 16px; white-space: normal; min-width: 300px; max-width: 360px;
+      }
+      .notif-item.unread { background: var(--nb-primary-50, #eef0fa); }
+      .notif-dot {
+        width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0;
+        background: transparent;
+      }
+      .notif-dot.on { background: var(--nb-primary-600, #3F51B5); }
+      .notif-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .notif-body strong { font-size: 13px; color: var(--nb-text); font-weight: 700; }
+      .notif-body small { font-size: 11.5px; color: var(--nb-text-muted); white-space: normal; }
 
       /* ---------- منطقة الصفحة ---------- */
       .page {
@@ -464,8 +510,30 @@ export class DashboardLayoutComponent {
   private readonly tenantService = inject(TenantService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly notifications = inject(NotificationsService);
 
   readonly searchQuery = signal('');
+
+  // مركز الإشعارات
+  readonly notifItems = this.notifications.items;
+  readonly notifUnread = this.notifications.unread;
+
+  constructor() {
+    this.notifications.load().subscribe();
+  }
+
+  openNotification(n: AppNotification): void {
+    if (!n.is_read) this.notifications.markRead(n.id).subscribe();
+    if (n.action_url) this.router.navigateByUrl(n.action_url);
+  }
+
+  markAllNotificationsRead(): void {
+    this.notifications.markAllRead().subscribe();
+  }
+
+  reloadNotifications(): void {
+    this.notifications.load().subscribe();
+  }
 
   /** القوائم الفرعية المفتوحة يدويًا (بالإضافة إلى الفرع النشط الذي يُفتح تلقائيًا) */
   private readonly manuallyToggled = signal<Record<string, boolean>>({});
@@ -576,15 +644,29 @@ export class DashboardLayoutComponent {
         {
           label: 'حسابات الطلاب المالية',
           match: '/student-finance',
-          link: '/student-finance/accounts',
+          link: '/student-finance/dashboard',
           children: [
+            { label: 'لوحة التحكم', link: '/student-finance/dashboard' },
             { label: 'حسابات الطلاب', link: '/student-finance/accounts' },
             { label: 'فواتير الطلاب', link: '/student-finance/invoices' },
             { label: 'سندات القبض والمدفوعات', link: '/student-finance/receipts' },
+            { label: 'مدفوعات أولياء الأمور', link: '/student-finance/online-payments' },
             { label: 'الأرصدة المستحقة', link: '/student-finance/outstanding' },
           ],
         },
-        { label: 'المشتريات', link: '/procurement' },
+        {
+          label: 'المشتريات',
+          match: '/procurement',
+          link: '/procurement/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/procurement/dashboard' },
+            { label: 'طلبات الشراء', link: '/procurement/requests' },
+            { label: 'عروض الأسعار', link: '/procurement/rfqs' },
+            { label: 'أوامر الشراء', link: '/procurement/orders' },
+            { label: 'الموردون', link: '/procurement/vendors' },
+            { label: 'العقود', link: '/procurement/contracts' },
+          ],
+        },
       ],
     },
     {

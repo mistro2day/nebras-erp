@@ -60,6 +60,10 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/online-payments/', params);
   }
 
+  onlinePaymentsPendingCount(): Observable<any> {
+    return this.api.get<any>('student-finance/online-payments/pending-count/');
+  }
+
   approveOnlinePayment(id: string): Observable<any> {
     return this.api.post<any>(`student-finance/online-payments/${id}/approve/`, {});
   }

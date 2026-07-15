@@ -215,6 +215,11 @@ export class StudentsService {
     return this.apiClient.post(`students/students/${studentId}/activate-student/`, {});
   }
 
+  /** إعادة تعيين كلمة مرور ولي الأمر وإرسال بيانات الدخول الجديدة */
+  resetGuardianPassword(studentId: string, relationId: string): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/reset-guardian-password/`, { relation_id: relationId });
+  }
+
   /** جلب بيانات هوية المدرسة (الشعار والاسم) للمستأجر الحالي — تُستخدم في ترويسة ملف الطالب */
   getBranding(): Observable<any> {
     return this.apiClient.get(`tenants/branding/current/`).pipe(
