@@ -31,7 +31,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             <div class="avatar-section">
               <div class="avatar-wrapper" (click)="photoInput.click()" title="انقر لتحديث الصورة الشخصية">
                 <img *ngIf="$any(s.profile)?.photo_url" [src]="$any(s.profile)?.photo_url" class="student-photo" alt="صورة الطالب" />
-                <div *ngIf="!$any(s.profile)?.photo_url" class="avatar-placeholder">{{ (s.profile?.arabic_name || '؟').charAt(0) }}</div>
+                <div *ngIf="!$any(s.profile)?.photo_url" class="avatar-placeholder">{{ (s.profile.arabic_name || '؟').charAt(0) }}</div>
                 <div class="avatar-overlay">
                   <span>تغيير 📷</span>
                 </div>
@@ -39,8 +39,8 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               <input type="file" #photoInput (change)="onPhotoSelected($event, s)" style="display: none;" accept="image/*" />
 
               <div class="basic-info">
-                <h2>{{ s.profile?.arabic_name || 'ملف طالب' }}</h2>
-                <p class="eng-name">{{ s.profile?.english_name }}</p>
+                <h2>{{ s.profile.arabic_name || 'ملف طالب' }}</h2>
+                <p class="eng-name">{{ s.profile.english_name }}</p>
                 <div class="badge-row">
                   <span [class]="statusBadge(s.status)">{{ statusText(s.status) }}</span>
                   <span class="num-badge">رقم الطالب: {{ s.student_number }}</span>
@@ -49,10 +49,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             </div>
             
             <div class="quick-stats">
-              <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile?.nationality || '—' }}</span></div>
-              <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile?.gender === 'male' ? 'ذكر' : s.profile?.gender === 'female' ? 'أنثى' : '—' }}</span></div>
-              <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile?.date_of_birth || '—' }}</span></div>
-              <div class="stat-item"><span class="label">العمر</span><span class="val font-semibold">{{ getAge(s.profile?.date_of_birth) }}</span></div>
+              <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile.nationality || '—' }}</span></div>
+              <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile.gender === 'male' ? 'ذكر' : s.profile.gender === 'female' ? 'أنثى' : '—' }}</span></div>
+              <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile.date_of_birth || '—' }}</span></div>
+              <div class="stat-item"><span class="label">العمر</span><span class="val font-semibold">{{ getAge(s.profile.date_of_birth) }}</span></div>
             </div>
           </div>
 
@@ -81,14 +81,14 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               <div class="tab-content">
                 <h3>المعلومات الشخصية الأساسية</h3>
                 <div class="info-grid">
-                  <div class="info-item"><strong>الاسم الكامل (عربي)</strong>{{ s.profile?.arabic_name }}</div>
-                  <div class="info-item"><strong>الاسم الكامل (إنجليزي)</strong>{{ s.profile?.english_name || '—' }}</div>
-                  <div class="info-item"><strong>الرقم الوطني / الجواز</strong>{{ s.profile?.national_id || '—' }}</div>
-                  <div class="info-item"><strong>رقم جواز السفر</strong>{{ s.profile?.passport || '—' }}</div>
-                  <div class="info-item"><strong>الجنسية</strong>{{ s.profile?.nationality }}</div>
-                  <div class="info-item"><strong>تاريخ الميلاد</strong>{{ s.profile?.date_of_birth }}</div>
-                  <div class="info-item"><strong>الديانة</strong>{{ s.profile?.religion || '—' }}</div>
-                  <div class="info-item"><strong>فصيلة الدم</strong><span class="blood-group">{{ s.profile?.blood_group || '—' }}</span></div>
+                  <div class="info-item"><strong>الاسم الكامل (عربي)</strong>{{ s.profile.arabic_name }}</div>
+                  <div class="info-item"><strong>الاسم الكامل (إنجليزي)</strong>{{ s.profile.english_name || '—' }}</div>
+                  <div class="info-item"><strong>الرقم الوطني / الجواز</strong>{{ s.profile.national_id || '—' }}</div>
+                  <div class="info-item"><strong>رقم جواز السفر</strong>{{ s.profile.passport || '—' }}</div>
+                  <div class="info-item"><strong>الجنسية</strong>{{ s.profile.nationality }}</div>
+                  <div class="info-item"><strong>تاريخ الميلاد</strong>{{ s.profile.date_of_birth }}</div>
+                  <div class="info-item"><strong>الديانة</strong>{{ s.profile.religion || '—' }}</div>
+                  <div class="info-item"><strong>فصيلة الدم</strong><span class="blood-group">{{ s.profile.blood_group || '—' }}</span></div>
                 </div>
 
                 <hr class="nb-divider" />
@@ -455,7 +455,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
         </div>
 
         <!-- نافذة تفاصيل المستند (فاتورة / سند قبض) — عرض وطباعة وتصدير -->
-        <sf-document-drawer [doc]="doc()" [studentName]="student()?.profile?.arabic_name || ''"
+        <sf-document-drawer [doc]="doc()" [studentName]="student().profile.arabic_name || ''"
           [methods]="paymentMethods()" (closed)="doc.set(null)"></sf-document-drawer>
 
         <!-- حاوية الطباعة الخاصة بـ A4 (مخفية في المتصفح وتظهر فقط عند الطباعة) -->
@@ -943,7 +943,7 @@ export class StudentDetailsComponent implements OnInit {
       disableClose: true,
       data: {
         title: 'تفعيل حساب الطالب',
-        targetName: s.profile?.arabic_name || s.student_number,
+        targetName: s.profile.arabic_name || s.student_number,
         processingHint: 'جارٍ إنشاء حساب البوابة وإرسال بيانات الدخول عبر البريد وواتساب…',
         action$: this.studentsService.activateStudentPortal(s.id),
       },
@@ -1098,17 +1098,17 @@ export class StudentDetailsComponent implements OnInit {
   }
 
   async graduate(s: any): Promise<void> {
-    const ok = await this.confirm({ title: 'تخريج الطالب', message: `سيُنقل «${s.profile?.arabic_name || s.id}» إلى سجل الخريجين بتاريخ اليوم.`, color: 'primary' });
+    const ok = await this.confirm({ title: 'تخريج الطالب', message: `سيُنقل «${s.profile.arabic_name || s.id}» إلى سجل الخريجين بتاريخ اليوم.`, color: 'primary' });
     if (ok) this.studentsService.graduateStudent(this.id, { graduation_date: this.today() }).subscribe({ next: () => this.reload() });
   }
 
   async withdraw(s: any): Promise<void> {
-    const ok = await this.confirm({ title: 'تسجيل انسحاب', message: `سيتم تسجيل انسحاب «${s.profile?.arabic_name || s.id}» بتاريخ اليوم.`, color: 'warn' });
+    const ok = await this.confirm({ title: 'تسجيل انسحاب', message: `سيتم تسجيل انسحاب «${s.profile.arabic_name || s.id}» بتاريخ اليوم.`, color: 'warn' });
     if (ok) this.studentsService.withdrawStudent(this.id, { withdrawal_date: this.today(), reason: 'انسحاب مسجّل من ملف الطالب' }).subscribe({ next: () => this.reload() });
   }
 
   async archive(s: any): Promise<void> {
-    const ok = await this.confirm({ title: 'أرشفة الطالب', message: `سيتم أرشفة ملف «${s.profile?.arabic_name || s.id}». يمكن استعادته لاحقاً.`, color: 'warn' });
+    const ok = await this.confirm({ title: 'أرشفة الطالب', message: `سيتم أرشفة ملف «${s.profile.arabic_name || s.id}». يمكن استعادته لاحقاً.`, color: 'warn' });
     if (ok) this.studentsService.archiveStudent(this.id, 'أرشفة يدوية من ملف الطالب').subscribe({ next: () => this.router.navigate(['/students/list']) });
   }
 
