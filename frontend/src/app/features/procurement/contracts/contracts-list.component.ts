@@ -3,18 +3,27 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { ContractCreateFormComponent } from './contract-create-form.component';
 
 /** عقود الشراء — الاتفاقيات الإطارية طويلة الأجل مع الموردين. */
 @Component({
   selector: 'app-procurement-contracts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, ContractCreateFormComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="عقود الشراء" subtitle="الاتفاقيات الإطارية والعقود طويلة الأجل مع الموردين.">
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <button class="btn primary" (click)="creating.set(!creating())">
+          {{ creating() ? 'إغلاق' : '＋ عقد جديد' }}
+        </button>
       </nb-page-header>
+
+      @if (creating()) {
+        <app-contract-create-form (created)="onCreated()" (cancel)="creating.set(false)"></app-contract-create-form>
+      }
 
       <div class="toolbar">
         <input class="search" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="بحث برقم العقد…" />
@@ -25,15 +34,15 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
           <span>رقم العقد</span><span>المورّد</span><span>يبدأ</span><span>ينتهي</span><span class="ta-end">القيمة</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل العقود…"></nb-loading>
         } @else {
           @for (c of filtered(); track c.id) {
             <div class="row">
               <span class="mono">{{ c.contract_number || '—' }}</span>
-              <span>{{ c.vendor_name || c.vendor?.name_ar || '—' }}</span>
+              <span>{{ vendorName(c.vendor) }}</span>
               <span class="muted">{{ c.start_date || '—' }}</span>
               <span class="muted">{{ c.end_date || '—' }}</span>
-              <span class="ta-end strong">{{ fmt(c.total_value || c.value) }}</span>
+              <span class="ta-end strong">{{ fmt(c.contract_value) }}</span>
             </div>
           }
           @if (filtered().length === 0) { <div class="empty">لا توجد عقود مسجّلة.</div> }
@@ -48,14 +57,34 @@ export class ProcurementContractsComponent implements OnInit {
   private svc = inject(ProcurementService);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
+  readonly creating = signal(false);
   readonly q = signal('');
+
+  onCreated() { this.creating.set(false); this.load(); }
 
   readonly filtered = computed(() => {
     const term = this.q().trim();
     return this.all().filter(c => !term || (c.contract_number || '').includes(term));
   });
 
-  ngOnInit() { this.load(); }
+  /** خريطة معرّف المورّد → اسمه (الـ serializer يُرجع المعرّف فقط). */
+  private readonly vendorMap = signal<Record<string, string>>({});
+
+  ngOnInit() {
+    this.load();
+    this.svc.getVendors({ page_size: 200 }).subscribe({
+      next: (d: any) => {
+        const list = Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
+        this.vendorMap.set(Object.fromEntries(list.map((v: any) => [String(v.id), v.name_ar || v.name_en])));
+      },
+      error: () => {},
+    });
+  }
+
+  vendorName(id: any): string {
+    return this.vendorMap()[String(id)] || '—';
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getContracts().subscribe({

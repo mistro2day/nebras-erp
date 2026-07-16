@@ -633,7 +633,19 @@ export class DashboardLayoutComponent {
       items: [
         { label: 'الموارد البشرية', link: '/hr' },
         { label: 'الرواتب', link: '/payroll' },
-        { label: 'الحضور والانصراف', link: '/attendance' },
+        {
+          label: 'الحضور والانصراف',
+          match: '/attendance',
+          link: '/attendance/dashboard',
+          children: [
+            { label: 'نظرة عامة ومتابعة', link: '/attendance/dashboard' },
+            { label: 'جدول الدوامات والورديات', link: '/attendance/shifts' },
+            { label: 'طلبات تصحيح البصمة', link: '/attendance/corrections' },
+            { label: 'سياسات الحضور', link: '/attendance/policies' },
+            { label: 'طرق تسجيل البصمة والتحقق', link: '/attendance/check-in-methods' },
+            { label: 'محاكي البصمة الجوالة', link: '/attendance/simulator' }
+          ]
+        },
       ],
     },
     {
@@ -710,7 +722,15 @@ export class DashboardLayoutComponent {
         { label: 'التكامل', link: '/integration' },
         { label: 'التخصيص', link: '/personalization' },
         { label: 'لوحة الأوامر', link: '/command' },
-        { label: 'الهيكل التنظيمي', link: '/organization' },
+        {
+          label: 'الهيكل التنظيمي',
+          match: '/organization',
+          link: '/organization/overview',
+          children: [
+            { label: 'نظرة عامة', link: '/organization/overview' },
+            { label: 'الأقسام', link: '/organization/departments' },
+          ],
+        },
         { label: '✦ مساعد نبراس', link: '/ai', ai: true },
       ],
     },

@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Sum
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.common.responses import StandardResponse
@@ -108,6 +109,43 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         }
         return Response(stats, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='reference-data')
+    def reference_data(self, request):
+        """بيانات مرجعية موحّدة لنموذج طلب الشراء: الأقسام + حسابات الموازنة + مراكز التكلفة.
+
+        تُجمَّع هنا (بصلاحية المشتريات) لتفادي اعتماد نموذج الطلب على صلاحيات وحدة المالية.
+        """
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        from apps.organization.domain.models import Department
+        from apps.finance.domain.models import ChartOfAccount, CostCenter
+
+        departments = [
+            {'id': str(d.id), 'name': d.name, 'code': d.code, 'type': d.type}
+            for d in Department.objects.filter(tenant_id=tenant_id, is_active=True, deleted_at__isnull=True)
+        ]
+        accounts = [
+            {'id': str(a.id), 'code': a.code, 'name': a.name_ar or a.name_en}
+            for a in ChartOfAccount.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)[:500]
+        ]
+        # مراكز التكلفة أبعاد مالية تملكها المالية — تُقرأ هنا للاستهلاك فقط (نمط Odoo/D365).
+        # نُرفق الميزانية المخصصة ليرى مقدّم الطلب أثر اختياره قبل الإرسال.
+        cost_centers = [
+            {
+                'id': str(c.id),
+                'code': c.code,
+                'name': c.name_ar or c.name_en or c.code,
+                'budget_allocated': float(c.budget_allocated or 0),
+            }
+            for c in CostCenter.objects.filter(
+                tenant_id=tenant_id, status='active', deleted_at__isnull=True
+            )
+        ]
+        return StandardResponse({
+            'departments': departments,
+            'accounts': accounts,
+            'cost_centers': cost_centers,
+        }, message="البيانات المرجعية لطلب الشراء.")
+
     @action(detail=False, methods=['post'], url_path='create-request')
     def create_request(self, request):
         tenant_id = request.tenant_id
@@ -119,16 +157,35 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         if not department_id or not requested_by or not items:
             return Response({'error': 'department_id, requested_by, and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        pr = ProcurementService.create_purchase_request(
-            tenant_id=tenant_id,
-            department_id=department_id,
-            requested_by=requested_by,
-            items_data=items,
-            reason=reason,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            pr = ProcurementService.create_purchase_request(
+                tenant_id=tenant_id,
+                department_id=department_id,
+                requested_by=requested_by,
+                items_data=items,
+                reason=reason,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(pr)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='submit')
+    def submit_request(self, request, pk=None):
+        """إرسال طلب الشراء للاعتماد (مسودة ← قيد المراجعة)."""
+        tenant_id = request.tenant_id
+        try:
+            pr = ProcurementService.submit_purchase_request(
+                tenant_id=tenant_id, request_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(pr).data,
+                                message="تم إرسال الطلب للاعتماد.")
 
     @action(detail=True, methods=['post'], url_path='approve')
     def approve_request(self, request, pk=None):
@@ -138,12 +195,16 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         if not approver_id:
             return Response({'error': 'approver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        pr = ProcurementService.approve_purchase_request(
-            tenant_id=tenant_id,
-            request_id=pk,
-            approver_id=approver_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            pr = ProcurementService.approve_purchase_request(
+                tenant_id=tenant_id,
+                request_id=pk,
+                approver_id=approver_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(pr)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -186,15 +247,56 @@ class RFQViewSet(BaseCRUDViewSet):
 
         deadline = timezone.datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M:%S')
 
-        rfq = ProcurementService.create_rfq_from_request(
-            tenant_id=tenant_id,
-            request_id=request_id,
-            deadline=deadline,
-            notes=notes,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            rfq = ProcurementService.create_rfq_from_request(
+                tenant_id=tenant_id,
+                request_id=request_id,
+                deadline=deadline,
+                notes=notes,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(rfq)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='submit-quotation')
+    def submit_quotation(self, request, pk=None):
+        """تسجيل عرض سعر مورّد على هذا الـ RFQ — الحلقة السابقة للترسية."""
+        tenant_id = request.tenant_id
+        try:
+            q = ProcurementService.submit_quotation(
+                tenant_id=tenant_id,
+                rfq_id=pk,
+                vendor_id=request.data.get('vendor_id'),
+                quotation_reference=request.data.get('quotation_reference'),
+                items_data=request.data.get('items', []),
+                lead_time_days=request.data.get('lead_time_days', 7),
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(
+            {'quotation_id': str(q.id), 'total_amount': float(q.total_amount)},
+            message="تم تسجيل عرض السعر بنجاح.", status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='revert-award')
+    def revert_award(self, request, pk=None):
+        """التراجع عن الترسية وإعادة الطلب لاستقبال العروض (يُمنع إن صدر أمر الشراء)."""
+        tenant_id = request.tenant_id
+        try:
+            rfq = ProcurementService.revert_award(
+                tenant_id=tenant_id, rfq_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(rfq).data,
+                                message="تم التراجع عن الترسية وإعادة الطلب لاستقبال العروض.")
 
     @action(detail=False, methods=['post'], url_path='compare-and-award')
     def compare_and_award(self, request):
@@ -206,13 +308,17 @@ class RFQViewSet(BaseCRUDViewSet):
         if not rfq_id or not vendor_id or not quotation_id:
             return Response({'error': 'rfq_id, vendor_id, and quotation_id are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        po = ProcurementService.compare_quotations_and_award(
-            tenant_id=tenant_id,
-            rfq_id=rfq_id,
-            vendor_id=vendor_id,
-            quotation_id=quotation_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            po = ProcurementService.compare_quotations_and_award(
+                tenant_id=tenant_id,
+                rfq_id=rfq_id,
+                vendor_id=vendor_id,
+                quotation_id=quotation_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         # نقوم بإرجاع بيانات أمر الشراء المولد
         return Response({'purchase_order_id': str(po.id), 'po_number': po.po_number}, status=status.HTTP_201_CREATED)
 
@@ -248,15 +354,45 @@ class PurchaseOrderViewSet(BaseCRUDViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['po_number']
 
+    @action(detail=True, methods=['post'], url_path='post-invoice')
+    def post_invoice(self, request, pk=None):
+        """تسجيل فاتورة المورّد وترحيل قيدها في دفتر الأستاذ (آخر حلقة نحو المالية)."""
+        tenant_id = request.tenant_id
+        invoice_number = request.data.get('invoice_number')
+        invoice_date = request.data.get('invoice_date') or None
+
+        try:
+            po = PurchaseOrderService.post_vendor_invoice(
+                tenant_id=tenant_id,
+                po_id=pk,
+                invoice_number=invoice_number,
+                invoice_date=invoice_date,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return StandardResponse(
+            {'po_number': po.po_number, 'journal_entry_id': str(po.journal_entry_id), 'status': po.status},
+            message="تم تسجيل فاتورة المورّد. أُرسل قيدها إلى المالية كمسودة بانتظار اعتماد المحاسب وترحيله.",
+        )
+
     @action(detail=True, methods=['post'], url_path='issue')
     def issue_po(self, request, pk=None):
+        """إصدار أمر الشراء للمورّد واستهلاك الموازنة المخصصة في المالية."""
         tenant_id = request.tenant_id
-        
-        po = PurchaseOrderService.issue_purchase_order(
-            tenant_id=tenant_id,
-            po_id=pk,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            po = PurchaseOrderService.issue_purchase_order(
+                tenant_id=tenant_id,
+                po_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            # مخالفة قاعدة عمل (تجاوز موازنة / حالة غير صالحة) ليست خطأ خادم
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(po)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

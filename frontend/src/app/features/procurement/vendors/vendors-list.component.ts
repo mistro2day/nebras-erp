@@ -1,23 +1,33 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { VendorCreateFormComponent } from './vendor-create-form.component';
 
 /** سجل الموردين — التأهيل، الحالة، والتقييم. بنمط نبراس على غرار Odoo / D365. */
 @Component({
   selector: 'app-procurement-vendors',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, VendorCreateFormComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموردون" subtitle="سجل الموردين المعتمدين وحالات التأهيل والتقييم.">
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <button class="btn primary" (click)="creating.set(!creating())">
+          {{ creating() ? 'إغلاق' : '＋ مورّد جديد' }}
+        </button>
       </nb-page-header>
 
+      @if (creating()) {
+        <app-vendor-create-form (created)="onCreated()" (cancel)="creating.set(false)"></app-vendor-create-form>
+      }
+
       <div class="toolbar">
-        <input class="search" [(ngModel)]="q" (ngModelChange)="q.set($event)" placeholder="بحث باسم المورّد…" />
+        <input class="search" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="بحث باسم المورّد…" />
         <div class="chips">
           <button [class.on]="filter()===''" (click)="filter.set('')">الكل</button>
           <button [class.on]="filter()==='approved'" (click)="filter.set('approved')">معتمد</button>
@@ -32,10 +42,10 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
           <span class="ta-end">التقييم</span><span class="ta-end">الحالة</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل الموردين…"></nb-loading>
         } @else {
           @for (v of filtered(); track v.id) {
-            <div class="row">
+            <div class="row clickable" (click)="open(v)" title="فتح ملف المورّد">
               <span class="who"><span class="ava">{{ initial(v.name_ar || v.name_en) }}</span>{{ v.name_ar || v.name_en }}</span>
               <span class="mono muted">{{ v.tax_number || '—' }}</span>
               <span class="mono muted">{{ v.cr_number || '—' }}</span>
@@ -49,14 +59,25 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
     </div>
   `,
   styleUrl: '../shared/procurement-table.scss',
-  styles: [`.row { grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr; }`],
+  styles: [`
+    .row { grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr; }
+    .row.clickable { cursor: pointer; }
+  `],
 })
 export class ProcurementVendorsComponent implements OnInit {
   private svc = inject(ProcurementService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
+  readonly creating = signal(false);
   readonly q = signal('');
   readonly filter = signal('');
+
+  onCreated() { this.creating.set(false); this.load(); }
+
+  /** فتح ملف المورّد (عرض وتعديل + سجل تعامله). */
+  open(v: any) { this.router.navigate(['/procurement/vendors', v.id]); }
 
   readonly filtered = computed(() => {
     const term = this.q().trim();
@@ -66,7 +87,13 @@ export class ProcurementVendorsComponent implements OnInit {
       (!term || (v.name_ar || '').includes(term) || (v.name_en || '').toLowerCase().includes(term.toLowerCase())));
   });
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    // بحث مُمرَّر من لوحة التحكم عند النقر على مورّد
+    const q = this.route.snapshot.queryParamMap.get('q');
+    if (q) this.q.set(q);
+    this.load();
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getVendors({ page_size: 200 }).subscribe({

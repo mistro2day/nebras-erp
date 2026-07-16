@@ -9,6 +9,11 @@ class EmployeeViewSet(BaseCRUDViewSet):
     model_class = Employee
     serializer_class = EmployeeSerializer
 
+    def get_permissions(self):
+        if self.action in ['list']:
+            return []
+        return super().get_permissions()
+
     @action(detail=True, methods=['post'], url_path='promote')
     def promote(self, request, pk=None):
         instance = self.get_object()

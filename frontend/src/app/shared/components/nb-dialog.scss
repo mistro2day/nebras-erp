@@ -1,0 +1,142 @@
+/**
+ * لغة نوافذ نبراس المنبثقة — تُستورد عبر styleUrl في كل نافذة.
+ *
+ * البنية: شريط ترويسة ملوّن ملتصق بالحواف (full-bleed) + جسم + شريط تذييل.
+ * تعتمد على تجاوزات الحاوية في styles.scss عبر panelClass: 'nb-dialog-panel'
+ * (حاوية Material تفرض حشوة وزوايا لا يمكن ضبطها من داخل المكوّن).
+ */
+.nb-dlg {
+  font-family: var(--nb-font-family, 'Cairo', sans-serif);
+  min-width: 460px;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 560px) {
+  .nb-dlg { min-width: auto; width: 100%; }
+}
+
+/* ── الترويسة: شريط ملوّن ملتصق بحواف النافذة ── */
+.nb-dlg-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--nb-primary-600, #3f51b5), var(--nb-primary-800, #2c387e));
+  color: #fff;
+}
+.nb-dlg-head.warn { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.nb-dlg-head.danger { background: linear-gradient(135deg, #dc2626, #991b1b); }
+
+.nb-dlg-ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex: none;
+  background: rgba(255, 255, 255, 0.18);
+}
+.nb-dlg-head h2 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #fff;
+}
+.nb-dlg-head p {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── الجسم ── */
+.nb-dlg-body { padding: 20px; background: var(--nb-surface, #fff); }
+
+.nb-dlg-grid { display: grid; gap: 14px; }
+.nb-dlg-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) { .nb-dlg-grid.cols-2 { grid-template-columns: 1fr; } }
+
+/* حقول بتسمية بسطر ثابت وحقل بارتفاع واحد → محاذاة مضمونة بالبناء */
+.nb-dlg label { display: grid; grid-template-rows: 18px auto; gap: 6px; }
+.nb-dlg .lbl {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--nb-text, #1f2937);
+  line-height: 18px;
+}
+.nb-dlg .req { color: var(--nb-danger, #dc2626); }
+.nb-dlg input,
+.nb-dlg select {
+  font-family: inherit;
+  font-size: 13px;
+  height: 38px;
+  padding: 0 11px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--nb-border, #e5e7eb);
+  border-radius: var(--nb-radius, 8px);
+  background: var(--nb-surface, #fff);
+  color: var(--nb-text, #1f2937);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.nb-dlg input:focus,
+.nb-dlg select:focus {
+  outline: none;
+  border-color: var(--nb-primary-400, #7986cb);
+  box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.12);
+}
+.nb-dlg input::placeholder { color: var(--nb-text-muted, #94a3b8); opacity: 0.75; }
+.nb-dlg .hint { font-size: 11px; color: var(--nb-text-muted, #64748b); margin-top: 7px; }
+
+/* ملاحظة وخطأ */
+.nb-dlg-note {
+  margin-top: 16px;
+  border-radius: var(--nb-radius, 8px);
+  border-inline-start: 3px solid var(--nb-primary-400, #7986cb);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  background: var(--nb-primary-50, #eef0fa);
+  color: var(--nb-primary-800, #2c387e);
+}
+.nb-dlg-err {
+  margin-top: 12px;
+  border-radius: var(--nb-radius, 8px);
+  border-inline-start: 3px solid var(--nb-danger, #dc2626);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+/* ── التذييل: شريط بخلفية أخف يفصل الإجراءات ── */
+.nb-dlg-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 13px 20px;
+  background: var(--nb-surface-raised, #f8fafc);
+  border-top: 1px solid var(--nb-border-soft, #eceef5);
+}
+.nb-dlg-btn {
+  height: 38px;
+  padding: 0 20px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--nb-radius, 8px);
+  cursor: pointer;
+  border: none;
+  transition: filter 0.15s ease;
+}
+.nb-dlg-btn:hover:not(:disabled) { filter: brightness(0.95); }
+.nb-dlg-btn:disabled { opacity: 0.6; cursor: default; }
+.nb-dlg-btn.ghost {
+  background: var(--nb-surface, #fff);
+  border: 1px solid var(--nb-border, #e5e7eb);
+  color: var(--nb-text, #1f2937);
+}
+.nb-dlg-btn.primary { background: var(--nb-primary-600, #3f51b5); color: #fff; }
+.nb-dlg-btn.danger { background: var(--nb-danger, #dc2626); color: #fff; }

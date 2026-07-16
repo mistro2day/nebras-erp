@@ -92,10 +92,14 @@
               "buildTarget": "nebras-erp:build:production"
             },
             "development": {
-              "buildTarget": "nebras-erp:build:development"
+              "buildTarget": "nebras-erp:build:development",
+              "proxyConfig": "proxy.conf.json"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          }
         },
         "test": {
           "builder": "@angular-devkit/build-angular:karma",

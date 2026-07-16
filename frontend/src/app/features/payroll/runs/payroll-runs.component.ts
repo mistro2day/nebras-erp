@@ -1056,6 +1056,9 @@ export class PayrollRunsComponent implements OnInit {
   getDynamicVal(slip: Payslip, colKey: string): number {
     const col = this.availableCols().find(c => c.key === colKey);
     if (!col) return 0;
+    if (colKey === 'delay_deduction') {
+      return Number((slip as any).late_deduction || 0);
+    }
     if (col.type === 'basic') {
       return Number((slip as any)[colKey] || 0);
     }
@@ -1187,7 +1190,31 @@ export class PayrollRunsComponent implements OnInit {
   }
 
   linkAttendance() {
-    this.notify.success('تمت تهيئة ربط الحضور والانصراف. سيتم سحب البيانات تلقائياً بمجرد إتاحة موديول الحضور والغياب.');
+    const run = this.selectedRun();
+    if (!run) return;
+    this.loadingPayslips.set(true);
+    // استدعاء إعادة الحساب لإعادة المعاينة وسحب بيانات الحضور والانصراف الحية للموظفين
+    this.http.post<any>(`${environment.apiUrl}payroll/runs/${run.id}/preview/`, {}).subscribe({
+      next: () => {
+        this.http.get<any>(`${environment.apiUrl}payroll/payslips/?payroll_run=${run.id}`).subscribe({
+          next: (r2) => {
+            if (r2?.success) {
+              this.payslips.set(r2.data);
+              this.fetchEmployeeNamesForSlips(r2.data);
+              this.notify.success('تم بنجاح سحب بيانات الحضور والانصراف الحية لشهر يونيو واحتساب الخصومات التلقائية للتأخير لكل موظف.');
+            } else {
+              this.loadingPayslips.set(false);
+            }
+            this.loadRuns();
+          },
+          error: () => this.loadingPayslips.set(false),
+        });
+      },
+      error: () => {
+        this.loadingPayslips.set(false);
+        this.notify.error('فشل في إعادة احتساب مسير الرواتب الحضور.');
+      }
+    });
   }
 
   // ── Data Loading ──

@@ -239,3 +239,28 @@ app-dashboard-layout > .shell > .main > .page > *:not(router-outlet):not(script)
   .stamp-box p { font-size: 9px !important; color: #64748b !important; margin-bottom: 2px !important; }
   .print-school-stamp { width: 65px !important; height: 65px !important; object-fit: contain !important; opacity: 0.85 !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   نوافذ نبراس المنبثقة — تجاوز حاوية Material
+   ─────────────────────────────────────────────────────────────────
+   حاوية mat-dialog تفرض حشوة وزوايا خاصة بها، وهي خارج نطاق أنماط
+   المكوّن المغلّفة (encapsulated) فلا يمكن ضبطها من الداخل — لذلك
+   تُضبط هنا عالمياً عبر panelClass: 'nb-dialog-panel'.
+   ══════════════════════════════════════════════════════════════════ */
+.nb-dialog-panel {
+  .mat-mdc-dialog-container {
+    --mdc-dialog-container-shape: var(--nb-radius-card, 12px);
+
+    .mat-mdc-dialog-surface {
+      border-radius: var(--nb-radius-card, 12px);
+      border: 1px solid var(--nb-border, #e5e7eb);
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+      overflow: hidden;      /* ليلتصق شريط الترويسة بالحواف */
+      padding: 0;            /* الحشوة تُدار داخل المكوّن */
+    }
+  }
+  .mat-mdc-dialog-content { padding: 0; margin: 0; max-height: none; }
+}
+
+/* خلفية معتمة أهدأ من افتراضي Material */
+.cdk-overlay-dark-backdrop { background: rgba(15, 23, 42, 0.45); }

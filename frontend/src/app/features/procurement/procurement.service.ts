@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface ProcurementStats {
   open_requests: number;
@@ -18,7 +19,8 @@ export interface ProcurementStats {
 })
 export class ProcurementService {
   private http = inject(HttpClient);
-  private apiUrl = '/api/v1/procurement';
+  /** رابط مطلق مثل بقية الخدمات العاملة — المسار النسبي يذهب لخادم Angular ويردّ بـ index.html. */
+  private apiUrl = `${environment.apiUrl}procurement`;
 
   // Signals for state management
   stats = signal<ProcurementStats | null>(null);
@@ -46,6 +48,16 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/requests/create-request/`, payload);
   }
 
+  /** طلب شراء مفرد مع بنوده. */
+  getPurchaseRequest(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/requests/${id}/`);
+  }
+
+  /** إرسال الطلب للاعتماد (مسودة ← قيد المراجعة). */
+  submitPurchaseRequest(id: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/requests/${id}/submit/`, {});
+  }
+
   approvePurchaseRequest(id: string, payload: { approver_id: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/requests/${id}/approve/`, payload);
   }
@@ -62,15 +74,95 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/rfqs/compare-and-award/`, payload);
   }
 
+  /** طلب عروض أسعار مفرد مع بنوده. */
+  getRFQ(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/rfqs/${id}/`);
+  }
+
+  /** تعديل بيانات الطلب (الموعد النهائي والملاحظات). */
+  updateRFQ(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/rfqs/${id}/`, payload);
+  }
+
+  /** التراجع عن الترسية — يُمنع إن صدر أمر الشراء واستهلك الموازنة. */
+  revertAward(id: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rfqs/${id}/revert-award/`, {});
+  }
+
+  /** تسجيل عرض سعر مورّد على طلب عروض الأسعار (الحلقة السابقة للترسية). */
+  submitQuotation(rfqId: string, payload: {
+    vendor_id: string; quotation_reference: string; lead_time_days: number;
+    items: { rfq_item_id: string; unit_price: number }[];
+  }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rfqs/${rfqId}/submit-quotation/`, payload);
+  }
+
   getPurchaseOrders(params?: any): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/orders/`, { params: params || {} });
+  }
+
+  /** أمر شراء مفرد مع بنوده. */
+  getPurchaseOrder(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/orders/${id}/`);
   }
 
   issuePurchaseOrder(id: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/orders/${id}/issue/`, {});
   }
 
+  /** تسجيل فاتورة المورّد وترحيل قيدها المحاسبي (آخر حلقة نحو المالية). */
+  postVendorInvoice(id: string, invoice_number: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/orders/${id}/post-invoice/`, { invoice_number });
+  }
+
   getContracts(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/contracts/`);
+  }
+
+  // ---- بيانات مرجعية موحّدة لنموذج طلب الشراء (أقسام + حسابات + مراكز تكلفة) ----
+  getRequestReferenceData(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/requests/reference-data/`);
+  }
+
+  createVendor(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/vendors/`, payload);
+  }
+
+  /** مورّد مفرد. */
+  getVendor(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendors/${id}/`);
+  }
+
+  updateVendor(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/vendors/${id}/`, payload);
+  }
+
+  // ---- جهات اتصال المورّد (الجوال والبريد) ----
+  getVendorContacts(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendor-contacts/`, { params: { page_size: 300 } as any });
+  }
+
+  createVendorContact(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/vendor-contacts/`, payload);
+  }
+
+  updateVendorContact(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/vendor-contacts/${id}/`, payload);
+  }
+
+  deleteVendorContact(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/vendor-contacts/${id}/`);
+  }
+
+  getVendorCategories(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendor-categories/`, { params: { page_size: 100 } as any });
+  }
+
+  createContract(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/contracts/`, payload);
+  }
+
+  getQuotations(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/quotations/`, { params: { page_size: 300 } as any });
   }
 }

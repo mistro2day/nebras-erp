@@ -5,3 +5,4 @@ export { NbBadgeComponent, type NbBadgeKind } from './nb-badge.component';
 export { NbDataTableComponent, type NbColumn } from './nb-data-table.component';
 export { NbLoadingComponent } from './nb-loading.component';
 export { NbDrawerComponent } from './nb-drawer.component';
+export { NbModalComponent } from './nb-modal.component';

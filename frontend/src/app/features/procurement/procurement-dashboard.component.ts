@@ -81,37 +81,53 @@ interface Stage {
         </div>
       </div>
 
+      <!-- بطاقات التنقّل بين صفحات المشتريات -->
+      <div class="nav-tiles">
+        @for (t of navTiles; track t.route) {
+          <button class="nav-tile" (click)="go(t.route)">
+            <span class="nt-ic">{{ t.icon }}</span>
+            <span class="nt-label">{{ t.label }}</span>
+            <span class="nt-arrow">←</span>
+          </button>
+        }
+      </div>
+
       <!-- عمودان: الطلبات الأخيرة + أداء الموردين -->
       <div class="cols">
         <section class="card">
           <div class="card-head">
             <h3>أحدث طلبات الشراء</h3>
-            <span class="card-sub">{{ requests().length }} طلب</span>
+            <a class="see-all" (click)="go('/procurement/requests')">عرض الكل ({{ requests().length }}) ←</a>
           </div>
           <div class="list">
             <div class="row head">
               <span>رقم الطلب</span><span>التاريخ</span><span class="ta-end">تقديري</span><span class="ta-end">الحالة</span>
             </div>
             @for (r of requests().slice(0, 7); track r.id) {
-              <div class="row">
+              <div class="row link" (click)="openRequest(r)" title="فتح تفاصيل الطلب">
                 <span class="mono">{{ r.request_number || '—' }}</span>
                 <span class="muted">{{ r.date || '—' }}</span>
                 <span class="ta-end strong">{{ fmt(r.total_estimated_amount) }}</span>
                 <span class="ta-end"><span class="badge" [attr.data-s]="r.status">{{ statusText(r.status) }}</span></span>
               </div>
             }
-            @if (requests().length === 0) { <div class="empty">لا توجد طلبات شراء بعد.</div> }
+            @if (requests().length === 0) {
+              <div class="empty">
+                لا توجد طلبات شراء بعد.
+                <a class="empty-cta" (click)="go('/procurement/requests')">إنشاء طلب شراء ←</a>
+              </div>
+            }
           </div>
         </section>
 
         <section class="card">
           <div class="card-head">
             <h3>أداء الموردين</h3>
-            <span class="card-sub">{{ vendors().length }} مورّد</span>
+            <a class="see-all" (click)="go('/procurement/vendors')">عرض الكل ({{ vendors().length }}) ←</a>
           </div>
           <div class="vendors">
             @for (v of topVendors(); track v.id) {
-              <div class="vendor">
+              <div class="vendor link" (click)="openVendor(v)" title="فتح سجل الموردين">
                 <div class="v-ava">{{ initial(v.name_ar || v.name) }}</div>
                 <div class="v-info">
                   <strong>{{ v.name_ar || v.name || 'مورّد' }}</strong>
@@ -123,7 +139,12 @@ interface Stage {
                 </div>
               </div>
             }
-            @if (vendors().length === 0) { <div class="empty">لا يوجد موردون معتمدون.</div> }
+            @if (vendors().length === 0) {
+              <div class="empty">
+                لا يوجد موردون معتمدون.
+                <a class="empty-cta" (click)="go('/procurement/vendors')">إضافة مورّد ←</a>
+              </div>
+            }
           </div>
         </section>
       </div>
@@ -176,6 +197,19 @@ interface Stage {
     .kpi.good .kpi-value { color: var(--nb-success); }
     .kpi-unit { display: block; font-size: 11px; color: var(--nb-text-muted); margin-top: 4px; }
 
+    /* بطاقات التنقّل */
+    .nav-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+    @media (max-width: 820px) { .nav-tiles { grid-template-columns: repeat(2, 1fr); } }
+    .nav-tile { display: flex; align-items: center; gap: 10px; background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 13px 14px; cursor: pointer; font-family: inherit; text-align: start;
+      transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+    .nav-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(48,63,159,0.1); border-color: var(--nb-primary-400); }
+    .nav-tile:hover .nt-arrow { opacity: 1; transform: translateX(-3px); }
+    .nt-ic { font-size: 18px; width: 34px; height: 34px; display: grid; place-items: center; flex: none;
+      background: var(--nb-primary-50); border-radius: 10px; }
+    .nt-label { flex: 1; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .nt-arrow { color: var(--nb-primary-600); font-size: 15px; opacity: 0; transition: all .15s ease; }
+
     /* الأعمدة */
     .cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
     @media (max-width: 960px) { .cols { grid-template-columns: 1fr; } }
@@ -183,6 +217,15 @@ interface Stage {
     .card-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 10px; }
     .card-head h3 { margin: 0; font-size: 14px; font-weight: 800; color: var(--nb-text); }
     .card-sub { font-size: 12px; color: var(--nb-text-muted); }
+    .see-all { font-size: 12px; font-weight: 700; color: var(--nb-primary-600); cursor: pointer; }
+    .see-all:hover { text-decoration: underline; }
+    /* الصفوف القابلة للفتح */
+    .row.link, .vendor.link { cursor: pointer; }
+    .row.link:hover { background: var(--nb-primary-50); }
+    .vendor.link:hover { background: var(--nb-primary-50); }
+    .empty-cta { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 700;
+      color: var(--nb-primary-600); cursor: pointer; }
+    .empty-cta:hover { text-decoration: underline; }
 
     .list { display: flex; flex-direction: column; }
     .list .row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 8px; align-items: center;
@@ -221,9 +264,25 @@ export class ProcurementDashboardComponent implements OnInit {
 
   go(route: string) { this.router.navigateByUrl(route); }
 
+  /** فتح استمارة الطلب مباشرة من اللوحة. */
+  openRequest(r: any) { this.router.navigate(['/procurement/requests', r.id]); }
+
+  /** فتح سجل الموردين مع تمرير اسم المورّد للبحث. */
+  openVendor(v: any) {
+    this.router.navigate(['/procurement/vendors'], { queryParams: { q: v.name_ar || v.name_en || '' } });
+  }
+
   readonly stats = this.svc.stats;
   readonly requests = signal<any[]>([]);
   readonly vendors = signal<any[]>([]);
+
+  readonly navTiles = [
+    { label: 'طلبات الشراء', icon: '📝', route: '/procurement/requests' },
+    { label: 'عروض الأسعار', icon: '📨', route: '/procurement/rfqs' },
+    { label: 'أوامر الشراء', icon: '📦', route: '/procurement/orders' },
+    { label: 'الموردون', icon: '🏭', route: '/procurement/vendors' },
+    { label: 'العقود', icon: '📄', route: '/procurement/contracts' },
+  ];
 
   readonly stages: Stage[] = [
     { key: 'req', label: 'طلبات الشراء', icon: '📝', countKey: 'open_requests', hint: 'واردة من الأقسام', route: '/procurement/requests' },

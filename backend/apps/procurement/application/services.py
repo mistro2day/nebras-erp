@@ -23,6 +23,7 @@ from apps.finance.application.services import BudgetService
 from apps.rules.application.services import RuleEvaluationService
 from apps.workflow.services import WorkflowEngine
 from apps.communications.application.events import EventBusConsumer
+from apps.shared.application.numbering import generate_unique_number
 
 logger = logging.getLogger('nebras.procurement')
 
@@ -41,7 +42,8 @@ class ProcurementService:
         """
         إنشاء طلب شراء جديد مع التحقق من الموازنة التقديرية لكل بند بشكل مبدئي.
         """
-        request_number = f"PR-{timezone.now().strftime('%y%m%d')}-{PurchaseRequest.objects.filter(tenant_id=tenant_id).count() + 1}"
+        request_number = generate_unique_number(
+            PurchaseRequest, tenant_id, f"PR-{timezone.now().strftime('%y%m%d')}-", 'request_number')
         
         # 1. حساب إجمالي الطلب التقديري
         total_estimated = Decimal('0.0')
@@ -99,13 +101,44 @@ class ProcurementService:
 
     @classmethod
     @transaction.atomic
+    def submit_purchase_request(cls, tenant_id, request_id, user_id=None):
+        """
+        إرسال طلب الشراء للاعتماد (مسودة ← قيد المراجعة).
+
+        فصل الإرسال عن الاعتماد مقصود (فصل المهام): مُنشئ الطلب يُرسله، وأخصائي
+        المشتريات أو المدير هو من يعتمده — مطابقاً لمصفوفة الصلاحيات في التوثيق
+        ولنمط Submit ثم Approve في Odoo/D365.
+        """
+        pr = PurchaseRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
+        if pr.status != 'draft':
+            raise ValidationError("لا يمكن إرسال هذا الطلب للاعتماد في حالته الحالية.")
+        if not pr.items.exists():
+            raise ValidationError("لا يمكن إرسال طلب بلا بنود.")
+
+        pr.status = 'pending_approval'
+        pr.save(update_fields=['status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PurchaseRequestSubmittedForApproval',
+            source_module='procurement',
+            event_data={
+                'request_id': str(pr.id),
+                'request_number': pr.request_number,
+                'total_amount': float(pr.total_estimated_amount),
+            },
+        )
+        return pr
+
+    @classmethod
+    @transaction.atomic
     def approve_purchase_request(cls, tenant_id, request_id, approver_id, user_id=None):
         """
         اعتماد طلب الشراء وتغيير حالته ليصبح قابلاً لتوليد RFQ.
         """
         pr = PurchaseRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
-        if pr.status != 'draft' and pr.status != 'pending_approval':
-            raise ValidationError("لا يمكن اعتماد هذا الطلب في حالته الحالية.")
+        if pr.status != 'pending_approval':
+            raise ValidationError("يجب إرسال الطلب للاعتماد أولاً قبل اعتماده.")
 
         # تسجيل الاعتماد
         PurchaseRequestApproval.objects.create(
@@ -143,7 +176,8 @@ class ProcurementService:
         if pr.status != 'approved':
             raise ValidationError("يجب اعتماد طلب الشراء أولاً لتوليد طلب عروض أسعار.")
 
-        rfq_number = f"RFQ-{timezone.now().strftime('%y%m%d')}-{RFQ.objects.filter(tenant_id=tenant_id).count() + 1}"
+        rfq_number = generate_unique_number(
+            RFQ, tenant_id, f"RFQ-{timezone.now().strftime('%y%m%d')}-", 'rfq_number')
         rfq = RFQ.objects.create(
             tenant_id=tenant_id,
             rfq_number=rfq_number,
@@ -178,6 +212,63 @@ class ProcurementService:
         )
 
         return rfq
+
+    @classmethod
+    @transaction.atomic
+    def submit_quotation(cls, tenant_id, rfq_id, vendor_id, quotation_reference,
+                         items_data, lead_time_days=7, user_id=None):
+        """
+        تسجيل عرض سعر مورّد على طلب عروض الأسعار — الحلقة التي تسبق الترسية.
+
+        `items_data`: [{rfq_item_id, unit_price, tax_amount?}]
+        يُحتسب إجمالي كل بند من كمية بند الـ RFQ، ومجموعها إجمالي العرض.
+        """
+        rfq = RFQ.objects.select_for_update().get(id=rfq_id, tenant_id=tenant_id)
+        if rfq.status not in ('published', 'closed'):
+            raise ValidationError("لا يمكن تسجيل عروض أسعار على طلب غير منشور أو تمت ترسيته.")
+
+        vendor = Vendor.objects.get(id=vendor_id, tenant_id=tenant_id)
+        if vendor.status == 'blacklisted':
+            raise ValidationError("المورد مدرج في القائمة السوداء ولا يمكن قبول عرضه.")
+        if not items_data:
+            raise ValidationError("يجب إدخال سعر بند واحد على الأقل.")
+        if Quotation.objects.filter(tenant_id=tenant_id, rfq=rfq, vendor=vendor).exists():
+            raise ValidationError("سبق تسجيل عرض سعر لهذا المورّد على هذا الطلب.")
+
+        quotation = Quotation.objects.create(
+            tenant_id=tenant_id, rfq=rfq, vendor=vendor,
+            quotation_reference=quotation_reference or f"Q-{rfq.rfq_number}-{vendor.code if hasattr(vendor, 'code') else ''}",
+            submitted_date=date.today(),
+            total_amount=Decimal('0.0'),
+            lead_time_days=int(lead_time_days or 7),
+            status='submitted',
+        )
+
+        total = Decimal('0.0')
+        for row in items_data:
+            rfq_item = RFQItem.objects.get(id=row['rfq_item_id'], rfq=rfq, tenant_id=tenant_id)
+            unit_price = Decimal(str(row['unit_price']))
+            tax = Decimal(str(row.get('tax_amount') or 0))
+            line_total = (unit_price * Decimal(str(rfq_item.quantity))) + tax
+            QuotationItem.objects.create(
+                tenant_id=tenant_id, quotation=quotation, rfq_item=rfq_item,
+                unit_price=unit_price, tax_amount=tax, total_price=line_total,
+            )
+            total += line_total
+
+        quotation.total_amount = total
+        quotation.save(update_fields=['total_amount'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='QuotationSubmitted',
+            source_module='procurement',
+            event_data={
+                'rfq_id': str(rfq.id), 'quotation_id': str(quotation.id),
+                'vendor': vendor.name_ar, 'amount': float(total),
+            },
+        )
+        return quotation
 
     @classmethod
     @transaction.atomic
@@ -218,7 +309,8 @@ class ProcurementService:
         quotation.save(update_fields=['status'])
 
         # 4. توليد أمر شراء (Purchase Order) مسودة تلقائياً
-        po_number = f"PO-{timezone.now().strftime('%y%m%d')}-{PurchaseOrder.objects.filter(tenant_id=tenant_id).count() + 1}"
+        po_number = generate_unique_number(
+            PurchaseOrder, tenant_id, f"PO-{timezone.now().strftime('%y%m%d')}-", 'po_number')
         po = PurchaseOrder.objects.create(
             tenant_id=tenant_id,
             po_number=po_number,
@@ -245,6 +337,64 @@ class ProcurementService:
             )
 
         return po
+
+
+    @classmethod
+    @transaction.atomic
+    def revert_award(cls, tenant_id, rfq_id, user_id=None):
+        """
+        التراجع عن ترسية طلب عروض الأسعار وإعادته لاستقبال العروض.
+
+        **قاعدة السلامة**: يُمنع التراجع إن كان أمر الشراء المتولّد قد صدر
+        (approved/issued/completed) — لأن الإصدار استهلك الموازنة فعلياً وقد
+        يكون رُحّل له قيد. عندها يُلغى أمر الشراء من مساره لا بالتراجع هنا.
+        """
+        rfq = RFQ.objects.select_for_update().get(id=rfq_id, tenant_id=tenant_id)
+        if rfq.status != 'awarded':
+            raise ValidationError("لا يمكن التراجع عن ترسية لم تتم.")
+
+        # أوامر الشراء المتولّدة من طلب الشراء نفسه
+        pos = PurchaseOrder.objects.filter(
+            tenant_id=tenant_id, purchase_request=rfq.purchase_request
+        )
+        blocking = pos.exclude(status__in=['draft', 'cancelled'])
+        if blocking.exists():
+            nums = '، '.join(blocking.values_list('po_number', flat=True))
+            raise ValidationError(
+                f"تعذّر التراجع: أمر الشراء ({nums}) صدر واستهلك الموازنة. "
+                f"ألغِ أمر الشراء أولاً من صفحته."
+            )
+
+        # إزالة أوامر الشراء المسودة المتولّدة عن هذه الترسية
+        for po in pos.filter(status='draft'):
+            po.items.all().delete()
+            po.delete()
+
+        # إعادة العروض لحالة «مقدم» وإزالة الترسية والمقارنة
+        for aw in VendorAward.objects.filter(tenant_id=tenant_id, rfq=rfq):
+            q = aw.quotation
+            if q:
+                q.status = 'submitted'
+                q.save(update_fields=['status'])
+            aw.delete()
+        QuotationComparison.objects.filter(tenant_id=tenant_id, rfq=rfq).delete()
+
+        rfq.status = 'published'
+        rfq.save(update_fields=['status'])
+
+        # إعادة طلب الشراء لحالة «أُنشئ RFQ»
+        pr = rfq.purchase_request
+        if pr.status == 'completed':
+            pr.status = 'rfq_created'
+            pr.save(update_fields=['status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='RFQAwardReverted',
+            source_module='procurement',
+            event_data={'rfq_id': str(rfq.id), 'rfq_number': rfq.rfq_number},
+        )
+        return rfq
 
 
 # ============================================================
@@ -290,4 +440,108 @@ class PurchaseOrderService:
             }
         )
 
+        return po
+
+    @classmethod
+    @transaction.atomic
+    def post_vendor_invoice(cls, tenant_id, po_id, invoice_number, invoice_date=None, user_id=None):
+        """
+        تسجيل فاتورة المورّد وترحيل قيدها المحاسبي — آخر حلقة في دورة الشراء نحو المالية.
+
+        يطابق نمط Odoo (Vendor Bill) و Dynamics 365 (Vendor invoice): أمر الشراء نفسه
+        التزام (Encumbrance) ولا يُرحَّل، أما فاتورة المورّد فتُرحَّل في دفتر الأستاذ:
+            من ح/ المصروف (حساب موازنة كل بند)      [مدين]
+            إلى ح/ ذمم الموردين الدائنة              [دائن]
+
+        يُنشأ القيد بحالة **مسودة** ويصل المالية لمراجعته: المحاسب المختص هو من
+        يعتمده ويرحّله من شاشة قيود اليومية (فصل المهام).
+        """
+        from apps.finance.domain.models import (
+            JournalEntry, JournalEntryLine, Currency, FiscalYear,
+        )
+        po = PurchaseOrder.objects.select_for_update().get(id=po_id, tenant_id=tenant_id)
+        if po.status not in ('approved', 'issued'):
+            raise ValidationError("يجب إصدار أمر الشراء واعتماده قبل تسجيل فاتورة المورّد.")
+        if po.journal_entry_id:
+            raise ValidationError("سبق ترحيل فاتورة هذا الأمر محاسبياً.")
+        if not invoice_number:
+            raise ValidationError("رقم فاتورة المورّد مطلوب.")
+
+        settings = PurchaseSettings.objects.filter(tenant_id=tenant_id).first()
+        payable_id = getattr(settings, 'payable_gl_account_id', None) if settings else None
+        payable = None
+        if payable_id:
+            payable = ChartOfAccount.objects.filter(id=payable_id, tenant_id=tenant_id).first()
+        if not payable:
+            # الافتراضي المعقول: حساب ذمم الموردين الدائنة في شجرة الحسابات
+            payable = ChartOfAccount.objects.filter(tenant_id=tenant_id, code='2101').first()
+        if not payable:
+            raise ValidationError(
+                "لم يُحدَّد حساب ذمم الموردين الدائنة في إعدادات المشتريات ولا يوجد حساب برمز 2101."
+            )
+
+        active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
+        if not active_fy:
+            raise ValidationError("لا توجد سنة مالية مفتوحة لترحيل الفاتورة.")
+        period = active_fy.periods.filter(start_date__lte=date.today(), end_date__gte=date.today()).first()
+        if not period:
+            raise ValidationError("تاريخ اليوم لا يقع ضمن أي فترة محاسبية مفتوحة.")
+
+        base_currency = Currency.objects.filter(tenant_id=tenant_id, is_base=True).first()
+
+        journal = JournalEntry.objects.create(
+            tenant_id=tenant_id,
+            entry_number=f"JV-{po.po_number}",
+            date=date.today(),
+            accounting_period=period,
+            description=f"إثبات فاتورة المورّد {po.vendor.name_ar} — أمر شراء {po.po_number}",
+            source_type='automatic',
+            status='draft',
+            currency=base_currency,
+            created_by=user_id,
+        )
+
+        total = Decimal('0.0')
+        # سطور المصروف (مدين) — حساب الموازنة لكل بند مع مركز تكلفته
+        for item in po.items.all():
+            acc = ChartOfAccount.objects.get(id=item.budget_account_id, tenant_id=tenant_id)
+            JournalEntryLine.objects.create(
+                tenant_id=tenant_id,
+                journal_entry=journal,
+                account=acc,
+                debit=item.total_price,
+                credit=Decimal('0.0'),
+                description=f"{item.item_name} — {po.po_number}",
+            )
+            total += Decimal(str(item.total_price))
+
+        # سطر ذمم الموردين (دائن)
+        JournalEntryLine.objects.create(
+            tenant_id=tenant_id,
+            journal_entry=journal,
+            account=payable,
+            debit=Decimal('0.0'),
+            credit=total,
+            description=f"ذمم المورّد {po.vendor.name_ar} — فاتورة {invoice_number}",
+        )
+
+        # لا نعتمد ولا نُرحّل هنا: القيد يصل المالية **مسودة** ليراجعه المحاسب المختص
+        # ويعتمده ويرحّله من شاشة قيود اليومية — فصل المهام بين المشتريات والمالية.
+
+        po.vendor_invoice_number = invoice_number
+        po.vendor_invoice_date = invoice_date or date.today()
+        po.journal_entry_id = journal.id
+        po.status = 'completed'
+        po.save(update_fields=['vendor_invoice_number', 'vendor_invoice_date', 'journal_entry_id', 'status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='VendorInvoicePosted',
+            source_module='procurement',
+            event_data={
+                'po_id': str(po.id), 'po_number': po.po_number,
+                'invoice_number': invoice_number, 'amount': float(total),
+                'journal_entry_id': str(journal.id),
+            },
+        )
         return po
