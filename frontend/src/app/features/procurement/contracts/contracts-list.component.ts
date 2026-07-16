@@ -38,7 +38,7 @@ import { ContractCreateFormComponent } from './contract-create-form.component';
           @for (c of filtered(); track c.id) {
             <div class="row">
               <span class="mono">{{ c.contract_number || '—' }}</span>
-              <span>{{ c.vendor_name || c.vendor?.name_ar || '—' }}</span>
+              <span>{{ vendorName(c.vendor) }}</span>
               <span class="muted">{{ c.start_date || '—' }}</span>
               <span class="muted">{{ c.end_date || '—' }}</span>
               <span class="ta-end strong">{{ fmt(c.contract_value) }}</span>
@@ -66,7 +66,24 @@ export class ProcurementContractsComponent implements OnInit {
     return this.all().filter(c => !term || (c.contract_number || '').includes(term));
   });
 
-  ngOnInit() { this.load(); }
+  /** خريطة معرّف المورّد → اسمه (الـ serializer يُرجع المعرّف فقط). */
+  private readonly vendorMap = signal<Record<string, string>>({});
+
+  ngOnInit() {
+    this.load();
+    this.svc.getVendors({ page_size: 200 }).subscribe({
+      next: (d: any) => {
+        const list = Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
+        this.vendorMap.set(Object.fromEntries(list.map((v: any) => [String(v.id), v.name_ar || v.name_en])));
+      },
+      error: () => {},
+    });
+  }
+
+  vendorName(id: any): string {
+    return this.vendorMap()[String(id)] || '—';
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getContracts().subscribe({

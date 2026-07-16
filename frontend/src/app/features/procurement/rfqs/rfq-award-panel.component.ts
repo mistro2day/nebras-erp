@@ -31,7 +31,7 @@ import { NotificationService } from '../../../core/services/notification.service
         @for (q of quotes(); track q.id) {
           <div class="q-row" [class.best]="q.id === bestId()">
             <span class="who">
-              {{ q.vendor_name || q.vendor?.name_ar || 'مورّد' }}
+              {{ vendorName(q.vendor) }}
               @if (q.id === bestId()) { <span class="best-tag">الأفضل سعراً</span> }
             </span>
             <span class="mono muted">{{ q.quotation_reference || '—' }}</span>
@@ -83,7 +83,16 @@ export class RfqAwardPanelComponent implements OnInit {
     return [...list].sort((a, b) => (Number(a.total_amount) || 0) - (Number(b.total_amount) || 0))[0].id;
   });
 
+  private readonly vendorMap = signal<Record<string, string>>({});
+
   ngOnInit() {
+    this.svc.getVendors({ page_size: 200 }).subscribe({
+      next: (d: any) => {
+        const list = Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
+        this.vendorMap.set(Object.fromEntries(list.map((v: any) => [String(v.id), v.name_ar || v.name_en])));
+      },
+      error: () => {},
+    });
     this.svc.getQuotations().subscribe({
       next: (d: any) => {
         const all = Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
@@ -93,6 +102,8 @@ export class RfqAwardPanelComponent implements OnInit {
       error: () => this.loading.set(false),
     });
   }
+
+  vendorName(id: any): string { return this.vendorMap()[String(id)] || 'مورّد'; }
 
   award(q: any) {
     this.busy.set(true);
