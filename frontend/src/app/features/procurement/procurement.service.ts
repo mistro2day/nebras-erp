@@ -113,6 +113,15 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/vendors/`, payload);
   }
 
+  /** مورّد مفرد. */
+  getVendor(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendors/${id}/`);
+  }
+
+  updateVendor(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/vendors/${id}/`, payload);
+  }
+
   getVendorCategories(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/vendor-categories/`, { params: { page_size: 100 } as any });
   }

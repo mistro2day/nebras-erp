@@ -6,6 +6,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -16,11 +17,14 @@ import { PrCreateFormComponent } from './pr-create-form.component';
   selector: 'app-procurement-requests',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, PrCreateFormComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, PrCreateFormComponent,
+            NbLoadingComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="طلبات الشراء" subtitle="طلبات الشراء الواردة من الأقسام في مسار الاعتماد والتوريد.">
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <nb-export-menu [columns]="exportCols" [rows]="filtered()"
+          title="طلبات الشراء" [subtitle]="exportSubtitle()" filename="طلبات-الشراء"></nb-export-menu>
         <button class="btn primary" (click)="creating.set(!creating())">
           {{ creating() ? 'إغلاق' : '＋ طلب شراء جديد' }}
         </button>
@@ -102,6 +106,23 @@ export class ProcurementRequestsComponent implements OnInit {
   readonly filter = signal('');
 
   onCreated() { this.creating.set(false); this.load(); }
+
+  /** أعمدة التصدير/الطباعة — تُصدَّر القيم المعروضة (أسماء لا معرّفات). */
+  readonly exportCols: ExportColumn[] = [
+    { key: 'request_number', label: 'رقم الطلب' },
+    { key: 'department_id', label: 'القسم الطالب', map: (r) => this.deptName(r.department_id) },
+    { key: 'date', label: 'التاريخ' },
+    { key: 'priority', label: 'الأولوية', map: (r) => this.priText(r.priority) },
+    { key: 'total_estimated_amount', label: 'الإجمالي التقديري', align: 'end',
+      map: (r) => Number(r.total_estimated_amount) || 0 },
+    { key: 'status', label: 'الحالة', map: (r) => this.statusText(r.status) },
+  ];
+
+  /** يوضّح في المستند المطبوع أي تصفية كانت مطبّقة وقت التصدير. */
+  exportSubtitle(): string {
+    const f = this.filter() ? this.statusText(this.filter()) : 'كل الحالات';
+    return `${f} — ${this.filtered().length} طلب`;
+  }
 
   /** فتح استمارة تفاصيل الطلب (نمط Odoo: النقر على السجل يفتح استمارته). */
   open(r: any) { this.router.navigate(['/procurement/requests', r.id]); }

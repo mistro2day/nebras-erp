@@ -15,6 +15,10 @@ export const PROCUREMENT_ROUTES: Routes = [
     loadComponent: () => import('./vendors/vendors-list.component').then(m => m.ProcurementVendorsComponent)
   },
   {
+    path: 'vendors/:id',
+    loadComponent: () => import('./vendors/vendor-detail.component').then(m => m.ProcurementVendorDetailComponent)
+  },
+  {
     path: 'requests',
     loadComponent: () => import('./requests/requests-list.component').then(m => m.ProcurementRequestsComponent)
   },

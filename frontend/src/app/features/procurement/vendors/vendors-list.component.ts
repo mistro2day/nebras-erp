@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -45,7 +45,7 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
           <nb-loading message="جارٍ تحميل الموردين…"></nb-loading>
         } @else {
           @for (v of filtered(); track v.id) {
-            <div class="row">
+            <div class="row clickable" (click)="open(v)" title="فتح ملف المورّد">
               <span class="who"><span class="ava">{{ initial(v.name_ar || v.name_en) }}</span>{{ v.name_ar || v.name_en }}</span>
               <span class="mono muted">{{ v.tax_number || '—' }}</span>
               <span class="mono muted">{{ v.cr_number || '—' }}</span>
@@ -59,11 +59,15 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
     </div>
   `,
   styleUrl: '../shared/procurement-table.scss',
-  styles: [`.row { grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr; }`],
+  styles: [`
+    .row { grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1fr; }
+    .row.clickable { cursor: pointer; }
+  `],
 })
 export class ProcurementVendorsComponent implements OnInit {
   private svc = inject(ProcurementService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
   readonly creating = signal(false);
@@ -71,6 +75,9 @@ export class ProcurementVendorsComponent implements OnInit {
   readonly filter = signal('');
 
   onCreated() { this.creating.set(false); this.load(); }
+
+  /** فتح ملف المورّد (عرض وتعديل + سجل تعامله). */
+  open(v: any) { this.router.navigate(['/procurement/vendors', v.id]); }
 
   readonly filtered = computed(() => {
     const term = this.q().trim();

@@ -7,6 +7,7 @@ import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.compon
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.component';
 import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
+import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
 @Component({
   selector: 'app-attendance-dashboard',
@@ -18,7 +19,8 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
     NbPageHeaderComponent,
     NbPanelComponent,
     NbDatepickerComponent,
-    NbBadgeComponent
+    NbBadgeComponent,
+    NbLoadingComponent
   ],
   template: `
     <div class="page" dir="rtl">
@@ -115,54 +117,58 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
             <span>مدة العمل</span>
             <span>التأخير</span>
           </div>
-          
-          @for (rec of filteredRecords(); track rec.id) {
-            <div class="tbl-row">
-              <!-- اسم الموظف والتفاصيل الشخصية -->
-              <div class="emp-profile">
-                <div class="avatar">{{ rec.employee_name.charAt(0) }}</div>
-                <div class="emp-info">
-                  <span class="name">{{ rec.employee_name }}</span>
-                  <span class="dept">{{ rec.department }} - {{ rec.position }}</span>
+
+          @if (isLoading()) {
+            <nb-loading message="جاري تحميل سجلات حضور الموظفين..."></nb-loading>
+          } @else {
+            @for (rec of filteredRecords(); track rec.id) {
+              <div class="tbl-row">
+                <!-- اسم الموظف والتفاصيل الشخصية -->
+                <div class="emp-profile">
+                  <div class="avatar">{{ rec.employee_name.charAt(0) }}</div>
+                  <div class="emp-info">
+                    <span class="name">{{ rec.employee_name }}</span>
+                    <span class="dept">{{ rec.department }} - {{ rec.position }}</span>
+                  </div>
                 </div>
+
+                <!-- شارة الحالة -->
+                <span>
+                  <nb-badge [kind]="statusBadge(rec.status)">{{ getStatusText(rec.status) }}</nb-badge>
+                </span>
+
+                <!-- الجدول المخطط -->
+                <span class="tab-num">{{ rec.scheduled_shift || '08:00 صباحاً - 04:00 مساءً' }}</span>
+
+                <!-- وقت تسجيل الدخول الفعلي -->
+                <span class="time-field" [class.highlight]="rec.check_in">
+                  {{ rec.check_in || '—' }}
+                  @if (rec.check_in) {
+                    <span class="meta-tag">عبر التطبيق (GPS)</span>
+                  }
+                </span>
+
+                <!-- وقت تسجيل الخروج الفعلي -->
+                <span class="time-field" [class.highlight]="rec.check_out">
+                  {{ rec.check_out || '—' }}
+                </span>
+
+                <!-- مدة العمل الإجمالية -->
+                <span class="duration">{{ rec.duration || '—' }}</span>
+
+                <!-- الدقائق المتأخرة -->
+                <span class="late-diff" [class.warning-text]="rec.late_minutes > 0">
+                  {{ rec.late_minutes > 0 ? '+' + rec.late_minutes + ' دقيقة' : '--' }}
+                </span>
               </div>
-
-              <!-- شارة الحالة -->
-              <span>
-                <nb-badge [kind]="statusBadge(rec.status)">{{ getStatusText(rec.status) }}</nb-badge>
-              </span>
-
-              <!-- الجدول المخطط -->
-              <span class="tab-num">{{ rec.scheduled_shift || '08:00 صباحاً - 04:00 مساءً' }}</span>
-
-              <!-- وقت تسجيل الدخول الفعلي -->
-              <span class="time-field" [class.highlight]="rec.check_in">
-                {{ rec.check_in || '—' }}
-                @if (rec.check_in) {
-                  <span class="meta-tag">عبر التطبيق (GPS)</span>
-                }
-              </span>
-
-              <!-- وقت تسجيل الخروج الفعلي -->
-              <span class="time-field" [class.highlight]="rec.check_out">
-                {{ rec.check_out || '—' }}
-              </span>
-
-              <!-- مدة العمل الإجمالية -->
-              <span class="duration">{{ rec.duration || '—' }}</span>
-
-              <!-- الدقائق المتأخرة -->
-              <span class="late-diff" [class.warning-text]="rec.late_minutes > 0">
-                {{ rec.late_minutes > 0 ? '+' + rec.late_minutes + ' دقيقة' : '--' }}
-              </span>
-            </div>
-          }
-          
-          @if (filteredRecords().length === 0) {
-            <div class="tbl-empty">
-              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <p>لا توجد سجلات حضور مطابقة ليوم {{ selectedDate() || 'المحدد' }}</p>
-            </div>
+            }
+            
+            @if (filteredRecords().length === 0) {
+              <div class="tbl-empty">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <p>لا توجد سجلات حضور مطابقة ليوم {{ selectedDate() || 'المحدد' }}</p>
+              </div>
+            }
           }
         </div>
       </nb-panel>
@@ -247,6 +253,8 @@ export class AttendanceDashboardComponent implements OnInit {
   searchQuery = signal<string>('');
   records = signal<any[]>([]);
 
+  isLoading = signal(false);
+
   // إحصائيات محسوبة
   lateCount = signal(1);
   absentCount = signal(2);
@@ -257,8 +265,10 @@ export class AttendanceDashboardComponent implements OnInit {
   }
 
   loadRealAttendance() {
+    this.isLoading.set(true);
     this.http.get<any>('/api/v1/employees/employees/').subscribe({
       next: (res) => {
+        this.isLoading.set(false);
         const list = res?.results || res?.data || res;
         if (Array.isArray(list) && list.length > 0) {
           const mapped = list.map((emp: any, idx: number) => {
@@ -283,6 +293,7 @@ export class AttendanceDashboardComponent implements OnInit {
         }
       },
       error: () => {
+        this.isLoading.set(false);
         this.loadMockData();
       }
     });

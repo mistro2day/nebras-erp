@@ -8,17 +8,20 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InputDialogComponent, InputDialogData } from '../../../shared/components/input-dialog/input-dialog.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 
 /** أوامر الشراء (PO) — الصادرة للموردين مع القيمة والحالة. */
 @Component({
   selector: 'app-procurement-orders',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbLoadingComponent, NbExportMenuComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="أوامر الشراء (PO)" subtitle="أوامر الشراء الصادرة للموردين وحالات الإصدار والاستلام.">
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <nb-export-menu [columns]="exportCols" [rows]="filtered()"
+          title="أوامر الشراء" [subtitle]="exportSubtitle()" filename="أوامر-الشراء"></nb-export-menu>
       </nb-page-header>
 
       <div class="toolbar">
@@ -43,7 +46,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           @for (o of filtered(); track o.id) {
             <div class="row">
               <span class="mono">{{ o.po_number || '—' }}</span>
-              <span>{{ o.vendor_name || o.vendor?.name_ar || '—' }}</span>
+              <span>{{ vendorName(o.vendor) }}</span>
               <span class="muted">{{ o.date || '—' }}</span>
               <span class="ta-end strong">{{ fmt(o.total_amount) }}</span>
               <span class="ta-end"><span class="badge" [attr.data-s]="o.status">{{ statusText(o.status) }}</span></span>
@@ -92,7 +95,36 @@ export class ProcurementOrdersComponent implements OnInit {
       (!f || o.status === f) && (!term || (o.po_number || '').includes(term)));
   });
 
-  ngOnInit() { this.load(); }
+  /** خريطة معرّف المورّد → اسمه (الـ serializer يُرجع المعرّف فقط). */
+  private readonly vendorMap = signal<Record<string, string>>({});
+  vendorName(id: any): string { return this.vendorMap()[String(id)] || '—'; }
+
+  /** أعمدة التصدير/الطباعة — القيم المعروضة نفسها (أسماء لا معرّفات). */
+  readonly exportCols: ExportColumn[] = [
+    { key: 'po_number', label: 'رقم الأمر' },
+    { key: 'vendor', label: 'المورّد', map: (o) => this.vendorName(o.vendor) },
+    { key: 'date', label: 'التاريخ' },
+    { key: 'total_amount', label: 'القيمة', align: 'end', map: (o) => Number(o.total_amount) || 0 },
+    { key: 'status', label: 'الحالة', map: (o) => this.statusText(o.status) },
+    { key: 'vendor_invoice_number', label: 'فاتورة المورّد', map: (o) => o.vendor_invoice_number || '—' },
+  ];
+
+  exportSubtitle(): string {
+    const f = this.filter() ? this.statusText(this.filter()) : 'كل الحالات';
+    return `${f} — ${this.filtered().length} أمر`;
+  }
+
+  ngOnInit() {
+    this.load();
+    this.svc.getVendors({ page_size: 200 }).subscribe({
+      next: (d: any) => {
+        const list = Array.isArray(d) ? d : (d?.data ?? d?.results ?? []);
+        this.vendorMap.set(Object.fromEntries(list.map((v: any) => [String(v.id), v.name_ar || v.name_en])));
+      },
+      error: () => {},
+    });
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getPurchaseOrders({ page_size: 200 }).subscribe({

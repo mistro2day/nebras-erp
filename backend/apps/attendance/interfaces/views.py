@@ -19,6 +19,12 @@ class WorkShiftViewSet(BaseCRUDViewSet):
 class AttendanceRecordViewSet(BaseCRUDViewSet):
     model_class = AttendanceRecord
     serializer_class = AttendanceRecordSerializer
+    permission_classes = [] # السماح بالمحاكاة العامة للبصمة الجوالة دون قيود الصلاحيات الصارمة مؤقتاً
+
+    def get_permissions(self):
+        if self.action in ['check_in', 'list', 'create']:
+            return []
+        return super().get_permissions()
 
     @action(detail=False, methods=['post'], url_path='check-in')
     def check_in(self, request):

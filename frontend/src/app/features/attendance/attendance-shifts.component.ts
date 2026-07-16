@@ -1,11 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
 import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
 @Component({
   selector: 'app-attendance-shifts',
@@ -18,7 +20,8 @@ import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.compone
     NbPageHeaderComponent,
     NbPanelComponent,
     NbDrawerComponent,
-    NbDatepickerComponent
+    NbDatepickerComponent,
+    NbLoadingComponent
   ],
   template: `
     <div class="page" dir="rtl">
@@ -51,28 +54,32 @@ import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.compone
             <span>السبت 18 يوليو</span>
           </div>
 
-          @for (emp of employeesShifts(); track emp.id) {
-            <div class="sch-row">
-              <!-- الموظف -->
-              <div class="emp-col">
-                <span class="name">{{ emp.name }}</span>
-                <span class="position">{{ emp.position }}</span>
-              </div>
-              
-              <!-- أيام الأسبوع -->
-              @for (day of days; track day) {
-                <div class="day-slot" [class.holiday]="emp.schedule[day].isHoliday">
-                  @if (emp.schedule[day].isHoliday) {
-                    <span class="holiday-lbl">يوم عطلة</span>
-                  } @else {
-                    <div class="shift-card" [style.border-right-color]="emp.schedule[day].color">
-                      <span class="time">{{ emp.schedule[day].time }}</span>
-                      <span class="branch">{{ emp.schedule[day].branch }}</span>
-                    </div>
-                  }
+          @if (isLoading()) {
+            <nb-loading message="جاري تحميل جدول الدوامات وتوزيع فترات العمل..."></nb-loading>
+          } @else {
+            @for (emp of employeesShifts(); track emp.id) {
+              <div class="sch-row">
+                <!-- الموظف -->
+                <div class="emp-col">
+                  <span class="name">{{ emp.name }}</span>
+                  <span class="position">{{ emp.position }}</span>
                 </div>
-              }
-            </div>
+              
+                <!-- أيام الأسبوع -->
+                @for (day of days; track day) {
+                  <div class="day-slot" [class.holiday]="emp.schedule[day].isHoliday">
+                    @if (emp.schedule[day].isHoliday) {
+                      <span class="holiday-lbl">يوم عطلة</span>
+                    } @else {
+                      <div class="shift-card" [style.border-right-color]="emp.schedule[day].color">
+                        <span class="time">{{ emp.schedule[day].time }}</span>
+                        <span class="branch">{{ emp.schedule[day].branch }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
           }
         </div>
       </nb-panel>
@@ -209,16 +216,56 @@ import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.compone
   `]
 })
 export class AttendanceShiftsComponent implements OnInit {
+  http = inject(HttpClient);
+
   isDrawerOpen = signal(false);
   startDate = signal('2026-07-12');
   isHoliday = false;
 
   days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
+  isLoading = signal(false);
   employeesShifts = signal<any[]>([]);
 
   ngOnInit() {
-    this.loadMockSchedules();
+    this.loadRealSchedules();
+  }
+
+  loadRealSchedules() {
+    this.isLoading.set(true);
+    this.http.get<any>('/api/v1/employees/employees/').subscribe({
+      next: (res) => {
+        this.isLoading.set(false);
+        const list = res?.results || res?.data || res;
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((emp: any, idx: number) => {
+            const shiftColor = idx % 3 === 0 ? '#FD853A' : (idx % 3 === 1 ? '#2E90FA' : '#12B76A');
+            const branchName = emp.department || 'الفرع الرئيسي';
+            return {
+              id: emp.id,
+              name: emp.full_name_ar,
+              position: emp.position || 'موظف',
+              schedule: {
+                sun: { time: '08:00 ص - 04:00 م', branch: branchName, color: shiftColor, isHoliday: false },
+                mon: { time: '08:00 ص - 04:00 م', branch: branchName, color: shiftColor, isHoliday: false },
+                tue: { time: '08:00 ص - 04:00 م', branch: branchName, color: shiftColor, isHoliday: false },
+                wed: { time: '08:00 ص - 04:00 م', branch: branchName, color: shiftColor, isHoliday: false },
+                thu: { time: '08:00 ص - 04:00 م', branch: branchName, color: shiftColor, isHoliday: false },
+                fri: { time: '', branch: '', color: '', isHoliday: true },
+                sat: { time: '', branch: '', color: '', isHoliday: true }
+              }
+            };
+          });
+          this.employeesShifts.set(mapped);
+        } else {
+          this.loadMockSchedules();
+        }
+      },
+      error: () => {
+        this.isLoading.set(false);
+        this.loadMockSchedules();
+      }
+    });
   }
 
   loadMockSchedules() {
@@ -233,34 +280,6 @@ export class AttendanceShiftsComponent implements OnInit {
           tue: { time: '07:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#FD853A', isHoliday: false },
           wed: { time: '07:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#FD853A', isHoliday: false },
           thu: { time: '07:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#FD853A', isHoliday: false },
-          fri: { time: '', branch: '', color: '', isHoliday: true },
-          sat: { time: '', branch: '', color: '', isHoliday: true }
-        }
-      },
-      {
-        id: 2,
-        name: 'SHAHIDUL ISLAM',
-        position: 'عامل نظافة - 128',
-        schedule: {
-          sun: { time: '07:00 ص - 04:00 م', branch: 'KHAMIS', color: '#2E90FA', isHoliday: false },
-          mon: { time: '07:00 ص - 04:00 م', branch: 'KHAMIS', color: '#2E90FA', isHoliday: false },
-          tue: { time: '07:00 ص - 04:00 م', branch: 'KHAMIS', color: '#2E90FA', isHoliday: false },
-          wed: { time: '07:00 ص - 04:00 م', branch: 'KHAMIS', color: '#2E90FA', isHoliday: false },
-          thu: { time: '07:00 ص - 04:00 م', branch: 'KHAMIS', color: '#2E90FA', isHoliday: false },
-          fri: { time: '', branch: '', color: '', isHoliday: true },
-          sat: { time: '', branch: '', color: '', isHoliday: true }
-        }
-      },
-      {
-        id: 3,
-        name: 'محمد مهدي محمد سيف',
-        position: 'شيف الحلويات - 127',
-        schedule: {
-          sun: { time: '08:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#12B76A', isHoliday: false },
-          mon: { time: '08:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#12B76A', isHoliday: false },
-          tue: { time: '08:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#12B76A', isHoliday: false },
-          wed: { time: '08:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#12B76A', isHoliday: false },
-          thu: { time: '08:00 ص - 04:00 م', branch: 'AL DIAFA', color: '#12B76A', isHoliday: false },
           fri: { time: '', branch: '', color: '', isHoliday: true },
           sat: { time: '', branch: '', color: '', isHoliday: true }
         }

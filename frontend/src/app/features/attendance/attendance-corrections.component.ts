@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
+import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
 @Component({
   selector: 'app-attendance-corrections',
@@ -14,7 +15,8 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
     RouterModule,
     NbPageHeaderComponent,
     NbPanelComponent,
-    NbBadgeComponent
+    NbBadgeComponent,
+    NbLoadingComponent
   ],
   template: `
     <div class="page" dir="rtl">
@@ -42,31 +44,35 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
             <span>الإجراءات</span>
           </div>
 
-          @for (req of requests(); track req.id) {
-            <div class="tbl-row">
-              <div class="emp-profile">
-                <div class="avatar">{{ req.employee_name.charAt(0) }}</div>
-                <div class="emp-info">
-                  <span class="name">{{ req.employee_name }}</span>
-                  <span class="dept">{{ req.department }}</span>
+          @if (isLoading()) {
+            <nb-loading message="جاري تحميل طلبات تصحيح الحضور المعلقة..."></nb-loading>
+          } @else {
+            @for (req of requests(); track req.id) {
+              <div class="tbl-row">
+                <div class="emp-profile">
+                  <div class="avatar">{{ req.employee_name.charAt(0) }}</div>
+                  <div class="emp-info">
+                    <span class="name">{{ req.employee_name }}</span>
+                    <span class="dept">{{ req.department }}</span>
+                  </div>
+                </div>
+
+                <span class="tab-num">{{ req.date }}</span>
+                <span><nb-badge kind="warning">نسيان بصمة</nb-badge></span>
+                <span class="time-req">{{ req.requested_check_in }}</span>
+                <span class="time-req">{{ req.requested_check_out }}</span>
+                <span class="reason-text" [title]="req.reason">{{ req.reason }}</span>
+                
+                <div class="actions">
+                  <button class="approve-btn" (click)="approve(req.id)">اعتماد</button>
+                  <button class="reject-btn" (click)="reject(req.id)">رفض</button>
                 </div>
               </div>
+            }
 
-              <span class="tab-num">{{ req.date }}</span>
-              <span><nb-badge kind="warning">نسيان بصمة</nb-badge></span>
-              <span class="time-req">{{ req.requested_check_in }}</span>
-              <span class="time-req">{{ req.requested_check_out }}</span>
-              <span class="reason-text" [title]="req.reason">{{ req.reason }}</span>
-              
-              <div class="actions">
-                <button class="approve-btn" (click)="approve(req.id)">اعتماد</button>
-                <button class="reject-btn" (click)="reject(req.id)">رفض</button>
-              </div>
-            </div>
-          }
-
-          @if (requests().length === 0) {
-            <div class="tbl-empty">لا توجد طلبات تصحيح معلقة حالياً.</div>
+            @if (requests().length === 0) {
+              <div class="tbl-empty">لا توجد طلبات تصحيح معلقة حالياً.</div>
+            }
           }
         </div>
       </nb-panel>
@@ -107,23 +113,28 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
 })
 export class AttendanceCorrectionsComponent implements OnInit {
   requests = signal<any[]>([]);
+  isLoading = signal(false);
 
   ngOnInit() {
     this.loadPendingRequests();
   }
 
   loadPendingRequests() {
-    this.requests.set([
-      {
-        id: 1,
-        employee_name: 'KAMRUL HASAN',
-        department: 'الخدمات العامة',
-        date: '2026-07-15',
-        requested_check_in: '12:05 مساءً',
-        requested_check_out: '08:00 مساءً',
-        reason: 'نسيت تسجيل الدخول بسبب عطل في شبكة الواي فاي للفرع.'
-      }
-    ]);
+    this.isLoading.set(true);
+    setTimeout(() => {
+      this.requests.set([
+        {
+          id: 1,
+          employee_name: 'KAMRUL HASAN',
+          department: 'الخدمات العامة',
+          date: '2026-07-15',
+          requested_check_in: '12:05 مساءً',
+          requested_check_out: '08:00 مساءً',
+          reason: 'نسيت تسجيل الدخول بسبب عطل في شبكة الواي فاي للفرع.'
+        }
+      ]);
+      this.isLoading.set(false);
+    }, 600);
   }
 
   approve(id: number) {
