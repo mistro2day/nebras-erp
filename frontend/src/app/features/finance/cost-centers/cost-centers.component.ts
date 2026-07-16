@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * مراكز التكلفة (Cost Centers) — الأبعاد المالية والفروع والأقسام،
@@ -16,7 +17,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-cost-centers',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="مراكز التكلفة" subtitle="هيكل مراكز التكلفة والأبعاد المالية لتوزيع المصروفات على الفروع والأقسام والمشاريع.">
@@ -49,6 +50,9 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
       <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
         <thead><tr><th>الرمز</th><th>الاسم</th><th>النوع</th><th class="end">الميزانية المخصصة</th><th>الحالة</th></tr></thead>
         <tbody>
+          @if (loading()) {
+            <tr><td colspan="5"><nb-loading message="جارٍ تحميل مراكز التكلفة…"></nb-loading></td></tr>
+          } @else {
           @for (c of centers(); track c.id) {
             <tr>
               <td [style.padding-inline-start.px]="c.parent ? 28 : 12"><strong>{{ c.code }}</strong></td>
@@ -59,6 +63,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
             </tr>
           }
           @if (!centers().length) { <tr><td colspan="5" class="empty">لا توجد مراكز تكلفة.</td></tr> }
+          }
         </tbody></table></div></nb-panel>
     </div>
   `,
@@ -98,12 +103,19 @@ export class CostCentersComponent implements OnInit {
   private router = inject(Router);
 
   centers = signal<any[]>([]);
+  loading = signal(true);
   showForm = signal(false);
   form: any = this.blank();
 
   ngOnInit() { this.load(); }
   blank() { return { code: '', name_ar: '', name_en: '', type: 'department', parent: null, budget_allocated: 0 }; }
-  load() { this.service.getCostCenters().subscribe((r) => { if (r?.success) this.centers.set(r.data); }); }
+  load() {
+    this.loading.set(true);
+    this.service.getCostCenters().subscribe({
+      next: (r) => { if (r?.success) this.centers.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+  }
   save() {
     if (!this.form.code || !this.form.name_ar) { this.notify.error('يرجى إدخال الرمز والاسم.'); return; }
     this.service.createCostCenter(this.form).subscribe({

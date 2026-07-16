@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * الضرائب (Taxes) — ضريبة القيمة المضافة والاستقطاع والرسوم،
@@ -16,7 +17,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-taxes',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الضرائب" subtitle="تعريف الضرائب المعتمدة (القيمة المضافة، الاستقطاع، الرسوم) وربطها بالحسابات المحاسبية.">
@@ -46,12 +47,16 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
       <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
         <thead><tr><th>الرمز</th><th>الاسم</th><th>النوع</th><th class="end">النسبة</th></tr></thead>
         <tbody>
+          @if (loading()) {
+            <tr><td colspan="4"><nb-loading message="جارٍ تحميل الضرائب…"></nb-loading></td></tr>
+          } @else {
           @for (t of taxes(); track t.id) {
             <tr><td><strong>{{ t.code }}</strong></td><td>{{ t.name_ar }} <span class="nm">{{ t.name_en }}</span></td>
               <td><span class="badge" [class]="t.type">{{ typeLabel(t.type) }}</span></td>
               <td class="end mono"><strong>{{ t.rate_percentage }}%</strong></td></tr>
           }
           @if (!taxes().length) { <tr><td colspan="4" class="empty">لا توجد ضرائب معرّفة.</td></tr> }
+          }
         </tbody></table></div></nb-panel>
     </div>
   `,
@@ -91,6 +96,7 @@ export class TaxesComponent implements OnInit {
   private router = inject(Router);
 
   taxes = signal<any[]>([]);
+  loading = signal(true);
   accounts = signal<any[]>([]);
   showForm = signal(false);
   form: any = this.blank();
@@ -100,7 +106,13 @@ export class TaxesComponent implements OnInit {
     this.load();
   }
   blank() { return { name_ar: '', name_en: '', code: '', rate_percentage: 15, type: 'vat', gl_account: '' }; }
-  load() { this.service.getTaxes().subscribe((r) => { if (r?.success) this.taxes.set(r.data); }); }
+  load() {
+    this.loading.set(true);
+    this.service.getTaxes().subscribe({
+      next: (r) => { if (r?.success) this.taxes.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+  }
   save() {
     if (!this.form.name_ar || !this.form.code || !this.form.gl_account) { this.notify.error('يرجى إدخال الاسم والرمز والحساب المحاسبي.'); return; }
     this.service.createTax(this.form).subscribe({

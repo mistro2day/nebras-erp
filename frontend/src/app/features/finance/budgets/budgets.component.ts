@@ -6,6 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * الموازنات التقديرية (Budgets) — رصد الموازنات لكل مركز تكلفة ومتابعة الاستهلاك،
@@ -15,7 +16,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
   selector: 'app-budgets',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموازنات التقديرية" subtitle="رصد الموازنات لكل مركز تكلفة، اعتمادها، ومتابعة نسب الاستهلاك مقابل المرصود.">
@@ -44,6 +45,9 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
       }
 
       <div class="cards">
+        @if (loading()) {
+          <nb-loading message="جارٍ تحميل الموازنات…"></nb-loading>
+        } @else {
         @for (b of budgets(); track b.id) {
           <nb-panel [title]="b.name" [subtitle]="yearName(b.fiscal_year) + ' • ' + centerName(b.cost_center)">
             <div class="usage">
@@ -59,6 +63,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
           </nb-panel>
         }
         @if (!budgets().length) { <nb-panel><div class="empty">لا توجد موازنات مسجلة بعد.</div></nb-panel> }
+        }
       </div>
     </div>
   `,
@@ -78,6 +83,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
     .form-actions { display: flex; gap: 10px; margin-top: 14px; }
 
     .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .cards > nb-loading { grid-column: 1 / -1; }
     @media (max-width: 800px) { .cards { grid-template-columns: 1fr; } }
     .usage { display: flex; flex-direction: column; gap: 8px; }
     .usage .row { display: flex; justify-content: space-between; font-size: 13px; }
@@ -104,6 +110,7 @@ export class BudgetsComponent implements OnInit {
   private router = inject(Router);
 
   budgets = signal<any[]>([]);
+  loading = signal(true);
   years = signal<any[]>([]);
   centers = signal<any[]>([]);
   accounts = signal<any[]>([]);
@@ -117,7 +124,13 @@ export class BudgetsComponent implements OnInit {
     this.load();
   }
   blank() { return { name: '', fiscal_year: '', cost_center: null, status: 'draft', items: [{ account: '', amount: 0 }] }; }
-  load() { this.service.getBudgets().subscribe((r) => { if (r?.success) this.budgets.set(r.data); }); }
+  load() {
+    this.loading.set(true);
+    this.service.getBudgets().subscribe({
+      next: (r) => { if (r?.success) this.budgets.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+  }
 
   addItem() { this.form.items = [...this.form.items, { account: '', amount: 0 }]; }
   removeItem(i: number) { this.form.items = this.form.items.filter((_: any, idx: number) => idx !== i); }

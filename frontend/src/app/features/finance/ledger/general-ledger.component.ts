@@ -7,6 +7,7 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * دفتر الأستاذ العام (General Ledger) — استعراض الحركات المرحّلة وأرصدتها التراكمية،
@@ -16,7 +17,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-general-ledger',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDrawerComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="دفتر الأستاذ العام" subtitle="جميع الحركات المرحّلة بشكل نهائي في الحسابات مع الأرصدة التراكمية.">
@@ -47,6 +48,9 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
           <table class="nb-table">
             <thead><tr><th>التاريخ</th><th>الحساب</th><th class="end">مدين</th><th class="end">دائن</th><th class="end">الرصيد التراكمي</th></tr></thead>
             <tbody>
+              @if (loading()) {
+                <tr><td colspan="5"><nb-loading message="جارٍ تحميل الحركات المرحّلة…"></nb-loading></td></tr>
+              } @else {
               @for (e of entries(); track e.id) {
                 <tr class="clickable" (click)="selected.set(e)">
                   <td class="mono">{{ e.date }}</td>
@@ -57,6 +61,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
                 </tr>
               }
               @if (!entries().length) { <tr><td colspan="5" class="empty">لا توجد حركات مرحّلة مطابقة للفلاتر.</td></tr> }
+              }
             </tbody>
           </table>
         </div>
@@ -122,6 +127,7 @@ export class GeneralLedgerComponent implements OnInit {
   private router = inject(Router);
 
   entries = signal<any[]>([]);
+  loading = signal(true);
   accounts = signal<any[]>([]);
   costCenters = signal<any[]>([]);
   selected = signal<any | null>(null);
@@ -140,7 +146,11 @@ export class GeneralLedgerComponent implements OnInit {
     const params: any = {};
     if (this.accountFilter) params.account = this.accountFilter;
     if (this.ccFilter) params.cost_center = this.ccFilter;
-    this.service.getLedgerEntries(params).subscribe((r) => { if (r?.success) this.entries.set(r.data); });
+    this.loading.set(true);
+    this.service.getLedgerEntries(params).subscribe({
+      next: (r) => { if (r?.success) this.entries.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
   }
   cols(): ExportColumn[] {
     return [

@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 interface Account {
   id: string; code: string; name_ar: string; name_en: string;
@@ -21,7 +22,7 @@ interface Account {
   selector: 'app-chart-of-accounts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="شجرة الحسابات" subtitle="دليل الحسابات المعتمد: الأصول، الخصوم، حقوق الملكية، الإيرادات، والمصروفات.">
@@ -84,6 +85,9 @@ interface Account {
               <tr><th>الرمز</th><th>اسم الحساب</th><th>النوع</th><th>طبيعة الحساب</th><th>الحالة</th></tr>
             </thead>
             <tbody>
+              @if (loading()) {
+                <tr><td colspan="5"><nb-loading message="جارٍ تحميل شجرة الحسابات…"></nb-loading></td></tr>
+              } @else {
               @for (a of filtered(); track a.id) {
                 <tr>
                   <td class="mono" [style.padding-inline-start.px]="a.parent ? 28 : 12"><strong>{{ a.code }}</strong></td>
@@ -98,6 +102,7 @@ interface Account {
                 </tr>
               }
               @if (!filtered().length) { <tr><td colspan="5" class="empty">لا توجد حسابات مطابقة.</td></tr> }
+              }
             </tbody>
           </table>
         </div>
@@ -148,6 +153,7 @@ export class ChartOfAccountsComponent implements OnInit {
   private router = inject(Router);
 
   accounts = signal<Account[]>([]);
+  loading = signal(true);
   types = signal<any[]>([]);
   showForm = signal(false);
   saving = signal(false);
@@ -172,7 +178,11 @@ export class ChartOfAccountsComponent implements OnInit {
   }
   apply() {}
   load() {
-    this.service.getCOA().subscribe((r) => { if (r?.success) this.accounts.set(r.data); });
+    this.loading.set(true);
+    this.service.getCOA().subscribe({
+      next: (r) => { if (r?.success) this.accounts.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
   }
   typeName(id: string): string { return this.types().find((t) => t.id === id)?.name_ar || '—'; }
 

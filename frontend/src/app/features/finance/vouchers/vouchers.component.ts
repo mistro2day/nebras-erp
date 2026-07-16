@@ -9,6 +9,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * السندات المالية (Vouchers) — سندات الصرف والقبض وترحيلها للدفاتر،
@@ -18,7 +19,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-vouchers',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="سندات الصرف والقبض" subtitle="إصدار السندات المالية النقدية والبنكية واعتمادها وترحيلها لدفتر الأستاذ.">
@@ -88,6 +89,9 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
           <table class="nb-table">
             <thead><tr><th>رقم السند</th><th>النوع</th><th>التاريخ</th><th class="end">المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>
+              @if (loading()) {
+                <tr><td colspan="7"><nb-loading message="جارٍ تحميل السندات…"></nb-loading></td></tr>
+              } @else {
               @for (v of vouchers(); track v.id) {
                 <tr class="clickable" (click)="detail.set(v)">
                   <td><strong>{{ v.voucher_number }}</strong></td>
@@ -100,6 +104,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
                 </tr>
               }
               @if (!vouchers().length) { <tr><td colspan="7" class="empty">لا توجد سندات مطابقة.</td></tr> }
+              }
             </tbody>
           </table>
         </div>
@@ -183,6 +188,7 @@ export class VouchersComponent implements OnInit {
   private router = inject(Router);
 
   vouchers = signal<any[]>([]);
+  loading = signal(true);
   currencies = signal<any[]>([]);
   methods = signal<any[]>([]);
   accounts = signal<any[]>([]);
@@ -208,7 +214,13 @@ export class VouchersComponent implements OnInit {
 
   blank() { return { voucher_type: 'payment', voucher_number: '', date: new Date().toISOString().split('T')[0], amount: 0, currency: '', payment_method: '', gl_account: '', bank_account: null, cash_box: null, description: '', status: 'draft' }; }
   setType(t: string) { this.typeFilter.set(t); this.load(); }
-  load() { this.service.getVouchers(this.typeFilter() ? { voucher_type: this.typeFilter() } : undefined).subscribe((r) => { if (r?.success) this.vouchers.set(r.data); }); }
+  load() {
+    this.loading.set(true);
+    this.service.getVouchers(this.typeFilter() ? { voucher_type: this.typeFilter() } : undefined).subscribe({
+      next: (r) => { if (r?.success) this.vouchers.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+  }
 
   save() {
     if (!this.form.voucher_number || !this.form.gl_account || !this.form.payment_method || !(Number(this.form.amount) > 0)) { this.notify.error('يرجى تعبئة رقم السند والمبلغ والحساب وطريقة الدفع.'); return; }

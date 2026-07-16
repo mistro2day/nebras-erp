@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * الفترات المالية والإغلاق (Fiscal Years, Periods & Closing) — إدارة السنوات والفترات وإجراءات القفل،
@@ -16,7 +17,7 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
   selector: 'app-fiscal-periods',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الفترات المالية والإغلاق" subtitle="إدارة السنوات المالية، الفترات المحاسبية، وعمليات القفل والإغلاق النهائي.">
@@ -55,7 +56,8 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
                 }
               </div>
             }
-            @if (!years().length) { <div class="empty">لا توجد سنوات مالية.</div> }
+            @if (!years().length && !loadingYears()) { <div class="empty">لا توجد سنوات مالية.</div> }
+            @if (loadingYears()) { <nb-loading message="جارٍ تحميل السنوات المالية…"></nb-loading> }
           </div>
         </nb-panel>
 
@@ -73,7 +75,8 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
                 @if (p.status === 'open') { <button class="btn danger xs" (click)="closePeriod(p)">إغلاق</button> }
               </div>
             }
-            @if (!periods().length) { <div class="empty">اختر سنة مالية لعرض الفترات.</div> }
+            @if (!periods().length && !loadingPeriods()) { <div class="empty">اختر سنة مالية لعرض الفترات.</div> }
+            @if (loadingPeriods()) { <nb-loading message="جارٍ تحميل الفترات…"></nb-loading> }
           </div>
         </nb-panel>
       </div>
@@ -82,8 +85,12 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
         <div class="table-wrap"><table class="nb-table">
           <thead><tr><th>النوع</th><th>تاريخ الإغلاق</th><th>الحالة</th></tr></thead>
           <tbody>
+            @if (loadingClosings()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل سجل الإغلاقات…"></nb-loading></td></tr>
+            } @else {
             @for (c of closings(); track c.id) { <tr><td>{{ c.closing_type === 'year' ? 'إغلاق سنة' : 'إغلاق فترة' }}</td><td class="mono">{{ c.closed_at | slice:0:10 }}</td><td><span class="badge" [class]="c.status">{{ closeStatusLabel(c.status) }}</span></td></tr> }
             @if (!closings().length) { <tr><td colspan="3" class="empty">لا توجد عمليات إغلاق منفذة.</td></tr> }
+            }
           </tbody></table></div>
       </nb-panel>
     </div>
@@ -149,6 +156,9 @@ export class FiscalPeriodsComponent implements OnInit {
   periods = signal<any[]>([]);
   closings = signal<any[]>([]);
   accounts = signal<any[]>([]);
+  loadingYears = signal(true);
+  loadingPeriods = signal(false);
+  loadingClosings = signal(true);
   selectedYear = signal<string>('');
   showForm = signal(false);
   retainedAccount = '';
@@ -156,18 +166,34 @@ export class FiscalPeriodsComponent implements OnInit {
 
   ngOnInit() {
     this.service.getCOA({ status: 'active' }).subscribe((r) => { if (r?.success) this.accounts.set(r.data); });
-    this.service.getClosings().subscribe((r) => { if (r?.success) this.closings.set(r.data); });
+    this.loadClosings();
     this.loadYears();
+  }
+  loadClosings() {
+    this.loadingClosings.set(true);
+    this.service.getClosings().subscribe({
+      next: (r) => { if (r?.success) this.closings.set(r.data); this.loadingClosings.set(false); },
+      error: () => this.loadingClosings.set(false),
+    });
   }
   blank() { return { name: '', start_date: '', end_date: '', is_current: false, status: 'open' }; }
   loadYears() {
-    this.service.getFiscalYears().subscribe((r) => {
-      if (r?.success) { this.years.set(r.data); if (r.data.length && !this.selectedYear()) this.selectYear(r.data[0].id); }
+    this.loadingYears.set(true);
+    this.service.getFiscalYears().subscribe({
+      next: (r) => {
+        if (r?.success) { this.years.set(r.data); if (r.data.length && !this.selectedYear()) this.selectYear(r.data[0].id); }
+        this.loadingYears.set(false);
+      },
+      error: () => this.loadingYears.set(false),
     });
   }
   selectYear(id: string) {
     this.selectedYear.set(id);
-    this.service.getPeriods({ fiscal_year: id }).subscribe((r) => { if (r?.success) this.periods.set(r.data); });
+    this.loadingPeriods.set(true);
+    this.service.getPeriods({ fiscal_year: id }).subscribe({
+      next: (r) => { if (r?.success) this.periods.set(r.data); this.loadingPeriods.set(false); },
+      error: () => this.loadingPeriods.set(false),
+    });
   }
   saveYear() {
     if (!this.form.name || !this.form.start_date || !this.form.end_date) { this.notify.error('يرجى إدخال الاسم وتاريخي البدء والانتهاء.'); return; }
@@ -180,7 +206,7 @@ export class FiscalPeriodsComponent implements OnInit {
     ev.stopPropagation();
     if (!this.retainedAccount) { this.notify.error('يرجى تحديد حساب الأرباح المحتجزة أولاً.'); return; }
     this.service.closeFiscalYear(y.id, this.retainedAccount).subscribe({
-      next: (r) => { if (r?.success) { this.notify.success('تم إغلاق السنة المالية وتدوير الأرصدة.'); this.loadYears(); this.service.getClosings().subscribe((c) => { if (c?.success) this.closings.set(c.data); }); } else this.notify.error(r?.message || 'تعذر الإغلاق.'); },
+      next: (r) => { if (r?.success) { this.notify.success('تم إغلاق السنة المالية وتدوير الأرصدة.'); this.loadYears(); this.loadClosings(); } else this.notify.error(r?.message || 'تعذر الإغلاق.'); },
       error: (e) => this.notify.error(e?.error?.message || 'تعذر إغلاق السنة المالية.'),
     });
   }
