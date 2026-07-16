@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface ProcurementStats {
   open_requests: number;
@@ -18,7 +19,8 @@ export interface ProcurementStats {
 })
 export class ProcurementService {
   private http = inject(HttpClient);
-  private apiUrl = '/api/v1/procurement';
+  /** رابط مطلق مثل بقية الخدمات العاملة — المسار النسبي يذهب لخادم Angular ويردّ بـ index.html. */
+  private apiUrl = `${environment.apiUrl}procurement`;
 
   // Signals for state management
   stats = signal<ProcurementStats | null>(null);
