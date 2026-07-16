@@ -9,6 +9,8 @@ import { NbBadgeComponent } from '../../shared/nebras/nb-badge.component';
 import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
 import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
+import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
+
 @Component({
   selector: 'app-attendance-check-in-methods',
   standalone: true,
@@ -19,9 +21,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     FormsModule,
     NbPageHeaderComponent,
     NbPanelComponent,
-    NbBadgeComponent,
-    NbDrawerComponent,
-    NbLoadingComponent
+    NbModalComponent
   ],
   template: `
     <div class="page" dir="rtl">
@@ -79,13 +79,21 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
                   <button class="btn-primary">تحديث الإحداثيات</button>
                 </div>
 
-                <!-- خريطة محاكاة تفاعلية بتنسيق جسر الفاخر -->
-                <div class="mock-map">
-                  <div class="geofence-circle">
+                <!-- خريطة تفاعلية مجانية بالكامل من OpenStreetMap ونطاق البصمة الجغرافي -->
+                <div class="mock-map" style="position: relative; overflow: hidden; border-radius: 8px;">
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameborder="0" 
+                    style="border:0; min-height: 320px;" 
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=39.1400,21.5700,39.1600,21.5900&layer=mapnik&marker=21.5796,39.1492" 
+                    allowfullscreen>
+                  </iframe>
+                  <div class="geofence-circle" style="position: absolute; pointer-events: none; z-index: 15; top: calc(50% - 70px); left: calc(50% - 70px);">
                     <span class="center-pin">📍</span>
                     <div class="radius-overlay"></div>
                   </div>
-                  <div class="map-overlay-info">
+                  <div class="map-overlay-info" style="z-index: 20;">
                     <strong>الفرع المحدد:</strong> جدة - حي السلامة | <strong>نطاق السماح:</strong> 150 متر
                   </div>
                 </div>
@@ -110,8 +118,18 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
               </ol>
             </div>
           </nb-panel>
-        </div>
       </div>
+
+      <!-- نافذة نجاح الحفظ المنبثقة بنمط نبراس -->
+      <nb-modal [open]="isModalOpen()" title="حفظ إعدادات التحقق" subtitle="إجراءات الحفظ بقاعدة البيانات" (closed)="closeModal()">
+        <div class="modal-body-content">
+          <p>🎉 تم حفظ إعدادات النطاق الجغرافي (Geofencing) للفرع بنجاح في قاعدة البيانات.</p>
+          <p>تم تطبيق شروط التحقق التلقائي للموقع عند تبصيم الموظفين عبر تطبيق الجوال.</p>
+        </div>
+        <div modal-actions>
+          <button class="btn-primary" (click)="closeModal()">حسناً</button>
+        </div>
+      </nb-modal>
     </div>
   `,
   styles: [`
@@ -194,12 +212,17 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 })
 export class AttendanceCheckInMethodsComponent implements OnInit {
   isLoading = signal(false);
+  isModalOpen = signal(false);
 
   ngOnInit() {
     this.isLoading.set(false);
   }
 
   saveGeofence() {
-    alert('تم حفظ إعدادات النطاق الجغرافي (Geofencing) للفرع بنجاح في قاعدة البيانات.');
+    this.isModalOpen.set(true);
+  }
+
+  closeModal() {
+    this.isModalOpen.set(false);
   }
 }

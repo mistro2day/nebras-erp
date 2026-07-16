@@ -26,32 +26,34 @@ import { ProcurementService } from '../procurement.service';
         </div>
       </div>
 
-      <div class="nb-dlg-grid cols-2">
-        <label>
-          <span class="lbl">التصنيف <b class="req">*</b></span>
-          <select [(ngModel)]="categoryId">
-            <option value="">اختر التصنيف…</option>
-            @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name_ar || c.name_en }}</option> }
-          </select>
-        </label>
-        <label>
-          <span class="lbl">اسم المورّد <b class="req">*</b></span>
-          <input [(ngModel)]="nameAr" placeholder="مثال: مكتبة الشريف" (keyup.enter)="save()" />
-        </label>
-        <label>
-          <span class="lbl">رقم الجوال</span>
-          <input [(ngModel)]="phone" placeholder="بدون" />
-        </label>
-        <label>
-          <span class="lbl">البريد الإلكتروني</span>
-          <input type="email" [(ngModel)]="email" placeholder="بدون" />
-        </label>
-      </div>
+      <div class="nb-dlg-body">
+        <div class="nb-dlg-grid cols-2">
+          <label>
+            <span class="lbl">التصنيف <b class="req">*</b></span>
+            <select [(ngModel)]="categoryId">
+              <option value="">اختر التصنيف…</option>
+              @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name_ar || c.name_en }}</option> }
+            </select>
+          </label>
+          <label>
+            <span class="lbl">اسم المورّد <b class="req">*</b></span>
+            <input [(ngModel)]="nameAr" placeholder="مثال: مكتبة الشريف" (keyup.enter)="save()" />
+          </label>
+          <label>
+            <span class="lbl">رقم الجوال</span>
+            <input [(ngModel)]="phone" placeholder="بدون" />
+          </label>
+          <label>
+            <span class="lbl">البريد الإلكتروني</span>
+            <input type="email" [(ngModel)]="email" placeholder="بدون" />
+          </label>
+        </div>
 
-      <div class="nb-dlg-note">
-        سيُسجَّل بحالة <b>«تحت التأهيل»</b> — يمكن اعتماده وإكمال بياناته من ملف المورّد.
+        <div class="nb-dlg-note">
+          سيُسجَّل بحالة <b>«تحت التأهيل»</b> — يمكن اعتماده وإكمال بياناته من ملف المورّد.
+        </div>
+        @if (error()) { <div class="nb-dlg-err">{{ error() }}</div> }
       </div>
-      @if (error()) { <div class="nb-dlg-err">{{ error() }}</div> }
 
       <div class="nb-dlg-acts">
         <button class="nb-dlg-btn ghost" (click)="close()">إلغاء</button>

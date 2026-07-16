@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ProcurementService } from '../procurement.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { printDoc, ExportColumn } from '../../../shared/export';
 
 /**
  * ملف المورّد — عرض وتعديل في مكان واحد.
@@ -41,6 +42,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             </div>
           </div>
           <div class="h-actions">
+            <button class="btn ghost" (click)="print(v)" title="طباعة ملف المورّد وسجل تعامله">🖨️ طباعة</button>
             @if (!editing()) {
               <button class="btn primary" (click)="startEdit(v)">✎ تعديل البيانات</button>
             }
@@ -431,6 +433,32 @@ export class ProcurementVendorDetailComponent implements OnInit {
         this.notify.error(e?.details?.error || e?.details?.detail || e?.message || 'تعذّر حفظ البيانات.');
       },
     });
+  }
+
+  /** طباعة ملف المورّد — يُطبع سجل أوامر شرائه فهو جوهر تعامله. */
+  print(v: any): void {
+    const cols: ExportColumn[] = [
+      { key: 'po_number', label: 'رقم الأمر' },
+      { key: 'date', label: 'التاريخ' },
+      { key: 'total_amount', label: 'القيمة', align: 'end', map: (o) => Number(o.total_amount) || 0 },
+      { key: 'status', label: 'الحالة', map: (o) => this.poStatus(o.status) },
+      { key: 'vendor_invoice_number', label: 'فاتورة المورّد', map: (o) => o.vendor_invoice_number || '—' },
+    ];
+    const contact = this.contacts()[0];
+    const contactLine = contact
+      ? ` · جهة الاتصال: ${contact.name}${contact.phone ? ' — ' + contact.phone : ''}`
+      : '';
+    printDoc(
+      {
+        title: `ملف المورّد — ${v.name_ar || v.name_en}`,
+        subtitle: `التصنيف: ${this.categoryName(v.category)} · الحالة: ${this.statusText(v.status)} · `
+          + `التقييم: ${Number(v.rating || 0).toFixed(1)}/5 · الرقم الضريبي: ${v.tax_number || 'بدون'} · `
+          + `أوامر الشراء: ${this.orders().length} · إجمالي المُرسى: ${this.fmt(this.totalAwarded())}${contactLine}`,
+        filename: `مورّد-${v.name_ar || v.name_en}`,
+      },
+      cols,
+      this.orders()
+    );
   }
 
   back() { this.router.navigate(['/procurement/vendors']); }

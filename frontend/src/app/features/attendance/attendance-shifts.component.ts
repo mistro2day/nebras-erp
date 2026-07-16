@@ -20,7 +20,6 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     NbPageHeaderComponent,
     NbPanelComponent,
     NbDrawerComponent,
-    NbDatepickerComponent,
     NbLoadingComponent
   ],
   template: `
@@ -30,11 +29,11 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         subtitle="توزيع الورديات الأسبوعية وتعيين أوقات وفروع العمل للموظفين"
       >
         <div class="header-nav">
-          <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" class="nav-btn active">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" class="nav-btn">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
+          <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
+          <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
+          <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
+          <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>
+          <a routerLink="/attendance/check-in-methods" routerLinkActive="active" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
           <button class="add-shift-btn" (click)="openAssignDrawer()">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             إسناد دوام
@@ -69,7 +68,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
               
                 <!-- أيام الأسبوع -->
                 @for (day of days; track day) {
-                  <div class="day-slot" [class.holiday]="emp.schedule[day].isHoliday">
+                  <div class="day-slot" [class.holiday]="emp.schedule[day].isHoliday" (click)="openEditDrawer(emp, day)">
                     @if (emp.schedule[day].isHoliday) {
                       <span class="holiday-lbl">يوم عطلة</span>
                     } @else {
@@ -86,55 +85,47 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         </div>
       </nb-panel>
 
-      <!-- الدرج الجانبي لإسناد وردية دوام جديدة -->
-      <nb-drawer [open]="isDrawerOpen()" title="إسناد دوام للموظفين" (closed)="closeAssignDrawer()">
+      <!-- الدرج الجانبي لإسناد وتعديل وردية دوام -->
+      <nb-drawer [open]="isDrawerOpen()" [title]="isBulkMode ? 'تعديل الدوام للكل دفعة واحدة' : 'تعديل الدوام للموظف المحدد'" (closed)="closeAssignDrawer()">
         <div class="drawer-form">
-          <div class="form-group">
-            <label>اختر الموظف أو الموظفين</label>
-            <select class="form-control">
-              <option>RUMON AHMED MAFIJUL ISLAM</option>
-              <option>SHAHIDUL ISLAM</option>
-              <option>محمد مهدي محمد سيف</option>
-              <option>KAMRUL HASAN</option>
-            </select>
+          <div class="form-group" *ngIf="!isBulkMode">
+            <label>الموظف المحدد</label>
+            <input type="text" class="form-control" [value]="selectedEmpName" readonly />
           </div>
 
-          <div class="form-group row-flex">
-            <div class="flex-item">
-              <label>تاريخ البدء</label>
-              <nb-datepicker [(value)]="startDate" placeholder="تاريخ البدء"></nb-datepicker>
-            </div>
+          <div class="form-group" *ngIf="!isBulkMode">
+            <label>اليوم المختار للتعديل</label>
+            <input type="text" class="form-control" [value]="getDayArName(selectedDay)" readonly />
           </div>
 
           <div class="form-group">
             <label class="toggle-container">
-              <input type="checkbox" [(ngModel)]="isHoliday" (change)="toggleHoliday($event)" />
+              <input type="checkbox" [(ngModel)]="isHoliday" />
               <span class="toggle-label">تعيين كـ يوم عطلة</span>
             </label>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" *ngIf="!isHoliday">
             <label>الموقع الجغرافي / الفرع المسموح به للبصمة</label>
-            <select class="form-control">
-              <option>الفرع الرئيسي - الرياض (AL DIAFA)</option>
-              <option>فرع حي الياسمين (ABER KHAMIS)</option>
-              <option>السماح بالبصمة من أي موقع</option>
+            <select class="form-control" [(ngModel)]="selectedBranch">
+              <option value="AL DIAFA">الفرع الرئيسي - الرياض (AL DIAFA)</option>
+              <option value="KHAMIS">فرع حي الياسمين (ABER KHAMIS)</option>
+              <option value="التعليم والإشراف">مكتب التعليم والإشراف</option>
             </select>
-            <small class="hint-text">إذا تم ربط الوردية بفرع معين، فلن يتمكن الموظف من تسجيل حضور خارج النطاق الجغرافي لهذا الفرع.</small>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" *ngIf="!isHoliday">
             <label>المدة الزمنية المجدولة</label>
             <div class="time-range">
-              <input type="time" class="form-control" value="08:00" />
+              <input type="time" class="form-control" [(ngModel)]="startTime" />
               <span>إلى</span>
-              <input type="time" class="form-control" value="16:00" />
+              <input type="time" class="form-control" [(ngModel)]="endTime" />
             </div>
           </div>
         </div>
 
         <div drawer-actions>
-          <button class="btn-primary" (click)="saveAssignment()">حفظ ونشر</button>
+          <button class="btn-primary" (click)="saveAssignment()">حفظ ونشر التعديلات</button>
           <button class="btn-secondary" (click)="closeAssignDrawer()">إلغاء</button>
         </div>
       </nb-drawer>
@@ -145,7 +136,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     .header-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; width: 100%; border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 8px; }
     .nav-btn { text-decoration: none; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--nb-text-secondary); border-radius: 6px; transition: all 0.2s; }
     .nav-btn:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
-    .nav-btn.active { background: #101828; color: #fff; }
+    .nav-btn.active, .nav-btn[routerLinkActive="active"] { background: #101828; color: #fff; }
 
     .add-shift-btn {
       margin-inline-start: auto;
@@ -290,13 +281,50 @@ export class AttendanceShiftsComponent implements OnInit {
     this.employeesShifts.set(mockShifts);
   }
 
+  // متغيرات حالة تعديل الدوام
+  isBulkMode = false;
+  selectedEmpId: number | null = null;
+  selectedEmpName = '';
+  selectedDay = 'sun';
+  selectedBranch = 'AL DIAFA';
+  startTime = '08:00';
+  endTime = '16:00';
+
   openAssignDrawer() {
+    this.isBulkMode = true;
+    this.selectedEmpId = null;
+    this.selectedEmpName = 'الجميع';
+    this.isHoliday = false;
+    this.selectedBranch = 'AL DIAFA';
+    this.startTime = '08:00';
+    this.endTime = '16:00';
+    this.isDrawerOpen.set(true);
+  }
+
+  openEditDrawer(emp: any, day: string) {
+    this.isBulkMode = false;
+    this.selectedEmpId = emp.id;
+    this.selectedEmpName = emp.name;
+    this.selectedDay = day;
+    
+    const dayData = emp.schedule[day];
+    this.isHoliday = dayData.isHoliday;
+    this.selectedBranch = dayData.branch || 'AL DIAFA';
+    
+    // استخراج الوقت الافتراضي
+    if (dayData.time && dayData.time.includes('-')) {
+      const parts = dayData.time.split('-');
+      this.startTime = '08:00'; // محاكاة استخراج الوقت
+      this.endTime = '16:00';
+    } else {
+      this.startTime = '08:00';
+      this.endTime = '16:00';
+    }
+    
     this.isDrawerOpen.set(true);
   }
 
   closeAssignDrawer() {
-    this.isDrawerOpen.set(true);
-    // إغلاق الدرج
     this.isDrawerOpen.set(false);
   }
 
@@ -304,7 +332,51 @@ export class AttendanceShiftsComponent implements OnInit {
     this.isHoliday = event.target.checked;
   }
 
+  getDayArName(day: string): string {
+    const map: Record<string, string> = {
+      sun: 'الأحد', mon: 'الإثنين', tue: 'الثلاثاء', wed: 'الأربعاء', thu: 'الخميس', fri: 'الجمعة', sat: 'السبت'
+    };
+    return map[day] || day;
+  }
+
   saveAssignment() {
+    const timeText = this.isHoliday ? '' : `${this.startTime} - ${this.endTime}`;
+    const branchText = this.isHoliday ? '' : this.selectedBranch;
+    
+    this.employeesShifts.update(shifts => {
+      return shifts.map(emp => {
+        // إذا كان تعديلاً جماعياً أو كان الموظف المحدد
+        if (this.isBulkMode || emp.id === this.selectedEmpId) {
+          const updatedSchedule = { ...emp.schedule };
+          
+          if (this.isBulkMode) {
+            // التعديل للكل دفعة واحدة على جميع الأيام غير العطلة الرسمية
+            this.days.forEach(d => {
+              if (d !== 'fri' && d !== 'sat') {
+                updatedSchedule[d] = {
+                  time: timeText,
+                  branch: branchText,
+                  color: emp.schedule[d].color || '#12B76A',
+                  isHoliday: this.isHoliday
+                };
+              }
+            });
+          } else {
+            // تعديل الخلية المحددة فقط
+            updatedSchedule[this.selectedDay] = {
+              time: timeText,
+              branch: branchText,
+              color: emp.schedule[this.selectedDay].color || '#12B76A',
+              isHoliday: this.isHoliday
+            };
+          }
+          
+          return { ...emp, schedule: updatedSchedule };
+        }
+        return emp;
+      });
+    });
+    
     this.closeAssignDrawer();
   }
 }

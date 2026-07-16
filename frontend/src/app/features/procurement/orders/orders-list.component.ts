@@ -145,6 +145,7 @@ export class ProcurementOrdersComponent implements OnInit {
   async postInvoice(o: any): Promise<void> {
     const num: string | null = await new Promise(resolve =>
       this.dialog.open(InputDialogComponent, {
+        panelClass: 'nb-dialog-panel',
         data: {
           title: 'تسجيل فاتورة المورّد',
           message: `سيُنشأ قيد محاسبي بقيمة ${this.fmt(o.total_amount)} (مدين: المصروف / دائن: ذمم الموردين) ويُرسل إلى المالية كمسودة بانتظار اعتماد المحاسب وترحيله.`,

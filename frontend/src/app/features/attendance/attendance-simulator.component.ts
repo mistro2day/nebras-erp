@@ -22,10 +22,12 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
         subtitle="محاكاة آلية التحقق الجغرافي (Geofencing) والزمني لتسجيل حضور الموظفين"
       >
         <div class="header-nav">
-          <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/simulator" class="nav-btn active">محاكي البصمة</a>
+          <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
+          <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
+          <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
+          <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>
+          <a routerLink="/attendance/check-in-methods" routerLinkActive="active" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
+          <a routerLink="/attendance/simulator" routerLinkActive="active" class="nav-btn">محاكي البصمة</a>
         </div>
       </nb-page-header>
 
@@ -147,7 +149,7 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
     .header-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; width: 100%; border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 8px; }
     .nav-btn { text-decoration: none; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--nb-text-secondary); border-radius: 6px; transition: all 0.2s; }
     .nav-btn:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
-    .nav-btn.active { background: #101828; color: #fff; }
+    .nav-btn.active, .nav-btn[routerLinkActive="active"] { background: #101828; color: #fff; }
 
     .layout-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; margin-top: 16px; align-items: start; }
     

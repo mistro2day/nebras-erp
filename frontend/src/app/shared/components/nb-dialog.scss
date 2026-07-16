@@ -1,55 +1,64 @@
 /**
- * لغة نوافذ نبراس المنبثقة — تُستورد عبر styleUrl في كل نافذة لضمان التطابق.
- * تمنع تفرّق الأنماط (أزرار Material الكبسولية مقابل أزرار نبراس، ترويسات مختلفة،
- * ارتفاعات حقول متفاوتة).
+ * لغة نوافذ نبراس المنبثقة — تُستورد عبر styleUrl في كل نافذة.
+ *
+ * البنية: شريط ترويسة ملوّن ملتصق بالحواف (full-bleed) + جسم + شريط تذييل.
+ * تعتمد على تجاوزات الحاوية في styles.scss عبر panelClass: 'nb-dialog-panel'
+ * (حاوية Material تفرض حشوة وزوايا لا يمكن ضبطها من داخل المكوّن).
  */
 .nb-dlg {
   font-family: var(--nb-font-family, 'Cairo', sans-serif);
-  min-width: 440px;
-  max-width: 560px;
-  padding: 2px;
+  min-width: 460px;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
 }
 @media (max-width: 560px) {
   .nb-dlg { min-width: auto; width: 100%; }
 }
 
-/* الترويسة: أيقونة + عنوان + وصف — موحّدة في كل النوافذ */
+/* ── الترويسة: شريط ملوّن ملتصق بحواف النافذة ── */
 .nb-dlg-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 13px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--nb-primary-600, #3f51b5), var(--nb-primary-800, #2c387e));
+  color: #fff;
 }
+.nb-dlg-head.warn { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.nb-dlg-head.danger { background: linear-gradient(135deg, #dc2626, #991b1b); }
+
 .nb-dlg-ic {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
-  font-size: 19px;
+  font-size: 18px;
   flex: none;
-  background: var(--nb-primary-50, #eef0fa);
+  background: rgba(255, 255, 255, 0.18);
 }
-.nb-dlg-ic.warn { background: #fef3c7; }
-.nb-dlg-ic.danger { background: #fee2e2; }
 .nb-dlg-head h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 800;
-  color: var(--nb-text, #1f2937);
+  color: #fff;
 }
 .nb-dlg-head p {
   margin: 3px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--nb-text-muted, #64748b);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.82);
 }
 
-/* الحقول: تسمية بسطر ثابت + حقل بارتفاع واحد → محاذاة مضمونة بالبناء */
+/* ── الجسم ── */
+.nb-dlg-body { padding: 20px; background: var(--nb-surface, #fff); }
+
 .nb-dlg-grid { display: grid; gap: 14px; }
 .nb-dlg-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 @media (max-width: 560px) { .nb-dlg-grid.cols-2 { grid-template-columns: 1fr; } }
 
+/* حقول بتسمية بسطر ثابت وحقل بارتفاع واحد → محاذاة مضمونة بالبناء */
 .nb-dlg label { display: grid; grid-template-rows: 18px auto; gap: 6px; }
 .nb-dlg .lbl {
   font-size: 12.5px;
@@ -70,21 +79,23 @@
   border-radius: var(--nb-radius, 8px);
   background: var(--nb-surface, #fff);
   color: var(--nb-text, #1f2937);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .nb-dlg input:focus,
 .nb-dlg select:focus {
   outline: none;
-  border-color: var(--nb-primary-400, #7986CB);
+  border-color: var(--nb-primary-400, #7986cb);
   box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.12);
 }
-.nb-dlg input::placeholder { color: var(--nb-text-muted, #94a3b8); opacity: 0.8; }
-.nb-dlg .hint { font-size: 11px; color: var(--nb-text-muted, #64748b); margin-top: 6px; }
+.nb-dlg input::placeholder { color: var(--nb-text-muted, #94a3b8); opacity: 0.75; }
+.nb-dlg .hint { font-size: 11px; color: var(--nb-text-muted, #64748b); margin-top: 7px; }
 
-/* الملاحظات والأخطاء */
+/* ملاحظة وخطأ */
 .nb-dlg-note {
-  margin-top: 14px;
+  margin-top: 16px;
   border-radius: var(--nb-radius, 8px);
-  padding: 9px 12px;
+  border-inline-start: 3px solid var(--nb-primary-400, #7986cb);
+  padding: 10px 12px;
   font-size: 12px;
   line-height: 1.7;
   background: var(--nb-primary-50, #eef0fa);
@@ -93,19 +104,21 @@
 .nb-dlg-err {
   margin-top: 12px;
   border-radius: var(--nb-radius, 8px);
-  padding: 9px 12px;
+  border-inline-start: 3px solid var(--nb-danger, #dc2626);
+  padding: 10px 12px;
   font-size: 12.5px;
   background: #fef2f2;
-  border: 1px solid #fecaca;
   color: #991b1b;
 }
 
-/* الأزرار: لغة نبراس لا كبسولات Material */
+/* ── التذييل: شريط بخلفية أخف يفصل الإجراءات ── */
 .nb-dlg-acts {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
+  padding: 13px 20px;
+  background: var(--nb-surface-raised, #f8fafc);
+  border-top: 1px solid var(--nb-border-soft, #eceef5);
 }
 .nb-dlg-btn {
   height: 38px;
@@ -118,10 +131,10 @@
   border: none;
   transition: filter 0.15s ease;
 }
-.nb-dlg-btn:hover:not(:disabled) { filter: brightness(0.96); }
+.nb-dlg-btn:hover:not(:disabled) { filter: brightness(0.95); }
 .nb-dlg-btn:disabled { opacity: 0.6; cursor: default; }
 .nb-dlg-btn.ghost {
-  background: var(--nb-surface-raised, #f1f5f9);
+  background: var(--nb-surface, #fff);
   border: 1px solid var(--nb-border, #e5e7eb);
   color: var(--nb-text, #1f2937);
 }

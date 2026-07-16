@@ -32,24 +32,23 @@ export interface InputDialogData {
   imports: [CommonModule, FormsModule, MatDialogModule],
   template: `
     <div class="nb-dlg" dir="rtl">
-      <div class="nb-dlg-head">
-        <span class="nb-dlg-ic" [class.warn]="data.tone === 'warn'" [class.danger]="data.tone === 'danger'">
-          {{ data.icon || '✎' }}
-        </span>
+      <div class="nb-dlg-head" [class.warn]="data.tone === 'warn'" [class.danger]="data.tone === 'danger'">
+        <span class="nb-dlg-ic">{{ data.icon || '✎' }}</span>
         <div>
           <h2>{{ data.title }}</h2>
           @if (data.message) { <p>{{ data.message }}</p> }
         </div>
       </div>
 
-      <label>
-        <span class="lbl">{{ data.label }} @if (data.required !== false) { <b class="req">*</b> }</span>
-        <input [type]="data.type || 'text'" [(ngModel)]="value"
-               [placeholder]="data.placeholder || ''" (keyup.enter)="confirm()" autofocus />
-      </label>
-      @if (data.hint) { <div class="hint">{{ data.hint }}</div> }
-
-      @if (error()) { <div class="nb-dlg-err">{{ error() }}</div> }
+      <div class="nb-dlg-body">
+        <label>
+          <span class="lbl">{{ data.label }} @if (data.required !== false) { <b class="req">*</b> }</span>
+          <input [type]="data.type || 'text'" [(ngModel)]="value"
+                 [placeholder]="data.placeholder || ''" (keyup.enter)="confirm()" autofocus />
+        </label>
+        @if (data.hint) { <div class="hint">{{ data.hint }}</div> }
+        @if (error()) { <div class="nb-dlg-err">{{ error() }}</div> }
+      </div>
 
       <div class="nb-dlg-acts">
         <button class="nb-dlg-btn ghost" (click)="cancel()">{{ data.cancelText || 'إلغاء' }}</button>

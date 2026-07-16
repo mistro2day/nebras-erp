@@ -207,7 +207,7 @@ export class QuotationEntryFormComponent implements OnInit {
    * يوفّر الانتقال إلى سجل الموردين والعودة (نمط Quick Create).
    */
   quickAddVendor(): void {
-    this.dialog.open(QuickVendorDialogComponent, { autoFocus: false })
+    this.dialog.open(QuickVendorDialogComponent, { autoFocus: false, panelClass: 'nb-dialog-panel' })
       .afterClosed().subscribe((created: any) => {
         if (!created?.id) return;
         this.vendors.update(list => [created, ...list]);

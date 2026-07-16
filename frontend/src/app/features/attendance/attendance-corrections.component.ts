@@ -25,11 +25,11 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         subtitle="مراجعة واعتماد طلبات تعديل البصمات المقدمة من الموظفين"
       >
         <div class="header-nav">
-          <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" class="nav-btn active">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" class="nav-btn">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
+          <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
+          <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
+          <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
+          <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>
+          <a routerLink="/attendance/check-in-methods" routerLinkActive="active" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
         </div>
       </nb-page-header>
 
@@ -85,7 +85,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     .header-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; width: 100%; border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 8px; }
     .nav-btn { text-decoration: none; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--nb-text-secondary); border-radius: 6px; transition: all 0.2s; }
     .nav-btn:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
-    .nav-btn.active { background: #101828; color: #fff; }
+    .nav-btn.active, .nav-btn[routerLinkActive="active"] { background: #101828; color: #fff; }
 
     .tbl { display: flex; flex-direction: column; }
     .tbl-head, .tbl-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.2fr 1.2fr 2fr 1.5fr; gap: 12px; padding: 12px 18px; align-items: center; }

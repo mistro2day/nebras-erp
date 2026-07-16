@@ -6,6 +6,7 @@ import { ProcurementService } from '../procurement.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { printDoc, ExportColumn } from '../../../shared/export';
 
 /**
  * تفاصيل طلب الشراء — عرض الاستمارة (Form View) على نمط Odoo/D365.
@@ -41,6 +42,7 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
             </div>
           </div>
           <div class="hero-actions">
+            <button class="btn ghost" (click)="print(r)" title="طباعة الطلب ببنوده">🖨️ طباعة</button>
             @if (r.status === 'draft') {
               <button class="btn primary" [disabled]="busy()" (click)="submit(r)">📤 إرسال للاعتماد</button>
               <span class="hint">الخطوة التالية: إرسال الطلب لمراجعته واعتماده.</span>
@@ -283,6 +285,31 @@ export class ProcurementRequestDetailComponent implements OnInit {
       next: (d: any) => this.orders.set(this.pick(d).filter((x: any) => String(x.purchase_request) === this.id)),
       error: () => {},
     });
+  }
+
+  print(r: any): void {
+    // دالة الطباعة وتصدير المستند
+    const cols: ExportColumn[] = [
+      { key: 'item_name', label: 'الصنف' },
+      { key: 'quantity', label: 'الكمية', align: 'end' },
+      { key: 'unit', label: 'الوحدة' },
+      { key: 'estimated_unit_price', label: 'سعر تقديري', align: 'end',
+        map: (i) => Number(i.estimated_unit_price) || 0 },
+      { key: 'budget_account_id', label: 'حساب الموازنة', map: (i) => this.accName(i.budget_account_id) },
+      { key: 'cost_center_id', label: 'مركز التكلفة', map: (i) => this.ccName(i.cost_center_id) },
+      { key: 'total', label: 'الإجمالي', align: 'end', map: (i) => this.lineTotal(i) },
+    ];
+    printDoc(
+      {
+        title: `طلب شراء ${r.request_number}`,
+        subtitle: `القسم الطالب: ${this.deptName(r.department_id)} · التاريخ: ${r.date} · `
+          + `الحالة: ${this.statusText(r.status)} · الأولوية: ${this.priText(r.priority)} · `
+          + `الإجمالي التقديري: ${this.fmt(r.total_estimated_amount)}`,
+        filename: `طلب-شراء-${r.request_number}`,
+      },
+      cols,
+      r.items || []
+    );
   }
 
   back() { this.router.navigate(['/procurement/requests']); }
