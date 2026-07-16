@@ -48,6 +48,11 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/requests/create-request/`, payload);
   }
 
+  /** طلب شراء مفرد مع بنوده. */
+  getPurchaseRequest(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/requests/${id}/`);
+  }
+
   approvePurchaseRequest(id: string, payload: { approver_id: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/requests/${id}/approve/`, payload);
   }

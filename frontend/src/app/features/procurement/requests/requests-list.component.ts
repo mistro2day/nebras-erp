@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
@@ -48,19 +49,20 @@ import { PrCreateFormComponent } from './pr-create-form.component';
           @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
         } @else {
           @for (r of filtered(); track r.id) {
-            <div class="row">
+            <div class="row clickable" (click)="open(r)" title="فتح تفاصيل الطلب">
               <span class="mono">{{ r.request_number || '—' }}</span>
               <span>{{ deptName(r.department_id) }}</span>
               <span class="muted">{{ r.date || '—' }}</span>
               <span><span class="pri" [attr.data-p]="r.priority">{{ priText(r.priority) }}</span></span>
               <span class="ta-end strong">{{ fmt(r.total_estimated_amount) }}</span>
               <span class="ta-end"><span class="badge" [attr.data-s]="r.status">{{ statusText(r.status) }}</span></span>
-              <span class="ta-end actions">
+              <!-- الإجراءات لا تفتح التفاصيل: نوقف انتشار الحدث -->
+              <span class="ta-end actions" (click)="$event.stopPropagation()">
                 @if (r.status === 'pending_approval') {
                   <button class="act ok" [disabled]="busyId()===r.id" (click)="approve(r)">اعتماد</button>
                 } @else if (r.status === 'approved') {
                   <button class="act pri-btn" [disabled]="busyId()===r.id" (click)="makeRfq(r)">توليد RFQ</button>
-                } @else { <span class="dash">—</span> }
+                } @else { <span class="chev">‹</span> }
               </span>
             </div>
           }
@@ -79,6 +81,8 @@ import { PrCreateFormComponent } from './pr-create-form.component';
     .act.ok { background: #16a34a; color: #fff; }
     .act.pri-btn { background: var(--nb-primary-600); color: #fff; }
     .dash { color: var(--nb-text-muted); }
+    .row.clickable { cursor: pointer; }
+    .chev { color: #c7cbd6; font-size: 18px; transform: scaleX(-1); display: inline-block; }
   `],
 })
 export class ProcurementRequestsComponent implements OnInit {
@@ -86,6 +90,7 @@ export class ProcurementRequestsComponent implements OnInit {
   private auth = inject(AuthService);
   private dialog = inject(MatDialog);
   private notify = inject(NotificationService);
+  private router = inject(Router);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
   readonly busyId = signal<string | null>(null);
@@ -94,6 +99,9 @@ export class ProcurementRequestsComponent implements OnInit {
   readonly filter = signal('');
 
   onCreated() { this.creating.set(false); this.load(); }
+
+  /** فتح استمارة تفاصيل الطلب (نمط Odoo: النقر على السجل يفتح استمارته). */
+  open(r: any) { this.router.navigate(['/procurement/requests', r.id]); }
 
   /** خريطة معرّف القسم → اسمه (الطلب يخزّن department_id فقط). */
   private readonly deptMap = signal<Record<string, string>>({});
