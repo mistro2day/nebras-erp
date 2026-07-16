@@ -126,9 +126,18 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
             {'id': str(a.id), 'code': a.code, 'name': a.name_ar or a.name_en}
             for a in ChartOfAccount.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)[:500]
         ]
+        # مراكز التكلفة أبعاد مالية تملكها المالية — تُقرأ هنا للاستهلاك فقط (نمط Odoo/D365).
+        # نُرفق الميزانية المخصصة ليرى مقدّم الطلب أثر اختياره قبل الإرسال.
         cost_centers = [
-            {'id': str(c.id), 'name': c.name_ar or c.name_en or c.code}
-            for c in CostCenter.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)
+            {
+                'id': str(c.id),
+                'code': c.code,
+                'name': c.name_ar or c.name_en or c.code,
+                'budget_allocated': float(c.budget_allocated or 0),
+            }
+            for c in CostCenter.objects.filter(
+                tenant_id=tenant_id, status='active', deleted_at__isnull=True
+            )
         ]
         return StandardResponse({
             'departments': departments,

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ProcurementService } from '../procurement.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -18,7 +19,7 @@ interface ItemRow {
   selector: 'app-pr-create-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="panel" dir="rtl">
       <div class="panel-head">
@@ -31,7 +32,10 @@ interface ItemRow {
         <div class="ref-hint">لا توجد أقسام معرّفة — أضفها من <b>الهيكل التنظيمي ← الأقسام</b>.</div>
       }
       @if (!refError() && costCenters().length === 0) {
-        <div class="ref-hint">لا توجد مراكز تكلفة معرّفة — عرّفها في <b>المالية ← مراكز التكلفة</b>.</div>
+        <div class="ref-hint">
+          لا توجد مراكز تكلفة نشطة — تُعرَّف في وحدة المالية.
+          <a routerLink="/finance/cost-centers">فتح مراكز التكلفة ←</a>
+        </div>
       }
 
       <div class="grid2">
@@ -47,9 +51,18 @@ interface ItemRow {
       </div>
 
       <div class="items">
+        <!-- الأبعاد المالية تُعرَّف في المالية وتُستهلك هنا فقط (نمط Odoo/D365) -->
+        <div class="dims-note">
+          <span class="dn-ic">🔗</span>
+          <span>
+            <b>حساب الموازنة</b> و<b>مركز التكلفة</b> أبعاد مالية تُعرَّف في وحدة المالية،
+            ويُخصم عليها الإنفاق عند إصدار أمر الشراء.
+          </span>
+          <a routerLink="/finance/cost-centers" class="dn-link">إدارة مراكز التكلفة ←</a>
+        </div>
         <div class="items-head">
           <span>الصنف</span><span>الكمية</span><span>الوحدة</span><span>سعر تقديري</span>
-          <span>حساب الموازنة</span><span>مركز التكلفة</span><span></span>
+          <span class="dim-h">حساب الموازنة</span><span class="dim-h">مركز التكلفة</span><span></span>
         </div>
         @for (it of items(); track $index) {
           <div class="item">
@@ -57,13 +70,15 @@ interface ItemRow {
             <input type="number" min="0" [(ngModel)]="it.quantity" placeholder="0" />
             <input [(ngModel)]="it.unit" placeholder="حبة" />
             <input type="number" min="0" [(ngModel)]="it.estimated_unit_price" placeholder="0.00" />
-            <select [(ngModel)]="it.budget_account_id">
+            <select [(ngModel)]="it.budget_account_id" class="dim-in">
               <option value="">—</option>
               @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.code }} — {{ a.name }}</option> }
             </select>
-            <select [(ngModel)]="it.cost_center_id">
+            <select [(ngModel)]="it.cost_center_id" class="dim-in">
               <option value="">—</option>
-              @for (c of costCenters(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+              @for (c of costCenters(); track c.id) {
+                <option [value]="c.id">{{ c.code }} — {{ c.name }} ({{ c.budget_allocated | number:'1.0-0' }})</option>
+              }
             </select>
             <button class="rm" (click)="removeItem($index)" [disabled]="items().length === 1" aria-label="حذف">✕</button>
           </div>
@@ -95,13 +110,28 @@ interface ItemRow {
       padding: 10px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; }
     .ref-hint { background: var(--nb-warning-bg, #fffaf0); border: 1px solid #fde9c8; color: #92400e;
       border-radius: var(--nb-radius); padding: 9px 12px; font-size: 12.5px; margin-bottom: 10px; }
+    .ref-hint a { color: #b45309; font-weight: 800; text-decoration: none; margin-inline-start: 6px; }
+    .ref-hint a:hover { text-decoration: underline; }
     .grid2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; margin-bottom: 16px; }
     @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
     input, select { font-family: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--nb-border);
       border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text); }
     input:focus, select:focus { outline: none; border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(63,81,181,0.12); }
-    .items-head, .item { display: grid; grid-template-columns: 1.6fr 0.7fr 0.7fr 0.9fr 1.4fr 1.2fr 32px; gap: 8px; align-items: center; }
+    /* ملاحظة ملكية الأبعاد المالية */
+    .dims-note { display: flex; align-items: center; gap: 10px; background: var(--nb-primary-50);
+      border: 1px solid var(--nb-primary-100, #E8EAF6); border-radius: var(--nb-radius);
+      padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: var(--nb-primary-800, #2C387E); }
+    .dn-ic { font-size: 15px; flex: none; }
+    .dims-note b { font-weight: 800; }
+    .dn-link { margin-inline-start: auto; flex: none; color: var(--nb-primary-700); font-weight: 800;
+      text-decoration: none; font-size: 11.5px; white-space: nowrap; }
+    .dn-link:hover { text-decoration: underline; }
+
+    .items-head, .item { display: grid; grid-template-columns: 1.6fr 0.7fr 0.7fr 0.9fr 1.4fr 1.4fr 32px; gap: 8px; align-items: center; }
     .items-head { font-size: 11px; font-weight: 700; color: var(--nb-text-muted); padding: 0 2px 6px; }
+    /* تمييز الأبعاد المالية بصرياً عن حقول الصنف */
+    .dim-h { color: var(--nb-primary-700); }
+    .dim-in { background: var(--nb-primary-50); border-color: var(--nb-primary-100, #E8EAF6); }
     .item { margin-bottom: 8px; }
     .rm { background: none; border: 1px solid var(--nb-border); border-radius: 8px; color: var(--nb-danger);
       cursor: pointer; height: 34px; }
