@@ -23,6 +23,7 @@ from apps.finance.application.services import BudgetService
 from apps.rules.application.services import RuleEvaluationService
 from apps.workflow.services import WorkflowEngine
 from apps.communications.application.events import EventBusConsumer
+from apps.shared.application.numbering import generate_unique_number
 
 logger = logging.getLogger('nebras.procurement')
 
@@ -41,7 +42,8 @@ class ProcurementService:
         """
         إنشاء طلب شراء جديد مع التحقق من الموازنة التقديرية لكل بند بشكل مبدئي.
         """
-        request_number = f"PR-{timezone.now().strftime('%y%m%d')}-{PurchaseRequest.objects.filter(tenant_id=tenant_id).count() + 1}"
+        request_number = generate_unique_number(
+            PurchaseRequest, tenant_id, f"PR-{timezone.now().strftime('%y%m%d')}-", 'request_number')
         
         # 1. حساب إجمالي الطلب التقديري
         total_estimated = Decimal('0.0')
@@ -143,7 +145,8 @@ class ProcurementService:
         if pr.status != 'approved':
             raise ValidationError("يجب اعتماد طلب الشراء أولاً لتوليد طلب عروض أسعار.")
 
-        rfq_number = f"RFQ-{timezone.now().strftime('%y%m%d')}-{RFQ.objects.filter(tenant_id=tenant_id).count() + 1}"
+        rfq_number = generate_unique_number(
+            RFQ, tenant_id, f"RFQ-{timezone.now().strftime('%y%m%d')}-", 'rfq_number')
         rfq = RFQ.objects.create(
             tenant_id=tenant_id,
             rfq_number=rfq_number,
@@ -178,6 +181,63 @@ class ProcurementService:
         )
 
         return rfq
+
+    @classmethod
+    @transaction.atomic
+    def submit_quotation(cls, tenant_id, rfq_id, vendor_id, quotation_reference,
+                         items_data, lead_time_days=7, user_id=None):
+        """
+        تسجيل عرض سعر مورّد على طلب عروض الأسعار — الحلقة التي تسبق الترسية.
+
+        `items_data`: [{rfq_item_id, unit_price, tax_amount?}]
+        يُحتسب إجمالي كل بند من كمية بند الـ RFQ، ومجموعها إجمالي العرض.
+        """
+        rfq = RFQ.objects.select_for_update().get(id=rfq_id, tenant_id=tenant_id)
+        if rfq.status not in ('published', 'closed'):
+            raise ValidationError("لا يمكن تسجيل عروض أسعار على طلب غير منشور أو تمت ترسيته.")
+
+        vendor = Vendor.objects.get(id=vendor_id, tenant_id=tenant_id)
+        if vendor.status == 'blacklisted':
+            raise ValidationError("المورد مدرج في القائمة السوداء ولا يمكن قبول عرضه.")
+        if not items_data:
+            raise ValidationError("يجب إدخال سعر بند واحد على الأقل.")
+        if Quotation.objects.filter(tenant_id=tenant_id, rfq=rfq, vendor=vendor).exists():
+            raise ValidationError("سبق تسجيل عرض سعر لهذا المورّد على هذا الطلب.")
+
+        quotation = Quotation.objects.create(
+            tenant_id=tenant_id, rfq=rfq, vendor=vendor,
+            quotation_reference=quotation_reference or f"Q-{rfq.rfq_number}-{vendor.code if hasattr(vendor, 'code') else ''}",
+            submitted_date=date.today(),
+            total_amount=Decimal('0.0'),
+            lead_time_days=int(lead_time_days or 7),
+            status='submitted',
+        )
+
+        total = Decimal('0.0')
+        for row in items_data:
+            rfq_item = RFQItem.objects.get(id=row['rfq_item_id'], rfq=rfq, tenant_id=tenant_id)
+            unit_price = Decimal(str(row['unit_price']))
+            tax = Decimal(str(row.get('tax_amount') or 0))
+            line_total = (unit_price * Decimal(str(rfq_item.quantity))) + tax
+            QuotationItem.objects.create(
+                tenant_id=tenant_id, quotation=quotation, rfq_item=rfq_item,
+                unit_price=unit_price, tax_amount=tax, total_price=line_total,
+            )
+            total += line_total
+
+        quotation.total_amount = total
+        quotation.save(update_fields=['total_amount'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='QuotationSubmitted',
+            source_module='procurement',
+            event_data={
+                'rfq_id': str(rfq.id), 'quotation_id': str(quotation.id),
+                'vendor': vendor.name_ar, 'amount': float(total),
+            },
+        )
+        return quotation
 
     @classmethod
     @transaction.atomic
@@ -218,7 +278,8 @@ class ProcurementService:
         quotation.save(update_fields=['status'])
 
         # 4. توليد أمر شراء (Purchase Order) مسودة تلقائياً
-        po_number = f"PO-{timezone.now().strftime('%y%m%d')}-{PurchaseOrder.objects.filter(tenant_id=tenant_id).count() + 1}"
+        po_number = generate_unique_number(
+            PurchaseOrder, tenant_id, f"PO-{timezone.now().strftime('%y%m%d')}-", 'po_number')
         po = PurchaseOrder.objects.create(
             tenant_id=tenant_id,
             po_number=po_number,

@@ -23,6 +23,8 @@ from apps.student_finance.domain.models import (
     PaymentAllocation, Receipt, StudentFinanceSettings,
 )
 
+from apps.shared.application.numbering import generate_unique_number
+
 logger = logging.getLogger('nebras.student_finance')
 
 
@@ -169,7 +171,8 @@ def _settle_payment(tenant_id, account, amount, user_id, req):
     amt = Decimal(str(amount))
     pm = _resolve_bank_transfer_method(tenant_id)
 
-    receipt_number = f"RCP-ON-{timezone.now().strftime('%y%m%d')}-{Receipt.objects.filter(tenant_id=tenant_id).count() + 1}"
+    receipt_number = generate_unique_number(
+        Receipt, tenant_id, f"RCP-ON-{timezone.now().strftime('%y%m%d')}-", 'receipt_number')
     receipt = Receipt.objects.create(
         tenant_id=tenant_id,
         student_billing_account=account,

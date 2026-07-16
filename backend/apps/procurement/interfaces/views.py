@@ -234,6 +234,28 @@ class RFQViewSet(BaseCRUDViewSet):
         serializer = self.get_serializer(rfq)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['post'], url_path='submit-quotation')
+    def submit_quotation(self, request, pk=None):
+        """تسجيل عرض سعر مورّد على هذا الـ RFQ — الحلقة السابقة للترسية."""
+        tenant_id = request.tenant_id
+        try:
+            q = ProcurementService.submit_quotation(
+                tenant_id=tenant_id,
+                rfq_id=pk,
+                vendor_id=request.data.get('vendor_id'),
+                quotation_reference=request.data.get('quotation_reference'),
+                items_data=request.data.get('items', []),
+                lead_time_days=request.data.get('lead_time_days', 7),
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(
+            {'quotation_id': str(q.id), 'total_amount': float(q.total_amount)},
+            message="تم تسجيل عرض السعر بنجاح.", status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=False, methods=['post'], url_path='compare-and-award')
     def compare_and_award(self, request):
         tenant_id = request.tenant_id

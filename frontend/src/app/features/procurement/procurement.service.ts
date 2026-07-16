@@ -69,6 +69,19 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/rfqs/compare-and-award/`, payload);
   }
 
+  /** طلب عروض أسعار مفرد مع بنوده. */
+  getRFQ(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/rfqs/${id}/`);
+  }
+
+  /** تسجيل عرض سعر مورّد على طلب عروض الأسعار (الحلقة السابقة للترسية). */
+  submitQuotation(rfqId: string, payload: {
+    vendor_id: string; quotation_reference: string; lead_time_days: number;
+    items: { rfq_item_id: string; unit_price: number }[];
+  }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rfqs/${rfqId}/submit-quotation/`, payload);
+  }
+
   getPurchaseOrders(params?: any): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/orders/`, { params: params || {} });
   }

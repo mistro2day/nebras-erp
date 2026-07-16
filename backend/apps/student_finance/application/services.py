@@ -26,6 +26,7 @@ from apps.finance.application.services import PostingService, CashManagementServ
 from apps.rules.application.services import RuleEvaluationService
 from apps.workflow.services import WorkflowEngine
 from apps.communications.application.events import EventBusConsumer
+from apps.shared.application.numbering import generate_unique_number
 
 logger = logging.getLogger('nebras.student_finance')
 
@@ -58,7 +59,8 @@ class BillingService:
         revenue_gl_account = ChartOfAccount.objects.get(id=settings.revenue_gl_account_id, tenant_id=tenant_id)
 
         # 2. إنشاء الفاتورة بمسودة مبدئية
-        invoice_number = f"INV-ST-{timezone.now().strftime('%y%m%d')}-{StudentInvoice.objects.filter(tenant_id=tenant_id).count() + 1}"
+        invoice_number = generate_unique_number(
+            StudentInvoice, tenant_id, f"INV-ST-{timezone.now().strftime('%y%m%d')}-", 'invoice_number')
         invoice = StudentInvoice.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,
@@ -232,7 +234,8 @@ class PaymentService:
             raise ValidationError("يرجى ضبط الإعدادات المالية للطلاب أولاً.")
 
         # 1. إنشاء إيصال التحصيل الداخلي
-        receipt_number = f"RCP-ST-{timezone.now().strftime('%y%m%d')}-{Receipt.objects.filter(tenant_id=tenant_id).count() + 1}"
+        receipt_number = generate_unique_number(
+            Receipt, tenant_id, f"RCP-ST-{timezone.now().strftime('%y%m%d')}-", 'receipt_number')
         receipt = Receipt.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,
