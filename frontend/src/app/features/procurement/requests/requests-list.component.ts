@@ -142,7 +142,7 @@ export class ProcurementRequestsComponent implements OnInit {
     this.busyId.set(r.id);
     this.svc.approvePurchaseRequest(r.id, { approver_id: approverId }).subscribe({
       next: () => { this.busyId.set(null); this.notify.success('تم اعتماد طلب الشراء.'); this.load(); },
-      error: (e) => { this.busyId.set(null); this.notify.error(e?.error?.error || 'تعذّر اعتماد الطلب.'); },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر اعتماد الطلب.'); },
     });
   }
 
@@ -157,7 +157,7 @@ export class ProcurementRequestsComponent implements OnInit {
     this.busyId.set(r.id);
     this.svc.createRFQ({ purchase_request_id: r.id, deadline, notes: '' }).subscribe({
       next: () => { this.busyId.set(null); this.notify.success('تم توليد طلب عروض الأسعار.'); this.load(); },
-      error: (e) => { this.busyId.set(null); this.notify.error(e?.error?.error || 'تعذّر توليد RFQ.'); },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر توليد RFQ.'); },
     });
   }
 

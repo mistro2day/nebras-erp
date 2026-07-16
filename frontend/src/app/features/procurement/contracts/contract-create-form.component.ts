@@ -100,7 +100,7 @@ export class ContractCreateFormComponent implements OnInit {
     this.saving.set(true);
     this.svc.createContract(payload).subscribe({
       next: () => { this.saving.set(false); this.notify.success('تم إضافة العقد.'); this.created.emit(); },
-      error: (e) => { this.saving.set(false); this.notify.error(e?.error?.error || e?.error?.detail || 'تعذّر حفظ العقد.'); },
+      error: (e) => { this.saving.set(false); this.notify.error(e?.details?.error || e?.details?.detail || e?.message || 'تعذّر حفظ العقد.'); },
     });
   }
 }

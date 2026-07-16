@@ -150,11 +150,11 @@ export class PrCreateFormComponent implements OnInit {
         this.accounts.set(d.accounts || []);
         this.costCenters.set(d.cost_centers || []);
       },
-      // لا نكتم الخطأ: قائمة فارغة بلا سبب أسوأ من رسالة واضحة
+      // معترض الأخطاء يُسطّح الخطأ إلى {status, message, details} — نعرض سببه الحقيقي
       error: (e) => this.refError.set(
-        e?.status === 404
-          ? 'تعذّر تحميل البيانات المرجعية (النقطة غير متاحة) — أعد تشغيل خادم الـ backend.'
-          : 'تعذّر تحميل الأقسام وحسابات الموازنة ومراكز التكلفة. تحقّق من الاتصال والصلاحيات.'
+        `تعذّر تحميل البيانات المرجعية — ${e?.message || 'خطأ غير معروف'}` +
+        (e?.status ? ` (HTTP ${e.status})` : '') +
+        (e?.status === 404 ? ' — أعد تشغيل خادم الـ backend لتسجيل النقطة الجديدة.' : '')
       ),
     });
   }
@@ -188,7 +188,7 @@ export class PrCreateFormComponent implements OnInit {
     this.saving.set(true);
     this.svc.createPurchaseRequest(payload as any).subscribe({
       next: () => { this.saving.set(false); this.notify.success('تم إنشاء طلب الشراء.'); this.created.emit(); },
-      error: (e) => { this.saving.set(false); this.notify.error(e?.error?.error || e?.error?.detail || 'تعذّر إنشاء الطلب. تحقّق من ربط المالية.'); },
+      error: (e) => { this.saving.set(false); this.notify.error(e?.details?.error || e?.details?.detail || e?.message || 'تعذّر إنشاء الطلب. تحقّق من ربط المالية.'); },
     });
   }
 }

@@ -108,7 +108,7 @@ export class ProcurementOrdersComponent implements OnInit {
     this.busyId.set(o.id);
     this.svc.issuePurchaseOrder(o.id).subscribe({
       next: () => { this.busyId.set(null); this.notify.success('تم إصدار أمر الشراء للمورّد.'); this.load(); },
-      error: (e) => { this.busyId.set(null); this.notify.error(e?.error?.error || 'تعذّر إصدار أمر الشراء.'); },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر إصدار أمر الشراء.'); },
     });
   }
 

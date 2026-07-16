@@ -113,7 +113,7 @@ export class RfqAwardPanelComponent implements OnInit {
         this.notify.success(`تمت الترسية وتوليد أمر شراء ${r?.po_number || ''}.`);
         this.awarded.emit();
       },
-      error: (e) => { this.busy.set(false); this.notify.error(e?.error?.error || 'تعذّرت الترسية.'); },
+      error: (e) => { this.busy.set(false); this.notify.error(e?.details?.error || e?.message || 'تعذّرت الترسية.'); },
     });
   }
 }

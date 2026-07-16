@@ -103,7 +103,7 @@ export class VendorCreateFormComponent implements OnInit {
     this.saving.set(true);
     this.svc.createVendor(payload).subscribe({
       next: () => { this.saving.set(false); this.notify.success('تم إضافة المورّد.'); this.created.emit(); },
-      error: (e) => { this.saving.set(false); this.notify.error(e?.error?.error || e?.error?.detail || 'تعذّر حفظ المورّد.'); },
+      error: (e) => { this.saving.set(false); this.notify.error(e?.details?.error || e?.details?.detail || e?.message || 'تعذّر حفظ المورّد.'); },
     });
   }
 }

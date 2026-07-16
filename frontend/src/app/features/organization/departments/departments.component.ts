@@ -29,38 +29,64 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
       @if (editing()) {
         <div class="panel">
           <div class="panel-head">
-            <h3>{{ editId() ? 'تعديل قسم' : 'قسم جديد' }}</h3>
+            <div class="ph-title">
+              <span class="ph-ic">{{ form.type === 'academic' ? '🎓' : '🏢' }}</span>
+              <div>
+                <h3>{{ editId() ? 'تعديل قسم' : 'قسم جديد' }}</h3>
+                <p>القسم جهة طالبة في المشتريات ومرجع لتعيينات المستخدمين.</p>
+              </div>
+            </div>
             <button class="x" (click)="closeForm()" aria-label="إغلاق">✕</button>
           </div>
-          <div class="grid">
-            <label>اسم القسم <span>*</span>
-              <input [(ngModel)]="form.name" placeholder="مثال: تقنية المعلومات" />
-            </label>
-            <label>الرمز <span>*</span>
-              <input [(ngModel)]="form.code" placeholder="IT" />
-            </label>
-            <label>النوع
-              <select [(ngModel)]="form.type">
-                <option value="administrative">إداري</option>
-                <option value="academic">أكاديمي</option>
-              </select>
-            </label>
-            <label>الفرع
-              <select [(ngModel)]="form.branch">
-                <option [ngValue]="null">— بلا فرع —</option>
-                @for (b of branches(); track b.id) { <option [ngValue]="b.id">{{ b.name }}</option> }
-              </select>
-            </label>
-            <label>القسم الأب
-              <select [(ngModel)]="form.parent">
-                <option [ngValue]="null">— قسم رئيسي —</option>
-                @for (d of parentOptions(); track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
-              </select>
-            </label>
-            <label class="chk">
-              <input type="checkbox" [(ngModel)]="form.is_active" /> نشط
-            </label>
+
+          <!-- الهوية -->
+          <div class="fieldset">
+            <span class="legend">هوية القسم</span>
+            <div class="grid">
+              <label class="col-2">اسم القسم <b class="req">*</b>
+                <input [(ngModel)]="form.name" placeholder="مثال: تقنية المعلومات" />
+              </label>
+              <label>الرمز <b class="req">*</b>
+                <input class="code-in" [(ngModel)]="form.code" placeholder="IT" />
+                <small>رمز مختصر فريد يُستخدم في التقارير.</small>
+              </label>
+            </div>
+            <div class="seg-wrap">
+              <span class="seg-label">النوع</span>
+              <div class="seg">
+                <button type="button" [class.on]="form.type === 'administrative'" (click)="form.type = 'administrative'">🏢 إداري</button>
+                <button type="button" [class.on]="form.type === 'academic'" (click)="form.type = 'academic'">🎓 أكاديمي</button>
+              </div>
+            </div>
           </div>
+
+          <!-- الموضع في الهيكل -->
+          <div class="fieldset">
+            <span class="legend">الموضع في الهيكل المؤسسي</span>
+            <div class="grid">
+              <label>الفرع
+                <select [(ngModel)]="form.branch">
+                  <option [ngValue]="null">— بلا فرع —</option>
+                  @for (b of branches(); track b.id) { <option [ngValue]="b.id">{{ b.name }}</option> }
+                </select>
+              </label>
+              <label>القسم الأب
+                <select [(ngModel)]="form.parent">
+                  <option [ngValue]="null">— قسم رئيسي —</option>
+                  @for (d of parentOptions(); track d.id) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                </select>
+                <small>اتركه فارغاً ليكون قسماً رئيسياً.</small>
+              </label>
+              <label class="switch-cell">
+                <span class="s-title">حالة القسم</span>
+                <button type="button" class="switch" [class.on]="form.is_active" (click)="form.is_active = !form.is_active">
+                  <span class="knob"></span>
+                </button>
+                <small>{{ form.is_active ? 'نشط — يظهر في طلبات الشراء' : 'موقوف — مخفي من الاختيارات' }}</small>
+              </label>
+            </div>
+          </div>
+
           <div class="foot">
             <button class="btn ghost" (click)="closeForm()">إلغاء</button>
             <button class="btn primary" [disabled]="saving()" (click)="save()">
@@ -134,20 +160,51 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
     .btn.primary:disabled { opacity: .6; }
 
     .panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
-      padding: 16px; margin-bottom: 16px; }
-    .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .panel-head h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--nb-text); }
+      padding: 18px; margin-bottom: 16px; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+    .ph-title { display: flex; align-items: center; gap: 12px; }
+    .ph-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 19px;
+      background: var(--nb-primary-50); flex: none; }
+    .panel-head h3 { margin: 0; font-size: 15.5px; font-weight: 800; color: var(--nb-text); }
+    .panel-head p { margin: 2px 0 0; font-size: 12px; color: var(--nb-text-muted); }
     .x { background: none; border: none; font-size: 16px; color: var(--nb-text-muted); cursor: pointer; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+    .fieldset { border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); padding: 16px 14px 14px;
+      margin-bottom: 14px; position: relative; }
+    .legend { position: absolute; top: -8px; inset-inline-start: 12px; background: var(--nb-surface); padding: 0 8px;
+      font-size: 11px; font-weight: 800; color: var(--nb-text-muted); }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    .col-2 { grid-column: span 2; }
+    @media (max-width: 720px) { .col-2 { grid-column: span 1; } }
     label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
-    label span { color: var(--nb-danger); }
-    label.chk { flex-direction: row; align-items: center; gap: 8px; align-self: end; padding-bottom: 8px; }
-    input, select { font-family: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--nb-border);
+    label .req { color: var(--nb-danger); }
+    label small { font-size: 11px; font-weight: 500; color: var(--nb-text-muted); }
+    input, select { font-family: inherit; font-size: 13px; padding: 9px 11px; border: 1px solid var(--nb-border);
       border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text); }
-    input[type=checkbox] { width: 16px; height: 16px; padding: 0; }
+    .code-in { text-transform: uppercase; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
     input:focus, select:focus { outline: none; border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(63,81,181,0.12); }
-    .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--nb-border-soft); }
+
+    /* مبدّل النوع */
+    .seg-wrap { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .seg-label { font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .seg { display: inline-flex; background: var(--nb-surface-raised); border: 1px solid var(--nb-border);
+      border-radius: 10px; padding: 3px; gap: 3px; }
+    .seg button { border: none; background: none; padding: 7px 16px; border-radius: 8px; font-family: inherit;
+      font-size: 12.5px; font-weight: 700; color: var(--nb-text-secondary); cursor: pointer; }
+    .seg button.on { background: var(--nb-surface); color: var(--nb-primary-700); box-shadow: 0 1px 4px rgba(15,23,42,.1); }
+
+    /* مفتاح الحالة */
+    .switch-cell { gap: 6px; }
+    .s-title { font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .switch { width: 46px; height: 26px; border-radius: 999px; border: none; background: var(--nb-border);
+      position: relative; cursor: pointer; padding: 0; transition: background .15s ease; }
+    .switch.on { background: #16a34a; }
+    .knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; transition: inset-inline-start .15s ease; }
+    .switch.on .knob { inset-inline-start: 23px; }
+
+    .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--nb-border-soft); }
 
     .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .search { flex: 1; min-width: 220px; height: 36px; padding: 0 12px; font-family: inherit; font-size: 13px;
@@ -317,7 +374,7 @@ export class OrgDepartmentsComponent implements OnInit {
       },
       error: (e) => {
         this.saving.set(false);
-        this.notify.error(e?.error?.error?.message || e?.error?.detail || 'تعذّر حفظ القسم.');
+        this.notify.error(e?.details?.error?.message || e?.details?.detail || e?.message || 'تعذّر حفظ القسم.');
       },
     });
   }
