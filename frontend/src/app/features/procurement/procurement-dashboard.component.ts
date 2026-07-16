@@ -97,32 +97,37 @@ interface Stage {
         <section class="card">
           <div class="card-head">
             <h3>أحدث طلبات الشراء</h3>
-            <span class="card-sub">{{ requests().length }} طلب</span>
+            <a class="see-all" (click)="go('/procurement/requests')">عرض الكل ({{ requests().length }}) ←</a>
           </div>
           <div class="list">
             <div class="row head">
               <span>رقم الطلب</span><span>التاريخ</span><span class="ta-end">تقديري</span><span class="ta-end">الحالة</span>
             </div>
             @for (r of requests().slice(0, 7); track r.id) {
-              <div class="row">
+              <div class="row link" (click)="openRequest(r)" title="فتح تفاصيل الطلب">
                 <span class="mono">{{ r.request_number || '—' }}</span>
                 <span class="muted">{{ r.date || '—' }}</span>
                 <span class="ta-end strong">{{ fmt(r.total_estimated_amount) }}</span>
                 <span class="ta-end"><span class="badge" [attr.data-s]="r.status">{{ statusText(r.status) }}</span></span>
               </div>
             }
-            @if (requests().length === 0) { <div class="empty">لا توجد طلبات شراء بعد.</div> }
+            @if (requests().length === 0) {
+              <div class="empty">
+                لا توجد طلبات شراء بعد.
+                <a class="empty-cta" (click)="go('/procurement/requests')">إنشاء طلب شراء ←</a>
+              </div>
+            }
           </div>
         </section>
 
         <section class="card">
           <div class="card-head">
             <h3>أداء الموردين</h3>
-            <span class="card-sub">{{ vendors().length }} مورّد</span>
+            <a class="see-all" (click)="go('/procurement/vendors')">عرض الكل ({{ vendors().length }}) ←</a>
           </div>
           <div class="vendors">
             @for (v of topVendors(); track v.id) {
-              <div class="vendor">
+              <div class="vendor link" (click)="openVendor(v)" title="فتح سجل الموردين">
                 <div class="v-ava">{{ initial(v.name_ar || v.name) }}</div>
                 <div class="v-info">
                   <strong>{{ v.name_ar || v.name || 'مورّد' }}</strong>
@@ -134,7 +139,12 @@ interface Stage {
                 </div>
               </div>
             }
-            @if (vendors().length === 0) { <div class="empty">لا يوجد موردون معتمدون.</div> }
+            @if (vendors().length === 0) {
+              <div class="empty">
+                لا يوجد موردون معتمدون.
+                <a class="empty-cta" (click)="go('/procurement/vendors')">إضافة مورّد ←</a>
+              </div>
+            }
           </div>
         </section>
       </div>
@@ -207,6 +217,15 @@ interface Stage {
     .card-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 10px; }
     .card-head h3 { margin: 0; font-size: 14px; font-weight: 800; color: var(--nb-text); }
     .card-sub { font-size: 12px; color: var(--nb-text-muted); }
+    .see-all { font-size: 12px; font-weight: 700; color: var(--nb-primary-600); cursor: pointer; }
+    .see-all:hover { text-decoration: underline; }
+    /* الصفوف القابلة للفتح */
+    .row.link, .vendor.link { cursor: pointer; }
+    .row.link:hover { background: var(--nb-primary-50); }
+    .vendor.link:hover { background: var(--nb-primary-50); }
+    .empty-cta { display: block; margin-top: 8px; font-size: 12.5px; font-weight: 700;
+      color: var(--nb-primary-600); cursor: pointer; }
+    .empty-cta:hover { text-decoration: underline; }
 
     .list { display: flex; flex-direction: column; }
     .list .row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 8px; align-items: center;
@@ -244,6 +263,14 @@ export class ProcurementDashboardComponent implements OnInit {
   private router = inject(Router);
 
   go(route: string) { this.router.navigateByUrl(route); }
+
+  /** فتح استمارة الطلب مباشرة من اللوحة. */
+  openRequest(r: any) { this.router.navigate(['/procurement/requests', r.id]); }
+
+  /** فتح سجل الموردين مع تمرير اسم المورّد للبحث. */
+  openVendor(v: any) {
+    this.router.navigate(['/procurement/vendors'], { queryParams: { q: v.name_ar || v.name_en || '' } });
+  }
 
   readonly stats = this.svc.stats;
   readonly requests = signal<any[]>([]);

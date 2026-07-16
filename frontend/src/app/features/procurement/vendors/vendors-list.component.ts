@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -26,7 +27,7 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
       }
 
       <div class="toolbar">
-        <input class="search" [(ngModel)]="q" (ngModelChange)="q.set($event)" placeholder="بحث باسم المورّد…" />
+        <input class="search" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="بحث باسم المورّد…" />
         <div class="chips">
           <button [class.on]="filter()===''" (click)="filter.set('')">الكل</button>
           <button [class.on]="filter()==='approved'" (click)="filter.set('approved')">معتمد</button>
@@ -62,6 +63,7 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
 })
 export class ProcurementVendorsComponent implements OnInit {
   private svc = inject(ProcurementService);
+  private route = inject(ActivatedRoute);
   readonly all = signal<any[]>([]);
   readonly loading = signal(true);
   readonly creating = signal(false);
@@ -78,7 +80,13 @@ export class ProcurementVendorsComponent implements OnInit {
       (!term || (v.name_ar || '').includes(term) || (v.name_en || '').toLowerCase().includes(term.toLowerCase())));
   });
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    // بحث مُمرَّر من لوحة التحكم عند النقر على مورّد
+    const q = this.route.snapshot.queryParamMap.get('q');
+    if (q) this.q.set(q);
+    this.load();
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getVendors({ page_size: 200 }).subscribe({

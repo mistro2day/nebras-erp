@@ -375,6 +375,17 @@ export class AttendanceSimulatorComponent implements OnInit {
   }
 
   simulateCheckIn() {
+    const list = this.employees();
+    if (list.length === 0) return;
+    const emp = list[this.selectedEmployeeIndex()];
+
+    const payload = {
+      employee: emp.id,
+      latitude: this.userLocation() === 'inside' ? 24.7136 : 24.8136,
+      longitude: this.userLocation() === 'inside' ? 46.6753 : 46.7753,
+      location_simulation: this.userLocation()
+    };
+
     if (!this.isGeoInside()) {
       this.isSuccess.set(false);
       this.resultMessage.set('🚨 تم رفض البصمة! أنت خارج النطاق الجغرافي للفرع المعتمد.');
@@ -382,8 +393,16 @@ export class AttendanceSimulatorComponent implements OnInit {
       this.isSuccess.set(false);
       this.resultMessage.set('🚨 تم رفض البصمة! خارج النافذة الزمنية لتسجيل الحضور والانصراف.');
     } else {
-      this.isSuccess.set(true);
-      this.resultMessage.set('✅ تم تسجيل حضور الموظف بنجاح! الموقع والوقت ضمن النطاق المعتمد.');
+      this.http.post<any>('/api/v1/attendance/records/check-in/', payload).subscribe({
+        next: (res) => {
+          this.isSuccess.set(true);
+          this.resultMessage.set('✅ تم إرسال البصمة وحفظها في قاعدة البيانات بنجاح.');
+        },
+        error: (err) => {
+          this.isSuccess.set(false);
+          this.resultMessage.set(err.error?.message || '🚨 حدث خطأ أثناء الاتصال بالخادم لحفظ البصمة.');
+        }
+      });
     }
   }
 }

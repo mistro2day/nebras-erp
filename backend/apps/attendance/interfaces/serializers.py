@@ -12,9 +12,16 @@ class WorkShiftSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
+    employee_name = serializers.ReadOnlyField(source='employee.full_name_ar')
+    department = serializers.ReadOnlyField(source='employee.department')
+    position = serializers.ReadOnlyField(source='employee.position')
+
     class Meta:
         model = AttendanceRecord
-        fields = '__all__'
+        fields = [
+            'id', 'employee', 'employee_name', 'department', 'position',
+            'date', 'check_in', 'check_out', 'status', 'late_minutes', 'overtime_minutes'
+        ]
 
 class CorrectionRequestSerializer(serializers.ModelSerializer):
     class Meta:
