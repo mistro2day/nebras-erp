@@ -334,10 +334,11 @@ export class AttendanceSimulatorComponent implements OnInit {
   }
 
   loadRealEmployees() {
-    this.http.get<any>('/api/v1/employees/').subscribe({
+    this.http.get<any>('/api/v1/employees/employees/').subscribe({
       next: (res) => {
-        if (res?.success && res.data?.length > 0) {
-          this.employees.set(res.data);
+        const list = res?.results || res?.data || res;
+        if (Array.isArray(list) && list.length > 0) {
+          this.employees.set(list);
         } else {
           this.employees.set([
             { id: 1, full_name_ar: 'محمد مهدي محمد سيف', position: 'شيف الحلويات', department: 'الفرع الرئيسي - الرياض' },

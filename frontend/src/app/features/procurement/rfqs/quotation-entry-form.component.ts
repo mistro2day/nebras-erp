@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ProcurementService } from '../procurement.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { QuickVendorDialogComponent } from '../vendors/quick-vendor-dialog.component';
 
 interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; unit: string; unit_price: number | null; }
 
@@ -17,7 +19,7 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
   selector: 'app-quotation-entry-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatDialogModule],
   template: `
     <div class="panel" dir="rtl">
       <div class="panel-head">
@@ -36,10 +38,15 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
         <span class="legend">بيانات العرض</span>
         <div class="grid">
           <label>
-            <span class="lbl">المورّد <b class="req">*</b></span>
+            <span class="lbl">
+              المورّد <b class="req">*</b>
+              <button type="button" class="quick-add" (click)="quickAddVendor()">＋ تسجيل سريع</button>
+            </span>
             <select [(ngModel)]="vendorId">
               <option value="">اختر المورّد…</option>
-              @for (v of vendors(); track v.id) { <option [value]="v.id">{{ v.name_ar || v.name_en }}</option> }
+              @for (v of vendors(); track v.id) {
+                <option [value]="v.id">{{ v.name_ar || v.name_en }}{{ v.status === 'pending' ? ' — تحت التأهيل' : '' }}</option>
+              }
             </select>
           </label>
           <label>
@@ -115,8 +122,14 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
     @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
     label { display: grid; grid-template-rows: 18px auto; gap: 6px; }
     .lbl { font-size: 12.5px; font-weight: 700; color: var(--nb-text); line-height: 18px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: flex; align-items: center; gap: 8px; }
     .req { color: var(--nb-danger); }
+    /* زر التسجيل السريع داخل سطر التسمية — لا يزيد ارتفاع الصف */
+    .quick-add { margin-inline-start: auto; background: none; border: none; padding: 0;
+      font-family: inherit; font-size: 11.5px; font-weight: 800; line-height: 18px;
+      color: var(--nb-primary-600); cursor: pointer; }
+    .quick-add:hover { text-decoration: underline; }
     input, select { font-family: inherit; font-size: 13px; height: 38px; padding: 0 11px;
       border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
       background: var(--nb-surface); color: var(--nb-text); width: 100%; box-sizing: border-box; }
@@ -158,6 +171,7 @@ export class QuotationEntryFormComponent implements OnInit {
 
   private svc = inject(ProcurementService);
   private notify = inject(NotificationService);
+  private dialog = inject(MatDialog);
 
   readonly vendors = signal<any[]>([]);
   readonly rows = signal<PriceRow[]>([]);
@@ -187,6 +201,20 @@ export class QuotationEntryFormComponent implements OnInit {
   }
 
   lineTotal(r: PriceRow): number { return (Number(r.unit_price) || 0) * (Number(r.quantity) || 0); }
+
+  /**
+   * تسجيل مورّد سريع دون مغادرة نموذج العرض، ثم اختياره تلقائياً.
+   * يوفّر الانتقال إلى سجل الموردين والعودة (نمط Quick Create).
+   */
+  quickAddVendor(): void {
+    this.dialog.open(QuickVendorDialogComponent, { autoFocus: false })
+      .afterClosed().subscribe((created: any) => {
+        if (!created?.id) return;
+        this.vendors.update(list => [created, ...list]);
+        this.vendorId = created.id;          // اختياره فوراً
+        this.notify.success(`تم تسجيل «${created.name_ar || created.name_en}» واختياره.`);
+      });
+  }
 
   submit() {
     if (!this.vendorId) { this.notify.error('اختر المورّد.'); return; }

@@ -257,10 +257,11 @@ export class AttendanceDashboardComponent implements OnInit {
   }
 
   loadRealAttendance() {
-    this.http.get<any>('/api/v1/employees/').subscribe({
+    this.http.get<any>('/api/v1/employees/employees/').subscribe({
       next: (res) => {
-        if (res?.success && res.data?.length > 0) {
-          const mapped = res.data.map((emp: any, idx: number) => {
+        const list = res?.results || res?.data || res;
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((emp: any, idx: number) => {
             const hasCheckedIn = idx % 2 === 0;
             return {
               id: emp.id,
