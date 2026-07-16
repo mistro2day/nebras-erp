@@ -122,6 +122,23 @@ export class ProcurementService {
     return this.http.patch<any>(`${this.apiUrl}/vendors/${id}/`, payload);
   }
 
+  // ---- جهات اتصال المورّد (الجوال والبريد) ----
+  getVendorContacts(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/vendor-contacts/`, { params: { page_size: 300 } as any });
+  }
+
+  createVendorContact(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/vendor-contacts/`, payload);
+  }
+
+  updateVendorContact(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/vendor-contacts/${id}/`, payload);
+  }
+
+  deleteVendorContact(id: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/vendor-contacts/${id}/`);
+  }
+
   getVendorCategories(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/vendor-categories/`, { params: { page_size: 100 } as any });
   }

@@ -641,6 +641,8 @@ export class DashboardLayoutComponent {
             { label: 'نظرة عامة ومتابعة', link: '/attendance/dashboard' },
             { label: 'جدول الدوامات والورديات', link: '/attendance/shifts' },
             { label: 'طلبات تصحيح البصمة', link: '/attendance/corrections' },
+            { label: 'سياسات الحضور', link: '/attendance/policies' },
+            { label: 'طرق تسجيل البصمة والتحقق', link: '/attendance/check-in-methods' },
             { label: 'محاكي البصمة الجوالة', link: '/attendance/simulator' }
           ]
         },

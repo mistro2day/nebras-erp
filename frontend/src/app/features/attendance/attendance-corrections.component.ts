@@ -28,6 +28,8 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
           <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
           <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
           <a routerLink="/attendance/corrections" class="nav-btn active">طلبات التصحيح</a>
+          <a routerLink="/attendance/policies" class="nav-btn">سياسات الحضور</a>
+          <a routerLink="/attendance/check-in-methods" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
         </div>
       </nb-page-header>
 

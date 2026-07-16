@@ -49,8 +49,10 @@ class VendorContact(CombinedSharedModel):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='contacts')
     name = models.CharField(max_length=150)
     job_title = models.CharField(max_length=100, blank=True, null=True)
-    email = models.EmailField()
-    phone = models.CharField(max_length=50)
+    # البريد والهاتف اختياريان: كثير من الموردين يُعرفون بهاتف فقط، وفرض بريد
+    # إجباري يدفع لاختلاق عناوين وهمية تُلوّث البيانات.
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         db_table = 'nebras_vendor_contacts'

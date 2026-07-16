@@ -110,6 +110,69 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           </section>
         }
 
+        <!-- بيانات الاتصال -->
+        <section class="card">
+          <div class="card-head row-head">
+            <h3>بيانات الاتصال</h3>
+            @if (!addingContact()) {
+              <button class="link-btn" (click)="startAddContact()">＋ إضافة جهة اتصال</button>
+            }
+          </div>
+
+          @if (addingContact()) {
+            <div class="contact-form">
+              <div class="cf-grid">
+                <label>
+                  <span class="lbl">الاسم <b class="req">*</b></span>
+                  <input [(ngModel)]="cForm.name" placeholder="اسم المسؤول" />
+                </label>
+                <label>
+                  <span class="lbl">المسمى الوظيفي</span>
+                  <input [(ngModel)]="cForm.job_title" placeholder="بدون" />
+                </label>
+                <label>
+                  <span class="lbl">رقم الجوال</span>
+                  <input [(ngModel)]="cForm.phone" placeholder="بدون" />
+                </label>
+                <label>
+                  <span class="lbl">البريد الإلكتروني</span>
+                  <input type="email" [(ngModel)]="cForm.email" placeholder="بدون" />
+                </label>
+              </div>
+              <div class="cf-foot">
+                <button class="btn ghost" (click)="addingContact.set(false)">إلغاء</button>
+                <button class="btn primary" [disabled]="savingContact()" (click)="saveContact()">
+                  {{ savingContact() ? 'جارٍ الحفظ…' : (cForm.id ? 'حفظ التعديل' : 'إضافة') }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (contacts().length) {
+            <div class="row ct head">
+              <span>الاسم</span><span>المسمى</span><span>الجوال</span><span>البريد</span><span class="ta-end">إجراء</span>
+            </div>
+            @for (ct of contacts(); track ct.id) {
+              <div class="row ct">
+                <span class="strong">{{ ct.name }}</span>
+                <span class="muted">{{ ct.job_title || '—' }}</span>
+                <span class="mono">
+                  @if (ct.phone) { <a class="c-link" [href]="'tel:' + ct.phone">{{ ct.phone }}</a> } @else { — }
+                </span>
+                <span class="mail">
+                  @if (ct.email) { <a class="c-link" [href]="'mailto:' + ct.email">{{ ct.email }}</a> } @else { — }
+                </span>
+                <span class="ta-end ct-acts">
+                  <button class="mini" (click)="startEditContact(ct)">تعديل</button>
+                  <button class="mini danger" (click)="removeContact(ct)">حذف</button>
+                </span>
+              </div>
+            }
+          } @else if (!addingContact()) {
+            <div class="empty">لا توجد جهات اتصال — أضف رقم الجوال والبريد للتواصل مع المورّد.</div>
+          }
+        </section>
+
         <!-- سجل التعامل -->
         <section class="card">
           <div class="card-head"><h3>أوامر الشراء</h3></div>
@@ -199,6 +262,25 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 8px; align-items: center;
       padding: 10px 16px; font-size: 13px; border-top: 1px solid var(--nb-border-soft); }
     .row.c { grid-template-columns: 1.2fr 1.6fr 1fr 1fr; }
+    .row.ct { grid-template-columns: 1.3fr 1fr 1.1fr 1.6fr 0.9fr; }
+
+    /* جهات الاتصال */
+    .row-head { display: flex; align-items: center; justify-content: space-between; }
+    .link-btn { background: none; border: none; font-family: inherit; font-size: 12px; font-weight: 800;
+      color: var(--nb-primary-600); cursor: pointer; padding: 0; }
+    .link-btn:hover { text-decoration: underline; }
+    .contact-form { padding: 4px 16px 16px; border-top: 1px solid var(--nb-border-soft); }
+    .cf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding-top: 12px; }
+    @media (max-width: 900px) { .cf-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .cf-grid { grid-template-columns: 1fr; } }
+    .cf-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .c-link { color: var(--nb-primary-700); text-decoration: none; }
+    .c-link:hover { text-decoration: underline; }
+    .mail { direction: ltr; text-align: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ct-acts { display: flex; justify-content: flex-end; gap: 6px; }
+    .mini { border: 1px solid var(--nb-border); background: var(--nb-surface); border-radius: 7px;
+      padding: 4px 9px; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--nb-text); cursor: pointer; }
+    .mini.danger { color: var(--nb-danger); border-color: #fecaca; }
     .row.head { background: var(--nb-surface-raised); font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
     .ta-end { text-align: end; } .mono { font-variant-numeric: tabular-nums; font-weight: 600; }
     .muted { color: var(--nb-text-muted); } .strong { font-weight: 700; }
@@ -235,6 +317,63 @@ export class ProcurementVendorDetailComponent implements OnInit {
   form: any = {};
   private id = '';
 
+  // جهات الاتصال (الجوال والبريد)
+  readonly contacts = signal<any[]>([]);
+  readonly addingContact = signal(false);
+  readonly savingContact = signal(false);
+  cForm: any = {};
+
+  loadContacts() {
+    this.svc.getVendorContacts().subscribe({
+      next: (d: any) => this.contacts.set(this.pick(d).filter((c: any) => String(c.vendor) === this.id)),
+      error: () => {},
+    });
+  }
+
+  startAddContact() { this.cForm = { name: '', job_title: '', phone: '', email: '' }; this.addingContact.set(true); }
+
+  startEditContact(ct: any) {
+    this.cForm = { id: ct.id, name: ct.name, job_title: ct.job_title, phone: ct.phone, email: ct.email };
+    this.addingContact.set(true);
+  }
+
+  saveContact() {
+    if (!this.cForm.name?.trim()) { this.notify.error('أدخل اسم جهة الاتصال.'); return; }
+    if (!this.cForm.phone?.trim() && !this.cForm.email?.trim()) {
+      this.notify.error('أدخل رقم الجوال أو البريد الإلكتروني على الأقل.');
+      return;
+    }
+    const payload = {
+      vendor: this.id,
+      name: this.cForm.name.trim(),
+      job_title: (this.cForm.job_title || '').trim() || null,
+      phone: (this.cForm.phone || '').trim() || null,
+      email: (this.cForm.email || '').trim() || null,
+    };
+    this.savingContact.set(true);
+    const req = this.cForm.id
+      ? this.svc.updateVendorContact(this.cForm.id, payload)
+      : this.svc.createVendorContact(payload);
+    req.subscribe({
+      next: () => {
+        this.savingContact.set(false); this.addingContact.set(false);
+        this.notify.success(this.cForm.id ? 'تم حفظ جهة الاتصال.' : 'تمت إضافة جهة الاتصال.');
+        this.loadContacts();
+      },
+      error: (e) => {
+        this.savingContact.set(false);
+        this.notify.error(e?.details?.error || e?.details?.detail || e?.message || 'تعذّر حفظ جهة الاتصال.');
+      },
+    });
+  }
+
+  removeContact(ct: any) {
+    this.svc.deleteVendorContact(ct.id).subscribe({
+      next: () => { this.notify.success('تم حذف جهة الاتصال.'); this.loadContacts(); },
+      error: () => this.notify.error('تعذّر حذف جهة الاتصال.'),
+    });
+  }
+
   readonly totalAwarded = computed(() =>
     this.orders().reduce((s, o) => s + (Number(o.total_amount) || 0), 0));
 
@@ -246,6 +385,7 @@ export class ProcurementVendorDetailComponent implements OnInit {
     this.svc.getVendorCategories().subscribe({
       next: (d: any) => this.categories.set(this.pick(d)), error: () => {},
     });
+    this.loadContacts();
     // سجل تعامله الفعلي
     this.svc.getPurchaseOrders({ page_size: 200 }).subscribe({
       next: (d: any) => this.orders.set(this.pick(d).filter((o: any) => String(o.vendor) === this.id)),

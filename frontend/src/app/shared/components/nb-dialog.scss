@@ -1,0 +1,129 @@
+/**
+ * لغة نوافذ نبراس المنبثقة — تُستورد عبر styleUrl في كل نافذة لضمان التطابق.
+ * تمنع تفرّق الأنماط (أزرار Material الكبسولية مقابل أزرار نبراس، ترويسات مختلفة،
+ * ارتفاعات حقول متفاوتة).
+ */
+.nb-dlg {
+  font-family: var(--nb-font-family, 'Cairo', sans-serif);
+  min-width: 440px;
+  max-width: 560px;
+  padding: 2px;
+}
+@media (max-width: 560px) {
+  .nb-dlg { min-width: auto; width: 100%; }
+}
+
+/* الترويسة: أيقونة + عنوان + وصف — موحّدة في كل النوافذ */
+.nb-dlg-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.nb-dlg-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  flex: none;
+  background: var(--nb-primary-50, #eef0fa);
+}
+.nb-dlg-ic.warn { background: #fef3c7; }
+.nb-dlg-ic.danger { background: #fee2e2; }
+.nb-dlg-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--nb-text, #1f2937);
+}
+.nb-dlg-head p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--nb-text-muted, #64748b);
+}
+
+/* الحقول: تسمية بسطر ثابت + حقل بارتفاع واحد → محاذاة مضمونة بالبناء */
+.nb-dlg-grid { display: grid; gap: 14px; }
+.nb-dlg-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) { .nb-dlg-grid.cols-2 { grid-template-columns: 1fr; } }
+
+.nb-dlg label { display: grid; grid-template-rows: 18px auto; gap: 6px; }
+.nb-dlg .lbl {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--nb-text, #1f2937);
+  line-height: 18px;
+}
+.nb-dlg .req { color: var(--nb-danger, #dc2626); }
+.nb-dlg input,
+.nb-dlg select {
+  font-family: inherit;
+  font-size: 13px;
+  height: 38px;
+  padding: 0 11px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--nb-border, #e5e7eb);
+  border-radius: var(--nb-radius, 8px);
+  background: var(--nb-surface, #fff);
+  color: var(--nb-text, #1f2937);
+}
+.nb-dlg input:focus,
+.nb-dlg select:focus {
+  outline: none;
+  border-color: var(--nb-primary-400, #7986CB);
+  box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.12);
+}
+.nb-dlg input::placeholder { color: var(--nb-text-muted, #94a3b8); opacity: 0.8; }
+.nb-dlg .hint { font-size: 11px; color: var(--nb-text-muted, #64748b); margin-top: 6px; }
+
+/* الملاحظات والأخطاء */
+.nb-dlg-note {
+  margin-top: 14px;
+  border-radius: var(--nb-radius, 8px);
+  padding: 9px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  background: var(--nb-primary-50, #eef0fa);
+  color: var(--nb-primary-800, #2c387e);
+}
+.nb-dlg-err {
+  margin-top: 12px;
+  border-radius: var(--nb-radius, 8px);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+/* الأزرار: لغة نبراس لا كبسولات Material */
+.nb-dlg-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.nb-dlg-btn {
+  height: 38px;
+  padding: 0 20px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--nb-radius, 8px);
+  cursor: pointer;
+  border: none;
+  transition: filter 0.15s ease;
+}
+.nb-dlg-btn:hover:not(:disabled) { filter: brightness(0.96); }
+.nb-dlg-btn:disabled { opacity: 0.6; cursor: default; }
+.nb-dlg-btn.ghost {
+  background: var(--nb-surface-raised, #f1f5f9);
+  border: 1px solid var(--nb-border, #e5e7eb);
+  color: var(--nb-text, #1f2937);
+}
+.nb-dlg-btn.primary { background: var(--nb-primary-600, #3f51b5); color: #fff; }
+.nb-dlg-btn.danger { background: var(--nb-danger, #dc2626); color: #fff; }

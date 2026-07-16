@@ -33,6 +33,8 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
           <a routerLink="/attendance/dashboard" class="nav-btn active">نظرة عامة</a>
           <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
           <a routerLink="/attendance/corrections" class="nav-btn">طلبات التصحيح</a>
+          <a routerLink="/attendance/policies" class="nav-btn">سياسات الحضور</a>
+          <a routerLink="/attendance/check-in-methods" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
           <a routerLink="/attendance/simulator" class="simulator-link-btn">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
             محاكي البصمة الجوالة
