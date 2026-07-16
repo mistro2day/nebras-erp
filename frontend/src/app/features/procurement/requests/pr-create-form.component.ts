@@ -26,6 +26,14 @@ interface ItemRow {
         <button class="x" (click)="cancel.emit()" aria-label="إغلاق">✕</button>
       </div>
 
+      @if (refError()) { <div class="ref-err">⚠︎ {{ refError() }}</div> }
+      @if (!refError() && departments().length === 0) {
+        <div class="ref-hint">لا توجد أقسام معرّفة — أضفها من <b>الهيكل التنظيمي ← الأقسام</b>.</div>
+      }
+      @if (!refError() && costCenters().length === 0) {
+        <div class="ref-hint">لا توجد مراكز تكلفة معرّفة — عرّفها في <b>المالية ← مراكز التكلفة</b>.</div>
+      }
+
       <div class="grid2">
         <label>القسم الطالب <span>*</span>
           <select [(ngModel)]="departmentId">
@@ -83,6 +91,10 @@ interface ItemRow {
     .x { background: none; border: none; font-size: 16px; color: var(--nb-text-muted); cursor: pointer; }
     label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
     label span { color: var(--nb-danger); }
+    .ref-err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: var(--nb-radius);
+      padding: 10px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; }
+    .ref-hint { background: var(--nb-warning-bg, #fffaf0); border: 1px solid #fde9c8; color: #92400e;
+      border-radius: var(--nb-radius); padding: 9px 12px; font-size: 12.5px; margin-bottom: 10px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; margin-bottom: 16px; }
     @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
     input, select { font-family: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--nb-border);
@@ -128,6 +140,8 @@ export class PrCreateFormComponent implements OnInit {
   readonly total = computed(() =>
     this.items().reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.estimated_unit_price) || 0), 0));
 
+  readonly refError = signal('');
+
   ngOnInit() {
     this.svc.getRequestReferenceData().subscribe({
       next: (res: any) => {
@@ -136,7 +150,12 @@ export class PrCreateFormComponent implements OnInit {
         this.accounts.set(d.accounts || []);
         this.costCenters.set(d.cost_centers || []);
       },
-      error: () => {},
+      // لا نكتم الخطأ: قائمة فارغة بلا سبب أسوأ من رسالة واضحة
+      error: (e) => this.refError.set(
+        e?.status === 404
+          ? 'تعذّر تحميل البيانات المرجعية (النقطة غير متاحة) — أعد تشغيل خادم الـ backend.'
+          : 'تعذّر تحميل الأقسام وحسابات الموازنة ومراكز التكلفة. تحقّق من الاتصال والصلاحيات.'
+      ),
     });
   }
 

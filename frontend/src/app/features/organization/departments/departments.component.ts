@@ -70,6 +70,14 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
         </div>
       }
 
+      <!-- مؤشرات الهيكل -->
+      <div class="stats">
+        <div class="stat"><span class="s-val">{{ all().length }}</span><span class="s-lbl">إجمالي الأقسام</span></div>
+        <div class="stat"><span class="s-val">{{ countOf('administrative') }}</span><span class="s-lbl">إدارية</span></div>
+        <div class="stat"><span class="s-val">{{ countOf('academic') }}</span><span class="s-lbl">أكاديمية</span></div>
+        <div class="stat"><span class="s-val">{{ rootCount() }}</span><span class="s-lbl">أقسام رئيسية</span></div>
+      </div>
+
       <div class="toolbar">
         <input class="search" [ngModel]="q()" (ngModelChange)="q.set($event)" placeholder="بحث بالاسم أو الرمز…" />
         <div class="chips">
@@ -81,29 +89,37 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
 
       <section class="card">
         <div class="row head">
-          <span>القسم</span><span>الرمز</span><span>النوع</span><span>القسم الأب</span>
+          <span>القسم</span><span>الرمز</span><span>النوع</span>
           <span class="ta-end">الحالة</span><span class="ta-end">إجراء</span>
         </div>
         @if (loading()) {
           @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
         } @else {
-          @for (d of filtered(); track d.id) {
-            <div class="row">
-              <span class="who"><span class="ava">{{ initial(d.name) }}</span>{{ d.name }}</span>
-              <span class="mono muted">{{ d.code }}</span>
-              <span><span class="tag" [attr.data-t]="d.type">{{ typeText(d.type) }}</span></span>
-              <span class="muted">{{ nameOf(d.parent) }}</span>
+          @for (node of tree(); track node.dept.id) {
+            <div class="row" [class.child]="node.depth > 0">
+              <span class="who" [style.padding-inline-start.px]="node.depth * 22">
+                @if (node.depth > 0) { <span class="branch-line" aria-hidden="true">└</span> }
+                <span class="ic" [attr.data-t]="node.dept.type">{{ node.dept.type === 'academic' ? '🎓' : '🏢' }}</span>
+                <span class="d-name">{{ node.dept.name }}</span>
+                @if (node.kids > 0) { <span class="kids">{{ node.kids }} فرعي</span> }
+              </span>
+              <span class="mono muted">{{ node.dept.code }}</span>
+              <span><span class="tag" [attr.data-t]="node.dept.type">{{ typeText(node.dept.type) }}</span></span>
               <span class="ta-end">
-                <span class="badge" [attr.data-s]="d.is_active ? 'on' : 'off'">{{ d.is_active ? 'نشط' : 'موقوف' }}</span>
+                <span class="badge" [attr.data-s]="node.dept.is_active ? 'on' : 'off'">{{ node.dept.is_active ? 'نشط' : 'موقوف' }}</span>
               </span>
               <span class="ta-end actions">
-                <button class="act" (click)="openEdit(d)">تعديل</button>
-                <button class="act danger" (click)="remove(d)">حذف</button>
+                <button class="act" (click)="openEdit(node.dept)">تعديل</button>
+                <button class="act danger" (click)="remove(node.dept)">حذف</button>
               </span>
             </div>
           }
-          @if (filtered().length === 0) {
-            <div class="empty">لا توجد أقسام مطابقة. ابدأ بإضافة قسم جديد.</div>
+          @if (tree().length === 0) {
+            <div class="empty">
+              <span class="e-ic">🏢</span>
+              <strong>لا توجد أقسام بعد</strong>
+              <p>الأقسام هي الجهة الطالبة في طلبات الشراء — ابدأ بإضافة قسم.</p>
+            </div>
           }
         }
       </section>
@@ -141,14 +157,29 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
       border-radius: 999px; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--nb-text-secondary); cursor: pointer; }
     .chips button.on { background: var(--nb-primary-600); color: #fff; border-color: transparent; }
 
+    /* مؤشرات الهيكل */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+    .s-val { font-size: 22px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+    .s-lbl { font-size: 12px; color: var(--nb-text-muted); }
+
     .card { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); overflow: hidden; }
-    .row { display: grid; grid-template-columns: 1.8fr 0.8fr 0.8fr 1.2fr 0.8fr 1.1fr; gap: 8px; align-items: center;
+    .row { display: grid; grid-template-columns: 2.4fr 0.8fr 0.9fr 0.8fr 1.1fr; gap: 8px; align-items: center;
       padding: 11px 16px; font-size: 13px; color: var(--nb-text); border-top: 1px solid var(--nb-border-row, var(--nb-border-soft)); }
     .row.head { border-top: none; background: var(--nb-surface-raised); font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
     .row:not(.head):hover { background: var(--nb-surface-raised); }
-    .who { display: flex; align-items: center; gap: 10px; font-weight: 600; }
-    .ava { width: 32px; height: 32px; border-radius: 9px; flex: none; background: var(--nb-primary-50);
-      color: var(--nb-primary-700); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+    .row.child { background: color-mix(in srgb, var(--nb-surface-raised) 45%, transparent); }
+
+    .who { display: flex; align-items: center; gap: 9px; font-weight: 600; min-width: 0; }
+    .branch-line { color: var(--nb-border); font-size: 13px; flex: none; }
+    .ic { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-size: 15px;
+      background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); }
+    .ic[data-t="academic"] { background: var(--nb-primary-50); border-color: transparent; }
+    .d-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .kids { font-size: 10.5px; font-weight: 700; color: var(--nb-text-muted); background: var(--nb-surface-raised);
+      border-radius: 999px; padding: 2px 8px; flex: none; }
     .ta-end { text-align: end; } .mono { font-variant-numeric: tabular-nums; font-weight: 600; } .muted { color: var(--nb-text-muted); }
     .tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 6px; }
     .tag[data-t="academic"] { background: var(--nb-primary-50); color: var(--nb-primary-700); }
@@ -160,7 +191,10 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
     .act { border: 1px solid var(--nb-border); background: var(--nb-surface); border-radius: 8px; padding: 5px 10px;
       font-family: inherit; font-size: 11.5px; font-weight: 700; color: var(--nb-text); cursor: pointer; }
     .act.danger { color: var(--nb-danger); border-color: #fecaca; }
-    .empty { padding: 34px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
+    .empty { padding: 40px 16px; text-align: center; color: var(--nb-text-muted); }
+    .empty .e-ic { font-size: 38px; display: block; margin-bottom: 10px; }
+    .empty strong { display: block; color: var(--nb-text); font-size: 14.5px; margin-bottom: 4px; }
+    .empty p { margin: 0; font-size: 12.5px; }
     .sk { height: 46px; border-top: 1px solid var(--nb-border-soft);
       background: linear-gradient(90deg, var(--nb-surface-raised), var(--nb-surface), var(--nb-surface-raised));
       background-size: 200% 100%; animation: sh 1.2s infinite; }
@@ -193,6 +227,33 @@ export class OrgDepartmentsComponent implements OnInit {
 
   /** خيارات القسم الأب — دون القسم قيد التعديل (منع التداخل الدائري). */
   readonly parentOptions = computed(() => this.all().filter(d => d.id !== this.editId()));
+
+  /**
+   * ترتيب هرمي مسطّح للعرض: كل قسم رئيسي يتبعه أبناؤه بإزاحة.
+   * الأقسام التي غاب أبوها عن نتيجة التصفية تُعرض كجذور حتى لا تختفي.
+   */
+  readonly tree = computed(() => {
+    const list = this.filtered();
+    const ids = new Set(list.map(d => d.id));
+    const out: { dept: Department; depth: number; kids: number }[] = [];
+    const seen = new Set<string>();
+
+    const walk = (d: Department, depth: number) => {
+      if (seen.has(d.id)) return; // حماية من التداخل الدائري
+      seen.add(d.id);
+      const kids = list.filter(x => x.parent === d.id);
+      out.push({ dept: d, depth, kids: kids.length });
+      kids.forEach(k => walk(k, depth + 1));
+    };
+
+    list.filter(d => !d.parent || !ids.has(d.parent)).forEach(r => walk(r, 0));
+    // أي عنصر لم يُزَر (حلقة مغلقة) يُضاف في النهاية
+    list.filter(d => !seen.has(d.id)).forEach(d => walk(d, 0));
+    return out;
+  });
+
+  countOf(type: string): number { return this.all().filter(d => d.type === type).length; }
+  rootCount(): number { return this.all().filter(d => !d.parent).length; }
 
   ngOnInit() {
     this.load();

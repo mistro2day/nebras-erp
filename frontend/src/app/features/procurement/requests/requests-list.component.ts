@@ -41,7 +41,7 @@ import { PrCreateFormComponent } from './pr-create-form.component';
 
       <section class="card">
         <div class="row head">
-          <span>رقم الطلب</span><span>التاريخ</span><span>الأولوية</span>
+          <span>رقم الطلب</span><span>القسم الطالب</span><span>التاريخ</span><span>الأولوية</span>
           <span class="ta-end">تقديري</span><span class="ta-end">الحالة</span><span class="ta-end">إجراء</span>
         </div>
         @if (loading()) {
@@ -50,6 +50,7 @@ import { PrCreateFormComponent } from './pr-create-form.component';
           @for (r of filtered(); track r.id) {
             <div class="row">
               <span class="mono">{{ r.request_number || '—' }}</span>
+              <span>{{ deptName(r.department_id) }}</span>
               <span class="muted">{{ r.date || '—' }}</span>
               <span><span class="pri" [attr.data-p]="r.priority">{{ priText(r.priority) }}</span></span>
               <span class="ta-end strong">{{ fmt(r.total_estimated_amount) }}</span>
@@ -70,7 +71,7 @@ import { PrCreateFormComponent } from './pr-create-form.component';
   `,
   styleUrl: '../shared/procurement-table.scss',
   styles: [`
-    .row { grid-template-columns: 1.3fr 1fr 0.9fr 1fr 1.1fr 1fr; }
+    .row { grid-template-columns: 1.1fr 1.2fr 0.9fr 0.8fr 0.9fr 1fr 0.9fr; }
     .actions { display: flex; justify-content: flex-end; }
     .act { border: none; border-radius: 8px; padding: 6px 12px; font-family: inherit; font-size: 12px;
       font-weight: 700; cursor: pointer; }
@@ -94,6 +95,10 @@ export class ProcurementRequestsComponent implements OnInit {
 
   onCreated() { this.creating.set(false); this.load(); }
 
+  /** خريطة معرّف القسم → اسمه (الطلب يخزّن department_id فقط). */
+  private readonly deptMap = signal<Record<string, string>>({});
+  deptName(id: any): string { return this.deptMap()[String(id)] || '—'; }
+
   readonly filtered = computed(() => {
     const term = this.q().trim();
     const f = this.filter();
@@ -101,7 +106,18 @@ export class ProcurementRequestsComponent implements OnInit {
       (!f || r.status === f) && (!term || (r.request_number || '').includes(term)));
   });
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    this.load();
+    // أسماء الأقسام لعرض الجهة الطالبة (مصدرها وحدة التنظيم عبر البيانات المرجعية)
+    this.svc.getRequestReferenceData().subscribe({
+      next: (res: any) => {
+        const list = (res?.data ?? res ?? {}).departments || [];
+        this.deptMap.set(Object.fromEntries(list.map((d: any) => [String(d.id), d.name])));
+      },
+      error: () => {},
+    });
+  }
+
   load() {
     this.loading.set(true);
     this.svc.getPurchaseRequests({ page_size: 200 }).subscribe({
