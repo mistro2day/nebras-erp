@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
@@ -44,13 +45,14 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
           <nb-loading message="جارٍ تحميل أوامر الشراء…"></nb-loading>
         } @else {
           @for (o of filtered(); track o.id) {
-            <div class="row">
+            <div class="row clickable" (click)="open(o)" title="فتح تفاصيل أمر الشراء">
               <span class="mono">{{ o.po_number || '—' }}</span>
               <span>{{ vendorName(o.vendor) }}</span>
               <span class="muted">{{ o.date || '—' }}</span>
               <span class="ta-end strong">{{ fmt(o.total_amount) }}</span>
               <span class="ta-end"><span class="badge" [attr.data-s]="o.status">{{ statusText(o.status) }}</span></span>
-              <span class="ta-end actions">
+              <!-- الإجراءات لا تفتح التفاصيل: نوقف انتشار الحدث -->
+              <span class="ta-end actions" (click)="$event.stopPropagation()">
                 @if (o.status === 'draft') {
                   <button class="act pri-btn" [disabled]="busyId()===o.id" (click)="issue(o)">إصدار للمورّد</button>
                 } @else if (o.status === 'approved' || o.status === 'issued') {
@@ -76,6 +78,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
     .act.ok-btn { background: #16a34a; color: #fff; }
     .posted { font-size: 11.5px; font-weight: 700; color: #166534; }
     .dash { color: var(--nb-text-muted); }
+    .row.clickable { cursor: pointer; }
   `],
 })
 export class ProcurementOrdersComponent implements OnInit {
@@ -94,6 +97,11 @@ export class ProcurementOrdersComponent implements OnInit {
     return this.all().filter(o =>
       (!f || o.status === f) && (!term || (o.po_number || '').includes(term)));
   });
+
+  private router = inject(Router);
+
+  /** فتح تفاصيل أمر الشراء (نمط Odoo: النقر على السجل يفتح استمارته). */
+  open(o: any) { this.router.navigate(['/procurement/orders', o.id]); }
 
   /** خريطة معرّف المورّد → اسمه (الـ serializer يُرجع المعرّف فقط). */
   private readonly vendorMap = signal<Record<string, string>>({});

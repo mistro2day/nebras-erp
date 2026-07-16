@@ -356,6 +356,25 @@ class PayrollRunViewSet(BaseCRUDViewSet):
             gross_earnings = basic + housing + transport + other
             total_deductions = 0.0
             
+            # احتساب دقائق التأخير الفعلي لشهر المسير
+            from apps.attendance.domain.models import AttendanceRecord
+            late_deduction = 0.0
+            late_minutes_total = 0
+            if period_code:
+                try:
+                    # استخراج السنة والشهر من كود المسير مثل '2026-06'
+                    year_part, month_part = map(int, period_code.split('-'))
+                    records = AttendanceRecord.objects.filter(employee=employee, date__year=year_part, date__month=month_part)
+                    late_minutes_total = sum(rec.late_minutes for rec in records if rec.late_minutes)
+                    
+                    if late_minutes_total > 0:
+                        # احتساب خصم الدقيقة = (الراتب الأساسي / 30 يوم عمل / 8 ساعات عمل يومياً / 60 دقيقة)
+                        minute_rate = (basic / 30.0 / 8.0 / 60.0)
+                        late_deduction = round(late_minutes_total * minute_rate, 2)
+                        total_deductions += late_deduction
+                except Exception:
+                    pass
+
             loan_qs = EmployeeLoan.objects.filter(employee=employee, status='approved')
             if tenant_id:
                 loan_qs = loan_qs.filter(tenant_id=tenant_id)
@@ -390,6 +409,8 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 basic_salary=basic,
                 gross_earnings=gross_earnings,
                 total_deductions=total_deductions,
+                late_minutes=late_minutes_total,
+                late_deduction=late_deduction,
                 net_salary=net_salary,
                 status='draft' if preview_only else 'approved'
             )
