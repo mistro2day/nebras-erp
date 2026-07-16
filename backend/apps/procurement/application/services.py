@@ -101,13 +101,44 @@ class ProcurementService:
 
     @classmethod
     @transaction.atomic
+    def submit_purchase_request(cls, tenant_id, request_id, user_id=None):
+        """
+        إرسال طلب الشراء للاعتماد (مسودة ← قيد المراجعة).
+
+        فصل الإرسال عن الاعتماد مقصود (فصل المهام): مُنشئ الطلب يُرسله، وأخصائي
+        المشتريات أو المدير هو من يعتمده — مطابقاً لمصفوفة الصلاحيات في التوثيق
+        ولنمط Submit ثم Approve في Odoo/D365.
+        """
+        pr = PurchaseRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
+        if pr.status != 'draft':
+            raise ValidationError("لا يمكن إرسال هذا الطلب للاعتماد في حالته الحالية.")
+        if not pr.items.exists():
+            raise ValidationError("لا يمكن إرسال طلب بلا بنود.")
+
+        pr.status = 'pending_approval'
+        pr.save(update_fields=['status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PurchaseRequestSubmittedForApproval',
+            source_module='procurement',
+            event_data={
+                'request_id': str(pr.id),
+                'request_number': pr.request_number,
+                'total_amount': float(pr.total_estimated_amount),
+            },
+        )
+        return pr
+
+    @classmethod
+    @transaction.atomic
     def approve_purchase_request(cls, tenant_id, request_id, approver_id, user_id=None):
         """
         اعتماد طلب الشراء وتغيير حالته ليصبح قابلاً لتوليد RFQ.
         """
         pr = PurchaseRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
-        if pr.status != 'draft' and pr.status != 'pending_approval':
-            raise ValidationError("لا يمكن اعتماد هذا الطلب في حالته الحالية.")
+        if pr.status != 'pending_approval':
+            raise ValidationError("يجب إرسال الطلب للاعتماد أولاً قبل اعتماده.")
 
         # تسجيل الاعتماد
         PurchaseRequestApproval.objects.create(

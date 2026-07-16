@@ -53,6 +53,11 @@ export class ProcurementService {
     return this.http.get<any>(`${this.apiUrl}/requests/${id}/`);
   }
 
+  /** إرسال الطلب للاعتماد (مسودة ← قيد المراجعة). */
+  submitPurchaseRequest(id: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/requests/${id}/submit/`, {});
+  }
+
   approvePurchaseRequest(id: string, payload: { approver_id: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/requests/${id}/approve/`, payload);
   }

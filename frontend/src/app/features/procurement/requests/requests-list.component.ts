@@ -58,7 +58,9 @@ import { PrCreateFormComponent } from './pr-create-form.component';
               <span class="ta-end"><span class="badge" [attr.data-s]="r.status">{{ statusText(r.status) }}</span></span>
               <!-- الإجراءات لا تفتح التفاصيل: نوقف انتشار الحدث -->
               <span class="ta-end actions" (click)="$event.stopPropagation()">
-                @if (r.status === 'pending_approval') {
+                @if (r.status === 'draft') {
+                  <button class="act pri-btn" [disabled]="busyId()===r.id" (click)="submit(r)">إرسال للاعتماد</button>
+                } @else if (r.status === 'pending_approval') {
                   <button class="act ok" [disabled]="busyId()===r.id" (click)="approve(r)">اعتماد</button>
                 } @else if (r.status === 'approved') {
                   <button class="act pri-btn" [disabled]="busyId()===r.id" (click)="makeRfq(r)">توليد RFQ</button>
@@ -137,6 +139,20 @@ export class ProcurementRequestsComponent implements OnInit {
   private confirm(data: ConfirmDialogData): Promise<boolean> {
     return new Promise(resolve =>
       this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe(ok => resolve(!!ok)));
+  }
+
+  async submit(r: any): Promise<void> {
+    const ok = await this.confirm({
+      title: 'إرسال الطلب للاعتماد',
+      message: `سيُرسل «${r.request_number}» لمراجعته واعتماده.`,
+      confirmText: 'إرسال', color: 'primary',
+    });
+    if (!ok) return;
+    this.busyId.set(r.id);
+    this.svc.submitPurchaseRequest(r.id).subscribe({
+      next: () => { this.busyId.set(null); this.notify.success('تم إرسال الطلب للاعتماد.'); this.load(); },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر الإرسال.'); },
+    });
   }
 
   async approve(r: any): Promise<void> {

@@ -41,14 +41,33 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
             </div>
           </div>
           <div class="hero-actions">
-            @if (r.status === 'pending_approval') {
+            @if (r.status === 'draft') {
+              <button class="btn primary" [disabled]="busy()" (click)="submit(r)">📤 إرسال للاعتماد</button>
+              <span class="hint">الخطوة التالية: إرسال الطلب لمراجعته واعتماده.</span>
+            } @else if (r.status === 'pending_approval') {
               <button class="btn ok" [disabled]="busy()" (click)="approve(r)">✓ اعتماد الطلب</button>
+              <span class="hint">الخطوة التالية: الاعتماد ثم توليد عروض الأسعار.</span>
             } @else if (r.status === 'approved') {
               <button class="btn primary" [disabled]="busy()" (click)="makeRfq(r)">📨 توليد طلب عروض أسعار</button>
-            } @else if (r.status === 'draft') {
-              <span class="hint">الطلب مسودة — يُرسل للاعتماد من مساره.</span>
+              <span class="hint">الخطوة التالية: استقبال عروض الموردين والترسية.</span>
+            } @else if (r.status === 'rfq_created') {
+              <a class="btn primary" routerLink="/procurement/rfqs">📨 فتح عروض الأسعار</a>
+              <span class="hint">سجّل عروض الموردين ثم أرسِ لتوليد أمر الشراء.</span>
+            } @else if (r.status === 'completed') {
+              <a class="btn ok" routerLink="/procurement/orders">📦 أوامر الشراء</a>
             }
           </div>
+        </div>
+
+        <!-- مسار الطلب: أين يقف الآن وما التالي -->
+        <div class="track">
+          @for (s of steps; track s.key; let last = $last) {
+            <div class="step" [class.done]="stepIndex() > $index" [class.now]="stepIndex() === $index">
+              <span class="dot">{{ stepIndex() > $index ? '✓' : $index + 1 }}</span>
+              <span class="st-label">{{ s.label }}</span>
+            </div>
+            @if (!last) { <span class="line" [class.done]="stepIndex() > $index"></span> }
+          }
         </div>
 
         <!-- المستندات المرتبطة (أزرار ذكية) -->
@@ -123,8 +142,25 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
     .meta { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--nb-text-muted); }
     .meta b { color: var(--nb-text); font-weight: 700; }
     .meta em { font-style: normal; font-weight: 800; color: var(--nb-text); font-size: 14px; }
-    .hero-actions { flex: none; display: flex; flex-direction: column; gap: 8px; }
-    .hint { font-size: 12px; color: var(--nb-text-muted); }
+    .hero-actions { flex: none; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+    .hint { font-size: 11.5px; color: var(--nb-text-muted); text-align: center; max-width: 240px; }
+    a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+    /* مسار الطلب */
+    .track { display: flex; align-items: center; background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 14px 18px; margin-bottom: 14px; overflow-x: auto; }
+    .step { display: flex; align-items: center; gap: 8px; flex: none; }
+    .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none;
+      font-size: 11px; font-weight: 800; background: var(--nb-surface-raised); color: var(--nb-text-muted);
+      border: 1px solid var(--nb-border); }
+    .st-label { font-size: 12px; font-weight: 700; color: var(--nb-text-muted); white-space: nowrap; }
+    .step.done .dot { background: #16a34a; color: #fff; border-color: transparent; }
+    .step.done .st-label { color: var(--nb-text); }
+    .step.now .dot { background: var(--nb-primary-600); color: #fff; border-color: transparent;
+      box-shadow: 0 0 0 4px var(--nb-primary-50); }
+    .step.now .st-label { color: var(--nb-primary-700); font-weight: 800; }
+    .line { flex: 1; min-width: 24px; height: 2px; background: var(--nb-border); margin: 0 10px; }
+    .line.done { background: #16a34a; }
 
     .btn { height: 38px; padding: 0 18px; font-family: inherit; font-size: 13px; font-weight: 800;
       border-radius: var(--nb-radius); cursor: pointer; border: none; white-space: nowrap; }
@@ -195,6 +231,21 @@ export class ProcurementRequestDetailComponent implements OnInit {
 
   private id = '';
 
+  /** مسار الطلب في دورة Source-to-Pay — يوضّح موضعه الحالي والخطوة التالية. */
+  readonly steps = [
+    { key: 'draft', label: 'مسودة' },
+    { key: 'pending_approval', label: 'قيد الاعتماد' },
+    { key: 'approved', label: 'معتمد' },
+    { key: 'rfq_created', label: 'عروض أسعار' },
+    { key: 'completed', label: 'مكتمل' },
+  ];
+
+  readonly stepIndex = computed(() => {
+    const s = this.pr()?.status;
+    const i = this.steps.findIndex(x => x.key === s);
+    return i < 0 ? 0 : i;
+  });
+
   private pick(d: any): any[] { return Array.isArray(d) ? d : (d?.data ?? d?.results ?? []); }
 
   ngOnInit() {
@@ -254,6 +305,20 @@ export class ProcurementRequestDetailComponent implements OnInit {
   private confirm(data: ConfirmDialogData): Promise<boolean> {
     return new Promise(resolve =>
       this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe(ok => resolve(!!ok)));
+  }
+
+  async submit(r: any) {
+    const ok = await this.confirm({
+      title: 'إرسال الطلب للاعتماد',
+      message: `سيُرسل «${r.request_number}» لمراجعته واعتماده، ولن يبقى مسودة قابلة للتعديل.`,
+      confirmText: 'إرسال', color: 'primary',
+    });
+    if (!ok) return;
+    this.busy.set(true);
+    this.svc.submitPurchaseRequest(r.id).subscribe({
+      next: () => { this.busy.set(false); this.notify.success('تم إرسال الطلب للاعتماد.'); this.load(); },
+      error: (e) => { this.busy.set(false); this.notify.error(e?.details?.error || e?.message || 'تعذّر الإرسال.'); },
+    });
   }
 
   async approve(r: any) {

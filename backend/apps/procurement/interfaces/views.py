@@ -157,16 +157,35 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         if not department_id or not requested_by or not items:
             return Response({'error': 'department_id, requested_by, and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        pr = ProcurementService.create_purchase_request(
-            tenant_id=tenant_id,
-            department_id=department_id,
-            requested_by=requested_by,
-            items_data=items,
-            reason=reason,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            pr = ProcurementService.create_purchase_request(
+                tenant_id=tenant_id,
+                department_id=department_id,
+                requested_by=requested_by,
+                items_data=items,
+                reason=reason,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(pr)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='submit')
+    def submit_request(self, request, pk=None):
+        """إرسال طلب الشراء للاعتماد (مسودة ← قيد المراجعة)."""
+        tenant_id = request.tenant_id
+        try:
+            pr = ProcurementService.submit_purchase_request(
+                tenant_id=tenant_id, request_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(pr).data,
+                                message="تم إرسال الطلب للاعتماد.")
 
     @action(detail=True, methods=['post'], url_path='approve')
     def approve_request(self, request, pk=None):
@@ -176,12 +195,16 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
         if not approver_id:
             return Response({'error': 'approver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        pr = ProcurementService.approve_purchase_request(
-            tenant_id=tenant_id,
-            request_id=pk,
-            approver_id=approver_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            pr = ProcurementService.approve_purchase_request(
+                tenant_id=tenant_id,
+                request_id=pk,
+                approver_id=approver_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(pr)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -224,13 +247,17 @@ class RFQViewSet(BaseCRUDViewSet):
 
         deadline = timezone.datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M:%S')
 
-        rfq = ProcurementService.create_rfq_from_request(
-            tenant_id=tenant_id,
-            request_id=request_id,
-            deadline=deadline,
-            notes=notes,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            rfq = ProcurementService.create_rfq_from_request(
+                tenant_id=tenant_id,
+                request_id=request_id,
+                deadline=deadline,
+                notes=notes,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(rfq)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -266,13 +293,17 @@ class RFQViewSet(BaseCRUDViewSet):
         if not rfq_id or not vendor_id or not quotation_id:
             return Response({'error': 'rfq_id, vendor_id, and quotation_id are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        po = ProcurementService.compare_quotations_and_award(
-            tenant_id=tenant_id,
-            rfq_id=rfq_id,
-            vendor_id=vendor_id,
-            quotation_id=quotation_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            po = ProcurementService.compare_quotations_and_award(
+                tenant_id=tenant_id,
+                rfq_id=rfq_id,
+                vendor_id=vendor_id,
+                quotation_id=quotation_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
         # نقوم بإرجاع بيانات أمر الشراء المولد
         return Response({'purchase_order_id': str(po.id), 'po_number': po.po_number}, status=status.HTTP_201_CREATED)
 
@@ -334,13 +365,19 @@ class PurchaseOrderViewSet(BaseCRUDViewSet):
 
     @action(detail=True, methods=['post'], url_path='issue')
     def issue_po(self, request, pk=None):
+        """إصدار أمر الشراء للمورّد واستهلاك الموازنة المخصصة في المالية."""
         tenant_id = request.tenant_id
-        
-        po = PurchaseOrderService.issue_purchase_order(
-            tenant_id=tenant_id,
-            po_id=pk,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            po = PurchaseOrderService.issue_purchase_order(
+                tenant_id=tenant_id,
+                po_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            # مخالفة قاعدة عمل (تجاوز موازنة / حالة غير صالحة) ليست خطأ خادم
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(po)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
