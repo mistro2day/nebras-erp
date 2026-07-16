@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Sum
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.common.responses import StandardResponse
@@ -284,6 +285,30 @@ class PurchaseOrderViewSet(BaseCRUDViewSet):
     serializer_class = PurchaseOrderSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['po_number']
+
+    @action(detail=True, methods=['post'], url_path='post-invoice')
+    def post_invoice(self, request, pk=None):
+        """تسجيل فاتورة المورّد وترحيل قيدها في دفتر الأستاذ (آخر حلقة نحو المالية)."""
+        tenant_id = request.tenant_id
+        invoice_number = request.data.get('invoice_number')
+        invoice_date = request.data.get('invoice_date') or None
+
+        try:
+            po = PurchaseOrderService.post_vendor_invoice(
+                tenant_id=tenant_id,
+                po_id=pk,
+                invoice_number=invoice_number,
+                invoice_date=invoice_date,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return StandardResponse(
+            {'po_number': po.po_number, 'journal_entry_id': str(po.journal_entry_id), 'status': po.status},
+            message="تم تسجيل فاتورة المورّد وترحيل قيدها المحاسبي بنجاح.",
+        )
 
     @action(detail=True, methods=['post'], url_path='issue')
     def issue_po(self, request, pk=None):

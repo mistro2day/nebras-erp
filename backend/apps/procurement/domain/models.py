@@ -312,6 +312,13 @@ class PurchaseOrder(CombinedSharedModel):
     total_amount = models.DecimalField(max_digits=15, decimal_places=2)
     payment_terms = models.TextField(blank=True, null=True)
 
+    # فاتورة المورّد والترحيل المحاسبي (آخر حلقة نحو المالية)
+    vendor_invoice_number = models.CharField(max_length=50, blank=True, null=True,
+                                             help_text="رقم فاتورة المورّد المستلمة")
+    vendor_invoice_date = models.DateField(null=True, blank=True)
+    journal_entry_id = models.UUIDField(null=True, blank=True,
+                                        help_text="قيد اليومية المرحّل لفاتورة المورّد بالمالية")
+
     class Meta:
         db_table = 'nebras_purchase_orders'
         unique_together = ('tenant_id', 'po_number')
@@ -401,6 +408,10 @@ class ContractRenewal(CombinedSharedModel):
 class PurchaseSettings(CombinedSharedModel):
     max_request_limit_without_rfq = models.DecimalField(max_digits=15, decimal_places=2, default=5000.00)
     enable_budget_validation = models.BooleanField(default=True)
+    payable_gl_account_id = models.UUIDField(
+        null=True, blank=True,
+        help_text="حساب ذمم الموردين الدائنة في شجرة حسابات المالية — يُرحَّل عليه قيد فاتورة المورّد"
+    )
 
     class Meta:
         db_table = 'nebras_purchase_settings'

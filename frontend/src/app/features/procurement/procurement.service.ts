@@ -72,6 +72,11 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/orders/${id}/issue/`, {});
   }
 
+  /** تسجيل فاتورة المورّد وترحيل قيدها المحاسبي (آخر حلقة نحو المالية). */
+  postVendorInvoice(id: string, invoice_number: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/orders/${id}/post-invoice/`, { invoice_number });
+  }
+
   getContracts(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/contracts/`);
   }

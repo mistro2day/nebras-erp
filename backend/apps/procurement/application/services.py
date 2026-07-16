@@ -291,3 +291,107 @@ class PurchaseOrderService:
         )
 
         return po
+
+    @classmethod
+    @transaction.atomic
+    def post_vendor_invoice(cls, tenant_id, po_id, invoice_number, invoice_date=None, user_id=None):
+        """
+        تسجيل فاتورة المورّد وترحيل قيدها المحاسبي — آخر حلقة في دورة الشراء نحو المالية.
+
+        يطابق نمط Odoo (Vendor Bill) و Dynamics 365 (Vendor invoice): أمر الشراء نفسه
+        التزام (Encumbrance) ولا يُرحَّل، أما فاتورة المورّد فتُرحَّل في دفتر الأستاذ:
+            من ح/ المصروف (حساب موازنة كل بند)      [مدين]
+            إلى ح/ ذمم الموردين الدائنة              [دائن]
+        """
+        from apps.finance.domain.models import (
+            JournalEntry, JournalEntryLine, Currency, FiscalYear,
+        )
+        from apps.finance.application.services import PostingService
+
+        po = PurchaseOrder.objects.select_for_update().get(id=po_id, tenant_id=tenant_id)
+        if po.status not in ('approved', 'issued'):
+            raise ValidationError("يجب إصدار أمر الشراء واعتماده قبل تسجيل فاتورة المورّد.")
+        if po.journal_entry_id:
+            raise ValidationError("سبق ترحيل فاتورة هذا الأمر محاسبياً.")
+        if not invoice_number:
+            raise ValidationError("رقم فاتورة المورّد مطلوب.")
+
+        settings = PurchaseSettings.objects.filter(tenant_id=tenant_id).first()
+        payable_id = getattr(settings, 'payable_gl_account_id', None) if settings else None
+        payable = None
+        if payable_id:
+            payable = ChartOfAccount.objects.filter(id=payable_id, tenant_id=tenant_id).first()
+        if not payable:
+            # الافتراضي المعقول: حساب ذمم الموردين الدائنة في شجرة الحسابات
+            payable = ChartOfAccount.objects.filter(tenant_id=tenant_id, code='2101').first()
+        if not payable:
+            raise ValidationError(
+                "لم يُحدَّد حساب ذمم الموردين الدائنة في إعدادات المشتريات ولا يوجد حساب برمز 2101."
+            )
+
+        active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
+        if not active_fy:
+            raise ValidationError("لا توجد سنة مالية مفتوحة لترحيل الفاتورة.")
+        period = active_fy.periods.filter(start_date__lte=date.today(), end_date__gte=date.today()).first()
+        if not period:
+            raise ValidationError("تاريخ اليوم لا يقع ضمن أي فترة محاسبية مفتوحة.")
+
+        base_currency = Currency.objects.filter(tenant_id=tenant_id, is_base=True).first()
+
+        journal = JournalEntry.objects.create(
+            tenant_id=tenant_id,
+            entry_number=f"JV-{po.po_number}",
+            date=date.today(),
+            accounting_period=period,
+            description=f"إثبات فاتورة المورّد {po.vendor.name_ar} — أمر شراء {po.po_number}",
+            source_type='automatic',
+            status='draft',
+            currency=base_currency,
+            created_by=user_id,
+        )
+
+        total = Decimal('0.0')
+        # سطور المصروف (مدين) — حساب الموازنة لكل بند مع مركز تكلفته
+        for item in po.items.all():
+            acc = ChartOfAccount.objects.get(id=item.budget_account_id, tenant_id=tenant_id)
+            JournalEntryLine.objects.create(
+                tenant_id=tenant_id,
+                journal_entry=journal,
+                account=acc,
+                debit=item.total_price,
+                credit=Decimal('0.0'),
+                description=f"{item.item_name} — {po.po_number}",
+            )
+            total += Decimal(str(item.total_price))
+
+        # سطر ذمم الموردين (دائن)
+        JournalEntryLine.objects.create(
+            tenant_id=tenant_id,
+            journal_entry=journal,
+            account=payable,
+            debit=Decimal('0.0'),
+            credit=total,
+            description=f"ذمم المورّد {po.vendor.name_ar} — فاتورة {invoice_number}",
+        )
+
+        journal.status = 'approved'
+        journal.save(update_fields=['status'])
+        PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+
+        po.vendor_invoice_number = invoice_number
+        po.vendor_invoice_date = invoice_date or date.today()
+        po.journal_entry_id = journal.id
+        po.status = 'completed'
+        po.save(update_fields=['vendor_invoice_number', 'vendor_invoice_date', 'journal_entry_id', 'status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='VendorInvoicePosted',
+            source_module='procurement',
+            event_data={
+                'po_id': str(po.id), 'po_number': po.po_number,
+                'invoice_number': invoice_number, 'amount': float(total),
+                'journal_entry_id': str(journal.id),
+            },
+        )
+        return po

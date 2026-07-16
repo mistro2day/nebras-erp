@@ -46,8 +46,12 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
               <span class="ta-end strong">{{ fmt(o.total_amount) }}</span>
               <span class="ta-end"><span class="badge" [attr.data-s]="o.status">{{ statusText(o.status) }}</span></span>
               <span class="ta-end actions">
-                @if (o.status === 'draft' || o.status === 'approved') {
+                @if (o.status === 'draft') {
                   <button class="act pri-btn" [disabled]="busyId()===o.id" (click)="issue(o)">إصدار للمورّد</button>
+                } @else if (o.status === 'approved' || o.status === 'issued') {
+                  <button class="act ok-btn" [disabled]="busyId()===o.id" (click)="postInvoice(o)">🧾 فاتورة المورّد</button>
+                } @else if (o.status === 'completed') {
+                  <span class="posted">✓ مُرحّل</span>
                 } @else { <span class="dash">—</span> }
               </span>
             </div>
@@ -64,6 +68,8 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
     .act { border: none; border-radius: 8px; padding: 6px 12px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
     .act:disabled { opacity: .6; cursor: default; }
     .act.pri-btn { background: var(--nb-primary-600); color: #fff; }
+    .act.ok-btn { background: #16a34a; color: #fff; }
+    .posted { font-size: 11.5px; font-weight: 700; color: #166534; }
     .dash { color: var(--nb-text-muted); }
   `],
 })
@@ -96,6 +102,27 @@ export class ProcurementOrdersComponent implements OnInit {
   private confirm(data: ConfirmDialogData): Promise<boolean> {
     return new Promise(resolve =>
       this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe(ok => resolve(!!ok)));
+  }
+
+  /**
+   * تسجيل فاتورة المورّد وترحيلها — أمر الشراء التزام لا يُرحَّل، والفاتورة هي
+   * ما يُرحَّل محاسبياً (نمط Vendor Bill في Odoo و Vendor invoice في D365).
+   */
+  async postInvoice(o: any): Promise<void> {
+    const suggested = `INV-${o.po_number}`;
+    const num = window.prompt('رقم فاتورة المورّد المستلمة:', suggested);
+    if (!num || !num.trim()) return;
+    const ok = await this.confirm({
+      title: 'ترحيل فاتورة المورّد',
+      message: `سيُرحَّل قيد محاسبي في دفتر الأستاذ: من ح/ المصروف ${this.fmt(o.total_amount)} إلى ح/ ذمم الموردين الدائنة.`,
+      confirmText: 'ترحيل', color: 'primary',
+    });
+    if (!ok) return;
+    this.busyId.set(o.id);
+    this.svc.postVendorInvoice(o.id, num.trim()).subscribe({
+      next: () => { this.busyId.set(null); this.notify.success('تم ترحيل فاتورة المورّد في دفتر الأستاذ.'); this.load(); },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر ترحيل الفاتورة.'); },
+    });
   }
 
   async issue(o: any): Promise<void> {
