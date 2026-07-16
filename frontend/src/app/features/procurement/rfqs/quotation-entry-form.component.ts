@@ -31,25 +31,24 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
         <button class="x" (click)="cancel.emit()" aria-label="إغلاق">✕</button>
       </div>
 
-      <!-- بيانات العرض -->
+      <!-- بيانات العرض — بنية موحّدة لكل حقل (تسمية + حقل) فتتحاذى الصفوف -->
       <div class="fieldset">
         <span class="legend">بيانات العرض</span>
         <div class="grid">
-          <label class="col-2">المورّد <b class="req">*</b>
+          <label>
+            <span class="lbl">المورّد <b class="req">*</b></span>
             <select [(ngModel)]="vendorId">
               <option value="">اختر المورّد…</option>
               @for (v of vendors(); track v.id) { <option [value]="v.id">{{ v.name_ar || v.name_en }}</option> }
             </select>
           </label>
-          <label>مرجع العرض
-            <input [(ngModel)]="reference" placeholder="رقم عرض المورّد" />
-            <small>اختياري — يُولَّد تلقائياً إن تُرك فارغاً.</small>
+          <label>
+            <span class="lbl">مرجع العرض</span>
+            <input [(ngModel)]="reference" placeholder="اختياري — يُولَّد تلقائياً" />
           </label>
-          <label>مدة التوريد
-            <div class="suffix-in">
-              <input type="number" min="1" [(ngModel)]="leadTime" />
-              <span class="suffix">يوم</span>
-            </div>
+          <label>
+            <span class="lbl">مدة التوريد (يوم)</span>
+            <input type="number" min="1" [(ngModel)]="leadTime" placeholder="7" />
           </label>
         </div>
       </div>
@@ -111,30 +110,25 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
     .legend { position: absolute; top: -8px; inset-inline-start: 12px; background: var(--nb-surface);
       padding: 0 8px; font-size: 11px; font-weight: 800; color: var(--nb-text-muted); }
 
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    /* شبكة موحّدة: كل خلية = تسمية بسطر ثابت + حقل بارتفاع واحد */
+    .grid { display: grid; grid-template-columns: 1.6fr 1.1fr 0.9fr; gap: 14px; align-items: start; }
     @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
-    .col-2 { grid-column: span 2; }
-    @media (max-width: 820px) { .col-2 { grid-column: span 1; } }
-    label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
-    label small { font-size: 11px; font-weight: 500; color: var(--nb-text-muted); }
+    label { display: grid; grid-template-rows: 18px auto; gap: 6px; }
+    .lbl { font-size: 12.5px; font-weight: 700; color: var(--nb-text); line-height: 18px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .req { color: var(--nb-danger); }
-    input, select { font-family: inherit; font-size: 13px; padding: 9px 11px; border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text);
-      width: 100%; box-sizing: border-box; }
+    input, select { font-family: inherit; font-size: 13px; height: 38px; padding: 0 11px;
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
+      background: var(--nb-surface); color: var(--nb-text); width: 100%; box-sizing: border-box; }
     input:focus, select:focus { outline: none; border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(63,81,181,0.12); }
-
-    /* حقل بلاحقة وحدة */
-    .suffix-in { position: relative; display: flex; align-items: center; }
-    .suffix-in input { padding-inline-end: 42px; }
-    .suffix { position: absolute; inset-inline-end: 11px; font-size: 11.5px; font-weight: 700;
-      color: var(--nb-text-muted); pointer-events: none; }
+    input::placeholder { color: var(--nb-text-muted); opacity: .8; }
 
     /* سطور التسعير */
     .lines { border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); overflow: hidden; }
     .l { display: grid; grid-template-columns: 2fr 0.7fr 0.7fr 1.1fr 1fr; gap: 10px; align-items: center;
-      padding: 9px 12px; font-size: 13px; border-top: 1px solid var(--nb-border-soft); }
+      padding: 8px 12px; font-size: 13px; border-top: 1px solid var(--nb-border-soft); min-height: 54px; }
     .l.head { border-top: none; background: var(--nb-surface-raised); font-size: 11px;
-      font-weight: 700; color: var(--nb-text-muted); }
+      font-weight: 700; color: var(--nb-text-muted); min-height: 0; padding: 9px 12px; }
     .l.priced { background: color-mix(in srgb, var(--nb-primary-50) 40%, transparent); }
     .price-cell input { text-align: end; font-variant-numeric: tabular-nums; }
     .line-total { font-weight: 800; color: var(--nb-text-muted); font-variant-numeric: tabular-nums; }
