@@ -21,42 +21,69 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
   template: `
     <div class="panel" dir="rtl">
       <div class="panel-head">
-        <h4>تسجيل عرض سعر — {{ rfqNumber() }}</h4>
+        <div class="ph-title">
+          <span class="ph-ic">📩</span>
+          <div>
+            <h4>تسجيل عرض سعر</h4>
+            <p>أدخل عرض المورّد كما ورد — يُحتسب الإجمالي آلياً من كميات الطلب.</p>
+          </div>
+        </div>
         <button class="x" (click)="cancel.emit()" aria-label="إغلاق">✕</button>
       </div>
 
-      <div class="grid">
-        <label>المورّد <b class="req">*</b>
-          <select [(ngModel)]="vendorId">
-            <option value="">اختر المورّد…</option>
-            @for (v of vendors(); track v.id) { <option [value]="v.id">{{ v.name_ar || v.name_en }}</option> }
-          </select>
-        </label>
-        <label>مرجع العرض
-          <input [(ngModel)]="reference" placeholder="رقم عرض المورّد" />
-        </label>
-        <label>مدة التوريد (يوم)
-          <input type="number" min="1" [(ngModel)]="leadTime" />
-        </label>
+      <!-- بيانات العرض -->
+      <div class="fieldset">
+        <span class="legend">بيانات العرض</span>
+        <div class="grid">
+          <label class="col-2">المورّد <b class="req">*</b>
+            <select [(ngModel)]="vendorId">
+              <option value="">اختر المورّد…</option>
+              @for (v of vendors(); track v.id) { <option [value]="v.id">{{ v.name_ar || v.name_en }}</option> }
+            </select>
+          </label>
+          <label>مرجع العرض
+            <input [(ngModel)]="reference" placeholder="رقم عرض المورّد" />
+            <small>اختياري — يُولَّد تلقائياً إن تُرك فارغاً.</small>
+          </label>
+          <label>مدة التوريد
+            <div class="suffix-in">
+              <input type="number" min="1" [(ngModel)]="leadTime" />
+              <span class="suffix">يوم</span>
+            </div>
+          </label>
+        </div>
       </div>
 
-      <div class="lines">
-        <div class="l head"><span>البند</span><span class="ta-end">الكمية</span><span>الوحدة</span>
-          <span class="ta-end">سعر الوحدة</span><span class="ta-end">الإجمالي</span></div>
-        @for (row of rows(); track row.rfq_item_id) {
-          <div class="l">
-            <span class="strong">{{ row.item_name }}</span>
-            <span class="ta-end mono">{{ row.quantity }}</span>
-            <span class="muted">{{ row.unit }}</span>
-            <span class="ta-end"><input type="number" min="0" step="0.01" [(ngModel)]="row.unit_price" placeholder="0.00" /></span>
-            <span class="ta-end strong">{{ lineTotal(row) | number:'1.0-2' }}</span>
+      <!-- تسعير البنود -->
+      <div class="fieldset">
+        <span class="legend">تسعير البنود</span>
+        <div class="lines">
+          <div class="l head">
+            <span>البند</span><span class="ta-end">الكمية</span><span>الوحدة</span>
+            <span class="ta-end">سعر الوحدة</span><span class="ta-end">إجمالي البند</span>
           </div>
-        }
-        @if (rows().length === 0) { <div class="empty">لا توجد بنود في طلب عروض الأسعار.</div> }
+          @for (row of rows(); track row.rfq_item_id) {
+            <div class="l" [class.priced]="(row.unit_price || 0) > 0">
+              <span class="strong">{{ row.item_name }}</span>
+              <span class="ta-end mono">{{ row.quantity }}</span>
+              <span class="muted">{{ row.unit }}</span>
+              <span class="price-cell">
+                <input type="number" min="0" step="0.01" [(ngModel)]="row.unit_price" placeholder="0.00" />
+              </span>
+              <span class="ta-end line-total" [class.on]="(row.unit_price || 0) > 0">
+                {{ lineTotal(row) | number:'1.0-2' }}
+              </span>
+            </div>
+          }
+          @if (rows().length === 0) { <div class="empty">لا توجد بنود في طلب عروض الأسعار.</div> }
+        </div>
       </div>
 
       <div class="foot">
-        <div class="total">إجمالي العرض: <strong>{{ total() | number:'1.0-2' }}</strong></div>
+        <div class="total">
+          <span class="t-lbl">إجمالي العرض</span>
+          <strong>{{ total() | number:'1.0-2' }}</strong>
+        </div>
         <div class="acts">
           <button class="btn ghost" (click)="cancel.emit()">إلغاء</button>
           <button class="btn primary" [disabled]="saving()" (click)="submit()">
@@ -68,32 +95,63 @@ interface PriceRow { rfq_item_id: string; item_name: string; quantity: number; u
   `,
   styles: [`
     :host { display: block; }
-    .panel { background: var(--nb-surface-raised); border: 1px dashed var(--nb-primary-300);
-      border-radius: var(--nb-radius); padding: 14px; margin: 12px 0; font-family: var(--nb-font-family); }
-    .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .panel-head h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--nb-text); }
-    .x { background: none; border: none; font-size: 15px; color: var(--nb-text-muted); cursor: pointer; }
-    .grid { display: grid; grid-template-columns: 1.6fr 1.2fr 0.8fr; gap: 10px; margin-bottom: 12px; }
-    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
-    label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; color: var(--nb-text); }
+    .panel { background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 18px; margin: 14px 0; font-family: var(--nb-font-family); }
+
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+    .ph-title { display: flex; align-items: center; gap: 12px; }
+    .ph-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: 18px;
+      background: var(--nb-primary-50); flex: none; }
+    .panel-head h4 { margin: 0; font-size: 15px; font-weight: 800; color: var(--nb-text); }
+    .panel-head p { margin: 2px 0 0; font-size: 12px; color: var(--nb-text-muted); }
+    .x { background: none; border: none; font-size: 16px; color: var(--nb-text-muted); cursor: pointer; }
+
+    .fieldset { border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius);
+      padding: 16px 14px 14px; margin-bottom: 14px; position: relative; }
+    .legend { position: absolute; top: -8px; inset-inline-start: 12px; background: var(--nb-surface);
+      padding: 0 8px; font-size: 11px; font-weight: 800; color: var(--nb-text-muted); }
+
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+    .col-2 { grid-column: span 2; }
+    @media (max-width: 820px) { .col-2 { grid-column: span 1; } }
+    label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    label small { font-size: 11px; font-weight: 500; color: var(--nb-text-muted); }
     .req { color: var(--nb-danger); }
-    input, select { font-family: inherit; font-size: 12.5px; padding: 7px 9px; border: 1px solid var(--nb-border);
-      border-radius: 8px; background: var(--nb-surface); color: var(--nb-text); width: 100%; box-sizing: border-box; }
+    input, select { font-family: inherit; font-size: 13px; padding: 9px 11px; border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text);
+      width: 100%; box-sizing: border-box; }
     input:focus, select:focus { outline: none; border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(63,81,181,0.12); }
-    .lines { background: var(--nb-surface); border: 1px solid var(--nb-border-soft); border-radius: 8px; overflow: hidden; }
-    .l { display: grid; grid-template-columns: 1.8fr 0.7fr 0.7fr 1fr 1fr; gap: 8px; align-items: center;
-      padding: 8px 12px; font-size: 12.5px; border-top: 1px solid var(--nb-border-soft); }
-    .l.head { border-top: none; background: var(--nb-surface-raised); font-size: 10.5px; font-weight: 700; color: var(--nb-text-muted); }
+
+    /* حقل بلاحقة وحدة */
+    .suffix-in { position: relative; display: flex; align-items: center; }
+    .suffix-in input { padding-inline-end: 42px; }
+    .suffix { position: absolute; inset-inline-end: 11px; font-size: 11.5px; font-weight: 700;
+      color: var(--nb-text-muted); pointer-events: none; }
+
+    /* سطور التسعير */
+    .lines { border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); overflow: hidden; }
+    .l { display: grid; grid-template-columns: 2fr 0.7fr 0.7fr 1.1fr 1fr; gap: 10px; align-items: center;
+      padding: 9px 12px; font-size: 13px; border-top: 1px solid var(--nb-border-soft); }
+    .l.head { border-top: none; background: var(--nb-surface-raised); font-size: 11px;
+      font-weight: 700; color: var(--nb-text-muted); }
+    .l.priced { background: color-mix(in srgb, var(--nb-primary-50) 40%, transparent); }
+    .price-cell input { text-align: end; font-variant-numeric: tabular-nums; }
+    .line-total { font-weight: 800; color: var(--nb-text-muted); font-variant-numeric: tabular-nums; }
+    .line-total.on { color: var(--nb-primary-700); }
     .ta-end { text-align: end; } .mono { font-variant-numeric: tabular-nums; } .muted { color: var(--nb-text-muted); }
     .strong { font-weight: 700; color: var(--nb-text); }
-    .empty { padding: 18px; text-align: center; font-size: 12.5px; color: var(--nb-text-muted); }
-    .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
-    .total { font-size: 12.5px; color: var(--nb-text-muted); }
-    .total strong { font-size: 16px; color: var(--nb-text); font-weight: 800; }
+    .empty { padding: 20px; text-align: center; font-size: 12.5px; color: var(--nb-text-muted); }
+
+    .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 4px;
+      padding-top: 14px; border-top: 1px solid var(--nb-border-soft); }
+    .total { display: flex; flex-direction: column; gap: 1px; }
+    .t-lbl { font-size: 11.5px; color: var(--nb-text-muted); }
+    .total strong { font-size: 20px; color: var(--nb-text); font-weight: 800; font-variant-numeric: tabular-nums; }
     .acts { display: flex; gap: 8px; }
-    .btn { height: 32px; padding: 0 16px; font-family: inherit; font-size: 12.5px; font-weight: 700;
-      border-radius: 8px; cursor: pointer; border: none; }
-    .btn.ghost { background: var(--nb-surface); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn { height: 36px; padding: 0 18px; font-family: inherit; font-size: 13px; font-weight: 700;
+      border-radius: var(--nb-radius); cursor: pointer; border: none; }
+    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn.primary { background: var(--nb-primary-600); color: #fff; }
     .btn.primary:disabled { opacity: .6; }
   `]

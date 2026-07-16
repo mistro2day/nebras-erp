@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -15,7 +16,7 @@ import { PrCreateFormComponent } from './pr-create-form.component';
   selector: 'app-procurement-requests',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, PrCreateFormComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, PrCreateFormComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="طلبات الشراء" subtitle="طلبات الشراء الواردة من الأقسام في مسار الاعتماد والتوريد.">
@@ -46,7 +47,7 @@ import { PrCreateFormComponent } from './pr-create-form.component';
           <span class="ta-end">تقديري</span><span class="ta-end">الحالة</span><span class="ta-end">إجراء</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل طلبات الشراء…"></nb-loading>
         } @else {
           @for (r of filtered(); track r.id) {
             <div class="row clickable" (click)="open(r)" title="فتح تفاصيل الطلب">

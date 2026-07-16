@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { ContractCreateFormComponent } from './contract-create-form.component';
 
 /** عقود الشراء — الاتفاقيات الإطارية طويلة الأجل مع الموردين. */
@@ -10,7 +11,7 @@ import { ContractCreateFormComponent } from './contract-create-form.component';
   selector: 'app-procurement-contracts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, ContractCreateFormComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, ContractCreateFormComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="عقود الشراء" subtitle="الاتفاقيات الإطارية والعقود طويلة الأجل مع الموردين.">
@@ -33,7 +34,7 @@ import { ContractCreateFormComponent } from './contract-create-form.component';
           <span>رقم العقد</span><span>المورّد</span><span>يبدأ</span><span>ينتهي</span><span class="ta-end">القيمة</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل العقود…"></nb-loading>
         } @else {
           @for (c of filtered(); track c.id) {
             <div class="row">

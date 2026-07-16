@@ -394,12 +394,13 @@ class PurchaseOrderService:
         التزام (Encumbrance) ولا يُرحَّل، أما فاتورة المورّد فتُرحَّل في دفتر الأستاذ:
             من ح/ المصروف (حساب موازنة كل بند)      [مدين]
             إلى ح/ ذمم الموردين الدائنة              [دائن]
+
+        يُنشأ القيد بحالة **مسودة** ويصل المالية لمراجعته: المحاسب المختص هو من
+        يعتمده ويرحّله من شاشة قيود اليومية (فصل المهام).
         """
         from apps.finance.domain.models import (
             JournalEntry, JournalEntryLine, Currency, FiscalYear,
         )
-        from apps.finance.application.services import PostingService
-
         po = PurchaseOrder.objects.select_for_update().get(id=po_id, tenant_id=tenant_id)
         if po.status not in ('approved', 'issued'):
             raise ValidationError("يجب إصدار أمر الشراء واعتماده قبل تسجيل فاتورة المورّد.")
@@ -466,9 +467,8 @@ class PurchaseOrderService:
             description=f"ذمم المورّد {po.vendor.name_ar} — فاتورة {invoice_number}",
         )
 
-        journal.status = 'approved'
-        journal.save(update_fields=['status'])
-        PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+        # لا نعتمد ولا نُرحّل هنا: القيد يصل المالية **مسودة** ليراجعه المحاسب المختص
+        # ويعتمده ويرحّله من شاشة قيود اليومية — فصل المهام بين المشتريات والمالية.
 
         po.vendor_invoice_number = invoice_number
         po.vendor_invoice_date = invoice_date or date.today()

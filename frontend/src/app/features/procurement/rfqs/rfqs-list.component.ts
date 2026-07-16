@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { RfqAwardPanelComponent } from './rfq-award-panel.component';
 
 /** طلبات عروض الأسعار (RFQ) — المرسلة للموردين وحالات التحليل والترسية. */
@@ -10,7 +11,7 @@ import { RfqAwardPanelComponent } from './rfq-award-panel.component';
   selector: 'app-procurement-rfqs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, RfqAwardPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, RfqAwardPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="عروض الأسعار (RFQ)" subtitle="طلبات عروض الأسعار المرسلة للموردين ومراحل التحليل والترسية.">
@@ -38,7 +39,7 @@ import { RfqAwardPanelComponent } from './rfq-award-panel.component';
           <span class="ta-end">الحالة</span><span class="ta-end">إجراء</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل عروض الأسعار…"></nb-loading>
         } @else {
           @for (r of filtered(); track r.id) {
             <div class="row">

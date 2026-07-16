@@ -6,13 +6,15 @@ import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { InputDialogComponent, InputDialogData } from '../../../shared/components/input-dialog/input-dialog.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /** أوامر الشراء (PO) — الصادرة للموردين مع القيمة والحالة. */
 @Component({
   selector: 'app-procurement-orders',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="أوامر الشراء (PO)" subtitle="أوامر الشراء الصادرة للموردين وحالات الإصدار والاستلام.">
@@ -36,7 +38,7 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
           <span class="ta-end">القيمة</span><span class="ta-end">الحالة</span><span class="ta-end">إجراء</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل أوامر الشراء…"></nb-loading>
         } @else {
           @for (o of filtered(); track o.id) {
             <div class="row">
@@ -109,19 +111,28 @@ export class ProcurementOrdersComponent implements OnInit {
    * ما يُرحَّل محاسبياً (نمط Vendor Bill في Odoo و Vendor invoice في D365).
    */
   async postInvoice(o: any): Promise<void> {
-    const suggested = `INV-${o.po_number}`;
-    const num = window.prompt('رقم فاتورة المورّد المستلمة:', suggested);
-    if (!num || !num.trim()) return;
-    const ok = await this.confirm({
-      title: 'ترحيل فاتورة المورّد',
-      message: `سيُرحَّل قيد محاسبي في دفتر الأستاذ: من ح/ المصروف ${this.fmt(o.total_amount)} إلى ح/ ذمم الموردين الدائنة.`,
-      confirmText: 'ترحيل', color: 'primary',
-    });
-    if (!ok) return;
+    const num: string | null = await new Promise(resolve =>
+      this.dialog.open(InputDialogComponent, {
+        data: {
+          title: 'تسجيل فاتورة المورّد',
+          message: `سيُنشأ قيد محاسبي بقيمة ${this.fmt(o.total_amount)} (مدين: المصروف / دائن: ذمم الموردين) ويُرسل إلى المالية كمسودة بانتظار اعتماد المحاسب وترحيله.`,
+          label: 'رقم فاتورة المورّد المستلمة',
+          placeholder: 'كما هو مدوّن في فاتورة المورّد',
+          value: `INV-${o.po_number}`,
+          hint: 'يُحفظ الرقم مرجعاً على أمر الشراء وقيده المحاسبي.',
+          confirmText: 'تسجيل الفاتورة',
+        } as InputDialogData,
+      }).afterClosed().subscribe(v => resolve(v ?? null)));
+
+    if (!num) return;
     this.busyId.set(o.id);
-    this.svc.postVendorInvoice(o.id, num.trim()).subscribe({
-      next: () => { this.busyId.set(null); this.notify.success('تم ترحيل فاتورة المورّد في دفتر الأستاذ.'); this.load(); },
-      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر ترحيل الفاتورة.'); },
+    this.svc.postVendorInvoice(o.id, num).subscribe({
+      next: (r: any) => {
+        this.busyId.set(null);
+        this.notify.success(r?.message || 'تم تسجيل الفاتورة وأُرسل قيدها للمالية كمسودة.');
+        this.load();
+      },
+      error: (e) => { this.busyId.set(null); this.notify.error(e?.details?.error || e?.message || 'تعذّر تسجيل الفاتورة.'); },
     });
   }
 

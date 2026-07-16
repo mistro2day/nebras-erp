@@ -633,7 +633,17 @@ export class DashboardLayoutComponent {
       items: [
         { label: 'الموارد البشرية', link: '/hr' },
         { label: 'الرواتب', link: '/payroll' },
-        { label: 'الحضور والانصراف', link: '/attendance' },
+        {
+          label: 'الحضور والانصراف',
+          match: '/attendance',
+          link: '/attendance/dashboard',
+          children: [
+            { label: 'نظرة عامة ومتابعة', link: '/attendance/dashboard' },
+            { label: 'جدول الدوامات والورديات', link: '/attendance/shifts' },
+            { label: 'طلبات تصحيح البصمة', link: '/attendance/corrections' },
+            { label: 'محاكي البصمة الجوالة', link: '/attendance/simulator' }
+          ]
+        },
       ],
     },
     {

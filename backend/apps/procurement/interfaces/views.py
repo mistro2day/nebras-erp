@@ -360,7 +360,7 @@ class PurchaseOrderViewSet(BaseCRUDViewSet):
 
         return StandardResponse(
             {'po_number': po.po_number, 'journal_entry_id': str(po.journal_entry_id), 'status': po.status},
-            message="تم تسجيل فاتورة المورّد وترحيل قيدها المحاسبي بنجاح.",
+            message="تم تسجيل فاتورة المورّد. أُرسل قيدها إلى المالية كمسودة بانتظار اعتماد المحاسب وترحيله.",
         )
 
     @action(detail=True, methods=['post'], url_path='issue')

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProcurementService } from '../procurement.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { VendorCreateFormComponent } from './vendor-create-form.component';
 
 /** سجل الموردين — التأهيل، الحالة، والتقييم. بنمط نبراس على غرار Odoo / D365. */
@@ -10,7 +11,7 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
   selector: 'app-procurement-vendors',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, VendorCreateFormComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, VendorCreateFormComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموردون" subtitle="سجل الموردين المعتمدين وحالات التأهيل والتقييم.">
@@ -40,7 +41,7 @@ import { VendorCreateFormComponent } from './vendor-create-form.component';
           <span class="ta-end">التقييم</span><span class="ta-end">الحالة</span>
         </div>
         @if (loading()) {
-          @for (i of [1,2,3,4]; track i) { <div class="sk"></div> }
+          <nb-loading message="جارٍ تحميل الموردين…"></nb-loading>
         } @else {
           @for (v of filtered(); track v.id) {
             <div class="row">
