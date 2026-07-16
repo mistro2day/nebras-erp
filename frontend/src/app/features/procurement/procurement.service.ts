@@ -79,6 +79,16 @@ export class ProcurementService {
     return this.http.get<any>(`${this.apiUrl}/rfqs/${id}/`);
   }
 
+  /** تعديل بيانات الطلب (الموعد النهائي والملاحظات). */
+  updateRFQ(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/rfqs/${id}/`, payload);
+  }
+
+  /** التراجع عن الترسية — يُمنع إن صدر أمر الشراء واستهلك الموازنة. */
+  revertAward(id: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rfqs/${id}/revert-award/`, {});
+  }
+
   /** تسجيل عرض سعر مورّد على طلب عروض الأسعار (الحلقة السابقة للترسية). */
   submitQuotation(rfqId: string, payload: {
     vendor_id: string; quotation_reference: string; lead_time_days: number;

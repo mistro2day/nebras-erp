@@ -1056,6 +1056,9 @@ export class PayrollRunsComponent implements OnInit {
   getDynamicVal(slip: Payslip, colKey: string): number {
     const col = this.availableCols().find(c => c.key === colKey);
     if (!col) return 0;
+    if (colKey === 'delay_deduction') {
+      return Number((slip as any).late_deduction || 0);
+    }
     if (col.type === 'basic') {
       return Number((slip as any)[colKey] || 0);
     }

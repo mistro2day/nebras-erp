@@ -31,6 +31,10 @@ export const PROCUREMENT_ROUTES: Routes = [
     loadComponent: () => import('./rfqs/rfqs-list.component').then(m => m.ProcurementRfqsComponent)
   },
   {
+    path: 'rfqs/:id',
+    loadComponent: () => import('./rfqs/rfq-detail.component').then(m => m.ProcurementRfqDetailComponent)
+  },
+  {
     path: 'orders',
     loadComponent: () => import('./orders/orders-list.component').then(m => m.ProcurementOrdersComponent)
   },

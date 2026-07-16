@@ -283,6 +283,21 @@ class RFQViewSet(BaseCRUDViewSet):
             message="تم تسجيل عرض السعر بنجاح.", status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=['post'], url_path='revert-award')
+    def revert_award(self, request, pk=None):
+        """التراجع عن الترسية وإعادة الطلب لاستقبال العروض (يُمنع إن صدر أمر الشراء)."""
+        tenant_id = request.tenant_id
+        try:
+            rfq = ProcurementService.revert_award(
+                tenant_id=tenant_id, rfq_id=pk,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(self.get_serializer(rfq).data,
+                                message="تم التراجع عن الترسية وإعادة الطلب لاستقبال العروض.")
+
     @action(detail=False, methods=['post'], url_path='compare-and-award')
     def compare_and_award(self, request):
         tenant_id = request.tenant_id

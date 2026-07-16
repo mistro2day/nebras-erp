@@ -339,6 +339,64 @@ class ProcurementService:
         return po
 
 
+    @classmethod
+    @transaction.atomic
+    def revert_award(cls, tenant_id, rfq_id, user_id=None):
+        """
+        التراجع عن ترسية طلب عروض الأسعار وإعادته لاستقبال العروض.
+
+        **قاعدة السلامة**: يُمنع التراجع إن كان أمر الشراء المتولّد قد صدر
+        (approved/issued/completed) — لأن الإصدار استهلك الموازنة فعلياً وقد
+        يكون رُحّل له قيد. عندها يُلغى أمر الشراء من مساره لا بالتراجع هنا.
+        """
+        rfq = RFQ.objects.select_for_update().get(id=rfq_id, tenant_id=tenant_id)
+        if rfq.status != 'awarded':
+            raise ValidationError("لا يمكن التراجع عن ترسية لم تتم.")
+
+        # أوامر الشراء المتولّدة من طلب الشراء نفسه
+        pos = PurchaseOrder.objects.filter(
+            tenant_id=tenant_id, purchase_request=rfq.purchase_request
+        )
+        blocking = pos.exclude(status__in=['draft', 'cancelled'])
+        if blocking.exists():
+            nums = '، '.join(blocking.values_list('po_number', flat=True))
+            raise ValidationError(
+                f"تعذّر التراجع: أمر الشراء ({nums}) صدر واستهلك الموازنة. "
+                f"ألغِ أمر الشراء أولاً من صفحته."
+            )
+
+        # إزالة أوامر الشراء المسودة المتولّدة عن هذه الترسية
+        for po in pos.filter(status='draft'):
+            po.items.all().delete()
+            po.delete()
+
+        # إعادة العروض لحالة «مقدم» وإزالة الترسية والمقارنة
+        for aw in VendorAward.objects.filter(tenant_id=tenant_id, rfq=rfq):
+            q = aw.quotation
+            if q:
+                q.status = 'submitted'
+                q.save(update_fields=['status'])
+            aw.delete()
+        QuotationComparison.objects.filter(tenant_id=tenant_id, rfq=rfq).delete()
+
+        rfq.status = 'published'
+        rfq.save(update_fields=['status'])
+
+        # إعادة طلب الشراء لحالة «أُنشئ RFQ»
+        pr = rfq.purchase_request
+        if pr.status == 'completed':
+            pr.status = 'rfq_created'
+            pr.save(update_fields=['status'])
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='RFQAwardReverted',
+            source_module='procurement',
+            event_data={'rfq_id': str(rfq.id), 'rfq_number': rfq.rfq_number},
+        )
+        return rfq
+
+
 # ============================================================
 # 2. Purchase Order Service — إدارة أوامر الشراء والموازنة
 # ============================================================
