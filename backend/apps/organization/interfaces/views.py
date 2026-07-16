@@ -20,8 +20,12 @@ class OrganizationBaseViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
     def get_queryset(self):
-        # تصفية الكائنات المحذوفة لطيفاً بشكل تلقائي وعزل المستأجرين يتم برمجياً بواسطة CombinedBaseModel والـ Manager
-        return self.model_class.objects.filter(deleted_at__isnull=True)
+        # تصفية المحذوفات لطيفاً + عزل المستأجر صراحةً (المدير الافتراضي لا يُصفّي بالمستأجر)
+        qs = self.model_class.objects.filter(deleted_at__isnull=True)
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        return qs
 
     def perform_create(self, serializer):
         tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None

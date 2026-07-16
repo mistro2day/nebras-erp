@@ -710,7 +710,15 @@ export class DashboardLayoutComponent {
         { label: 'التكامل', link: '/integration' },
         { label: 'التخصيص', link: '/personalization' },
         { label: 'لوحة الأوامر', link: '/command' },
-        { label: 'الهيكل التنظيمي', link: '/organization' },
+        {
+          label: 'الهيكل التنظيمي',
+          match: '/organization',
+          link: '/organization/overview',
+          children: [
+            { label: 'نظرة عامة', link: '/organization/overview' },
+            { label: 'الأقسام', link: '/organization/departments' },
+          ],
+        },
         { label: '✦ مساعد نبراس', link: '/ai', ai: true },
       ],
     },

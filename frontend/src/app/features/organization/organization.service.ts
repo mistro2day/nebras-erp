@@ -40,6 +40,16 @@ export interface Room {
   is_active: boolean;
 }
 
+export interface Department {
+  id: string;
+  branch?: string | null;
+  name: string;
+  code: string;
+  type: 'academic' | 'administrative';
+  parent?: string | null;
+  is_active: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -64,5 +74,22 @@ export class OrganizationService {
 
   getRooms(): Observable<any> {
     return this.apiClient.get<Room[]>('organization/rooms/');
+  }
+
+  // ---- الأقسام الإدارية والأكاديمية ----
+  getDepartments(params?: any): Observable<any> {
+    return this.apiClient.get<Department[]>('organization/departments/', params ?? { page_size: 300 });
+  }
+
+  createDepartment(payload: Partial<Department>): Observable<any> {
+    return this.apiClient.post('organization/departments/', payload);
+  }
+
+  updateDepartment(id: string, payload: Partial<Department>): Observable<any> {
+    return this.apiClient.patch(`organization/departments/${id}/`, payload);
+  }
+
+  deleteDepartment(id: string): Observable<any> {
+    return this.apiClient.delete(`organization/departments/${id}/`);
   }
 }
