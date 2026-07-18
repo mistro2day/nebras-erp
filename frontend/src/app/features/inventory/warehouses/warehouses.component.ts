@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { InventoryService } from '../inventory.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
@@ -14,13 +15,75 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
   selector: 'app-warehouses',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, DecimalPipe, NbPageHeaderComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="المستودعات" subtitle="مواقع التخزين ومناطقها ورفوفها، وما تحويه من أصناف.">
         <button class="btn ghost" (click)="back()">رجوع للوحة</button>
         <button class="btn ghost" (click)="load()">تحديث</button>
+        <button class="btn primary" (click)="openForm()">＋ مستودع جديد</button>
       </nb-page-header>
+
+      <!-- نموذج الإضافة والتعديل -->
+      @if (showForm()) {
+        <section class="form-card">
+          <header class="fc-head">
+            <h3>{{ editing() ? 'تعديل المستودع' : 'مستودع جديد' }}</h3>
+            <button class="x" (click)="closeForm()" aria-label="إغلاق">✕</button>
+          </header>
+
+          <div class="fc-body">
+            <div class="fields">
+              <label>
+                <span>الاسم بالعربي <i>*</i></span>
+                <input [(ngModel)]="form.name_ar" placeholder="المستودع الرئيسي" />
+              </label>
+              <label>
+                <span>الاسم بالإنجليزي</span>
+                <input [(ngModel)]="form.name_en" placeholder="Main Warehouse" />
+              </label>
+              <label>
+                <span>الرمز <i>*</i></span>
+                <input [(ngModel)]="form.code" placeholder="WH-MAIN" [disabled]="!!editing()" />
+              </label>
+              <label>
+                <span>السعة التخزينية (م³)</span>
+                <input type="number" min="0" [(ngModel)]="form.capacity_volume" placeholder="0" />
+              </label>
+              <label class="wide">
+                <span>الموقع</span>
+                <input [(ngModel)]="form.location" placeholder="المبنى الإداري — الدور الأرضي" />
+              </label>
+            </div>
+
+            <div class="switches">
+              <label class="sw">
+                <input type="checkbox" [(ngModel)]="form.is_default" />
+                <span>
+                  <strong>المستودع الافتراضي</strong>
+                  <small>يُقترح تلقائياً في عمليات الاستلام والصرف.</small>
+                </span>
+              </label>
+              <label class="sw">
+                <input type="checkbox" [(ngModel)]="form.is_transit" (ngModelChange)="onTransit($event)" />
+                <span>
+                  <strong>مستودع عبور</strong>
+                  <small>للبضاعة في الطريق بين موقعين — لا تُحتسب ضمن المخزون الفعلي.</small>
+                </span>
+              </label>
+            </div>
+
+            @if (error()) { <p class="err">{{ error() }}</p> }
+          </div>
+
+          <footer class="fc-acts">
+            <button class="btn ghost" (click)="closeForm()">إلغاء</button>
+            <button class="btn primary" [disabled]="saving()" (click)="save()">
+              {{ saving() ? 'جارٍ الحفظ…' : (editing() ? 'حفظ التعديلات' : 'إضافة المستودع') }}
+            </button>
+          </footer>
+        </section>
+      }
 
       @if (loading()) {
         <nb-loading message="جارٍ تحميل المستودعات…"></nb-loading>
@@ -37,6 +100,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                 </div>
                 @if (w.isDefault) { <span class="badge def">افتراضي</span> }
                 @if (w.isTransit) { <span class="badge tr">عبور</span> }
+                <button class="edit" (click)="openForm(w.id)" title="تعديل المستودع">تعديل</button>
               </header>
 
               @if (w.location) { <p class="wh-loc">📍 {{ w.location }}</p> }
@@ -82,6 +146,51 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .btn { font-family: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px;
       border-radius: var(--nb-radius); cursor: pointer; border: none; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn.primary { background: var(--nb-primary-600); color: #fff; }
+    .btn:disabled { opacity: .55; cursor: default; }
+
+    /* نموذج الإضافة — ترويسة وجسم وتذييل، بلغة نوافذ نبراس */
+    .form-card { background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); overflow: hidden; margin-bottom: 16px; }
+    .fc-head { display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 18px; background: var(--nb-primary-50, #f5f6ff);
+      border-bottom: 1px solid var(--nb-primary-100, #e3e6fb); }
+    .fc-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-primary-800, #2a3178); }
+    .x { border: none; background: none; font-size: 15px; color: var(--nb-text-muted);
+      cursor: pointer; line-height: 1; padding: 4px; }
+    .fc-body { padding: 16px 18px; }
+    .fc-acts { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px;
+      background: var(--nb-surface-raised); border-top: 1px solid var(--nb-border); }
+
+    .fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+    @media (max-width: 900px) { .fields { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .fields { grid-template-columns: 1fr; } }
+    .fields .wide { grid-column: 1 / -1; }
+    .fields label { display: grid; grid-template-rows: 18px auto; gap: 4px; }
+    .fields label > span { font-size: 11.5px; font-weight: 700; color: var(--nb-text-muted); }
+    .fields label i { color: #DC2626; font-style: normal; }
+    .fields input { height: 38px; padding: 0 11px; font-family: inherit; font-size: 13px;
+      border: 1px solid var(--nb-border); border-radius: 8px; background: var(--nb-surface);
+      color: var(--nb-text); width: 100%; box-sizing: border-box; }
+    .fields input:focus { outline: 2px solid var(--nb-primary-400); outline-offset: -1px; border-color: transparent; }
+    .fields input:disabled { background: var(--nb-surface-raised); color: var(--nb-text-muted); }
+
+    .switches { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 720px) { .switches { grid-template-columns: 1fr; } }
+    .sw { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px;
+      border: 1px solid var(--nb-border); border-radius: 10px; cursor: pointer; }
+    .sw input { margin-top: 2px; accent-color: var(--nb-primary-600); }
+    .sw span { display: flex; flex-direction: column; gap: 1px; }
+    .sw strong { font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .sw small { font-size: 11px; color: var(--nb-text-muted); }
+
+    .err { margin: 12px 0 0; font-size: 12.5px; color: #B91C1C; background: #fef2f2;
+      border: 1px solid #fecaca; border-radius: 8px; padding: 9px 12px; }
+
+    .edit { border: none; background: var(--nb-surface-raised); border: 1px solid var(--nb-border);
+      border-radius: 7px; font-family: inherit; font-size: 11px; font-weight: 700;
+      color: var(--nb-text-muted); cursor: pointer; padding: 4px 10px; }
+    .edit:hover { color: var(--nb-primary-700); border-color: var(--nb-primary-400); }
 
     .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     @media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, 1fr); } }
@@ -126,6 +235,12 @@ export class WarehousesComponent implements OnInit {
   private router = inject(Router);
 
   readonly loading = signal(true);
+  readonly showForm = signal(false);
+  readonly saving = signal(false);
+  readonly editing = signal<string | null>(null);
+  readonly error = signal('');
+  form: any = this.blank();
+
   private warehouses = signal<any[]>([]);
   private balances = signal<any[]>([]);
   private bins = signal<any[]>([]);
@@ -157,6 +272,66 @@ export class WarehousesComponent implements OnInit {
       };
     }),
   );
+
+  blank() {
+    return { name_ar: '', name_en: '', code: '', location: '',
+      capacity_volume: 0, is_default: false, is_transit: false, is_virtual: false };
+  }
+
+  openForm(id?: string) {
+    this.error.set('');
+    if (id) {
+      const w = this.warehouses().find((x) => x.id === id);
+      this.editing.set(id);
+      this.form = {
+        name_ar: w?.name_ar || '', name_en: w?.name_en || '', code: w?.code || '',
+        location: w?.location || '', capacity_volume: Number(w?.capacity_volume) || 0,
+        is_default: !!w?.is_default, is_transit: !!w?.is_transit, is_virtual: !!w?.is_virtual,
+      };
+    } else {
+      this.editing.set(null);
+      this.form = this.blank();
+    }
+    this.showForm.set(true);
+  }
+
+  closeForm() { this.showForm.set(false); this.editing.set(null); this.error.set(''); }
+
+  /** مستودع العبور افتراضي بطبيعته — لا يحمل مخزوناً فعلياً. */
+  onTransit(v: boolean) { this.form.is_virtual = v; }
+
+  save() {
+    const f = this.form;
+    if (!f.name_ar?.trim() || !f.code?.trim()) {
+      this.error.set('الاسم بالعربي والرمز حقلان مطلوبان.');
+      return;
+    }
+    const payload: any = {
+      name_ar: f.name_ar.trim(),
+      name_en: (f.name_en || f.code).trim(),
+      location: f.location?.trim() || null,
+      capacity_volume: Number(f.capacity_volume) || 0,
+      is_default: !!f.is_default,
+      is_transit: !!f.is_transit,
+      is_virtual: !!f.is_virtual,
+    };
+    const id = this.editing();
+    // الرمز معرّف ثابت بعد الإنشاء — تغييره يكسر الإحالات القائمة
+    if (!id) payload.code = f.code.trim();
+
+    this.saving.set(true);
+    this.error.set('');
+    const req = id ? this.svc.updateWarehouse(id, payload) : this.svc.createWarehouse(payload);
+    req.subscribe({
+      next: () => { this.saving.set(false); this.closeForm(); this.load(); },
+      error: (e: any) => {
+        this.saving.set(false);
+        // errorInterceptor يسطّح الخطأ — التفاصيل في details لا في error
+        const d = e?.details?.error ?? e?.details;
+        this.error.set(typeof d === 'string' ? d : (e?.message || 'تعذّر حفظ المستودع.'));
+      },
+    });
+  }
 
   ngOnInit() { this.load(); }
 

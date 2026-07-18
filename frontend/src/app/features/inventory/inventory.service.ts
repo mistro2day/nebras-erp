@@ -34,14 +34,40 @@ export class InventoryService {
   getWarehouses(params?: any): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/warehouses/`, { params: params || { page_size: 200 } });
   }
+  createWarehouse(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/warehouses/`, payload);
+  }
+  updateWarehouse(id: string, payload: any): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/warehouses/${id}/`, payload);
+  }
   getCategories(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/categories/`, { params: { page_size: 200 } as any });
+  }
+  createCategory(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/categories/`, payload);
   }
   getUnits(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/units/`, { params: { page_size: 200 } as any });
   }
+  createUnit(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/units/`, payload);
+  }
   getBins(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/bins/`, { params: { page_size: 300 } as any });
+  }
+
+  // ---- هيكل المستودع: منطقة ← ممر ← رف ----
+  getZones(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/zones/`, { params: { page_size: 300 } as any });
+  }
+  createZone(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/zones/`, payload);
+  }
+  createAisle(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/aisles/`, payload);
+  }
+  createBin(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/bins/`, payload);
   }
 
   // ---- الأصناف والأرصدة ----
@@ -59,6 +85,13 @@ export class InventoryService {
   }
   getReorderRules(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/reorder-rules/`, { params: { page_size: 300 } as any });
+  }
+  /** قاعدة إعادة الطلب هي ما يجعل الصنف يظهر على خط النواقص — بدونها لا حدّ يُقاس عليه. */
+  createReorderRule(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/reorder-rules/`, payload);
+  }
+  createBalance(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/balances/`, payload);
   }
 
   // ---- الحركة والمستندات ----
