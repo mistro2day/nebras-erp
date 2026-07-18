@@ -29,15 +29,7 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
       <nb-page-header
         title="طرق تسجيل البصمة والتحقق الجغرافي"
         subtitle="تحديد وضبط إعدادات النطاق الجغرافي (Geofencing) للتحقق من تواجد الموظفين داخل الفروع أثناء التبصيم"
-      >
-        <div class="header-nav">
-          <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" class="nav-btn">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" class="nav-btn active">طرق تسجيل البصمة والتحقق</a>
-        </div>
-      </nb-page-header>
+      ></nb-page-header>
 
       <!-- ضبط إعدادات النطاق الجغرافي للفرع -->
       <div class="container-grid">

@@ -28,17 +28,10 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         title="جدولة الدوامات"
         subtitle="توزيع الورديات الأسبوعية وتعيين أوقات وفروع العمل للموظفين"
       >
-        <div class="header-nav">
-          <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" routerLinkActive="active" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
-          <button class="add-shift-btn" (click)="openAssignDrawer()">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            إسناد دوام
-          </button>
-        </div>
+        <button class="add-shift-btn" (click)="openAssignDrawer()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          إسناد دوام
+        </button>
       </nb-page-header>
 
       <!-- جدول توزيع الورديات الأسبوعي (شكل جدول دوامات جسر) -->

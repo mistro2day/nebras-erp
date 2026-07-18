@@ -19,6 +19,14 @@ export const ATTENDANCE_ROUTES: Routes = [
     loadComponent: () => import('./attendance-corrections.component').then(m => m.AttendanceCorrectionsComponent)
   },
   {
+    path: 'sheets',
+    loadComponent: () => import('./attendance-sheets.component').then(m => m.AttendanceSheetsComponent)
+  },
+  {
+    path: 'sheets/:id',
+    loadComponent: () => import('./attendance-employee-details.component').then(m => m.AttendanceEmployeeDetailsComponent)
+  },
+  {
     path: 'policies',
     loadComponent: () => import('./attendance-policies.component').then(m => m.AttendancePoliciesComponent)
   },

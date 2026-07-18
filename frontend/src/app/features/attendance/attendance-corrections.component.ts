@@ -23,15 +23,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       <nb-page-header
         title="طلبات تصحيح الحضور"
         subtitle="مراجعة واعتماد طلبات تعديل البصمات المقدمة من الموظفين"
-      >
-        <div class="header-nav">
-          <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" routerLinkActive="active" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
-        </div>
-      </nb-page-header>
+      ></nb-page-header>
 
       <!-- قائمة طلبات تصحيح البصمة -->
       <nb-panel title="طلبات التعديل المعلقة" [flush]="true">

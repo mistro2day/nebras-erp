@@ -31,6 +31,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       >
         <div class="header-nav">
           <a routerLink="/attendance/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-btn">نظرة عامة</a>
+          <a routerLink="/attendance/sheets" routerLinkActive="active" class="nav-btn">الكشوف والمخالصات</a>
           <a routerLink="/attendance/shifts" routerLinkActive="active" class="nav-btn">الدوامات وجدولة العمل</a>
           <a routerLink="/attendance/corrections" routerLinkActive="active" class="nav-btn">طلبات التصحيح</a>
           <a routerLink="/attendance/policies" routerLinkActive="active" class="nav-btn">سياسات الحضور</a>

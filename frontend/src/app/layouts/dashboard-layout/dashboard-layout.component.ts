@@ -639,6 +639,7 @@ export class DashboardLayoutComponent {
           link: '/attendance/dashboard',
           children: [
             { label: 'نظرة عامة ومتابعة', link: '/attendance/dashboard' },
+            { label: 'الكشوف والمخالصات', link: '/attendance/sheets' },
             { label: 'جدول الدوامات والورديات', link: '/attendance/shifts' },
             { label: 'طلبات تصحيح البصمة', link: '/attendance/corrections' },
             { label: 'سياسات الحضور', link: '/attendance/policies' },
@@ -685,8 +686,28 @@ export class DashboardLayoutComponent {
       label: 'سلسلة الإمداد والخدمات',
       permission: 'settings:read',
       items: [
-        { label: 'المخزون', link: '/inventory' },
-        { label: 'الأصول', link: '/assets' },
+        {
+          label: 'المخزون',
+          match: '/inventory',
+          link: '/inventory/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/inventory/dashboard' },
+            { label: 'الأصناف والأرصدة', link: '/inventory/items' },
+            { label: 'المستودعات', link: '/inventory/warehouses' },
+            { label: 'حركة المخزون', link: '/inventory/movements' },
+            { label: 'استلام البضاعة', link: '/inventory/receipts' },
+          ],
+        },
+        {
+          label: 'الأصول',
+          match: '/assets',
+          link: '/assets/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/assets/dashboard' },
+            { label: 'سجل الأصول', link: '/assets/register' },
+            { label: 'الإهلاك', link: '/assets/depreciation' },
+          ],
+        },
         { label: 'النقل', link: '/transport' },
         { label: 'المكتبة', link: '/library' },
         { label: 'العيادة', link: '/clinic' },

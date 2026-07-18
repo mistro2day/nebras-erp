@@ -413,9 +413,9 @@ interface User {
           </div>
           <form (submit)="submitCreateRun($event)" class="dialog-body">
             <label class="form-label req">تاريخ المسير</label>
-            <nb-datepicker [value]="newRunDate" (valueChange)="onNewRunDateChange($event)" placeholder="اختر التاريخ"></nb-datepicker>
+            <nb-datepicker [(value)]="newRunDate" placeholder="اختر التاريخ"></nb-datepicker>
             <div class="dialog-foot">
-              <button type="submit" class="nb-btn nb-btn-primary" [disabled]="creatingRun()">
+              <button type="submit" class="nb-btn nb-btn-primary" [disabled]="creatingRun() || !newRunPeriodCode()">
                 {{ creatingRun() ? 'جاري الإنشاء...' : 'إنشاء المسير' }}
               </button>
               <button type="button" class="nb-btn nb-btn-ghost" (click)="closeCreateModal()">إلغاء</button>
@@ -971,8 +971,11 @@ export class PayrollRunsComponent implements OnInit {
   activeEditCol = signal<{ key: string; label: string; type: string } | null>(null);
   quickEditAmount: number | null = null;
 
-  newRunDate = '';
-  newRunPeriodCode = '';
+  readonly newRunDate = signal('');
+  readonly newRunPeriodCode = computed(() => {
+    const d = this.newRunDate();
+    return d ? d.slice(0, 7) : '';
+  });
   activeRunForApproval: PayrollRun | null = null;
   approvers: string[] = ['', '', ''];
 
@@ -1376,24 +1379,16 @@ export class PayrollRunsComponent implements OnInit {
 
   // ── Create Run Modal ──
   openCreateModal() {
-    this.newRunDate = new Date().toISOString().slice(0, 10);
-    this.newRunPeriodCode = this.newRunDate.slice(0, 7);
+    this.newRunDate.set(new Date().toISOString().slice(0, 10));
     this.showCreateModal.set(true);
   }
   closeCreateModal() { this.showCreateModal.set(false); }
 
-  onNewRunDateChange(v: string) {
-    if (v) {
-      this.newRunDate = v;
-      this.newRunPeriodCode = v.slice(0, 7);
-    }
-  }
-
   submitCreateRun(e: Event) {
     e.preventDefault();
-    if (!this.newRunPeriodCode) return;
+    const code = this.newRunPeriodCode();
+    if (!code) return;
     this.creatingRun.set(true);
-    const code = this.newRunPeriodCode;
     const [y, m] = code.split('-').map(Number);
     const startDate = `${code}-01`;
     const endDate = `${code}-${new Date(y, m, 0).getDate()}`;

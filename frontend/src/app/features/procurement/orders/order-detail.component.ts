@@ -64,6 +64,18 @@ import { printDoc, ExportColumn } from '../../../shared/export';
                                      : 'لم تُخصم بعد — تُخصم عند إصدار الأمر للمورّد.' }}</small>
             </div>
           </div>
+          <div class="fin-item" [class.done]="isIssued(o)">
+            <span class="fi-ic">{{ isIssued(o) ? '✓' : '○' }}</span>
+            <div>
+              <strong>استلام البضاعة</strong>
+              @if (isIssued(o)) {
+                <small>الأمر صادر — سجّل الكميات المستلمة ليدخل المخزون ويتحدّث الرصيد.</small>
+                <a class="fi-link" routerLink="/inventory/receipts">سندات الاستلام ←</a>
+              } @else {
+                <small>يبدأ الاستلام بعد إصدار الأمر للمورّد.</small>
+              }
+            </div>
+          </div>
           <div class="fin-item" [class.done]="!!o.journal_entry_id">
             <span class="fi-ic">{{ o.journal_entry_id ? '✓' : '○' }}</span>
             <div>

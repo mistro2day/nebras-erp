@@ -30,17 +30,10 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         title="سياسات الحضور والإنصراف"
         subtitle="إعداد قواعد العمل الإضافي، فترات السماح، ولوائح الحضور لجميع الموظفين والمعلمين"
       >
-        <div class="header-nav">
-          <a routerLink="/attendance/dashboard" class="nav-btn">نظرة عامة</a>
-          <a routerLink="/attendance/shifts" class="nav-btn">الدوامات وجدولة العمل</a>
-          <a routerLink="/attendance/corrections" class="nav-btn">طلبات التصحيح</a>
-          <a routerLink="/attendance/policies" class="nav-btn active">سياسات الحضور</a>
-          <a routerLink="/attendance/check-in-methods" class="nav-btn">طرق تسجيل البصمة والتحقق</a>
-          <button class="add-policy-btn" (click)="openAddDrawer()">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            إضافة سياسة حضور
-          </button>
-        </div>
+        <button class="add-policy-btn" (click)="openAddDrawer()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          إضافة سياسة حضور
+        </button>
       </nb-page-header>
 
       <!-- قائمة السياسات المعتمدة -->
