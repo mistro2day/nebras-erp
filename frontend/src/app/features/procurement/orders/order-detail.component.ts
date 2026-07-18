@@ -70,7 +70,7 @@ import { printDoc, ExportColumn } from '../../../shared/export';
               <strong>استلام البضاعة</strong>
               @if (isIssued(o)) {
                 <small>الأمر صادر — سجّل الكميات المستلمة ليدخل المخزون ويتحدّث الرصيد.</small>
-                <a class="fi-link" routerLink="/inventory/receipts">سندات الاستلام ←</a>
+                <a class="fi-link" [routerLink]="['/inventory/receipts/new', o.id]">استلام البضاعة ←</a>
               } @else {
                 <small>يبدأ الاستلام بعد إصدار الأمر للمورّد.</small>
               }

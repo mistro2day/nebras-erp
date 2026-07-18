@@ -44,10 +44,10 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             <div class="ready">
               <span class="r-lbl">أوامر شراء جاهزة للاستلام</span>
               @for (o of issuedOrders(); track o.id) {
-                <button class="r-po" (click)="openOrder(o.id)">
+                <button class="r-po" (click)="receive(o.id)">
                   <strong>{{ o.po_number }}</strong>
                   <span>{{ o.total_amount | number:'1.2-2' }} ر.س</span>
-                  <span class="r-go">فتح الأمر ‹</span>
+                  <span class="r-go">استلام ‹</span>
                 </button>
               }
             </div>
@@ -56,6 +56,19 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           }
         </section>
       } @else {
+        @if (issuedOrders().length) {
+          <div class="pending-bar">
+            <span class="pb-body">
+              <strong>{{ issuedOrders().length }}</strong> أمر شراء صادر بانتظار الاستلام.
+            </span>
+            <div class="pb-list">
+              @for (o of issuedOrders(); track o.id) {
+                <button class="pb-po" (click)="receive(o.id)">{{ o.po_number }} ‹</button>
+              }
+            </div>
+          </div>
+        }
+
         <section class="list">
           @for (r of receipts(); track r.id) {
             <article class="rc">
@@ -113,6 +126,18 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .r-po strong { font-size: 13px; font-weight: 700; color: var(--nb-text); flex: 1; }
     .r-po span { font-size: 12px; color: var(--nb-text-muted); }
     .r-go { color: var(--nb-primary-600) !important; font-weight: 700; }
+
+    .pending-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      flex-wrap: wrap; background: #fffaf0; border: 1px solid #fde9c8;
+      border-inline-start: 4px solid #F59E0B; border-radius: var(--nb-radius-card);
+      padding: 12px 16px; margin-bottom: 12px; }
+    .pb-body { font-size: 13px; color: var(--nb-text); }
+    .pb-body strong { font-weight: 800; }
+    .pb-list { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pb-po { font-family: inherit; font-size: 12px; font-weight: 700; color: #B45309;
+      background: var(--nb-surface); border: 1px solid #fde9c8; border-radius: 20px;
+      padding: 5px 13px; cursor: pointer; }
+    .pb-po:hover { background: #fef6e7; }
 
     .list { display: flex; flex-direction: column; gap: 10px; }
     .rc { background: var(--nb-surface); border: 1px solid var(--nb-border);
@@ -174,6 +199,8 @@ export class GoodsReceiptsComponent implements OnInit {
   private rows(d: any): any[] { return Array.isArray(d) ? d : (d?.data ?? d?.results ?? []); }
 
   openOrder(id: string) { this.router.navigate(['/procurement/orders', id]); }
+  /** الاستلام يبدأ من أمر الشراء — لا سند بلا أمر صادر. */
+  receive(poId: string) { this.router.navigate(['/inventory/receipts/new', poId]); }
   go(route: string) { this.router.navigateByUrl(route); }
   back() { this.router.navigateByUrl('/inventory/dashboard'); }
 }
