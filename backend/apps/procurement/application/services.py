@@ -82,7 +82,9 @@ class ProcurementService:
                 unit=item.get('unit', 'حبة'),
                 estimated_unit_price=price,
                 budget_account_id=acc.id,
-                cost_center_id=cc.id
+                cost_center_id=cc.id,
+                # يُحمل حتى نهاية السلسلة ليصل الاستلام بصنف معروف لا باسم نصّي
+                inventory_item_id=item.get('inventory_item_id') or None,
             )
 
         # 4. إرسال حدث للمنصة
@@ -194,7 +196,8 @@ class ProcurementService:
                 rfq=rfq,
                 item_name=item.item_name,
                 quantity=item.quantity,
-                unit=item.unit
+                unit=item.unit,
+                inventory_item_id=item.inventory_item_id,
             )
 
         pr.status = 'rfq_created'
@@ -333,7 +336,10 @@ class ProcurementService:
                 unit_price=q_item.unit_price,
                 total_price=q_item.total_price,
                 budget_account_id=pr_item.budget_account_id if pr_item else user_id,  # استخدام الحساب الحقيقي من طلب الشراء
-                cost_center_id=pr_item.cost_center_id if pr_item else user_id
+                cost_center_id=pr_item.cost_center_id if pr_item else user_id,
+                # الرابط يصل من بند طلب الشراء عبر بند عرض الأسعار
+                inventory_item_id=(q_item.rfq_item.inventory_item_id
+                                   or (pr_item.inventory_item_id if pr_item else None)),
             )
 
         return po

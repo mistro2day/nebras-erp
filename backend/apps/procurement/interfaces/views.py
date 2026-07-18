@@ -140,10 +140,28 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
                 tenant_id=tenant_id, status='active', deleted_at__isnull=True
             )
         ]
+        # الأصناف المخزنية تُعرض ليختار مقدّم الطلب صنفاً معرّفاً بدل اسم نصّي،
+        # فيصل الرابط حتى الاستلام ولا تلزم مطابقة يدوية لاحقاً.
+        from apps.inventory.domain.models import InventoryItem, InventoryUnit
+        units = {str(u.id): (u.name_ar or u.code) for u in InventoryUnit.objects.filter(
+            tenant_id=tenant_id, deleted_at__isnull=True)}
+        inventory_items = [
+            {
+                'id': str(i.id),
+                'sku': i.sku,
+                'name': i.name_ar or i.name_en,
+                'unit': units.get(str(i.uom_id), ''),
+            }
+            for i in InventoryItem.objects.filter(
+                tenant_id=tenant_id, deleted_at__isnull=True
+            ).order_by('name_ar')[:500]
+        ]
+
         return StandardResponse({
             'departments': departments,
             'accounts': accounts,
             'cost_centers': cost_centers,
+            'inventory_items': inventory_items,
         }, message="البيانات المرجعية لطلب الشراء.")
 
     @action(detail=False, methods=['post'], url_path='create-request')

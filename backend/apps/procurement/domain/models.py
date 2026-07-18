@@ -160,6 +160,7 @@ class PurchaseRequest(CombinedSharedModel):
 class PurchaseRequestItem(CombinedSharedModel):
     request = models.ForeignKey(PurchaseRequest, on_delete=models.CASCADE, related_name='items')
     item_name = models.CharField(max_length=200)
+    inventory_item_id = models.UUIDField(null=True, blank=True, help_text="الصنف المخزني المقابل — يُملأ حين يكون البند صنفاً معرّفاً في المخزون")
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=30)
     estimated_unit_price = models.DecimalField(max_digits=15, decimal_places=2)
@@ -232,6 +233,7 @@ class RFQ(CombinedSharedModel):
 class RFQItem(CombinedSharedModel):
     rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='items')
     item_name = models.CharField(max_length=200)
+    inventory_item_id = models.UUIDField(null=True, blank=True, help_text="الصنف المخزني المقابل — يُملأ حين يكون البند صنفاً معرّفاً في المخزون")
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=30)
 
@@ -335,6 +337,7 @@ class PurchaseOrder(CombinedSharedModel):
 class PurchaseOrderItem(CombinedSharedModel):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
     item_name = models.CharField(max_length=200)
+    inventory_item_id = models.UUIDField(null=True, blank=True, help_text="الصنف المخزني المقابل — يُملأ حين يكون البند صنفاً معرّفاً في المخزون")
     quantity = models.DecimalField(max_digits=12, decimal_places=2)
     unit = models.CharField(max_length=30)
     unit_price = models.DecimalField(max_digits=15, decimal_places=2)
