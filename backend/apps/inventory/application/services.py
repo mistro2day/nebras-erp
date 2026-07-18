@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError
 from apps.inventory.domain.models import (
     Warehouse, BinLocation, InventoryItem, InventoryBalance, InventoryTransaction,
     GoodsReceipt, GoodsReceiptItem, GoodsIssue, GoodsIssueItem, InventoryTransfer,
-    InventoryAdjustment, StockMovement, InventoryBatch, InventoryLot, SerialNumber
+    InventoryTransferItem, InventoryAdjustment, StockMovement, InventoryBatch,
+    InventoryLot, SerialNumber, StockCount, StockCountItem
 )
 
 # قيود المخازن تُنشأ كمسودات في المالية ويعتمدها المحاسب المختص (لا تُرحّل من هنا)
@@ -452,3 +453,197 @@ class InventoryAdjustmentService:
                     adjustment.save()
 
         return adjustment
+
+
+# ============================================================
+# 4. TransferService — التحويل بين المستودعات
+# ============================================================
+class TransferService:
+    """التحويل الداخلي ينقل الكمية بين مستودعين دون أثر محاسبي.
+
+    لا يُنشأ قيد يومية: إجمالي قيمة المخزون لا يتغيّر — تنتقل الكمية من
+    موقع إلى آخر داخل المنشأة نفسها. هذا سلوك التحويل الداخلي في Odoo
+    و D365، ويختلف عن الصرف الذي يُثبت مصروفاً فعلياً.
+    """
+
+    @staticmethod
+    @transaction.atomic
+    def execute_transfer(tenant_id, from_warehouse_id, to_warehouse_id, items_data, user_id=None):
+        if str(from_warehouse_id) == str(to_warehouse_id):
+            raise ValidationError("لا يمكن التحويل إلى المستودع نفسه.")
+
+        src = Warehouse.objects.get(tenant_id=tenant_id, id=from_warehouse_id)
+        dst = Warehouse.objects.get(tenant_id=tenant_id, id=to_warehouse_id)
+
+        transfer_number = f"TR-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+        tr = InventoryTransfer.objects.create(
+            tenant_id=tenant_id,
+            transfer_number=transfer_number,
+            from_warehouse=src,
+            to_warehouse=dst,
+            status='completed',
+            approved_by=user_id,
+            created_by=user_id,
+        )
+
+        moved = 0
+        for data in items_data:
+            item_id = data.get('item_id')
+            qty = Decimal(str(data.get('quantity', 0)))
+            if qty <= 0:
+                continue
+
+            item = InventoryItem.objects.get(tenant_id=tenant_id, id=item_id)
+
+            # الخصم من المصدر — مع التحقق من كفاية المتاح
+            try:
+                src_bal = InventoryBalance.objects.select_for_update().get(
+                    tenant_id=tenant_id, item=item, warehouse=src)
+            except InventoryBalance.DoesNotExist:
+                raise ValidationError(f"لا يوجد رصيد للصنف {item.name_ar} في المستودع المصدر.")
+
+            if src_bal.qty_available < qty:
+                raise ValidationError(
+                    f"الرصيد المتاح للصنف {item.name_ar} في {src.name_ar} لا يكفي للتحويل.")
+
+            unit_cost = Decimal(str(data.get('unit_cost', 0)))
+            src_bal.qty_on_hand -= qty
+            src_bal.save()
+
+            # الإضافة للوجهة — يُنشأ رصيد جديد إن لم يكن الصنف مخزّناً هناك
+            dst_bal, _ = InventoryBalance.objects.get_or_create(
+                tenant_id=tenant_id, item=item, warehouse=dst,
+                defaults={'qty_on_hand': Decimal('0.0000'), 'qty_reserved': Decimal('0.0000')},
+            )
+            dst_bal.qty_on_hand += qty
+            dst_bal.save()
+
+            InventoryTransferItem.objects.create(
+                tenant_id=tenant_id, transfer=tr, item=item,
+                quantity=qty, unit_cost=unit_cost, created_by=user_id,
+            )
+
+            # حركتان على كارت الصنف: خروج من المصدر ودخول للوجهة
+            StockMovement.objects.create(
+                tenant_id=tenant_id, item=item, warehouse=src,
+                quantity_delta=-qty, new_balance=src_bal.qty_on_hand,
+                reference_document=transfer_number, created_by=user_id,
+            )
+            StockMovement.objects.create(
+                tenant_id=tenant_id, item=item, warehouse=dst,
+                quantity_delta=qty, new_balance=dst_bal.qty_on_hand,
+                reference_document=transfer_number, created_by=user_id,
+            )
+            InventoryTransaction.objects.create(
+                tenant_id=tenant_id, transaction_number=f"{transfer_number}-{moved + 1}",
+                item=item, warehouse=dst, transaction_type='transfer',
+                quantity=qty, unit_cost=unit_cost, total_value=qty * unit_cost,
+                created_by=user_id,
+            )
+            moved += 1
+
+        if moved == 0:
+            raise ValidationError("لا توجد بنود صالحة للتحويل.")
+
+        return tr
+
+
+# ============================================================
+# 5. StockCountService — الجرد الفعلي وتسوية فروقه
+# ============================================================
+class StockCountService:
+    """الجرد لا يعدّل الأرصدة مباشرة: يرصد الفروق ثم يولّد تسوية مخزنية.
+
+    الفصل مقصود — التسوية هي المسار المدقَّق الذي يُنشئ قيداً في المالية
+    ويعتمده المحاسب، فلا يصير الجرد باباً خلفياً لتغيير الأرصدة والقيمة.
+    """
+
+    @staticmethod
+    @transaction.atomic
+    def open_count(tenant_id, warehouse_id, is_blind=False, user_id=None):
+        """يفتح محضر جرد ويلتقط الكميات الدفترية لحظة الفتح."""
+        warehouse = Warehouse.objects.get(tenant_id=tenant_id, id=warehouse_id)
+
+        open_exists = StockCount.objects.filter(
+            tenant_id=tenant_id, warehouse=warehouse,
+            status__in=['scheduled', 'in_progress']).first()
+        if open_exists:
+            raise ValidationError(
+                f"يوجد محضر جرد مفتوح لهذا المستودع ({open_exists.count_number}). أغلقه أولاً.")
+
+        count = StockCount.objects.create(
+            tenant_id=tenant_id,
+            count_number=f"SC-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            warehouse=warehouse,
+            start_date=timezone.localdate(),
+            status='in_progress',
+            is_blind=is_blind,
+            created_by=user_id,
+        )
+
+        balances = InventoryBalance.objects.filter(tenant_id=tenant_id, warehouse=warehouse)
+        for b in balances:
+            StockCountItem.objects.create(
+                tenant_id=tenant_id, stock_count=count, item=b.item,
+                qty_book=b.qty_on_hand, qty_physical=Decimal('0.0000'),
+                variance=Decimal('0.0000'), created_by=user_id,
+            )
+        return count
+
+    @staticmethod
+    @transaction.atomic
+    def record_counts(tenant_id, count_id, counts, user_id=None):
+        """تسجيل الكميات الفعلية بعد العدّ واحتساب الفروق."""
+        count = StockCount.objects.select_for_update().get(tenant_id=tenant_id, id=count_id)
+        if count.status == 'completed':
+            raise ValidationError("محضر الجرد مغلق ولا يقبل تعديلاً.")
+
+        by_id = {str(c.get('count_item_id')): c.get('qty_physical') for c in counts}
+        for ci in StockCountItem.objects.filter(tenant_id=tenant_id, stock_count=count):
+            if str(ci.id) in by_id:
+                ci.qty_physical = Decimal(str(by_id[str(ci.id)] or 0))
+                ci.variance = ci.qty_physical - ci.qty_book
+                ci.save(update_fields=['qty_physical', 'variance'])
+        return count
+
+    @staticmethod
+    @transaction.atomic
+    def post_count(tenant_id, count_id, expense_account_id=None, cost_center_id=None, user_id=None):
+        """إغلاق الجرد وتحويل فروقه إلى تسوية مخزنية معتمدة محاسبياً."""
+        count = StockCount.objects.select_for_update().get(tenant_id=tenant_id, id=count_id)
+        if count.status == 'completed':
+            raise ValidationError("محضر الجرد مُرحّل بالفعل.")
+
+        variances = [
+            ci for ci in StockCountItem.objects.filter(tenant_id=tenant_id, stock_count=count)
+            if ci.variance != 0
+        ]
+
+        adjustment = None
+        if variances:
+            # مفاتيح adjust_stock: qty_delta و account_id — لا qty_diff/expense_account_id
+            items_data = []
+            for ci in variances:
+                # تكلفة الفرق تُؤخذ من آخر حركة فعلية للصنف — أقرب تقدير متاح لقيمته
+                last_trx = InventoryTransaction.objects.filter(
+                    tenant_id=tenant_id, item_id=ci.item_id,
+                ).order_by('-created_at').first()
+                items_data.append({
+                    'item_id': str(ci.item_id),
+                    'qty_delta': float(ci.variance),
+                    'unit_cost': float(last_trx.unit_cost) if last_trx else 0,
+                    'account_id': expense_account_id,
+                    'cost_center_id': cost_center_id,
+                })
+
+            adjustment = InventoryAdjustmentService.adjust_stock(
+                tenant_id=tenant_id,
+                warehouse_id=count.warehouse_id,
+                items_data=items_data,
+                reason=f"تسوية فروق الجرد — محضر {count.count_number}",
+                user_id=user_id,
+            )
+
+        count.status = 'completed'
+        count.save(update_fields=['status'])
+        return {'count': count, 'adjustment': adjustment, 'variance_count': len(variances)}

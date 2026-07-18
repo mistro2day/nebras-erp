@@ -4,6 +4,7 @@ from apps.inventory.domain.models import (
     InventoryUnit, InventoryItem, InventoryBatch, InventoryLot, SerialNumber,
     InventoryBalance, InventoryTransaction, InventoryReservation, InventoryAdjustment,
     GoodsReceipt, GoodsReceiptItem, GoodsIssue, GoodsIssueItem, InventoryTransfer,
+    InventoryTransferItem,
     StockCount, StockCountItem, StockMovement, InventoryValuation, ReorderRule,
     InventorySettings, InventoryStatistics, InventoryAudit
 )
@@ -106,7 +107,14 @@ class GoodsIssueSerializer(BaseInventorySerializer):
         model = GoodsIssue
         fields = '__all__'
 
+class InventoryTransferItemSerializer(BaseInventorySerializer):
+    class Meta(BaseInventorySerializer.Meta):
+        model = InventoryTransferItem
+        fields = '__all__'
+
 class InventoryTransferSerializer(BaseInventorySerializer):
+    items = InventoryTransferItemSerializer(many=True, read_only=True)
+
     class Meta(BaseInventorySerializer.Meta):
         model = InventoryTransfer
         fields = '__all__'

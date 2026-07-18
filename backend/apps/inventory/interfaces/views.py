@@ -24,7 +24,8 @@ from apps.inventory.interfaces.serializers import (
     InventorySettingsSerializer, InventoryStatisticsSerializer, InventoryAuditSerializer
 )
 from apps.inventory.application.services import (
-    GoodsReceiptService, GoodsIssueService, InventoryAdjustmentService
+    GoodsReceiptService, GoodsIssueService, InventoryAdjustmentService,
+    TransferService, StockCountService
 )
 
 
@@ -223,10 +224,90 @@ class InventoryTransferViewSet(BaseCRUDViewSet):
     model_class = InventoryTransfer
     serializer_class = InventoryTransferSerializer
 
+    @action(detail=False, methods=['post'], url_path='execute')
+    def execute(self, request):
+        """تنفيذ التحويل فعلياً — ينقل الكميات ويسجّل الحركات."""
+        from_wh = request.data.get('from_warehouse_id')
+        to_wh = request.data.get('to_warehouse_id')
+        items = request.data.get('items', [])
+
+        if not from_wh or not to_wh or not items:
+            return Response({'error': 'المستودع المصدر والوجهة والبنود حقول مطلوبة.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            tr = TransferService.execute_transfer(
+                tenant_id=request.tenant_id,
+                from_warehouse_id=from_wh,
+                to_warehouse_id=to_wh,
+                items_data=items,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(self.get_serializer(tr).data, status=status.HTTP_201_CREATED)
+
 
 class StockCountViewSet(BaseCRUDViewSet):
     model_class = StockCount
     serializer_class = StockCountSerializer
+
+    @action(detail=False, methods=['post'], url_path='open')
+    def open_count(self, request):
+        """فتح محضر جرد والتقاط الكميات الدفترية لحظة الفتح."""
+        warehouse_id = request.data.get('warehouse_id')
+        if not warehouse_id:
+            return Response({'error': 'المستودع حقل مطلوب.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            count = StockCountService.open_count(
+                tenant_id=request.tenant_id,
+                warehouse_id=warehouse_id,
+                is_blind=bool(request.data.get('is_blind', False)),
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(self.get_serializer(count).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='record')
+    def record(self, request, pk=None):
+        """تسجيل الكميات الفعلية بعد العدّ."""
+        try:
+            count = StockCountService.record_counts(
+                tenant_id=request.tenant_id,
+                count_id=pk,
+                counts=request.data.get('counts', []),
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(self.get_serializer(count).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='post-count')
+    def post_count(self, request, pk=None):
+        """إغلاق الجرد وتحويل فروقه إلى تسوية مخزنية بقيد مسودة."""
+        try:
+            result = StockCountService.post_count(
+                tenant_id=request.tenant_id,
+                count_id=pk,
+                expense_account_id=request.data.get('expense_account_id'),
+                cost_center_id=request.data.get('cost_center_id'),
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        adj = result['adjustment']
+        return Response({
+            'count': self.get_serializer(result['count']).data,
+            'variance_count': result['variance_count'],
+            'adjustment_number': adj.adjustment_number if adj else None,
+            'journal_entry_id': str(adj.journal_entry_id) if adj and adj.journal_entry_id else None,
+        }, status=status.HTTP_200_OK)
 
 
 class StockCountItemViewSet(BaseCRUDViewSet):

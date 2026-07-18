@@ -128,4 +128,27 @@ export class InventoryService {
   adjustStock(payload: { warehouse_id: string; items: any[]; reason: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/adjustments/adjust-stock/`, payload);
   }
+
+  /** التحويل الداخلي ينقل الكمية بين مستودعين بلا أثر محاسبي. */
+  executeTransfer(payload: { from_warehouse_id: string; to_warehouse_id: string; items: any[] }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/transfers/execute/`, payload);
+  }
+
+  // ---- الجرد: فتح ← عدّ ← ترحيل ----
+  getStockCounts(params?: any): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/counts/`, { params: params || { page_size: 200 } });
+  }
+  getStockCount(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/counts/${id}/`);
+  }
+  openStockCount(payload: { warehouse_id: string; is_blind?: boolean }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/counts/open/`, payload);
+  }
+  recordStockCount(id: string, counts: { count_item_id: string; qty_physical: number }[]): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/counts/${id}/record/`, { counts });
+  }
+  /** الترحيل يولّد تسوية مخزنية بقيد مسودة — لا يعدّل الأرصدة مباشرة. */
+  postStockCount(id: string, payload: { expense_account_id?: string; cost_center_id?: string }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/counts/${id}/post-count/`, payload);
+  }
 }

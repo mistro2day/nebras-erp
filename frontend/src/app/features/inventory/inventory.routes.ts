@@ -35,6 +35,14 @@ export const INVENTORY_ROUTES: Routes = [
     loadComponent: () => import('./issues/goods-issues.component').then((m) => m.GoodsIssuesComponent),
   },
   {
+    path: 'transfers',
+    loadComponent: () => import('./transfers/transfers.component').then((m) => m.InventoryTransfersComponent),
+  },
+  {
+    path: 'counts',
+    loadComponent: () => import('./counts/stock-counts.component').then((m) => m.StockCountsComponent),
+  },
+  {
     path: 'setup',
     loadComponent: () => import('./setup/inventory-setup.component').then((m) => m.InventorySetupComponent),
   },

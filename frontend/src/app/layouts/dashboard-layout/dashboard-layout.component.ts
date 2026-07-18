@@ -697,6 +697,8 @@ export class DashboardLayoutComponent {
             { label: 'حركة المخزون', link: '/inventory/movements' },
             { label: 'استلام البضاعة', link: '/inventory/receipts' },
             { label: 'صرف المخزون', link: '/inventory/issues' },
+            { label: 'التحويل بين المستودعات', link: '/inventory/transfers' },
+            { label: 'الجرد', link: '/inventory/counts' },
             { label: 'المرجعيات', link: '/inventory/setup' },
           ],
         },

@@ -247,6 +247,8 @@ export class InventoryDashboardComponent implements OnInit {
     { icon: '↕︎', title: 'حركة المخزون', desc: 'كارت الصنف وسجل الحركات.', route: '/inventory/movements' },
     { icon: '🚚', title: 'استلام البضاعة', desc: 'سندات الاستلام مقابل أوامر الشراء.', route: '/inventory/receipts' },
     { icon: '📤', title: 'صرف المخزون', desc: 'صرف الأصناف للأقسام والمختبرات.', route: '/inventory/issues' },
+    { icon: '⇄', title: 'التحويل بين المستودعات', desc: 'نقل الأصناف بين المواقع.', route: '/inventory/transfers' },
+    { icon: '📋', title: 'الجرد', desc: 'العدّ الفعلي وتسوية الفروق.', route: '/inventory/counts' },
     { icon: '⚙️', title: 'المرجعيات', desc: 'فئات الأصناف ووحدات القياس.', route: '/inventory/setup' },
   ];
 

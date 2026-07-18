@@ -369,6 +369,20 @@ class InventoryTransfer(CombinedSharedModel):
         verbose_name_plural = "حركات التحويل بين المستودعات"
 
 
+# 19-ب. InventoryTransferItem (بنود التحويل المخزني)
+class InventoryTransferItem(CombinedSharedModel):
+    """بنود التحويل — التحويل بلا بنود لا يعرف ماذا يُنقل ولا كم."""
+    transfer = models.ForeignKey(InventoryTransfer, on_delete=models.CASCADE, related_name='items', verbose_name="التحويل")
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, verbose_name="الصنف المحوَّل")
+    quantity = models.DecimalField(max_digits=15, decimal_places=4, verbose_name="الكمية المحوَّلة")
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="تكلفة الوحدة وقت التحويل")
+
+    class Meta:
+        db_table = 'nebras_inventory_transfer_items'
+        verbose_name = "بند تحويل مخزني"
+        verbose_name_plural = "بنود التحويلات المخزنية"
+
+
 # 20. StockCount (أوامر جرد المخزون)
 class StockCount(CombinedSharedModel):
     STATUS_CHOICES = (
