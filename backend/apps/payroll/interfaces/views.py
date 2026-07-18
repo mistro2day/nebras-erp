@@ -356,22 +356,35 @@ class PayrollRunViewSet(BaseCRUDViewSet):
             gross_earnings = basic + housing + transport + other
             total_deductions = 0.0
             
-            # احتساب دقائق التأخير الفعلي لشهر المسير
+            # احتساب دقائق التأخير الفعلي والغياب الفعلي لشهر المسير
             from apps.attendance.domain.models import AttendanceRecord
             late_deduction = 0.0
             late_minutes_total = 0
+            absence_days_count = 0
+            absence_deduction = 0.0
+            
             if period_code:
                 try:
                     # استخراج السنة والشهر من كود المسير مثل '2026-06'
                     year_part, month_part = map(int, period_code.split('-'))
                     records = AttendanceRecord.objects.filter(employee=employee, date__year=year_part, date__month=month_part)
-                    late_minutes_total = sum(rec.late_minutes for rec in records if rec.late_minutes)
                     
+                    # 1. دقائق التأخير
+                    late_minutes_total = sum(rec.late_minutes for rec in records if rec.late_minutes)
                     if late_minutes_total > 0:
                         # احتساب خصم الدقيقة = (الراتب الأساسي / 30 يوم عمل / 8 ساعات عمل يومياً / 60 دقيقة)
                         minute_rate = (basic / 30.0 / 8.0 / 60.0)
                         late_deduction = round(late_minutes_total * minute_rate, 2)
                         total_deductions += late_deduction
+                        
+                    # 2. أيام الغياب الفعلي
+                    absent_records = records.filter(status='absent')
+                    absence_days_count = absent_records.count()
+                    if absence_days_count > 0:
+                        # خصم الغياب اليومي = الراتب الأساسي / 30 يوم عمل
+                        daily_absence_rate = basic / 30.0
+                        absence_deduction = round(absence_days_count * daily_absence_rate, 2)
+                        total_deductions += absence_deduction
                 except Exception:
                     pass
 
@@ -411,6 +424,8 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                 total_deductions=total_deductions,
                 late_minutes=late_minutes_total,
                 late_deduction=late_deduction,
+                absence_days=absence_days_count,
+                absence_deduction=absence_deduction,
                 net_salary=net_salary,
                 status='draft' if preview_only else 'approved'
             )

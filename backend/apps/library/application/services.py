@@ -9,7 +9,6 @@ from apps.library.domain.models import (
 )
 
 # استدعاء خدمات المحاسبة بالمالية
-from apps.finance.application.services import PostingService
 from apps.finance.domain.models import ChartOfAccount, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
 
 
@@ -142,7 +141,7 @@ class FineService:
                     accounting_period=period,
                     description=f"قيد غرامة تأخير مكتبية للمستعير",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -158,7 +157,7 @@ class FineService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # مسودة بانتظار اعتماد المحاسب المختص — لا تُرحّل من هنا
                 fine.journal_entry_id = journal.id
                 fine.save()
 

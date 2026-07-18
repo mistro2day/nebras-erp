@@ -62,6 +62,8 @@ class Payslip(CombinedSharedModel):
     total_deductions = models.DecimalField(max_digits=12, decimal_places=2)
     late_minutes = models.IntegerField(default=0)
     late_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    absence_days = models.IntegerField(default=0)
+    absence_deduction = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     net_salary = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=30, default='draft') # draft, approved, paid
 

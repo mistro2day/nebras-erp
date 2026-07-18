@@ -1062,6 +1062,9 @@ export class PayrollRunsComponent implements OnInit {
     if (colKey === 'delay_deduction') {
       return Number((slip as any).late_deduction || 0);
     }
+    if (colKey === 'absence_deduction') {
+      return Number((slip as any).absence_deduction || 0);
+    }
     if (col.type === 'basic') {
       return Number((slip as any)[colKey] || 0);
     }
@@ -1077,6 +1080,14 @@ export class PayrollRunsComponent implements OnInit {
   setDynamicVal(slip: Payslip, colKey: string, val: number) {
     const col = this.availableCols().find(c => c.key === colKey);
     if (!col) return;
+    if (colKey === 'delay_deduction') {
+      (slip as any).late_deduction = String(val);
+      return;
+    }
+    if (colKey === 'absence_deduction') {
+      (slip as any).absence_deduction = String(val);
+      return;
+    }
     if (col.type === 'basic') {
       (slip as any)[colKey] = String(val);
       return;
@@ -1126,9 +1137,24 @@ export class PayrollRunsComponent implements OnInit {
     });
     slip.gross_earnings = String(basic + other + dynEarningsSum);
 
-    let dynDeductionsSum = Number(slip.total_deductions); // keep loan deductions too
+    // تحديث إجمالي الخصومات الأساسية (السلف + التأخيرات + الغيابات بعد التعديل اليدوي إن وُجد)
+    let baseDeductions = 0;
+    
+    // حساب قيمة السلف المتبقية (إجمالي الخصم الكلي مطروحاً منه التأخير والغياب الأصليين)
+    // أو مباشرة: slip.total_deductions - late_deduction - absence_deduction
+    const origLate = Number((slip as any).late_deduction || 0);
+    const origAbs = Number((slip as any).absence_deduction || 0);
+    const origLoan = Math.max(0, Number(slip.total_deductions) - origLate - origAbs);
+    
+    // الإجمالي الجديد للخصومات الأساسية
+    slip.total_deductions = String(origLoan + Number((slip as any).late_deduction || 0) + Number((slip as any).absence_deduction || 0));
+
+    let dynDeductionsSum = Number(slip.total_deductions);
     this.availableCols().forEach(c => {
-      if (c.type === 'deduction') dynDeductionsSum += this.getDynamicVal(slip, c.key);
+      // فقط إضافة الاستقطاعات المخصصة الإضافية التي لا تمثل خصم التأخير أو الغياب لأنها مدمجة مسبقاً في slip.total_deductions
+      if (c.type === 'deduction' && c.key !== 'delay_deduction' && c.key !== 'absence_deduction') {
+        dynDeductionsSum += this.getDynamicVal(slip, c.key);
+      }
     });
     
     slip.net_salary = String(Math.max(0, Number(slip.gross_earnings) - dynDeductionsSum));
@@ -1155,7 +1181,7 @@ export class PayrollRunsComponent implements OnInit {
     const gross = this.computeGrossWithDynamic(slip);
     let ded = Number(slip.total_deductions);
     this.availableCols().forEach(c => {
-      if (c.type === 'deduction' && c.visible) {
+      if (c.type === 'deduction' && c.visible && c.key !== 'delay_deduction' && c.key !== 'absence_deduction') {
         ded += this.getDynamicVal(slip, c.key);
       }
     });

@@ -12,7 +12,6 @@ from apps.assets.domain.models import Asset
 
 # استدعاء خدمات المخازن والمالية
 from apps.inventory.application.services import GoodsIssueService
-from apps.finance.application.services import PostingService
 from apps.finance.domain.models import ChartOfAccount, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
 
 
@@ -203,7 +202,7 @@ class MaintenanceCostService:
                     accounting_period=period,
                     description=f"قيد مصروفات صيانة وتصليح للأصل {wo.asset.name_ar}",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -219,7 +218,7 @@ class MaintenanceCostService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # مسودة بانتظار اعتماد المحاسب المختص — لا تُرحّل من هنا
                 cost_record.journal_entry_id = journal.id
                 cost_record.save()
 

@@ -10,8 +10,7 @@ from apps.inventory.domain.models import (
     InventoryAdjustment, StockMovement, InventoryBatch, InventoryLot, SerialNumber
 )
 
-# استهلاك النظام المالي لبث قيود استحقاق المخازن تلقائياً
-from apps.finance.application.services import PostingService
+# قيود المخازن تُنشأ كمسودات في المالية ويعتمدها المحاسب المختص (لا تُرحّل من هنا)
 from apps.finance.domain.models import ChartOfAccount, CostCenter, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
 
 # استهلاك نظام المشتريات لتحديث حالة الاستلام
@@ -145,11 +144,11 @@ class GoodsReceiptService:
                         accounting_period=period,
                         description=f"إثبات قيد استلام البضائع بسند {receipt_number}",
                         source_type='automatic',
-                        status='approved',
+                        status='draft',
                         currency=base_currency,
                         created_by=user_id
                     )
-                    
+
                     for line in journal_lines:
                         JournalEntryLine.objects.create(
                             tenant_id=tenant_id,
@@ -160,9 +159,9 @@ class GoodsReceiptService:
                             credit=line['credit'],
                             description=line['description']
                         )
-                    
-                    # ترحيل القيد ليعكس في أرصدة الأستاذ العام
-                    PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+
+                    # يصل القيد للمالية كمسودة — المحاسب المختص هو من يعتمده ويرحّله.
+                    # فصل الصلاحيات: أمين المستودع يحرّك المخزون، والمحاسب يحرّك الدفاتر.
                     gr.journal_entry_id = journal.id
                     gr.save()
 
@@ -284,7 +283,7 @@ class GoodsIssueService:
                         accounting_period=period,
                         description=f"إثبات قيد استهلاك وصرف مخزني بسند {issue_number}",
                         source_type='automatic',
-                        status='approved',
+                        status='draft',
                         currency=base_currency,
                         created_by=user_id
                     )
@@ -300,7 +299,7 @@ class GoodsIssueService:
                             description=line['description']
                         )
 
-                    PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                    # مسودة بانتظار اعتماد المحاسب — راجع التعليق في receive_from_purchase_order
                     gi.journal_entry_id = journal.id
                     gi.save()
 
@@ -432,7 +431,7 @@ class InventoryAdjustmentService:
                         accounting_period=period,
                         description=f"إثبات قيد تسوية مخزنية بسند {adj_number}",
                         source_type='automatic',
-                        status='approved',
+                        status='draft',
                         currency=base_currency,
                         created_by=user_id
                     )
@@ -448,7 +447,7 @@ class InventoryAdjustmentService:
                             description=line['description']
                         )
 
-                    PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                    # مسودة بانتظار اعتماد المحاسب — التسوية المخزنية تمسّ الدفاتر فلا تُرحّل تلقائياً
                     adjustment.journal_entry_id = journal.id
                     adjustment.save()
 

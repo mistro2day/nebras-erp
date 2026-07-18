@@ -9,8 +9,7 @@ from apps.assets.domain.models import (
     AssetCapitalization, AssetDepreciation, AssetDisposal, AssetRevaluation
 )
 
-# استيراد موديول المالية
-from apps.finance.application.services import PostingService
+# قيود الأصول تُنشأ كمسودات في المالية ويعتمدها المحاسب المختص (لا تُرحّل من هنا)
 from apps.finance.domain.models import ChartOfAccount, CostCenter, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
 
 
@@ -72,7 +71,7 @@ class AssetService:
                     accounting_period=period,
                     description=f"قيد رسملة وتأصيل الأصل {asset.name_ar}",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -88,7 +87,8 @@ class AssetService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # يصل القيد للمالية كمسودة — المحاسب المختص هو من يعتمده ويرحّله.
+                # فصل الصلاحيات: مسؤول الأصول يسجّل الأصل، والمحاسب يحرّك الدفاتر.
                 cap.journal_entry_id = journal.id
                 cap.save()
 
@@ -172,7 +172,7 @@ class DepreciationService:
                     accounting_period=period,
                     description=f"قيد إهلاك دوري للأصل {asset.name_ar}",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -188,7 +188,7 @@ class DepreciationService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # مسودة بانتظار اعتماد المحاسب — حتى الإهلاك الدوري يمرّ بالمراجعة
                 depr.journal_entry_id = journal.id
                 depr.save()
 
@@ -303,7 +303,7 @@ class DisposalService:
                     accounting_period=period,
                     description=f"قيد استبعاد وتصفية الأصل {asset.name_ar}",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -319,7 +319,7 @@ class DisposalService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # مسودة بانتظار اعتماد المحاسب — الاستبعاد يثبت ربحاً أو خسارة رأسمالية
                 disp.journal_entry_id = journal.id
                 disp.save()
 

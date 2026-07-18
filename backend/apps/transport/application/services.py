@@ -9,7 +9,6 @@ from apps.transport.domain.models import (
 )
 
 # استدعاء خدمات المحاسبة بالمالية
-from apps.finance.application.services import PostingService
 from apps.finance.domain.models import ChartOfAccount, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
 
 # استدعاء الصيانة وأوامر العمل للتكامل
@@ -151,7 +150,7 @@ class FuelService:
                     accounting_period=period,
                     description=f"قيد تموين استهلاك وقود أسطول حافلات",
                     source_type='automatic',
-                    status='approved',
+                    status='draft',
                     currency=base_currency,
                     created_by=user_id
                 )
@@ -167,7 +166,7 @@ class FuelService:
                         description=line['description']
                     )
 
-                PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+                # مسودة بانتظار اعتماد المحاسب المختص — لا تُرحّل من هنا
                 tx.journal_entry_id = journal.id
                 tx.save()
 
