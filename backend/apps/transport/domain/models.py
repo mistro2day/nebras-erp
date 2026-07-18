@@ -99,7 +99,7 @@ class DriverLicense(CombinedSharedModel):
 class DriverAssignment(CombinedSharedModel):
     driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='assignments', verbose_name="السائق")
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='driver_assignments', verbose_name="المركبة")
-    assigned_date = models.DateField(default=timezone.now, verbose_name="تاريخ التخصيص")
+    assigned_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ التخصيص")
     is_active = models.BooleanField(default=True, verbose_name="نشط وجاري قيادة المركبة")
 
     class Meta:
@@ -252,7 +252,7 @@ class VehicleInspection(CombinedSharedModel):
         ('failed', 'فشل في الفحص ويوجد ملاحظات/أعطال'),
     )
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='inspections', verbose_name="المركبة")
-    inspection_date = models.DateField(default=timezone.now, verbose_name="تاريخ الفحص")
+    inspection_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الفحص")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='passed', verbose_name="نتيجة الفحص الفني")
     notes = models.TextField(blank=True, null=True, verbose_name="تفاصيل الملاحظات وعوامل الخطر")
 
@@ -279,7 +279,7 @@ class FuelTransaction(CombinedSharedModel):
     station = models.ForeignKey(FuelStation, on_delete=models.PROTECT, verbose_name="محطة الوقود")
     liters = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="كمية الوقود باللتر")
     cost = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="تكلفة الوقود الإجمالية")
-    transaction_date = models.DateField(default=timezone.now, verbose_name="تاريخ تعبئة الوقود")
+    transaction_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ تعبئة الوقود")
     odometer_reading = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="قراءة العداد عند التعبئة")
     journal_entry_id = models.UUIDField(null=True, blank=True, help_text="قيد استهلاك الوقود المنعكس بالمالية")
 
@@ -292,7 +292,7 @@ class FuelTransaction(CombinedSharedModel):
 # 21. OdometerReading (تتبع قراءات عداد الكيلومترات للمركبات)
 class OdometerReading(CombinedSharedModel):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='odometer_readings', verbose_name="المركبة")
-    reading_date = models.DateField(default=timezone.now, verbose_name="تاريخ القراءة")
+    reading_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ القراءة")
     reading_value = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="قراءة العداد (كم)")
 
     class Meta:

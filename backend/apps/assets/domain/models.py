@@ -119,7 +119,7 @@ class Asset(CombinedSharedModel):
 class AssetAssignment(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='assignments', verbose_name="الأصل")
     assigned_to_user_id = models.UUIDField(db_index=True, verbose_name="الموظف المستلم للعهدة")
-    assigned_date = models.DateField(default=timezone.now, verbose_name="تاريخ تسليم العهدة")
+    assigned_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ تسليم العهدة")
     return_date = models.DateField(blank=True, null=True, verbose_name="تاريخ إرجاع العهدة")
     notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
 
@@ -133,7 +133,7 @@ class AssetAssignment(CombinedSharedModel):
 class AssetCustodian(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='custodians', verbose_name="الأصل")
     custodian_user_id = models.UUIDField(verbose_name="أمين العهدة")
-    start_date = models.DateField(default=timezone.now, verbose_name="تاريخ البدء")
+    start_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ البدء")
     end_date = models.DateField(blank=True, null=True, verbose_name="تاريخ الانتهاء")
 
     class Meta:
@@ -279,7 +279,7 @@ class AssetTransfer(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='transfers', verbose_name="الأصل")
     from_location = models.ForeignKey(AssetLocation, on_delete=models.PROTECT, related_name='outgoing_transfers', verbose_name="الموقع الأصلي")
     to_location = models.ForeignKey(AssetLocation, on_delete=models.PROTECT, related_name='incoming_transfers', verbose_name="الموقع الوجهة")
-    transfer_date = models.DateField(default=timezone.now, verbose_name="تاريخ طلب النقل")
+    transfer_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ طلب النقل")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     approved_by = models.UUIDField(null=True, blank=True)
 
@@ -306,7 +306,7 @@ class AssetMovement(CombinedSharedModel):
 # 19. AssetMaintenancePlaceholder (صيانة الأصول)
 class AssetMaintenancePlaceholder(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='maintenance_records', verbose_name="الأصل")
-    maintenance_date = models.DateField(default=timezone.now, verbose_name="تاريخ الصيانة والإصلاح")
+    maintenance_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الصيانة والإصلاح")
     cost = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="تكلفة الصيانة")
     description = models.TextField(verbose_name="وصف أعمال الصيانة")
 
@@ -320,7 +320,7 @@ class AssetMaintenancePlaceholder(CombinedSharedModel):
 class AssetCondition(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='conditions', verbose_name="الأصل")
     condition = models.CharField(max_length=50, choices=(('new', 'جديد ممتاز'), ('good', 'حالة جيدة'), ('fair', 'مقبول'), ('poor', 'تالف/متهالك')), default='good', verbose_name="الحالة الحالية للأصل")
-    as_of_date = models.DateField(default=timezone.now, verbose_name="التاريخ")
+    as_of_date = models.DateField(default=timezone.localdate, verbose_name="التاريخ")
 
     class Meta:
         db_table = 'nebras_asset_conditions'
@@ -331,7 +331,7 @@ class AssetCondition(CombinedSharedModel):
 # 21. AssetInspection (فحوصات ومعاينات الأصول)
 class AssetInspection(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='inspections', verbose_name="الأصل")
-    inspection_date = models.DateField(default=timezone.now, verbose_name="تاريخ الفحص")
+    inspection_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الفحص")
     inspector_user_id = models.UUIDField(verbose_name="المفتش/الموظف القائم بالفحص")
     result = models.TextField(verbose_name="نتائج وتوصيات الفحص")
 
@@ -357,7 +357,7 @@ class AssetDisposal(CombinedSharedModel):
     )
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='disposals', verbose_name="الأصل المستبعد")
     disposal_type = models.CharField(max_length=20, choices=DISPOSAL_TYPE, default='write_off', verbose_name="نوع الاستبعاد")
-    disposal_date = models.DateField(default=timezone.now, verbose_name="تاريخ الاستبعاد الفعلي")
+    disposal_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الاستبعاد الفعلي")
     disposal_proceeds = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="متحصلات البيع/الاستبعاد")
     gain_loss = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="الأرباح أو الخسائر الرأسمالية المحققة")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -384,7 +384,7 @@ class AssetSale(CombinedSharedModel):
 # 24. AssetRetirement (سجل تقاعد وخروج الأصول الفعلي)
 class AssetRetirement(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='retirements', verbose_name="الأصل")
-    retirement_date = models.DateField(default=timezone.now, verbose_name="تاريخ التقاعد")
+    retirement_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ التقاعد")
     reason = models.TextField(verbose_name="سبب الخروج من الخدمة")
 
     class Meta:
@@ -396,7 +396,7 @@ class AssetRetirement(CombinedSharedModel):
 # 25. AssetRevaluation (عمليات إعادة التقييم المالي للأصل)
 class AssetRevaluation(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='revaluations', verbose_name="الأصل")
-    revaluation_date = models.DateField(default=timezone.now, verbose_name="تاريخ إعادة التقييم")
+    revaluation_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ إعادة التقييم")
     old_value = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="القيمة القديمة")
     new_value = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="القيمة المقدرة الجديدة")
     journal_entry_id = models.UUIDField(null=True, blank=True, help_text="قيد تسوية إعادة التقييم بالمالية")
@@ -410,7 +410,7 @@ class AssetRevaluation(CombinedSharedModel):
 # 26. AssetImpairment (خسائر تدني/اضمحلال قيمة الأصل)
 class AssetImpairment(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='impairments', verbose_name="الأصل")
-    impairment_date = models.DateField(default=timezone.now, verbose_name="تاريخ الاضمحلال")
+    impairment_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الاضمحلال")
     impairment_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="قيمة الاضمحلال/التخفيض")
     journal_entry_id = models.UUIDField(null=True, blank=True)
 
@@ -423,7 +423,7 @@ class AssetImpairment(CombinedSharedModel):
 # 27. AssetInventoryAudit (حملات جرد الأصول الثابتة الفعلي)
 class AssetInventoryAudit(CombinedSharedModel):
     audit_name = models.CharField(max_length=150, verbose_name="اسم حملة جرد الأصول")
-    audit_date = models.DateField(default=timezone.now, verbose_name="تاريخ الجرد")
+    audit_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الجرد")
     status = models.CharField(max_length=30, choices=(('scheduled', 'مجدول'), ('in_progress', 'جاري المطابقة'), ('completed', 'مكتمل ومرحل')), default='scheduled')
 
     class Meta:

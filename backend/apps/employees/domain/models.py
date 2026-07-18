@@ -25,7 +25,7 @@ class Employee(CombinedSharedModel):
     department = models.CharField(max_length=100)
     position = models.CharField(max_length=100)
     employment_type = models.CharField(max_length=50) # e.g. Full-time, Part-time
-    joining_date = models.DateField(default=timezone.now)
+    joining_date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=30, default='active', db_index=True) # active, suspended, resigned, terminated
 
     def save(self, *args, **kwargs):

@@ -1,6 +1,7 @@
 from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
@@ -95,15 +96,18 @@ class AssetViewSet(BaseCRUDViewSet):
 
         capitalization_date = timezone.datetime.strptime(capitalization_date_str, '%Y-%m-%d').date()
 
-        cap = AssetService.capitalize_asset(
-            tenant_id=tenant_id,
-            asset_id=pk,
-            capitalization_date=capitalization_date,
-            asset_gl_account_id=asset_gl_account_id,
-            offset_gl_account_id=offset_gl_account_id,
-            cost_center_id=cost_center_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            cap = AssetService.capitalize_asset(
+                tenant_id=tenant_id,
+                asset_id=pk,
+                capitalization_date=capitalization_date,
+                asset_gl_account_id=asset_gl_account_id,
+                offset_gl_account_id=offset_gl_account_id,
+                cost_center_id=cost_center_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = AssetCapitalizationSerializer(cap)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -120,15 +124,18 @@ class AssetViewSet(BaseCRUDViewSet):
 
         run_date = timezone.datetime.strptime(run_date_str, '%Y-%m-%d').date()
 
-        depr = DepreciationService.calculate_and_post_depreciation(
-            tenant_id=tenant_id,
-            asset_id=pk,
-            run_date=run_date,
-            depr_expense_gl_account_id=depr_expense_gl_account_id,
-            accum_depr_gl_account_id=accum_depr_gl_account_id,
-            cost_center_id=cost_center_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            depr = DepreciationService.calculate_and_post_depreciation(
+                tenant_id=tenant_id,
+                asset_id=pk,
+                run_date=run_date,
+                depr_expense_gl_account_id=depr_expense_gl_account_id,
+                accum_depr_gl_account_id=accum_depr_gl_account_id,
+                cost_center_id=cost_center_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = AssetDepreciationSerializer(depr)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -233,17 +240,20 @@ class AssetDisposalViewSet(BaseCRUDViewSet):
 
         run_date = timezone.datetime.strptime(run_date_str, '%Y-%m-%d').date()
 
-        disp = DisposalService.dispose_asset(
-            tenant_id=tenant_id,
-            asset_id=asset_id,
-            disposal_type=disposal_type,
-            proceeds=proceeds,
-            run_date=run_date,
-            disposal_expense_gl_account_id=disposal_expense_gl_account_id,
-            asset_gl_account_id=asset_gl_account_id,
-            accum_depr_gl_account_id=accum_depr_gl_account_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            disp = DisposalService.dispose_asset(
+                tenant_id=tenant_id,
+                asset_id=asset_id,
+                disposal_type=disposal_type,
+                proceeds=proceeds,
+                run_date=run_date,
+                disposal_expense_gl_account_id=disposal_expense_gl_account_id,
+                asset_gl_account_id=asset_gl_account_id,
+                accum_depr_gl_account_id=accum_depr_gl_account_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.get_serializer(disp)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

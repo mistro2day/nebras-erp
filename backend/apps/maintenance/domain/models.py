@@ -203,7 +203,7 @@ class Inspection(CombinedSharedModel):
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='maintenance_inspections', verbose_name="الأصل الخاضع للمعاينة")
     work_order = models.ForeignKey(WorkOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='inspections', verbose_name="أمر العمل التابع له")
     
-    inspection_date = models.DateField(default=timezone.now, verbose_name="تاريخ الفحص الفعلي")
+    inspection_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الفحص الفعلي")
     inspector_user_id = models.UUIDField(verbose_name="المفتش/الفني القائم بالفحص")
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="نتيجة الفحص")
@@ -252,7 +252,7 @@ class MaintenanceAssignment(CombinedSharedModel):
 # 15. MaintenanceVisit (زيارات الصيانة الميدانية)
 class MaintenanceVisit(CombinedSharedModel):
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='visits', verbose_name="أمر العمل")
-    visit_date = models.DateField(default=timezone.now, verbose_name="تاريخ الزيارة الفعلي")
+    visit_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الزيارة الفعلي")
     start_time = models.TimeField(verbose_name="وقت الدخول")
     end_time = models.TimeField(verbose_name="وقت الخروج/المغادرة")
 

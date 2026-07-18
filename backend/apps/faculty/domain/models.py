@@ -30,7 +30,7 @@ class FacultyMember(CombinedSharedModel):
     branch_id = models.UUIDField(db_index=True, null=True, blank=True)
     department = models.CharField(max_length=100)
     current_position = models.CharField(max_length=100)
-    joining_date = models.DateField(default=timezone.now)
+    joining_date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=30, default='draft', db_index=True) # draft, pending_review, approved, active, suspended, resigned
 
     def save(self, *args, **kwargs):

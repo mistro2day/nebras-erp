@@ -436,7 +436,7 @@ class BillingCycle(CombinedSharedModel):
 # 26. Statement (كشوفات الحساب التاريخية)
 class Statement(CombinedSharedModel):
     student_billing_account = models.ForeignKey(StudentBillingAccount, on_delete=models.CASCADE, related_name='statements')
-    statement_date = models.DateField(default=timezone.now)
+    statement_date = models.DateField(default=timezone.localdate)
     start_date = models.DateField()
     end_date = models.DateField()
     opening_balance = models.DecimalField(max_digits=15, decimal_places=2)

@@ -63,6 +63,9 @@ export class InventoryService {
   createZone(payload: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/zones/`, payload);
   }
+  getAisles(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/aisles/`, { params: { page_size: 300 } as any });
+  }
   createAisle(payload: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/aisles/`, payload);
   }

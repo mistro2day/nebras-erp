@@ -1,6 +1,7 @@
 from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.inventory.domain.models import (
@@ -134,13 +135,17 @@ class InventoryAdjustmentViewSet(BaseCRUDViewSet):
         if not warehouse_id or not items:
             return Response({'error': 'warehouse_id and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        adj = InventoryAdjustmentService.adjust_stock(
-            tenant_id=tenant_id,
-            warehouse_id=warehouse_id,
-            items_data=items,
-            reason=reason,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            adj = InventoryAdjustmentService.adjust_stock(
+                tenant_id=tenant_id,
+                warehouse_id=warehouse_id,
+                items_data=items,
+                reason=reason,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(adj)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -159,13 +164,17 @@ class GoodsReceiptViewSet(BaseCRUDViewSet):
         if not purchase_order_id or not warehouse_id or not items:
             return Response({'error': 'purchase_order_id, warehouse_id, and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        gr = GoodsReceiptService.receive_from_purchase_order(
-            tenant_id=tenant_id,
-            po_id=purchase_order_id,
-            warehouse_id=warehouse_id,
-            items_data=items,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            gr = GoodsReceiptService.receive_from_purchase_order(
+                tenant_id=tenant_id,
+                po_id=purchase_order_id,
+                warehouse_id=warehouse_id,
+                items_data=items,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(gr)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -189,13 +198,18 @@ class GoodsIssueViewSet(BaseCRUDViewSet):
         if not warehouse_id or not items:
             return Response({'error': 'warehouse_id and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        gi = GoodsIssueService.issue_stock(
-            tenant_id=tenant_id,
-            warehouse_id=warehouse_id,
-            issue_type=issue_type,
-            items_data=items,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            gi = GoodsIssueService.issue_stock(
+                tenant_id=tenant_id,
+                warehouse_id=warehouse_id,
+                issue_type=issue_type,
+                items_data=items,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            # قواعد العمل (رصيد غير كافٍ مثلاً) خطأ مستخدم لا خطأ خادم
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(gi)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

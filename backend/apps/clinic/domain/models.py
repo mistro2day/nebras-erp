@@ -77,7 +77,7 @@ class ClinicVisit(CombinedSharedModel):
     )
     clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, verbose_name="العيادة")
     patient_user_id = models.UUIDField(db_index=True, verbose_name="معرف المريض")
-    visit_date = models.DateField(default=timezone.now, verbose_name="تاريخ الزيارة")
+    visit_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الزيارة")
     visit_type = models.CharField(max_length=20, choices=VISIT_TYPES, default='walk_in', verbose_name="نوع الزيارة")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='checked_in', verbose_name="حالة الزيارة")
     check_in_time = models.DateTimeField(default=timezone.now, verbose_name="وقت الدخول للعيادة")
@@ -133,7 +133,7 @@ class MedicationDispense(CombinedSharedModel):
     visit = models.ForeignKey(ClinicVisit, on_delete=models.CASCADE, related_name='dispenses', verbose_name="زيارة العيادة")
     medication = models.ForeignKey(Medication, on_delete=models.PROTECT, verbose_name="الدواء المصروف")
     quantity_dispensed = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الكمية المصروفة")
-    dispense_date = models.DateField(default=timezone.now, verbose_name="تاريخ الصرف")
+    dispense_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الصرف")
 
     class Meta:
         db_table = 'nebras_clinic_medication_dispenses'
@@ -203,7 +203,7 @@ class VaccinationSchedule(CombinedSharedModel):
 # 15. MedicalScreening (الفحوصات الطبية الدورية العامة للطلاب)
 class MedicalScreening(CombinedSharedModel):
     patient_user_id = models.UUIDField(db_index=True, verbose_name="المريض")
-    screening_date = models.DateField(default=timezone.now, verbose_name="تاريخ الفحص العام")
+    screening_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الفحص العام")
     general_notes = models.TextField(blank=True, null=True, verbose_name="التقييم العام المكتوب")
 
     class Meta:
@@ -230,7 +230,7 @@ class VitalSigns(CombinedSharedModel):
 # 17. GrowthRecord (سجلات مراقبة النمو ومؤشر كتلة الجسم)
 class GrowthRecord(CombinedSharedModel):
     patient_user_id = models.UUIDField(db_index=True, verbose_name="الطالب")
-    check_date = models.DateField(default=timezone.now, verbose_name="تاريخ الفحص")
+    check_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الفحص")
     bmi = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="مؤشر كتلة الجسم (BMI)")
 
     class Meta:
@@ -242,7 +242,7 @@ class GrowthRecord(CombinedSharedModel):
 # 18. HeightWeightRecord (القياسات الفزيائية للطول والوزن)
 class HeightWeightRecord(CombinedSharedModel):
     patient_user_id = models.UUIDField(db_index=True, verbose_name="الطالب")
-    record_date = models.DateField(default=timezone.now, verbose_name="تاريخ القياس")
+    record_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ القياس")
     height_cm = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="الطول (سم)")
     weight_kg = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="الوزن (كجم)")
 
@@ -372,7 +372,7 @@ class HealthIncident(CombinedSharedModel):
 # 28. IsolationCase (حالات العزل الصحي للأمراض المعدية)
 class IsolationCase(CombinedSharedModel):
     patient_user_id = models.UUIDField(db_index=True, verbose_name="المعزول صحياً")
-    start_date = models.DateField(default=timezone.now, verbose_name="تاريخ الدخول في العزل")
+    start_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الدخول في العزل")
     end_date = models.DateField(blank=True, null=True, verbose_name="تاريخ فك العزل/الشفاء")
     reason = models.CharField(max_length=200, verbose_name="المرض المعدي المشخص (كورونا، جدري، إلخ)")
 

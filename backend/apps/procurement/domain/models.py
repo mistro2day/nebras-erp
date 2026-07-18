@@ -90,7 +90,7 @@ class VendorDocument(CombinedSharedModel):
 # 6. VendorEvaluation (تقييم الموردين)
 class VendorEvaluation(CombinedSharedModel):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='evaluations')
-    evaluation_date = models.DateField(default=timezone.now)
+    evaluation_date = models.DateField(default=timezone.localdate)
     evaluator_id = models.UUIDField()
     score = models.DecimalField(max_digits=5, decimal_places=2)  # النسبة المئوية مثلاً
     notes = models.TextField()
@@ -104,7 +104,7 @@ class VendorEvaluation(CombinedSharedModel):
 # 7. VendorBlacklist (القائمة السوداء للموردين)
 class VendorBlacklist(CombinedSharedModel):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='blacklist_records')
-    blacklist_date = models.DateField(default=timezone.now)
+    blacklist_date = models.DateField(default=timezone.localdate)
     reason = models.TextField()
     removed_date = models.DateField(blank=True, null=True)
 
@@ -140,7 +140,7 @@ class PurchaseRequest(CombinedSharedModel):
     request_number = models.CharField(max_length=50, db_index=True)
     department_id = models.UUIDField(db_index=True, help_text="القسم الطالب للشراء")
     requested_by = models.UUIDField(db_index=True)
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     priority = models.CharField(max_length=20, choices=(('low', 'منخفض'), ('medium', 'متوسط'), ('high', 'عاجل')), default='medium')
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='draft')
     total_estimated_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.0)
@@ -246,7 +246,7 @@ class Quotation(CombinedSharedModel):
     rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='quotations')
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT)
     quotation_reference = models.CharField(max_length=50)
-    submitted_date = models.DateField(default=timezone.now)
+    submitted_date = models.DateField(default=timezone.localdate)
     total_amount = models.DecimalField(max_digits=15, decimal_places=2)
     lead_time_days = models.IntegerField(default=7)
     status = models.CharField(max_length=20, choices=(('submitted', 'مقدم'), ('evaluated', 'مقيّم'), ('awarded', 'مقبول وتمت الترسية'), ('rejected', 'مرفوض')), default='submitted')
@@ -288,7 +288,7 @@ class VendorAward(CombinedSharedModel):
     rfq = models.ForeignKey(RFQ, on_delete=models.PROTECT)
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT)
     quotation = models.ForeignKey(Quotation, on_delete=models.PROTECT)
-    award_date = models.DateField(default=timezone.now)
+    award_date = models.DateField(default=timezone.localdate)
     awarded_amount = models.DecimalField(max_digits=15, decimal_places=2)
 
     class Meta:
@@ -309,7 +309,7 @@ class PurchaseOrder(CombinedSharedModel):
     po_number = models.CharField(max_length=50, db_index=True)
     purchase_request = models.ForeignKey(PurchaseRequest, on_delete=models.PROTECT, related_name='purchase_orders')
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT)
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='draft')
     total_amount = models.DecimalField(max_digits=15, decimal_places=2)
     payment_terms = models.TextField(blank=True, null=True)
@@ -352,7 +352,7 @@ class PurchaseOrderItem(CombinedSharedModel):
 class PurchaseOrderRevision(CombinedSharedModel):
     purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='revisions')
     revision_number = models.IntegerField(default=1)
-    revised_date = models.DateField(default=timezone.now)
+    revised_date = models.DateField(default=timezone.localdate)
     change_summary = models.TextField()
 
     class Meta:
@@ -396,7 +396,7 @@ class ContractItem(CombinedSharedModel):
 # 25. ContractRenewal (تجديدات العقود)
 class ContractRenewal(CombinedSharedModel):
     contract = models.ForeignKey(PurchaseContract, on_delete=models.CASCADE, related_name='renewals')
-    renewal_date = models.DateField(default=timezone.now)
+    renewal_date = models.DateField(default=timezone.localdate)
     new_end_date = models.DateField()
     adjusted_value = models.DecimalField(max_digits=15, decimal_places=2)
 

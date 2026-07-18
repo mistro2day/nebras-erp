@@ -189,7 +189,7 @@ class BorrowTransaction(CombinedSharedModel):
     )
     copy = models.ForeignKey(BookCopy, on_delete=models.PROTECT, related_name='borrows', verbose_name="نسخة الكتاب")
     borrower_user_id = models.UUIDField(db_index=True, verbose_name="معرف المستعير (طالب/معلم/موظف)")
-    borrow_date = models.DateField(default=timezone.now, verbose_name="تاريخ الاستعارة")
+    borrow_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الاستعارة")
     due_date = models.DateField(verbose_name="تاريخ الإرجاع المستحق")
     actual_return_date = models.DateField(blank=True, null=True, verbose_name="تاريخ الإرجاع الفعلي")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='borrowed', verbose_name="حالة الاستعارة")
@@ -210,7 +210,7 @@ class Reservation(CombinedSharedModel):
     )
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='reservations', verbose_name="الكتاب المطلوب")
     user_id = models.UUIDField(db_index=True, verbose_name="المستخدم المتقدم بالحجز")
-    reservation_date = models.DateField(default=timezone.now, verbose_name="تاريخ تقديم الحجز")
+    reservation_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ تقديم الحجز")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     class Meta:
@@ -222,7 +222,7 @@ class Reservation(CombinedSharedModel):
 # 14. Renewal (عمليات التجديد لطلب الاستعارة الحالي)
 class Renewal(CombinedSharedModel):
     borrow_transaction = models.ForeignKey(BorrowTransaction, on_delete=models.CASCADE, related_name='renewals', verbose_name="عملية الاستعارة")
-    renewal_date = models.DateField(default=timezone.now, verbose_name="تاريخ تقديم التجديد")
+    renewal_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ تقديم التجديد")
     new_due_date = models.DateField(verbose_name="تاريخ الإرجاع الجديد الممنوح")
 
     class Meta:
@@ -253,7 +253,7 @@ class Fine(CombinedSharedModel):
 # 16. LostBook (سجل إثبات الكتب المفقودة)
 class LostBook(CombinedSharedModel):
     copy = models.ForeignKey(BookCopy, on_delete=models.PROTECT, related_name='lost_records', verbose_name="نسخة الكتاب")
-    reported_date = models.DateField(default=timezone.now, verbose_name="تاريخ إثبات الفقد")
+    reported_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ إثبات الفقد")
     charge_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="القيمة المحملة على المستعير كتعويض")
     is_paid = models.BooleanField(default=False)
 
@@ -266,7 +266,7 @@ class LostBook(CombinedSharedModel):
 # 17. DamagedBook (سجلات الكتب التالفة بفعل الاستعارة)
 class DamagedBook(CombinedSharedModel):
     copy = models.ForeignKey(BookCopy, on_delete=models.PROTECT, related_name='damaged_records', verbose_name="نسخة الكتاب")
-    reported_date = models.DateField(default=timezone.now, verbose_name="تاريخ إثبات التلف")
+    reported_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ إثبات التلف")
     damage_description = models.TextField(verbose_name="توصيف التلف الفعلي للنسخة")
     repair_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
@@ -339,7 +339,7 @@ class ResourceAttachment(CombinedSharedModel):
 class ReadingHistory(CombinedSharedModel):
     user_id = models.UUIDField(db_index=True, verbose_name="المستخدم")
     book = models.ForeignKey(Book, on_delete=models.CASCADE, verbose_name="الكتاب المطالع")
-    read_date = models.DateField(default=timezone.now, verbose_name="تاريخ القراءة/الاستعارة")
+    read_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ القراءة/الاستعارة")
 
     class Meta:
         db_table = 'nebras_library_reading_histories'

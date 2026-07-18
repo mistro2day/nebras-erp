@@ -103,6 +103,11 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                 <button class="edit" (click)="openForm(w.id)" title="تعديل المستودع">تعديل</button>
               </header>
 
+              <button class="structure" (click)="openDetail(w.id)">
+                <span>هيكل التخزين</span>
+                <span class="st-meta">{{ w.bins }} رف · فتح ‹</span>
+              </button>
+
               @if (w.location) { <p class="wh-loc">📍 {{ w.location }}</p> }
 
               <div class="wh-stats">
@@ -186,6 +191,13 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 
     .err { margin: 12px 0 0; font-size: 12.5px; color: #B91C1C; background: #fef2f2;
       border: 1px solid #fecaca; border-radius: 8px; padding: 9px 12px; }
+
+    .structure { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-family: inherit; font-size: 12px; font-weight: 700; color: var(--nb-text);
+      background: var(--nb-surface-raised); border: 1px solid var(--nb-border);
+      border-radius: 9px; padding: 9px 12px; cursor: pointer; text-align: start; }
+    .structure:hover { border-color: var(--nb-primary-400); color: var(--nb-primary-700); }
+    .st-meta { font-size: 11px; font-weight: 600; color: var(--nb-text-muted); }
 
     .edit { border: none; background: var(--nb-surface-raised); border: 1px solid var(--nb-border);
       border-radius: 7px; font-family: inherit; font-size: 11px; font-weight: 700;
@@ -349,5 +361,6 @@ export class WarehousesComponent implements OnInit {
   private rows(d: any): any[] { return Array.isArray(d) ? d : (d?.data ?? d?.results ?? []); }
 
   go(route: string) { this.router.navigateByUrl(route); }
+  openDetail(id: string) { this.router.navigate(['/inventory/warehouses', id]); }
   back() { this.router.navigateByUrl('/inventory/dashboard'); }
 }

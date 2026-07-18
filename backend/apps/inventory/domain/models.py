@@ -225,7 +225,7 @@ class InventoryTransaction(CombinedSharedModel):
     quantity = models.DecimalField(max_digits=15, decimal_places=4, verbose_name="الكمية")
     unit_cost = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="تكلفة الوحدة")
     total_value = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="القيمة الإجمالية للحركة")
-    date = models.DateField(default=timezone.now, verbose_name="تاريخ تسجيل الحركة")
+    date = models.DateField(default=timezone.localdate, verbose_name="تاريخ تسجيل الحركة")
 
     class Meta:
         db_table = 'nebras_inventory_transactions'
@@ -262,7 +262,7 @@ class InventoryAdjustment(CombinedSharedModel):
     )
     adjustment_number = models.CharField(max_length=50, db_index=True, verbose_name="رقم التسوية المخزنية")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="المستودع")
-    date = models.DateField(default=timezone.now, verbose_name="التاريخ")
+    date = models.DateField(default=timezone.localdate, verbose_name="التاريخ")
     reason = models.TextField(verbose_name="سبب التسوية (فقد/تلف/عجز/زيادة)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     journal_entry_id = models.UUIDField(null=True, blank=True, help_text="قيد التسوية المخزنية المنعكس في المالية")
@@ -284,7 +284,7 @@ class GoodsReceipt(CombinedSharedModel):
     )
     receipt_number = models.CharField(max_length=50, db_index=True, verbose_name="رقم سند الاستلام")
     purchase_order_id = models.UUIDField(null=True, blank=True, help_text="رابط مع أمر الشراء (PO) في موديول المشتريات")
-    received_date = models.DateField(default=timezone.now, verbose_name="تاريخ الاستلام الفعلي")
+    received_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الاستلام الفعلي")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="مستودع الاستلام الرئيسي")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     journal_entry_id = models.UUIDField(null=True, blank=True, help_text="قيد الاستحقاق/التسوية المخزنية بالمالية")
@@ -321,7 +321,7 @@ class GoodsIssue(CombinedSharedModel):
     issue_number = models.CharField(max_length=50, db_index=True, verbose_name="رقم سند الصرف")
     issue_type = models.CharField(max_length=50, default='department', help_text="نوع الجهة المستلمة: قسم، عيادة، مختبر، طالب، إلخ")
     destination_reference_id = models.UUIDField(null=True, blank=True, help_text="المعرف للجهة المستلمة (UUID للمستلم)")
-    issue_date = models.DateField(default=timezone.now, verbose_name="تاريخ صرف البند")
+    issue_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ صرف البند")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="مستودع الصرف")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     journal_entry_id = models.UUIDField(null=True, blank=True, help_text="قيد الصرف الاستهلاكي المنعكس بالمالية")
@@ -358,7 +358,7 @@ class InventoryTransfer(CombinedSharedModel):
     transfer_number = models.CharField(max_length=50, db_index=True, verbose_name="رقم طلب التحويل")
     from_warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='outgoing_transfers', verbose_name="المستودع المصدر")
     to_warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, related_name='incoming_transfers', verbose_name="المستودع الوجهة")
-    date = models.DateField(default=timezone.now, verbose_name="تاريخ الطلب")
+    date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الطلب")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     approved_by = models.UUIDField(null=True, blank=True)
 

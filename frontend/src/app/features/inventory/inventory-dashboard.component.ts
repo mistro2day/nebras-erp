@@ -217,7 +217,7 @@ interface StockLine {
     .empty { padding: 28px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
 
     .sec-title { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
-    .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
     .tile { text-align: start; font-family: inherit; cursor: pointer; background: var(--nb-surface);
       border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px;
@@ -246,6 +246,8 @@ export class InventoryDashboardComponent implements OnInit {
     { icon: '🏬', title: 'المستودعات', desc: 'المواقع والمناطق والرفوف.', route: '/inventory/warehouses' },
     { icon: '↕︎', title: 'حركة المخزون', desc: 'كارت الصنف وسجل الحركات.', route: '/inventory/movements' },
     { icon: '🚚', title: 'استلام البضاعة', desc: 'سندات الاستلام مقابل أوامر الشراء.', route: '/inventory/receipts' },
+    { icon: '📤', title: 'صرف المخزون', desc: 'صرف الأصناف للأقسام والمختبرات.', route: '/inventory/issues' },
+    { icon: '⚙️', title: 'المرجعيات', desc: 'فئات الأصناف ووحدات القياس.', route: '/inventory/setup' },
   ];
 
   stat(k: string): number { return Number(this.stats()?.[k] ?? 0); }
