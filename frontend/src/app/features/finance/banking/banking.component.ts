@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * البنوك والصناديق (Cash & Bank) — إدارة البنوك، الحسابات البنكية، والخزائن النقدية،
@@ -16,7 +17,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-banking',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="البنوك والصناديق النقدية" subtitle="إدارة المصارف، الحسابات البنكية، والخزائن النقدية المرتبطة بالحسابات المحاسبية.">
@@ -44,8 +45,12 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الرمز</th><th>الاسم</th><th>SWIFT</th></tr></thead>
           <tbody>
+            @if (loadingBanks()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل المصارف…"></nb-loading></td></tr>
+            } @else {
             @for (b of banks(); track b.id) { <tr><td><strong>{{ b.code }}</strong></td><td>{{ b.name_ar }} <span class="nm">{{ b.name_en }}</span></td><td class="mono">{{ b.swift_code }}</td></tr> }
             @if (!banks().length) { <tr><td colspan="3" class="empty">لا توجد مصارف مسجلة.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
 
@@ -64,8 +69,12 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>المصرف</th><th>رقم الحساب</th><th>الآيبان</th><th>الحالة</th></tr></thead>
           <tbody>
+            @if (loadingAccounts()) {
+              <tr><td colspan="4"><nb-loading message="جارٍ تحميل الحسابات البنكية…"></nb-loading></td></tr>
+            } @else {
             @for (a of bankAccounts(); track a.id) { <tr><td><strong>{{ a.bank_name }}</strong></td><td class="mono">{{ a.account_number }}</td><td class="mono">{{ a.iban }}</td><td><span class="badge ok">{{ a.status === 'active' ? 'نشط' : 'غير نشط' }}</span></td></tr> }
             @if (!bankAccounts().length) { <tr><td colspan="4" class="empty">لا توجد حسابات بنكية.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
 
@@ -83,8 +92,12 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الاسم</th><th>العملة</th><th>الحالة</th></tr></thead>
           <tbody>
+            @if (loadingBoxes()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل الخزائن النقدية…"></nb-loading></td></tr>
+            } @else {
             @for (cb of cashBoxes(); track cb.id) { <tr><td><strong>{{ cb.name_ar }}</strong> <span class="nm">{{ cb.name_en }}</span></td><td>{{ currCode(cb.currency) }}</td><td><span class="badge ok">{{ cb.status === 'active' ? 'نشطة' : 'غير نشطة' }}</span></td></tr> }
             @if (!cashBoxes().length) { <tr><td colspan="3" class="empty">لا توجد خزائن نقدية.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
     </div>
@@ -131,6 +144,9 @@ export class BankingComponent implements OnInit {
   banks = signal<any[]>([]);
   bankAccounts = signal<any[]>([]);
   cashBoxes = signal<any[]>([]);
+  loadingBanks = signal(true);
+  loadingAccounts = signal(true);
+  loadingBoxes = signal(true);
   currencies = signal<any[]>([]);
   accounts = signal<any[]>([]);
 
@@ -144,9 +160,21 @@ export class BankingComponent implements OnInit {
     this.loadAll();
   }
   loadAll() {
-    this.service.getBanks().subscribe((r) => { if (r?.success) this.banks.set(r.data); });
-    this.service.getBankAccounts().subscribe((r) => { if (r?.success) this.bankAccounts.set(r.data); });
-    this.service.getCashBoxes().subscribe((r) => { if (r?.success) this.cashBoxes.set(r.data); });
+    this.loadingBanks.set(true);
+    this.loadingAccounts.set(true);
+    this.loadingBoxes.set(true);
+    this.service.getBanks().subscribe({
+      next: (r) => { if (r?.success) this.banks.set(r.data); this.loadingBanks.set(false); },
+      error: () => this.loadingBanks.set(false),
+    });
+    this.service.getBankAccounts().subscribe({
+      next: (r) => { if (r?.success) this.bankAccounts.set(r.data); this.loadingAccounts.set(false); },
+      error: () => this.loadingAccounts.set(false),
+    });
+    this.service.getCashBoxes().subscribe({
+      next: (r) => { if (r?.success) this.cashBoxes.set(r.data); this.loadingBoxes.set(false); },
+      error: () => this.loadingBoxes.set(false),
+    });
   }
   currCode(id: string) { return this.currencies().find((c) => c.id === id)?.code || '—'; }
 

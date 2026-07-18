@@ -9,6 +9,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 interface Line { account: string; debit: number; credit: number; cost_center: string | null; description?: string; }
 
@@ -20,7 +21,7 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
   selector: 'app-journal-entries',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="قيود اليومية والاعتمادات" subtitle="إنشاء القيود المزدوجة المتوازنة، واعتمادها، وترحيلها لدفتر الأستاذ العام.">
@@ -87,6 +88,9 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
           <table class="nb-table">
             <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>المصدر</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody>
+              @if (loading()) {
+                <tr><td colspan="6"><nb-loading message="جارٍ تحميل القيود…"></nb-loading></td></tr>
+              } @else {
               @for (j of journals(); track j.id) {
                 <tr class="clickable" (click)="openDetail(j)">
                   <td><strong>{{ j.entry_number }}</strong></td>
@@ -104,6 +108,7 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
                 </tr>
               }
               @if (!journals().length) { <tr><td colspan="6" class="empty">لا توجد قيود بهذه الحالة.</td></tr> }
+              }
             </tbody>
           </table>
         </div>
@@ -225,6 +230,7 @@ export class JournalEntriesComponent implements OnInit {
   private router = inject(Router);
 
   journals = signal<any[]>([]);
+  loading = signal(true);
   accounts = signal<any[]>([]);
   periods = signal<any[]>([]);
   costCenters = signal<any[]>([]);
@@ -262,8 +268,12 @@ export class JournalEntriesComponent implements OnInit {
 
   setStatus(s: string) { this.statusFilter.set(s); this.load(); }
   load() {
+    this.loading.set(true);
     const params = this.statusFilter() ? { status: this.statusFilter() } : undefined;
-    this.service.getJournals(params).subscribe((r) => { if (r?.success) this.journals.set(r.data); });
+    this.service.getJournals(params).subscribe({
+      next: (r) => { if (r?.success) this.journals.set(r.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
   }
 
   toggleEditor() { this.showEditor.update((v) => !v); if (this.showEditor()) this.draft = this.blank(); }

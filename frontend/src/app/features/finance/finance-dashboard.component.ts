@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FinanceService } from './finance.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
 interface FinanceModule {
   key: string; title: string; desc: string; icon: string; route: string;
@@ -19,7 +20,7 @@ interface FinanceModule {
   selector: 'app-finance-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -131,6 +132,9 @@ interface FinanceModule {
           <table class="nb-table">
             <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>الحالة</th></tr></thead>
             <tbody>
+              @if (loadingRecent()) {
+                <tr><td colspan="4"><nb-loading message="جارٍ تحميل أحدث القيود…"></nb-loading></td></tr>
+              } @else {
               @for (j of recent(); track j.id) {
                 <tr (click)="go('/finance/journals')">
                   <td><strong>{{ j.entry_number }}</strong></td>
@@ -140,6 +144,7 @@ interface FinanceModule {
                 </tr>
               }
               @if (!recent().length) { <tr><td colspan="4" class="empty">لا توجد قيود مسجلة بعد — ابدأ بإنشاء قيد جديد.</td></tr> }
+              }
             </tbody>
           </table>
         </div>
@@ -285,6 +290,7 @@ export class FinanceDashboardComponent implements OnInit {
 
   stats = signal<any>({ alerts: [] });
   recent = signal<any[]>([]);
+  loadingRecent = signal(true);
 
   equity = computed(() => (Number(this.stats().total_assets) || 0) - (Number(this.stats().total_liabilities) || 0));
   netResult = computed(() => (Number(this.stats().revenue) || 0) - (Number(this.stats().expenses) || 0));
@@ -315,7 +321,11 @@ export class FinanceDashboardComponent implements OnInit {
 
   ngOnInit() {
     this.service.getDashboardData().subscribe({ next: (r) => { if (r?.success) this.stats.set(r.data); }, error: () => {} });
-    this.service.getJournals().subscribe({ next: (r) => { if (r?.success) this.recent.set((r.data || []).slice(0, 6)); }, error: () => {} });
+    this.loadingRecent.set(true);
+    this.service.getJournals().subscribe({
+      next: (r) => { if (r?.success) this.recent.set((r.data || []).slice(0, 6)); this.loadingRecent.set(false); },
+      error: () => this.loadingRecent.set(false),
+    });
   }
 
   go(route: string) { this.router.navigateByUrl(route); }

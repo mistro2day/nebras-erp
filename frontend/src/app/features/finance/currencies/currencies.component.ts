@@ -8,6 +8,7 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * العملات وأسعار الصرف (Currencies & Exchange Rates) — العملات المعتمدة وأسعار التحويل،
@@ -17,7 +18,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
   selector: 'app-currencies',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbExportMenuComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="العملات وأسعار الصرف" subtitle="إدارة العملات المعتمدة وأسعار التحويل بين العملات لتقييم المعاملات متعددة العملات.">
@@ -44,10 +45,14 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الرمز</th><th>الاسم</th><th>الرمز المختصر</th><th>أساسية</th><th>الحالة</th></tr></thead>
           <tbody>
+            @if (loadingCur()) {
+              <tr><td colspan="5"><nb-loading message="جارٍ تحميل العملات…"></nb-loading></td></tr>
+            } @else {
             @for (c of currencies(); track c.id) { <tr><td><strong>{{ c.code }}</strong></td><td>{{ c.name_ar }} <span class="nm">{{ c.name_en }}</span></td><td>{{ c.symbol }}</td>
               <td>@if (c.is_base) { <span class="badge info">أساسية</span> } @else { — }</td>
               <td><span class="badge ok">{{ c.status === 'active' ? 'نشط' : 'غير نشط' }}</span></td></tr> }
             @if (!currencies().length) { <tr><td colspan="5" class="empty">لا توجد عملات.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
 
@@ -64,8 +69,12 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>من</th><th>إلى</th><th class="end">السعر</th><th>التاريخ</th></tr></thead>
           <tbody>
+            @if (loadingRates()) {
+              <tr><td colspan="4"><nb-loading message="جارٍ تحميل أسعار الصرف…"></nb-loading></td></tr>
+            } @else {
             @for (r of rates(); track r.id) { <tr><td>{{ code(r.from_currency) }}</td><td>{{ code(r.to_currency) }}</td><td class="end mono">{{ r.rate }}</td><td class="mono">{{ r.rate_date }}</td></tr> }
             @if (!rates().length) { <tr><td colspan="4" class="empty">لا توجد أسعار صرف مسجلة.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
     </div>
@@ -112,13 +121,23 @@ export class CurrenciesComponent implements OnInit {
   tab = signal<'cur' | 'rate'>('cur');
   currencies = signal<any[]>([]);
   rates = signal<any[]>([]);
+  loadingCur = signal(true);
+  loadingRates = signal(true);
   cur: any = { code: '', name_ar: '', name_en: '', symbol: '', is_base: false };
   rate: any = { from_currency: '', to_currency: '', rate: 1, rate_date: new Date().toISOString().split('T')[0] };
 
   ngOnInit() { this.load(); }
   load() {
-    this.service.getCurrencies().subscribe((r) => { if (r?.success) this.currencies.set(r.data); });
-    this.service.getExchangeRates().subscribe((r) => { if (r?.success) this.rates.set(r.data); });
+    this.loadingCur.set(true);
+    this.loadingRates.set(true);
+    this.service.getCurrencies().subscribe({
+      next: (r) => { if (r?.success) this.currencies.set(r.data); this.loadingCur.set(false); },
+      error: () => this.loadingCur.set(false),
+    });
+    this.service.getExchangeRates().subscribe({
+      next: (r) => { if (r?.success) this.rates.set(r.data); this.loadingRates.set(false); },
+      error: () => this.loadingRates.set(false),
+    });
   }
   code(id: string) { return this.currencies().find((c) => c.id === id)?.code || '—'; }
   saveCur() {

@@ -6,6 +6,7 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
 /**
  * الإعداد والمرجعيات المالية (Finance Setup) — أنواع الحسابات، التصنيفات، وطرق الدفع.
@@ -15,7 +16,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
   selector: 'app-finance-setup',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الإعداد والمرجعيات المالية" subtitle="تعريف أنواع الحسابات وتصنيفاتها وطرق الدفع المعتمدة في النظام المحاسبي.">
@@ -41,9 +42,13 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الرمز</th><th>الاسم</th><th>الطبيعة</th></tr></thead>
           <tbody>
+            @if (loadingTypes()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل أنواع الحسابات…"></nb-loading></td></tr>
+            } @else {
             @for (x of types(); track x.id) { <tr><td><strong>{{ x.code }}</strong></td><td>{{ x.name_ar }} <span class="nm">{{ x.name_en }}</span></td>
               <td><span class="badge" [class.debit]="x.normal_balance==='debit'" [class.credit]="x.normal_balance==='credit'">{{ x.normal_balance === 'debit' ? 'مدين' : 'دائن' }}</span></td></tr> }
             @if (!types().length) { <tr><td colspan="3" class="empty">لا توجد أنواع.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
 
@@ -60,8 +65,12 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الرمز</th><th>الاسم</th><th>النوع</th></tr></thead>
           <tbody>
+            @if (loadingCats()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل التصنيفات…"></nb-loading></td></tr>
+            } @else {
             @for (c of cats(); track c.id) { <tr><td><strong>{{ c.code }}</strong></td><td>{{ c.name_ar }}</td><td>{{ typeName(c.account_type) }}</td></tr> }
             @if (!cats().length) { <tr><td colspan="3" class="empty">لا توجد تصنيفات.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
 
@@ -77,9 +86,13 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
         <nb-panel [flush]="true"><div class="table-wrap"><table class="nb-table">
           <thead><tr><th>الرمز</th><th>الاسم</th><th>الحالة</th></tr></thead>
           <tbody>
+            @if (loadingMethods()) {
+              <tr><td colspan="3"><nb-loading message="جارٍ تحميل طرق الدفع…"></nb-loading></td></tr>
+            } @else {
             @for (m of methods(); track m.id) { <tr><td><strong>{{ m.code }}</strong></td><td>{{ m.name_ar }} <span class="nm">{{ m.name_en }}</span></td>
               <td><span class="badge ok">{{ m.status === 'active' ? 'نشط' : 'غير نشط' }}</span></td></tr> }
             @if (!methods().length) { <tr><td colspan="3" class="empty">لا توجد طرق دفع.</td></tr> }
+            }
           </tbody></table></div></nb-panel>
       }
     </div>
@@ -125,6 +138,9 @@ export class FinanceSetupComponent implements OnInit {
   types = signal<any[]>([]);
   cats = signal<any[]>([]);
   methods = signal<any[]>([]);
+  loadingTypes = signal(true);
+  loadingCats = signal(true);
+  loadingMethods = signal(true);
   saving = signal(false);
 
   type: any = { code: '', name_ar: '', name_en: '', normal_balance: 'debit' };
@@ -133,9 +149,21 @@ export class FinanceSetupComponent implements OnInit {
 
   ngOnInit() { this.loadAll(); }
   loadAll() {
-    this.service.getAccountTypes().subscribe((r) => { if (r?.success) this.types.set(r.data); });
-    this.service.getAccountCategories().subscribe((r) => { if (r?.success) this.cats.set(r.data); });
-    this.service.getPaymentMethods().subscribe((r) => { if (r?.success) this.methods.set(r.data); });
+    this.loadingTypes.set(true);
+    this.loadingCats.set(true);
+    this.loadingMethods.set(true);
+    this.service.getAccountTypes().subscribe({
+      next: (r) => { if (r?.success) this.types.set(r.data); this.loadingTypes.set(false); },
+      error: () => this.loadingTypes.set(false),
+    });
+    this.service.getAccountCategories().subscribe({
+      next: (r) => { if (r?.success) this.cats.set(r.data); this.loadingCats.set(false); },
+      error: () => this.loadingCats.set(false),
+    });
+    this.service.getPaymentMethods().subscribe({
+      next: (r) => { if (r?.success) this.methods.set(r.data); this.loadingMethods.set(false); },
+      error: () => this.loadingMethods.set(false),
+    });
   }
   typeName(id: string) { return this.types().find((x) => x.id === id)?.name_ar || '—'; }
 
