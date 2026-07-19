@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
+from apps.shared.application.numbering import generate_unique_number
 from apps.maintenance.domain.models import (
     MaintenanceCategory, MaintenancePriority, MaintenanceType, MaintenanceRequest,
     MaintenanceTeam, Technician, WorkOrder, WorkOrderTask, MaintenancePlan,
@@ -52,6 +53,14 @@ class MaintenanceRequestViewSet(BaseCRUDViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'description', 'request_number']
 
+    def get_create_defaults(self, request):
+        """رقم البلاغ يُولَّد في الخادم — المُبلِّغ لا يعرف آخر رقم ولا يُفترض أن يخترعه."""
+        return {
+            'request_number': generate_unique_number(
+                MaintenanceRequest, request.tenant_id,
+                f"MR-{timezone.now().strftime('%y%m%d')}-", 'request_number'),
+        }
+
     @action(detail=False, methods=['get'], url_path='dashboard-stats')
     def get_dashboard_stats(self, request):
         """جلب إحصائيات لوحة تحكم الصيانة الفورية (CMMS)."""
@@ -92,6 +101,14 @@ class WorkOrderViewSet(BaseCRUDViewSet):
     serializer_class = WorkOrderSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['wo_number']
+
+    def get_create_defaults(self, request):
+        """رقم أمر العمل يُولَّد في الخادم — يضمن التسلسل وعدم التكرار."""
+        return {
+            'wo_number': generate_unique_number(
+                WorkOrder, request.tenant_id,
+                f"WO-{timezone.now().strftime('%y%m%d')}-", 'wo_number'),
+        }
 
     @action(detail=True, methods=['post'], url_path='complete')
     def complete(self, request, pk=None):

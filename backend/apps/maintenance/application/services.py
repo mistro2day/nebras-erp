@@ -50,7 +50,35 @@ class WorkOrderService:
             created_by=user_id
         )
 
-        # 4. تحديث حالة طلب البلاغ إن وجد
+        # 4. احتساب أجر العمالة وإضافته لتكلفة أمر العمل
+        # الساعات وحدها لا تكلفة لها: تُضرب في سعر ساعة الفني المسند.
+        # بدونها تظهر تكلفة الصيانة ناقصة (مواد فقط) فيُتخذ قرار الاستبدال على رقم مضلّل.
+        hours = Decimal(str(actual_hours or 0))
+        tech = wo.assigned_technician
+        if hours > 0 and tech is not None and Decimal(str(tech.hourly_rate or 0)) > 0:
+            rate = Decimal(str(tech.hourly_rate))
+            labor_total = hours * rate
+
+            LaborCost.objects.create(
+                tenant_id=tenant_id,
+                work_order=wo,
+                technician=tech,
+                hours_worked=hours,
+                hourly_rate=rate,
+                created_by=user_id,
+            )
+
+            maint_cost, created = MaintenanceCost.objects.get_or_create(
+                tenant_id=tenant_id,
+                work_order=wo,
+                defaults={'labor_cost': labor_total, 'total_cost': labor_total},
+            )
+            if not created:
+                maint_cost.labor_cost += labor_total
+                maint_cost.total_cost += labor_total
+                maint_cost.save()
+
+        # 5. تحديث حالة طلب البلاغ إن وجد
         if wo.request:
             req = wo.request
             req.status = 'completed'

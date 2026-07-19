@@ -56,14 +56,26 @@ class BaseCRUDViewSet(viewsets.ModelViewSet):
             qs = qs.filter(tenant_id=tenant_id)
         return qs
 
+    def get_create_defaults(self, request):
+        """قيم يولّدها الخادم عند الإنشاء — تُمرَّر لـ save() ولا تُقبل من العميل.
+
+        موضعها هنا لأن `create` يحفظ مباشرة ولا يمرّ بـ `perform_create`.
+        تستخدمها الموديولات لتوليد أرقام المستندات (بلاغ، أمر عمل…).
+        """
+        return {}
+
     def create(self, request, *args, **kwargs):
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # حفظ الكيان مع ربط المستأجر الحالي
+        # حفظ الكيان مع ربط المستأجر الحالي، وأي قيم يولّدها الخادم (أرقام مستندات مثلاً)
         try:
-            instance = serializer.save(tenant_id=tenant_id, created_by=request.user.id if request.user else None)
+            instance = serializer.save(
+                tenant_id=tenant_id,
+                created_by=request.user.id if request.user else None,
+                **self.get_create_defaults(request),
+            )
         except IntegrityError as exc:
             message = _friendly_integrity_message(exc, self.model_class)
             if message is None:

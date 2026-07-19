@@ -105,6 +105,8 @@ class Technician(CombinedSharedModel):
     user_id = models.UUIDField(unique=True, verbose_name="رابط حساب مستخدم الفني")
     team = models.ForeignKey(MaintenanceTeam, on_delete=models.SET_NULL, null=True, blank=True, related_name='technicians', verbose_name="فريق العمل")
     specialty = models.CharField(max_length=150, blank=True, null=True, verbose_name="التخصص الفني (كهرباء، تبريد، شبكات)")
+    hourly_rate = models.DecimalField(max_digits=8, decimal_places=2, default=0.00,
+                                      verbose_name="سعر ساعة العمل — يُحتسب به أجر الفني على أوامر العمل")
     is_active = models.BooleanField(default=True, verbose_name="نشط وقابل لإسناد المهام")
 
     class Meta:

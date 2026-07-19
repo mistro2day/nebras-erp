@@ -58,19 +58,21 @@ interface PartLine { item: string; qty: number; }
                   }
                 </select>
               </label>
-              <label>
+              <label class="wide">
                 <span>الفني المسؤول</span>
                 <select [(ngModel)]="form.technician">
                   <option value="">— غير مسند —</option>
                   @for (t of technicians(); track t.id) {
-                    <option [value]="t.id">{{ t.specialty || 'فني' }}</option>
+                    <option [value]="t.id">
+                      {{ t.specialty || 'فني' }} — {{ t.hourly_rate }} ر.س/ساعة
+                    </option>
                   }
                 </select>
               </label>
-              <label>
-                <span>رقم أمر العمل <i>*</i></span>
-                <input [(ngModel)]="form.number" placeholder="WO-2026-001" />
-              </label>
+              <p class="hint-note">
+                سعر ساعة الفني يُحتسب به أجر العمل عند إكمال الأمر ويُضاف لتكلفته.
+                رقم أمر العمل يُولَّد تلقائياً.
+              </p>
             </div>
             @if (error()) { <p class="err">{{ error() }}</p> }
           </div>
@@ -363,6 +365,7 @@ interface PartLine { item: string; qty: number; }
       font-family: inherit; font-size: 12px; font-weight: 700; color: var(--nb-text-muted);
       cursor: pointer; padding: 7px 14px; width: 100%; }
 
+    .hint-note { grid-column: 1 / -1; margin: 0; font-size: 11.5px; color: var(--nb-text-muted); }
     .err { margin: 12px 0 0; font-size: 12.5px; color: #B91C1C; background: #fef2f2;
       border: 1px solid #fecaca; border-radius: 8px; padding: 9px 12px; }
     .empty-card { background: var(--nb-surface); border: 1px solid var(--nb-border);
@@ -397,7 +400,7 @@ export class MaintenanceWorkOrdersComponent implements OnInit {
   readonly postFor = signal<any | null>(null);
   readonly partLines = signal<PartLine[]>([{ item: '', qty: 0 }]);
 
-  form: any = { asset: '', request: '', technician: '', number: '' };
+  form: any = { asset: '', request: '', technician: '' };
   parts: any = { warehouse: '', account: '' };
   comp: any = { hours: 0, summary: '' };
   pc: any = { expense: '', offset: '', cc: '' };
@@ -461,20 +464,20 @@ export class MaintenanceWorkOrdersComponent implements OnInit {
     this.partLines.update((ls) => ls.map((l, x) => (x === i ? { ...l, qty: Number(v) || 0 } : l)));
   }
 
-  openNew() { this.form = { asset: '', request: '', technician: '', number: '' }; this.error.set(''); this.showNew.set(true); }
+  openNew() { this.form = { asset: '', request: '', technician: '' }; this.error.set(''); this.showNew.set(true); }
   openParts(o: any) { this.parts = { warehouse: '', account: '' }; this.partLines.set([{ item: '', qty: 0 }]); this.error.set(''); this.partsFor.set(o); }
   openComplete(o: any) { this.comp = { hours: 0, summary: '' }; this.error.set(''); this.completeFor.set(o); }
   openPost(o: any) { this.pc = { expense: '', offset: '', cc: '' }; this.error.set(''); this.postFor.set(o); }
 
   createOrder() {
-    if (!this.form.asset || !this.form.number?.trim()) {
-      this.error.set('الأصل ورقم أمر العمل مطلوبان.');
+    if (!this.form.asset) {
+      this.error.set('اختر الأصل المعني بالصيانة.');
       return;
     }
     this.saving.set(true);
     this.error.set('');
+    // رقم أمر العمل يولّده الخادم — لا يُرسل من هنا
     this.svc.createWorkOrder({
-      wo_number: this.form.number.trim(),
       asset: this.form.asset,
       request: this.form.request || null,
       assigned_technician: this.form.technician || null,

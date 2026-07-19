@@ -67,13 +67,23 @@ def seed(tenant_id, user_id):
             defaults={'name_en': en, 'leader_user_id': leader})
         made_teams.append(team)
 
-    # الفنيون: مرتبطون بموظفين حقيقيين ما أمكن
-    specialties = ['كهرباء وتمديدات', 'تبريد وتكييف', 'شبكات وأجهزة', 'سباكة']
-    for i, spec in enumerate(specialties):
+    # الفنيون: مرتبطون بموظفين حقيقيين ما أمكن، ولكلٍّ سعر ساعة يُحتسب به أجره
+    specialties = [
+        ('كهرباء وتمديدات', 45),
+        ('تبريد وتكييف', 50),
+        ('شبكات وأجهزة', 60),
+        ('سباكة', 40),
+    ]
+    for i, (spec, rate) in enumerate(specialties):
         uid = emps[i].id if i < len(emps) else user_id
-        Technician.objects.get_or_create(
+        tech, created = Technician.objects.get_or_create(
             tenant_id=tenant_id, user_id=uid,
-            defaults={'team': made_teams[i % len(made_teams)], 'specialty': spec, 'is_active': True})
+            defaults={'team': made_teams[i % len(made_teams)], 'specialty': spec,
+                      'hourly_rate': rate, 'is_active': True})
+        # الفنيون المُنشأون قبل إضافة الحقل سعرهم صفر — يُضبط هنا
+        if not created and not tech.hourly_rate:
+            tech.hourly_rate = rate
+            tech.save(update_fields=['hourly_rate'])
 
     print(f'  تصنيفات: {MaintenanceCategory.objects.filter(tenant_id=tenant_id).count()}'
           f' | أولويات: {MaintenancePriority.objects.filter(tenant_id=tenant_id).count()}'

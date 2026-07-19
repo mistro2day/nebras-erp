@@ -70,10 +70,6 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   @for (ty of types(); track ty.id) { <option [value]="ty.id">{{ ty.name_ar }}</option> }
                 </select>
               </label>
-              <label>
-                <span>رقم البلاغ <i>*</i></span>
-                <input [(ngModel)]="form.number" placeholder="MR-2026-001" />
-              </label>
               <label class="wide">
                 <span>وصف العطل <i>*</i></span>
                 <input [(ngModel)]="form.description" placeholder="ما الذي حدث ومتى" />
@@ -217,7 +213,7 @@ export class MaintenanceRequestsComponent implements OnInit {
   readonly priorities = signal<any[]>([]);
   readonly types = signal<any[]>([]);
 
-  form: any = { title: '', asset: '', category: '', priority: '', type: '', number: '', description: '' };
+  form: any = { title: '', asset: '', category: '', priority: '', type: '', description: '' };
 
   /** الترتيب بالأولوية: ما يوقف الدراسة أولاً مهما كان تاريخه. */
   private priorityRank(id: string): number {
@@ -249,22 +245,21 @@ export class MaintenanceRequestsComponent implements OnInit {
   }
 
   openNew() {
-    this.form = { title: '', asset: '', category: '', priority: '', type: '', number: '', description: '' };
+    this.form = { title: '', asset: '', category: '', priority: '', type: '', description: '' };
     this.error.set('');
     this.showNew.set(true);
   }
 
   save() {
     const f = this.form;
-    if (!f.title?.trim() || !f.asset || !f.category || !f.priority || !f.type
-        || !f.number?.trim() || !f.description?.trim()) {
+    if (!f.title?.trim() || !f.asset || !f.category || !f.priority || !f.type || !f.description?.trim()) {
       this.error.set('كل الحقول المعلَّمة بنجمة مطلوبة، ومنها وصف العطل.');
       return;
     }
     this.saving.set(true);
     this.error.set('');
+    // رقم البلاغ يولّده الخادم — لا يُرسل من هنا
     this.svc.createRequest({
-      request_number: f.number.trim(),
       title: f.title.trim(),
       description: f.description.trim(),
       asset: f.asset,

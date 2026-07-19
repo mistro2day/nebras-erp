@@ -29,6 +29,9 @@ class MaintenanceTypeSerializer(BaseMaintSerializer):
         fields = '__all__'
 
 class MaintenanceRequestSerializer(BaseMaintSerializer):
+    # الرقم يُولَّد في الخادم — لا يُطلب من المستخدم ولا يُقبل منه
+    request_number = serializers.CharField(read_only=True)
+
     class Meta(BaseMaintSerializer.Meta):
         model = MaintenanceRequest
         fields = '__all__'
@@ -44,6 +47,9 @@ class TechnicianSerializer(BaseMaintSerializer):
         fields = '__all__'
 
 class WorkOrderSerializer(BaseMaintSerializer):
+    # الرقم يُولَّد في الخادم — لا يُطلب من المستخدم ولا يُقبل منه
+    wo_number = serializers.CharField(read_only=True)
+
     class Meta(BaseMaintSerializer.Meta):
         model = WorkOrder
         fields = '__all__'
