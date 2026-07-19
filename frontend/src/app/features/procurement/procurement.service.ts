@@ -115,6 +115,13 @@ export class ProcurementService {
     return this.http.post<any>(`${this.apiUrl}/orders/${id}/post-invoice/`, { invoice_number });
   }
 
+  /** سداد المورّد — يُنشئ سند صرف بالمالية: مدين الذمم الدائنة / دائن البنك. */
+  payVendor(id: string, payload: {
+    payment_method_id: string; bank_account_id?: string; cash_box_id?: string; amount?: number;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/orders/${id}/pay/`, payload);
+  }
+
   getContracts(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/contracts/`);
   }

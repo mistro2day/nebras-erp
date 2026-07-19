@@ -551,3 +551,96 @@ class PurchaseOrderService:
             },
         )
         return po
+
+
+# ============================================================
+# VendorPaymentService — سداد المورّد (آخر حلقة في دورة المشتريات)
+# ============================================================
+class VendorPaymentService:
+    """يسدّد أمر شراء مفوتر عبر سند صرف في المالية.
+
+    لا يُنشئ قيداً بنفسه: يُنشئ سند صرف ويمرّره لخدمة النقدية بالمالية،
+    فيتولّد القيد بيدها — مدين حساب الذمم الدائنة (إقفال الالتزام)،
+    ودائن البنك أو الصندوق (خروج النقد). إبقاء توليد القيد في المالية
+    يمنع ازدواج منطق الترحيل ويُبقي الدفاتر تحت يد جهة واحدة.
+    """
+
+    @classmethod
+    @transaction.atomic
+    def pay_purchase_order(cls, tenant_id, po_id, payment_method_id,
+                           bank_account_id=None, cash_box_id=None,
+                           amount=None, pay_date=None, user_id=None):
+        from apps.finance.domain.models import (
+            Voucher, Currency, PaymentMethod, BankAccount, CashBox, ChartOfAccount,
+        )
+        from apps.finance.application.services import CashManagementService
+        from apps.shared.application.numbering import generate_unique_number
+
+        po = PurchaseOrder.objects.select_for_update().get(tenant_id=tenant_id, id=po_id)
+
+        # لا يُسدَّد إلا ما أُثبتت فاتورته — وإلا سُدّد التزام غير مُقر
+        if not po.vendor_invoice_number:
+            raise ValidationError(
+                "لا يمكن السداد قبل تسجيل فاتورة المورّد — الفاتورة هي ما يُثبت الالتزام.")
+        if po.status == 'paid':
+            raise ValidationError(f"أمر الشراء {po.po_number} مسدَّد بالفعل.")
+        if po.status == 'cancelled':
+            raise ValidationError("لا يمكن سداد أمر شراء ملغى.")
+        if not bank_account_id and not cash_box_id:
+            raise ValidationError("حدّد الحساب البنكي أو الصندوق الذي سيُصرف منه.")
+
+        settings = PurchaseSettings.objects.filter(tenant_id=tenant_id).first()
+        payable_id = getattr(settings, 'payable_gl_account_id', None) if settings else None
+        payable = None
+        if payable_id:
+            payable = ChartOfAccount.objects.filter(tenant_id=tenant_id, id=payable_id).first()
+        if payable is None:
+            # نفس الحساب الذي حُمّل عليه الالتزام عند إثبات الفاتورة
+            payable = ChartOfAccount.objects.filter(
+                tenant_id=tenant_id, code__startswith='2').order_by('code').first()
+        if payable is None:
+            raise ValidationError("لم يُعثر على حساب الذمم الدائنة في دليل الحسابات.")
+
+        pay_amount = Decimal(str(amount)) if amount is not None else Decimal(str(po.total_amount))
+        if pay_amount <= 0:
+            raise ValidationError("مبلغ السداد يجب أن يكون أكبر من صفر.")
+        if pay_amount > Decimal(str(po.total_amount)):
+            raise ValidationError(
+                f"مبلغ السداد ({pay_amount}) يتجاوز قيمة أمر الشراء ({po.total_amount}).")
+
+        currency = Currency.objects.filter(tenant_id=tenant_id, is_base=True).first()
+        method = PaymentMethod.objects.filter(tenant_id=tenant_id, id=payment_method_id).first()
+        if method is None:
+            raise ValidationError("طريقة الدفع غير صحيحة.")
+
+        bank = BankAccount.objects.filter(tenant_id=tenant_id, id=bank_account_id).first() if bank_account_id else None
+        box = CashBox.objects.filter(tenant_id=tenant_id, id=cash_box_id).first() if cash_box_id else None
+        if bank is None and box is None:
+            raise ValidationError("الحساب البنكي أو الصندوق المحدد غير موجود.")
+
+        voucher = Voucher.objects.create(
+            tenant_id=tenant_id,
+            voucher_number=generate_unique_number(Voucher, tenant_id, 'PV-', 'voucher_number'),
+            voucher_type='payment',
+            date=pay_date or timezone.localdate(),
+            amount=pay_amount,
+            currency=currency,
+            payment_method=method,
+            bank_account=bank,
+            cash_box=box,
+            gl_account=payable,
+            status='draft',
+            description=(f"سداد أمر الشراء {po.po_number} للمورّد {po.vendor.name_ar} — "
+                         f"فاتورة {po.vendor_invoice_number}"),
+            created_by=user_id,
+        )
+
+        # الترحيل بيد المالية: مدين الذمم الدائنة / دائن البنك أو الصندوق
+        CashManagementService.process_voucher(tenant_id, voucher.id, user_id)
+        voucher.refresh_from_db()
+
+        po.payment_voucher_id = voucher.id
+        po.status = 'paid'
+        po.save(update_fields=['payment_voucher_id', 'status'])
+
+        return {'voucher': voucher, 'purchase_order': po}

@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InputDialogComponent, InputDialogData } from '../../../shared/components/input-dialog/input-dialog.component';
+import { PayVendorDialogComponent } from './pay-vendor-dialog.component';
 import { printDoc, ExportColumn } from '../../../shared/export';
 
 /**
@@ -47,9 +48,16 @@ import { printDoc, ExportColumn } from '../../../shared/export';
             @if (o.status === 'draft') {
               <button class="btn primary" [disabled]="busy()" (click)="issue(o)">📦 إصدار للمورّد</button>
               <span class="hint">الإصدار يستهلك الموازنة المخصّصة في المالية.</span>
-            } @else if (o.status === 'approved' || o.status === 'issued') {
+            } @else if (!o.vendor_invoice_number && o.status !== 'cancelled') {
               <button class="btn ok" [disabled]="busy()" (click)="postInvoice(o)">🧾 تسجيل فاتورة المورّد</button>
               <span class="hint">يُنشئ قيداً يُرسل للمالية كمسودة.</span>
+            }
+            @if (o.vendor_invoice_number && o.status !== 'paid' && o.status !== 'cancelled') {
+              <button class="btn pay" [disabled]="busy()" (click)="payVendor(o)">💳 سداد المورّد</button>
+              <span class="hint">يُنشئ سند صرف: مدين ذمم الموردين / دائن البنك.</span>
+            }
+            @if (o.status === 'paid') {
+              <span class="paid-tag">✓ مسدَّد</span>
             }
           </div>
         </div>
@@ -88,6 +96,20 @@ import { printDoc, ExportColumn } from '../../../shared/export';
                 <a class="fi-link" routerLink="/finance/journals">فتح قيود اليومية ←</a>
               } @else {
                 <small>لم تُسجَّل فاتورة المورّد بعد.</small>
+              }
+            </div>
+          </div>
+          <div class="fin-item" [class.done]="o.status === 'paid'">
+            <span class="fi-ic">{{ o.status === 'paid' ? '✓' : '○' }}</span>
+            <div>
+              <strong>سداد المورّد</strong>
+              @if (o.status === 'paid') {
+                <small>سُدّد بسند صرف — أُقفل الالتزام وخرج النقد من الحساب المحدّد.</small>
+                <a class="fi-link" routerLink="/finance/vouchers">سندات الصرف ←</a>
+              } @else if (o.vendor_invoice_number) {
+                <small>الفاتورة مُثبتة — الالتزام قائم بانتظار السداد.</small>
+              } @else {
+                <small>يبدأ السداد بعد إثبات فاتورة المورّد.</small>
               }
             </div>
           </div>
@@ -210,6 +232,9 @@ import { printDoc, ExportColumn } from '../../../shared/export';
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn.primary { background: var(--nb-primary-600); color: #fff; }
     .btn.ok { background: #16a34a; color: #fff; }
+    .btn.pay { background: var(--nb-primary-700, #2a3178); color: #fff; }
+    .paid-tag { font-size: 12px; font-weight: 700; color: #15803D;
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px; padding: 5px 13px; }
     .btn:disabled { opacity: .6; }
     .empty { padding: 26px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
   `]
@@ -301,6 +326,34 @@ export class ProcurementOrderDetailComponent implements OnInit {
     this.svc.issuePurchaseOrder(o.id).subscribe({
       next: () => { this.busy.set(false); this.notify.success('تم إصدار أمر الشراء واستهلاك الموازنة.'); this.load(); },
       error: (e) => { this.busy.set(false); this.notify.error(e?.details?.error || e?.message || 'تعذّر الإصدار.'); },
+    });
+  }
+
+  /** السداد لا يتم إلا بعد إثبات الفاتورة — وهي ما يُقرّ الالتزام. */
+  payVendor(o: any) {
+    this.dialog.open(PayVendorDialogComponent, {
+      panelClass: 'nb-dialog-panel',
+      width: '520px',
+      data: {
+        poNumber: o.po_number,
+        vendorName: this.vendorName(o.vendor),
+        invoiceNumber: o.vendor_invoice_number,
+        amount: Number(o.total_amount) || 0,
+      },
+    }).afterClosed().subscribe((payload: any) => {
+      if (!payload) return;
+      this.busy.set(true);
+      this.svc.payVendor(o.id, payload).subscribe({
+        next: (r: any) => {
+          this.busy.set(false);
+          this.notify.success(r?.message || 'تم السداد.');
+          this.load();
+        },
+        error: (e) => {
+          this.busy.set(false);
+          this.notify.error(e?.details?.error || e?.message || 'تعذّر السداد.');
+        },
+      });
     });
   }
 

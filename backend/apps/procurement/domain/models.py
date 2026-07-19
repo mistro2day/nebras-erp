@@ -306,6 +306,7 @@ class PurchaseOrder(CombinedSharedModel):
         ('approved', 'معتمد ومصدر للمورد'),
         ('issued', 'مرسل ومؤكد'),
         ('completed', 'مكتمل ومستلم بالكامل'),
+        ('paid', 'مسدَّد للمورّد'),
         ('cancelled', 'ملغى'),
     )
     po_number = models.CharField(max_length=50, db_index=True)
@@ -322,6 +323,8 @@ class PurchaseOrder(CombinedSharedModel):
     vendor_invoice_date = models.DateField(null=True, blank=True)
     journal_entry_id = models.UUIDField(null=True, blank=True,
                                         help_text="قيد اليومية المرحّل لفاتورة المورّد بالمالية")
+    payment_voucher_id = models.UUIDField(null=True, blank=True,
+                                          help_text="سند الصرف الذي سُدّد به هذا الأمر في المالية")
 
     class Meta:
         db_table = 'nebras_purchase_orders'

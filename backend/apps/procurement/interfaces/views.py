@@ -29,7 +29,9 @@ from apps.procurement.interfaces.serializers import (
     PurchaseSettingsSerializer, ProcurementStatisticsSerializer, ProcurementAuditSerializer
 )
 
-from apps.procurement.application.services import ProcurementService, PurchaseOrderService
+from apps.procurement.application.services import (
+    ProcurementService, PurchaseOrderService, VendorPaymentService
+)
 
 
 class VendorCategoryViewSet(BaseCRUDViewSet):
@@ -394,6 +396,38 @@ class PurchaseOrderViewSet(BaseCRUDViewSet):
         return StandardResponse(
             {'po_number': po.po_number, 'journal_entry_id': str(po.journal_entry_id), 'status': po.status},
             message="تم تسجيل فاتورة المورّد. أُرسل قيدها إلى المالية كمسودة بانتظار اعتماد المحاسب وترحيله.",
+        )
+
+    @action(detail=True, methods=['post'], url_path='pay')
+    def pay_vendor(self, request, pk=None):
+        """سداد أمر الشراء للمورّد — يُنشئ سند صرف في المالية ويقفل الالتزام."""
+        try:
+            result = VendorPaymentService.pay_purchase_order(
+                tenant_id=request.tenant_id,
+                po_id=pk,
+                payment_method_id=request.data.get('payment_method_id'),
+                bank_account_id=request.data.get('bank_account_id'),
+                cash_box_id=request.data.get('cash_box_id'),
+                amount=request.data.get('amount'),
+                pay_date=request.data.get('pay_date') or None,
+                user_id=request.user.id if request.user else None,
+            )
+        except DjangoValidationError as e:
+            return Response({'error': e.messages[0] if getattr(e, 'messages', None) else str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        v = result['voucher']
+        po = result['purchase_order']
+        return StandardResponse(
+            {
+                'po_number': po.po_number,
+                'status': po.status,
+                'voucher_number': v.voucher_number,
+                'voucher_id': str(v.id),
+                'amount': float(v.amount),
+                'journal_entry_id': str(v.journal_entry_id) if v.journal_entry_id else None,
+            },
+            message=f"تم السداد بسند الصرف {v.voucher_number}.",
         )
 
     @action(detail=True, methods=['post'], url_path='issue')
