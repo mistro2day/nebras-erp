@@ -238,6 +238,7 @@ export class AssetsDashboardComponent implements OnInit {
   readonly tiles = [
     { icon: '🏛️', title: 'سجل الأصول', desc: 'الأصول وبياناتها ودورة حياتها.', route: '/assets/register' },
     { icon: '📉', title: 'الإهلاك', desc: 'الإهلاك الدوري وقيوده المالية.', route: '/assets/depreciation' },
+    { icon: '🧾', title: 'العهد والتغطية', desc: 'من يحمل كل أصل، وضماناته وتأمينه.', route: '/assets/custody' },
     { icon: '📒', title: 'القيود المحاسبية', desc: 'أثر الرسملة والإهلاك في المالية.', route: '/finance/journals' },
     { icon: '🔧', title: 'الصيانة', desc: 'أوامر صيانة الأصول وتاريخها.', route: '/maintenance' },
   ];

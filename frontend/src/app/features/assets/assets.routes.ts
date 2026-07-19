@@ -15,6 +15,10 @@ export const ASSETS_ROUTES: Routes = [
     loadComponent: () => import('./register/asset-detail.component').then((m) => m.AssetDetailComponent),
   },
   {
+    path: 'custody',
+    loadComponent: () => import('./custody/custody-coverage.component').then((m) => m.CustodyCoverageComponent),
+  },
+  {
     path: 'depreciation',
     loadComponent: () => import('./depreciation/depreciation.component').then((m) => m.AssetDepreciationComponent),
   },

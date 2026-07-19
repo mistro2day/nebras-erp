@@ -413,19 +413,13 @@ export class AttendanceSheetsComponent implements OnInit {
   }
 
   loadAttendanceRecords() {
-    // جلب جميع البصمات لشهر يونيو 2026
-    this.http.get<any>(`${environment.apiUrl}attendance/records/?limit=1000`).subscribe({
+    // جلب البصمات لشهر يونيو 2026 مباشرة من السيرفر بدون ترقيم ومصفاة بالكامل
+    this.http.get<any>(`${environment.apiUrl}attendance/records/?year=2026&month=6`).subscribe({
       next: (res) => {
         this.loading.set(false);
-        const list = res?.results || res?.data || res;
+        const list = res?.data || res;
         if (Array.isArray(list)) {
-          // فلترة سجلات شهر يونيو فقط بدقة (2026-06 أو 2026-6)
-          const juneRecords = list.filter((r: any) => {
-            if (!r.date) return false;
-            const parts = r.date.split('-');
-            return parts[0] === '2026' && (parts[1] === '06' || parts[1] === '6');
-          });
-          this.attendanceRecords.set(juneRecords);
+          this.attendanceRecords.set(list);
         }
       },
       error: () => this.loading.set(false)

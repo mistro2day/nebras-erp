@@ -709,6 +709,7 @@ export class DashboardLayoutComponent {
           children: [
             { label: 'لوحة التحكم', link: '/assets/dashboard' },
             { label: 'سجل الأصول', link: '/assets/register' },
+            { label: 'العهد والتغطية', link: '/assets/custody' },
             { label: 'الإهلاك', link: '/assets/depreciation' },
           ],
         },

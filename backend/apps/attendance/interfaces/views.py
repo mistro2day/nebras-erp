@@ -20,6 +20,26 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
     model_class = AttendanceRecord
     serializer_class = AttendanceRecordSerializer
     permission_classes = [] # السماح بالمحاكاة العامة للبصمة الجوالة دون قيود الصلاحيات الصارمة مؤقتاً
+    pagination_class = None # تعطيل الترقيم لجلب كافة البصمات دفعة واحدة للتقارير والكشوفات
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('employee')
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+            
+        date = self.request.query_params.get('date')
+        if date:
+            qs = qs.filter(date=date)
+            
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        if year:
+            qs = qs.filter(date__year=year)
+        if month:
+            qs = qs.filter(date__month=month)
+            
+        return qs
 
     def get_permissions(self):
         if self.action in ['check_in', 'list', 'create']:

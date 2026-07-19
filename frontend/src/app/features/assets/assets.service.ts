@@ -57,8 +57,24 @@ export class AssetsService {
   getAssignments(params?: any): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/assignments/`, { params: params || { page_size: 200 } });
   }
+  createAssignment(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/assignments/`, payload);
+  }
+  /** الإرجاع لا يحذف العهدة — يختمها بتاريخ، فيبقى أثر من حملها ومتى. */
+  returnAssignment(id: string, return_date: string): Observable<any> {
+    return this.http.patch<any>(`${this.apiUrl}/assignments/${id}/`, { return_date });
+  }
   getWarranties(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/warranties/`, { params: { page_size: 200 } as any });
+  }
+  createWarranty(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/warranties/`, payload);
+  }
+  getInsurances(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/insurances/`, { params: { page_size: 200 } as any });
+  }
+  createInsurance(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/insurances/`, payload);
   }
   getMaintenances(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/maintenances/`, { params: { page_size: 200 } as any });

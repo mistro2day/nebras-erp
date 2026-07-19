@@ -118,9 +118,9 @@ import { printDoc, ExportColumn } from '../../../shared/export';
             <span class="lk-t">الصيانة</span>
             <span class="lk-d">أوامر صيانة هذا الأصل وتاريخها</span>
           </button>
-          <button class="lk" (click)="go('/assets/depreciation')">
-            <span class="lk-t">سجل الإهلاك</span>
-            <span class="lk-d">الإهلاك الدوري لكل الأصول</span>
+          <button class="lk" (click)="go('/assets/custody')">
+            <span class="lk-t">العهدة والتغطية</span>
+            <span class="lk-d">من يحمل الأصل، وضمانه وتأمينه</span>
           </button>
         </section>
       }
