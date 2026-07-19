@@ -45,4 +45,12 @@ export class ClinicService {
   approveMedicalLeave(leaveId: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/leaves/${leaveId}/approve/`, {});
   }
+
+  getLeaves(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/leaves/`);
+  }
+
+  getMedications(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/medications/`);
+  }
 }

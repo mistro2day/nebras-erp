@@ -47,4 +47,12 @@ export class LibraryService {
   returnBook(borrowId: string, payload: { actual_return_date: string; debit_gl_account_id?: string; credit_gl_account_id?: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/borrow/${borrowId}/return/`, payload);
   }
+
+  getBorrowTransactions(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/borrow/`);
+  }
+
+  getFines(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/fines/`);
+  }
 }

@@ -50,26 +50,38 @@ interface AttendanceRecord {
         subtitle="مراجعة واعتماد كشوف الحضور والانصراف الشهرية للموظفين لربطها بمسير الرواتب."
       ></nb-page-header>
 
+      <!-- شبكة بطاقات اختيار الشهور -->
+      <div class="periods-cards-grid">
+        @for (p of periods; track p.code) {
+          <div 
+            class="period-card" 
+            [class.active]="selectedPeriod() === p.code"
+            (click)="onPeriodChange(p.code)"
+          >
+            <div class="period-header">
+              <span class="period-title">{{ p.label }}</span>
+              <span 
+                class="period-status-badge" 
+                [class.badge-approved]="getSheetStatus(p.code) === 'approved'"
+                [class.badge-draft]="getSheetStatus(p.code) !== 'approved'"
+              >
+                {{ getSheetStatus(p.code) === 'approved' ? 'معتمد' : 'مسودة' }}
+              </span>
+            </div>
+            <p class="period-range">{{ p.range }}</p>
+          </div>
+        }
+      </div>
+
       @if (loading()) {
         <nb-loading message="جاري تحميل كشوف الحضور والانصراف..."></nb-loading>
       } @else {
-        <!-- كرت ملخص الكشوف المعلقة والمراجعة واختيار الشهر -->
+        <!-- كرت ملخص الكشوف المعلقة والمراجعة -->
         <div class="sheet-main-card">
           <div class="sheet-info">
             <span class="sheet-badge">كشف شهري</span>
-            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
-              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #101828;">كشف شهر:</h2>
-              <select 
-                [value]="selectedPeriod()" 
-                (change)="onPeriodChange($any($event.target).value)"
-                style="height: 38px; padding: 0 12px; border: 1px solid var(--nb-border); border-radius: 8px; font-family: var(--nb-font-family); font-size: 15px; font-weight: 700; color: #101828; background: #fff;"
-              >
-                @for (p of periods; track p.code) {
-                  <option [value]="p.code">{{ p.label }}</option>
-                }
-              </select>
-            </div>
-            <p style="margin-top: 6px; font-size: 13px; color: #667085;">{{ getSelectedPeriodRange() }}</p>
+            <h2>كشف شهر {{ getSelectedPeriodLabel() }}</h2>
+            <p>{{ getSelectedPeriodRange() }}</p>
           </div>
           
           <div class="sheet-summary-stats">
@@ -114,19 +126,19 @@ interface AttendanceRecord {
           <div class="summary-view animate-fade">
             <div class="alert-strip">
               <span class="alert-icon">⚠️</span>
-              <p>كشف الحضور والانصراف قد لا يكون دقيقاً بنسبة 100% للموظفين الذين لديهم أيام غير مجدولة أو سجلات غير مكتملة، يرجى معالجة الحالات التي تم إبرازها تجنباً لتأثيرات غير مرغوب فيها على مسير الرواتب.</p>
+              <p>كشف الحضور والانصراف قد لا يكون دقيقاً بنسبة 100% للموظفين الذين لديهم أيام غير مجدولة أو سجلات غير مكتملة، يرجى النقر على بطاقة أي موظف أدناه لاتخاذ قرارات الاستثناء، أو التعديل، أو تحويل الغياب إلى إجازة.</p>
             </div>
 
             <div class="attention-grid">
               <!-- بطاقة الموظفين وحالات الانتباه -->
               <div class="attention-card">
-                <h3>حالات تحتاج إلى انتباه</h3>
+                <h3>حالات تحتاج إلى انتباه (اضغط على الموظف لاتخاذ الإجراء)</h3>
                 <div class="attention-list">
                   @for (emp of employees(); track emp.id; let idx = $index) {
                     @let lateMin = getEmployeeLateMinutes(emp.id);
                     @let absDays = getEmployeeAbsentDays(emp.id);
                     @if (lateMin > 0 || absDays > 0) {
-                      <div class="attention-item">
+                      <div class="attention-item clickable" (click)="openEmployeeActions(emp)">
                         <div class="emp-profile">
                           <div class="avatar">{{ emp.full_name_ar.charAt(0) }}</div>
                           <div class="emp-meta">
@@ -141,6 +153,7 @@ interface AttendanceRecord {
                           @if (lateMin > 0) {
                             <span class="att-badge badge-orange">تأخير: {{ lateMin }} دقيقة</span>
                           }
+                          <span class="action-hint-arrow">← اتخاذ إجراء</span>
                         </div>
                       </div>
                     }
@@ -223,6 +236,85 @@ interface AttendanceRecord {
           </div>
         }
       }
+
+      <!-- نافذة اتخاذ القرار وحل حالات الانتباه -->
+      @if (selectedEmployeeForActions(); as emp) {
+        <div class="modal-backdrop" (click)="closeEmployeeActions()">
+          <div class="modal-content animate-slide-up" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>معالجة حالات الحضور: {{ emp.full_name_ar }}</h3>
+              <button class="close-btn" (click)="closeEmployeeActions()">✕</button>
+            </div>
+
+            <div class="modal-body">
+              <p class="modal-info">اختر الإجراء الإداري المناسب لكل يوم مخالفة لتعديله في قاعدة البيانات والمسير مباشرة:</p>
+
+              @let warnings = getEmployeeWarningRecords(emp.id);
+              @if (warnings.length === 0) {
+                <div style="text-align: center; padding: 24px; color: #027A48; font-weight: 700;">
+                  ✓ تم حل جميع حالات الانتباه لهذا الموظف بنجاح!
+                </div>
+              } @else {
+                <div class="warnings-details-list">
+                  @for (rec of warnings; track rec.id) {
+                    <div class="warning-detail-item">
+                      <div class="warning-meta">
+                        <span class="warning-date">{{ rec.date | date:'yyyy/MM/dd' }}</span>
+                        <span 
+                          class="att-badge"
+                          [class.badge-red]="rec.status === 'absent'"
+                          [class.badge-orange]="rec.status !== 'absent' && rec.late_minutes > 0"
+                        >
+                          {{ rec.status === 'absent' ? 'غياب كامل' : 'تأخير ' + rec.late_minutes + ' دقيقة' }}
+                        </span>
+                      </div>
+
+                      <div class="warning-actions-row">
+                        @if (rec.status === 'absent') {
+                          <button class="nb-btn nb-btn-outline" (click)="updateRecordStatus(rec.id, 'leave')">
+                            ✈️ تحويل إلى إجازة رسمية
+                          </button>
+                          <button class="nb-btn nb-btn-outline" (click)="updateRecordStatus(rec.id, 'present')">
+                            ✓ احتساب حضور (عفو)
+                          </button>
+                        } @else if (rec.late_minutes > 0) {
+                          @if (editingRecordId() === rec.id) {
+                            <div style="display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 4px;">
+                              <input 
+                                type="number" 
+                                [value]="editingMinutesValue()" 
+                                (input)="editingMinutesValue.set(+$any($event.target).value)"
+                                style="width: 80px; height: 32px; padding: 0 8px; border: 1px solid var(--nb-border); border-radius: 6px; font-family: var(--nb-font-family); font-size: 13px;"
+                              />
+                              <button class="nb-btn nb-btn-success" style="height: 32px; font-size: 12px; padding: 0 12px; background: #12B76A; color: #fff;" (click)="saveEditLateness(rec.id)">
+                                حفظ
+                              </button>
+                              <button class="nb-btn nb-btn-outline" style="height: 32px; font-size: 12px; padding: 0 12px; background: #fff; border: 1px solid #D0D5DD; color: #344054;" (click)="cancelEditLateness()">
+                                إلغاء
+                              </button>
+                            </div>
+                          } @else {
+                            <button class="nb-btn nb-btn-outline" (click)="excuseLateness(rec.id)">
+                              ✓ استثناء التأخير (عفو/تصفير)
+                            </button>
+                            <button class="nb-btn nb-btn-outline" (click)="startEditLateness(rec)">
+                              ✏️ تعديل دقائق التأخير
+                            </button>
+                          }
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            
+            <div style="padding: 16px 24px; background: #F9FAFB; border-top: 1px solid #EAECF0; display: flex; justify-content: flex-end;">
+              <button class="nb-btn" style="background: #101828; color: #fff;" (click)="closeEmployeeActions()">إغلاق النافذة</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -231,6 +323,43 @@ interface AttendanceRecord {
     .nav-btn { text-decoration: none; padding: 8px 16px; font-size: 13px; font-weight: 600; color: var(--nb-text-secondary); border-radius: 6px; transition: all 0.2s; }
     .nav-btn:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
     .nav-btn.active, .nav-btn[routerLinkActive="active"] { background: #101828; color: #fff; }
+
+    /* شبكة بطاقات اختيار الشهور */
+    .periods-cards-grid {
+      display: flex; gap: 16px; margin-top: 16px; width: 100%; flex-wrap: wrap; margin-bottom: 8px;
+    }
+    .period-card {
+      background: #ffffff; border: 1px solid var(--nb-border); border-radius: 12px;
+      padding: 16px 20px; min-width: 250px; flex: 1; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05); transition: all 0.2s ease-in-out;
+      position: relative; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .period-card:hover {
+      border-color: #7F56D9; transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+    }
+    .period-card.active {
+      border-color: #6941C6; background: #F9F5FF;
+      box-shadow: 0 4px 12px rgba(105, 65, 198, 0.1);
+    }
+    .period-card.active::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: #6941C6; border-radius: 12px 12px 0 0;
+    }
+    .period-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .period-title {
+      font-size: 15px; font-weight: 700; color: #101828;
+    }
+    .period-range {
+      font-size: 12px; color: #667085; margin: 0;
+    }
+    .period-status-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+    }
+    .badge-approved { background: #D1FADF; color: #027A48; }
+    .badge-draft { background: #FEF0C7; color: #DC6803; }
 
     /* الكرت الرئيسي */
     .sheet-main-card {
@@ -270,12 +399,24 @@ interface AttendanceRecord {
     
     .attention-list { display: flex; flex-direction: column; gap: 12px; }
     .attention-item { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #F2F4F7; }
+    
+    .attention-item.clickable {
+      cursor: pointer; transition: background 0.15s ease;
+    }
+    .attention-item.clickable:hover {
+      background: #F9FAFB; border-radius: 8px; padding: 0 8px;
+    }
+    .action-hint-arrow {
+      font-size: 11px; font-weight: 700; color: #6941C6; background: #F4F3FF;
+      padding: 2px 6px; border-radius: 4px; margin-left: 4px;
+    }
+
     .emp-profile { display: flex; align-items: center; gap: 10px; }
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: #F9F5FF; color: #7F56D9; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
     .emp-meta { display: flex; flex-direction: column; }
     .emp-meta .name { font-size: 13.5px; font-weight: 700; color: #101828; }
     .emp-meta .title { font-size: 11px; color: #667085; }
-    .attention-badges { display: flex; gap: 6px; }
+    .attention-badges { display: flex; align-items: center; gap: 6px; }
     .att-badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
     .badge-red { background: #FEE4E2; color: #D92D20; }
     .badge-orange { background: #FEF0C7; color: #DC6803; }
@@ -305,6 +446,43 @@ interface AttendanceRecord {
     }
     .nb-btn-success { background: #12B76A; color: #fff; }
     .nb-btn-success:hover { background: #027A48; }
+
+    /* النافذة المنبثقة (Modal) */
+    .modal-backdrop {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(16, 24, 40, 0.4); display: grid; place-items: center;
+      z-index: 1000; backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: #ffffff; border-radius: 12px; width: 90%; max-width: 600px;
+      box-shadow: 0 20px 24px -4px rgba(16, 24, 40, 0.1), 0 8px 8px -4px rgba(16, 24, 40, 0.04);
+      display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--nb-border);
+    }
+    .modal-header {
+      padding: 16px 24px; border-bottom: 1px solid #EAECF0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #101828; }
+    .close-btn { background: transparent; border: none; font-size: 18px; cursor: pointer; color: #667085; }
+    
+    .modal-body { padding: 24px; max-height: 55vh; overflow-y: auto; }
+    .modal-info { font-size: 13.5px; color: #475467; margin-bottom: 16px; font-weight: 500; }
+    
+    .warnings-details-list { display: flex; flex-direction: column; gap: 14px; }
+    .warning-detail-item {
+      padding: 16px; border: 1px solid #EAECF0; border-radius: 8px;
+      display: flex; flex-direction: column; gap: 12px; background: #F9FAFB;
+    }
+    .warning-meta { display: flex; justify-content: space-between; align-items: center; }
+    .warning-date { font-size: 13px; font-weight: 700; color: #344054; }
+    .warning-actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .warning-actions-row .nb-btn-outline {
+      background: #ffffff; border: 1px solid #D0D5DD; color: #344054;
+      font-size: 12px; height: 32px; padding: 0 12px; border-radius: 6px;
+    }
+    .warning-actions-row .nb-btn-outline:hover {
+      background: #F9FAFB; border-color: #B2DDFF; color: #175CD3;
+    }
   `]
 })
 export class AttendanceSheetsComponent implements OnInit {
@@ -320,6 +498,10 @@ export class AttendanceSheetsComponent implements OnInit {
 
   readonly selectedPeriod = signal('2026-06');
   readonly currentSheetId = signal<string | null>(null);
+  readonly sheets = signal<any[]>([]);
+  readonly selectedEmployeeForActions = signal<Employee | null>(null);
+  readonly editingRecordId = signal<string | null>(null);
+  readonly editingMinutesValue = signal<number>(0);
 
   readonly periods = [
     { code: '2026-06', label: 'يونيو 2026', range: 'من 01 يونيو، 2026 إلى 30 يونيو، 2026' },
@@ -426,9 +608,85 @@ export class AttendanceSheetsComponent implements OnInit {
     return p ? p.range : '';
   }
 
+  getSheetStatus(periodCode: string): string {
+    const sheet = this.sheets().find(s => s.period_code === periodCode);
+    return sheet ? sheet.status : 'draft';
+  }
+
   onPeriodChange(code: string) {
     this.selectedPeriod.set(code);
     this.loadSheetMetadata();
+  }
+
+  openEmployeeActions(emp: Employee) {
+    this.selectedEmployeeForActions.set(emp);
+  }
+
+  closeEmployeeActions() {
+    this.selectedEmployeeForActions.set(null);
+  }
+
+  getEmployeeWarningRecords(empId: string): AttendanceRecord[] {
+    return this.attendanceRecords().filter(r => 
+      String(r.employee) === String(empId) && (r.status === 'absent' || (r.late_minutes && r.late_minutes > 0))
+    );
+  }
+
+  updateRecordStatus(recId: string, status: string) {
+    this.loading.set(true);
+    this.http.patch<any>(`${environment.apiUrl}attendance/records/${recId}/`, { status }).subscribe({
+      next: () => {
+        this.notify.success('تم تحديث حالة السجل بنجاح.');
+        this.loadAttendanceRecords();
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل تحديث السجل.');
+      }
+    });
+  }
+
+  excuseLateness(recId: string) {
+    this.loading.set(true);
+    this.http.patch<any>(`${environment.apiUrl}attendance/records/${recId}/`, { late_minutes: 0, status: 'present' }).subscribe({
+      next: () => {
+        this.notify.success('تم استثناء دقائق التأخير وتحديث السجل بنجاح.');
+        this.loadAttendanceRecords();
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل استثناء التأخير.');
+      }
+    });
+  }
+
+  startEditLateness(rec: AttendanceRecord) {
+    this.editingRecordId.set(rec.id);
+    this.editingMinutesValue.set(rec.late_minutes || 0);
+  }
+
+  cancelEditLateness() {
+    this.editingRecordId.set(null);
+  }
+
+  saveEditLateness(recId: string) {
+    const mins = this.editingMinutesValue();
+    if (mins === null || isNaN(mins) || mins < 0) {
+      this.notify.error('أدخل رقماً صحيحاً لدقائق التأخير.');
+      return;
+    }
+    this.loading.set(true);
+    this.http.patch<any>(`${environment.apiUrl}attendance/records/${recId}/`, { late_minutes: mins }).subscribe({
+      next: () => {
+        this.notify.success('تم تعديل دقائق التأخير بنجاح.');
+        this.editingRecordId.set(null);
+        this.loadAttendanceRecords();
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل تعديل دقائق التأخير.');
+      }
+    });
   }
 
   loadSheetData() {
@@ -439,12 +697,27 @@ export class AttendanceSheetsComponent implements OnInit {
         const list = res?.results || res?.data || res;
         if (Array.isArray(list)) {
           this.employees.set(list);
-          this.loadSheetMetadata();
+          this.loadAllSheetsMetadata();
         } else {
           this.loading.set(false);
         }
       },
       error: () => this.loading.set(false)
+    });
+  }
+
+  loadAllSheetsMetadata() {
+    this.http.get<any>(`${environment.apiUrl}attendance/sheets/`).subscribe({
+      next: (res) => {
+        const list = res?.data || res;
+        if (Array.isArray(list)) {
+          this.sheets.set(list);
+        }
+        this.loadSheetMetadata();
+      },
+      error: () => {
+        this.loadSheetMetadata();
+      }
     });
   }
 
@@ -457,6 +730,9 @@ export class AttendanceSheetsComponent implements OnInit {
         if (sheet) {
           this.currentSheetId.set(sheet.id);
           this.isApproved.set(sheet.status === 'approved');
+          // تحديث قائمة الكشوفات محلياً
+          const updated = [...this.sheets().filter(s => s.period_code !== sheet.period_code), sheet];
+          this.sheets.set(updated);
         }
         this.loadAttendanceRecords();
       },
@@ -503,6 +779,7 @@ export class AttendanceSheetsComponent implements OnInit {
         this.loading.set(false);
         this.isApproved.set(true);
         this.notify.success(`تم اعتماد كشف حضور وانصراف شهر ${this.getSelectedPeriodLabel()} وتصدير المخالصة المالية للمسير بنجاح.`);
+        this.loadAllSheetsMetadata();
       },
       error: () => {
         this.loading.set(false);
