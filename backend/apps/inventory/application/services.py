@@ -13,6 +13,7 @@ from apps.inventory.domain.models import (
 
 # قيود المخازن تُنشأ كمسودات في المالية ويعتمدها المحاسب المختص (لا تُرحّل من هنا)
 from apps.finance.domain.models import ChartOfAccount, CostCenter, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
+from apps.finance.application.account_resolver import resolve_account
 
 # استهلاك نظام المشتريات لتحديث حالة الاستلام
 from apps.procurement.domain.models import PurchaseOrder
@@ -121,7 +122,8 @@ class GoodsReceiptService:
         po.save()
 
         # 4. توليد القيد المحاسبي في موديول المالية تلقائياً
-        creditor_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='2').first()
+        # الطرف الدائن: ذمم الموردين — حساب تفصيلي لا رئيسي
+        creditor_account = resolve_account(tenant_id, 'payable', prefix='21')
         if creditor_account and journal_lines:
             journal_lines.append({
                 'account_id': creditor_account.id,
@@ -261,7 +263,8 @@ class GoodsIssueService:
                 })
 
         # الجانب الدائن (Credit): حساب الأصول المخزنية المصروفة
-        inventory_asset_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='1').first()
+        # حساب أصل المخزون — تفصيلي (1106) لا الأصول الرئيسي (1000)
+        inventory_asset_account = resolve_account(tenant_id, 'inventory_asset', prefix='11')
         if inventory_asset_account and journal_lines:
             journal_lines.append({
                 'account_id': inventory_asset_account.id,
@@ -397,7 +400,8 @@ class InventoryAdjustmentService:
                     })
 
         # ربط مع القيد المالي بالمالية
-        inventory_asset_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='1').first()
+        # حساب أصل المخزون — تفصيلي (1106) لا الأصول الرئيسي (1000)
+        inventory_asset_account = resolve_account(tenant_id, 'inventory_asset', prefix='11')
         if inventory_asset_account and journal_lines:
             # إضافة الطرف المقابل للقيد تلقائياً
             for line in list(journal_lines):

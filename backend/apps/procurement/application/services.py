@@ -18,6 +18,7 @@ from apps.procurement.domain.models import (
 # استيراد خدمات ونماذج المالية للتحقق من الموازنة
 from apps.finance.domain.models import ChartOfAccount, CostCenter
 from apps.finance.application.services import BudgetService
+from apps.finance.application.account_resolver import resolve_account, is_postable
 
 # استيراد تكاملات المنصة
 from apps.rules.application.services import RuleEvaluationService
@@ -71,6 +72,13 @@ class ProcurementService:
             # التحقق من الحساب ومركز التكلفة بالمالية
             acc = ChartOfAccount.objects.get(id=item['budget_account_id'], tenant_id=tenant_id)
             cc = CostCenter.objects.get(id=item['cost_center_id'], tenant_id=tenant_id)
+
+            # الواجهة تُخفي الحسابات الرئيسية، لكن الحارس هنا لأن الـ API قد تُستدعى مباشرة
+            if not is_postable(acc):
+                raise ValidationError(
+                    f"حساب الموازنة ({acc.code} {acc.name_ar}) حساب رئيسي ولا يقبل الترحيل. "
+                    f"اختر حساباً تفصيلياً."
+                )
 
             # التحقق المبدئي دون استهلاك حقيقي (لأن الطلب لم يتم اعتماده أو إصداره كأمر شراء بعد)
             # نقوم فقط بالتأكد من صلاحية الموازنة
@@ -476,15 +484,8 @@ class PurchaseOrderService:
         settings = PurchaseSettings.objects.filter(tenant_id=tenant_id).first()
         payable_id = getattr(settings, 'payable_gl_account_id', None) if settings else None
         payable = None
-        if payable_id:
-            payable = ChartOfAccount.objects.filter(id=payable_id, tenant_id=tenant_id).first()
-        if not payable:
-            # الافتراضي المعقول: حساب ذمم الموردين الدائنة في شجرة الحسابات
-            payable = ChartOfAccount.objects.filter(tenant_id=tenant_id, code='2101').first()
-        if not payable:
-            raise ValidationError(
-                "لم يُحدَّد حساب ذمم الموردين الدائنة في إعدادات المشتريات ولا يوجد حساب برمز 2101."
-            )
+        # حساب ذمم الموردين الدائنة — تفصيلي لا رئيسي وإلا فسد هيكل التقارير
+        payable = resolve_account(tenant_id, 'payable', payable_id, prefix='21')
 
         active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
         if not active_fy:
@@ -592,14 +593,8 @@ class VendorPaymentService:
         settings = PurchaseSettings.objects.filter(tenant_id=tenant_id).first()
         payable_id = getattr(settings, 'payable_gl_account_id', None) if settings else None
         payable = None
-        if payable_id:
-            payable = ChartOfAccount.objects.filter(tenant_id=tenant_id, id=payable_id).first()
-        if payable is None:
-            # نفس الحساب الذي حُمّل عليه الالتزام عند إثبات الفاتورة
-            payable = ChartOfAccount.objects.filter(
-                tenant_id=tenant_id, code__startswith='2').order_by('code').first()
-        if payable is None:
-            raise ValidationError("لم يُعثر على حساب الذمم الدائنة في دليل الحسابات.")
+        # نفس الحساب الذي حُمّل عليه الالتزام عند إثبات الفاتورة — تفصيلي لا رئيسي
+        payable = resolve_account(tenant_id, 'payable', payable_id, prefix='21')
 
         pay_amount = Decimal(str(amount)) if amount is not None else Decimal(str(po.total_amount))
         if pay_amount <= 0:

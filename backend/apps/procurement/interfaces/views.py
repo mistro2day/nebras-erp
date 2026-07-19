@@ -125,9 +125,19 @@ class PurchaseRequestViewSet(BaseCRUDViewSet):
             {'id': str(d.id), 'name': d.name, 'code': d.code, 'type': d.type}
             for d in Department.objects.filter(tenant_id=tenant_id, is_active=True, deleted_at__isnull=True)
         ]
+        # الحسابات الرئيسية (لها أبناء) تُستبعد: الترحيل عليها يُفسد هيكل التقارير،
+        # فلا تُعرض للاختيار أصلاً بدل رفضها بعد أن يبني المستخدم طلبه عليها.
+        parent_ids = set(
+            ChartOfAccount.objects.filter(
+                tenant_id=tenant_id, deleted_at__isnull=True, parent__isnull=False
+            ).values_list('parent_id', flat=True)
+        )
         accounts = [
             {'id': str(a.id), 'code': a.code, 'name': a.name_ar or a.name_en}
-            for a in ChartOfAccount.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)[:500]
+            for a in ChartOfAccount.objects.filter(
+                tenant_id=tenant_id, deleted_at__isnull=True
+            ).order_by('code')[:500]
+            if a.id not in parent_ids
         ]
         # مراكز التكلفة أبعاد مالية تملكها المالية — تُقرأ هنا للاستهلاك فقط (نمط Odoo/D365).
         # نُرفق الميزانية المخصصة ليرى مقدّم الطلب أثر اختياره قبل الإرسال.

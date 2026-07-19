@@ -11,6 +11,7 @@ from apps.assets.domain.models import (
 
 # قيود الأصول تُنشأ كمسودات في المالية ويعتمدها المحاسب المختص (لا تُرحّل من هنا)
 from apps.finance.domain.models import ChartOfAccount, CostCenter, FiscalYear, AccountingPeriod, JournalEntry, JournalEntryLine, Currency
+from apps.finance.application.account_resolver import resolve_account
 
 
 class AssetService:
@@ -258,7 +259,8 @@ class DisposalService:
 
         # 3. إثبات المتحصلات النقدية إن وجدت
         if proceeds_decimal > 0:
-            cash_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, code__startswith='1').first() # صندوق/بنك
+            # الصندوق أو البنك — تفصيلي لا رئيسي
+            cash_account = resolve_account(tenant_id, 'cash', prefix='11')
             if cash_account:
                 journal_lines.append({
                     'account_id': cash_account.id,
