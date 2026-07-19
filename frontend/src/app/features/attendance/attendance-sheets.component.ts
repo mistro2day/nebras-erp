@@ -53,12 +53,23 @@ interface AttendanceRecord {
       @if (loading()) {
         <nb-loading message="جاري تحميل كشوف الحضور والانصراف..."></nb-loading>
       } @else {
-        <!-- كرت ملخص الكشوف المعلقة والمراجعة -->
+        <!-- كرت ملخص الكشوف المعلقة والمراجعة واختيار الشهر -->
         <div class="sheet-main-card">
           <div class="sheet-info">
             <span class="sheet-badge">كشف شهري</span>
-            <h2>كشف شهر يونيو، 2026</h2>
-            <p>من 01 يونيو، 2026 إلى 30 يونيو، 2026</p>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+              <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #101828;">كشف شهر:</h2>
+              <select 
+                [value]="selectedPeriod()" 
+                (change)="onPeriodChange($any($event.target).value)"
+                style="height: 38px; padding: 0 12px; border: 1px solid var(--nb-border); border-radius: 8px; font-family: var(--nb-font-family); font-size: 15px; font-weight: 700; color: #101828; background: #fff;"
+              >
+                @for (p of periods; track p.code) {
+                  <option [value]="p.code">{{ p.label }}</option>
+                }
+              </select>
+            </div>
+            <p style="margin-top: 6px; font-size: 13px; color: #667085;">{{ getSelectedPeriodRange() }}</p>
           </div>
           
           <div class="sheet-summary-stats">
@@ -75,7 +86,9 @@ interface AttendanceRecord {
               <span class="label">أيام الغياب الإجمالية</span>
             </div>
             <div class="stat-box">
-              <span class="num">{{ isApproved() ? 'معتمد' : 'قيد المراجعة' }}</span>
+              <span class="num" [class.text-danger]="!isApproved()" [class.text-success]="isApproved()">
+                {{ isApproved() ? 'معتمد' : 'مسودة' }}
+              </span>
               <span class="label">حالة الكشف الحالية</span>
             </div>
           </div>
@@ -177,19 +190,19 @@ interface AttendanceRecord {
                   [columns]="exportCols()"
                   [rows]="tableRows()"
                   title="كشف الحضور والانصراف"
-                  subtitle="كشف شهر يونيو 2026"
-                  filename="كشف-الحضور-والانصراف-يونيو-2026"
+                  [subtitle]="'كشف شهر ' + getSelectedPeriodLabel()"
+                  [filename]="'كشف-الحضور-والانصراف-' + selectedPeriod()"
                 ></nb-export-menu>
               </div>
             </div>
 
-            <nb-panel title="كشف حضور وانصراف الموظفين لشهر يونيو 2026">
+            <nb-panel [title]="'كشف حضور وانصراف الموظفين لشهر ' + getSelectedPeriodLabel()">
 
               <div id="print-area">
                 <nb-data-table
                   [columns]="columns"
                   [rows]="tableRows()"
-                  [emptyText]="'لا توجد سجلات حضور مسجلة.'"
+                  [emptyText]="'لا توجد سجلات حضور مسجلة لجهاز البصمة في هذا الشهر.'"
                 >
                   <ng-template #cell let-row let-col="col" let-val="value">
                     @if (col.key === 'full_name_ar') {
@@ -305,6 +318,14 @@ export class AttendanceSheetsComponent implements OnInit {
   readonly employees = signal<Employee[]>([]);
   readonly attendanceRecords = signal<AttendanceRecord[]>([]);
 
+  readonly selectedPeriod = signal('2026-06');
+  readonly currentSheetId = signal<string | null>(null);
+
+  readonly periods = [
+    { code: '2026-06', label: 'يونيو 2026', range: 'من 01 يونيو، 2026 إلى 30 يونيو، 2026' },
+    { code: '2026-07', label: 'يوليو 2026', range: 'من 01 يوليو، 2026 إلى 31 يوليو، 2026' }
+  ];
+
   readonly columns: NbColumn[] = [
     { key: 'full_name_ar', label: 'الموظف', fr: 2 },
     { key: 'role_info', label: 'القسم والوظيفة', fr: 2 },
@@ -395,6 +416,21 @@ export class AttendanceSheetsComponent implements OnInit {
     this.loadSheetData();
   }
 
+  getSelectedPeriodLabel(): string {
+    const p = this.periods.find(x => x.code === this.selectedPeriod());
+    return p ? p.label : 'يونيو 2026';
+  }
+
+  getSelectedPeriodRange(): string {
+    const p = this.periods.find(x => x.code === this.selectedPeriod());
+    return p ? p.range : '';
+  }
+
+  onPeriodChange(code: string) {
+    this.selectedPeriod.set(code);
+    this.loadSheetMetadata();
+  }
+
   loadSheetData() {
     this.loading.set(true);
     // جلب قائمة الموظفين
@@ -403,7 +439,7 @@ export class AttendanceSheetsComponent implements OnInit {
         const list = res?.results || res?.data || res;
         if (Array.isArray(list)) {
           this.employees.set(list);
-          this.loadAttendanceRecords();
+          this.loadSheetMetadata();
         } else {
           this.loading.set(false);
         }
@@ -412,9 +448,30 @@ export class AttendanceSheetsComponent implements OnInit {
     });
   }
 
+  loadSheetMetadata() {
+    this.loading.set(true);
+    // الحصول على بيانات الكشف أو إنشائه كمسودة
+    this.http.get<any>(`${environment.apiUrl}attendance/sheets/get-or-create/?period_code=${this.selectedPeriod()}`).subscribe({
+      next: (res) => {
+        const sheet = res?.data || res;
+        if (sheet) {
+          this.currentSheetId.set(sheet.id);
+          this.isApproved.set(sheet.status === 'approved');
+        }
+        this.loadAttendanceRecords();
+      },
+      error: () => {
+        this.loading.set(false);
+      }
+    });
+  }
+
   loadAttendanceRecords() {
-    // جلب البصمات لشهر يونيو 2026 مباشرة من السيرفر بدون ترقيم ومصفاة بالكامل
-    this.http.get<any>(`${environment.apiUrl}attendance/records/?year=2026&month=6`).subscribe({
+    const parts = this.selectedPeriod().split('-');
+    const year = parts[0];
+    const month = parseInt(parts[1], 10);
+    // جلب البصمات للشهر المختار مباشرة من السيرفر بدون ترقيم ومصفاة بالكامل
+    this.http.get<any>(`${environment.apiUrl}attendance/records/?year=${year}&month=${month}`).subscribe({
       next: (res) => {
         this.loading.set(false);
         const list = res?.data || res;
@@ -438,10 +495,19 @@ export class AttendanceSheetsComponent implements OnInit {
       .length;
   }
 
-
-
   approveSheet() {
-    this.isApproved.set(true);
-    this.notify.success('تم اعتماد كشف حضور وانصراف شهر يونيو وتصدير المخالصة المالية للمسير بنجاح.');
+    if (!this.currentSheetId()) return;
+    this.loading.set(true);
+    this.http.post<any>(`${environment.apiUrl}attendance/sheets/${this.currentSheetId()}/approve/`, {}).subscribe({
+      next: (res) => {
+        this.loading.set(false);
+        this.isApproved.set(true);
+        this.notify.success(`تم اعتماد كشف حضور وانصراف شهر ${this.getSelectedPeriodLabel()} وتصدير المخالصة المالية للمسير بنجاح.`);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.notify.error('فشل اعتماد كشف الحضور، يرجى المحاولة لاحقاً.');
+      }
+    });
   }
 }

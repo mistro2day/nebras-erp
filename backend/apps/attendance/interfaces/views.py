@@ -2,10 +2,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from apps.common.responses import StandardResponse
 from apps.shared.interfaces.views import BaseCRUDViewSet
-from apps.attendance.domain.models import AttendancePolicy, WorkShift, AttendanceRecord, CorrectionRequest
+from apps.attendance.domain.models import AttendancePolicy, WorkShift, AttendanceRecord, CorrectionRequest, AttendanceSheet
 from apps.attendance.interfaces.serializers import (
     AttendancePolicySerializer, WorkShiftSerializer, AttendanceRecordSerializer,
-    CorrectionRequestSerializer
+    CorrectionRequestSerializer, AttendanceSheetSerializer
 )
 
 class AttendancePolicyViewSet(BaseCRUDViewSet):
@@ -106,3 +106,40 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
 class CorrectionRequestViewSet(BaseCRUDViewSet):
     model_class = CorrectionRequest
     serializer_class = CorrectionRequestSerializer
+
+class AttendanceSheetViewSet(BaseCRUDViewSet):
+    model_class = AttendanceSheet
+    serializer_class = AttendanceSheetSerializer
+    permission_classes = [] # السماح بالوصول دون قيود الصلاحيات الصارمة مؤقتاً
+    pagination_class = None
+
+    def get_queryset(self):
+        return super().get_queryset().order_by('-period_code')
+
+    @action(detail=False, methods=['get'], url_path='get-or-create')
+    def get_or_create_sheet(self, request):
+        period_code = request.query_params.get('period_code')
+        if not period_code:
+            import datetime
+            today = datetime.date.today()
+            period_code = today.strftime('%Y-%m') # e.g. '2026-07'
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        
+        sheet, created = AttendanceSheet.objects.get_or_create(
+            period_code=period_code,
+            tenant_id=tenant_id,
+            defaults={'status': 'draft'}
+        )
+        
+        return StandardResponse(AttendanceSheetSerializer(sheet).data)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_sheet(self, request, pk=None):
+        sheet = self.get_object()
+        from django.utils import timezone
+        sheet.status = 'approved'
+        sheet.approved_at = timezone.now()
+        sheet.approved_by = request.user.id if request.user and request.user.id else None
+        sheet.save()
+        return StandardResponse(AttendanceSheetSerializer(sheet).data, message="تم اعتماد كشف الحضور بنجاح وتحويله إلى كشف مغلق.")

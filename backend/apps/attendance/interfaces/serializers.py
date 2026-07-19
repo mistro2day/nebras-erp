@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.attendance.domain.models import AttendancePolicy, WorkShift, AttendanceRecord, CorrectionRequest
+from apps.attendance.domain.models import AttendancePolicy, WorkShift, AttendanceRecord, CorrectionRequest, AttendanceSheet
 
 class AttendancePolicySerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,4 +26,9 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
 class CorrectionRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = CorrectionRequest
+        fields = '__all__'
+
+class AttendanceSheetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceSheet
         fields = '__all__'

@@ -55,6 +55,18 @@ class CorrectionRequest(CombinedSharedModel):
         db_table = 'nebras_attendance_correction_requests'
 
 
+# 4.5 Attendance Sheet
+class AttendanceSheet(CombinedSharedModel):
+    period_code = models.CharField(max_length=20, db_index=True) # e.g. '2026-06'
+    status = models.CharField(max_length=30, default='draft') # draft, approved
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.UUIDField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'nebras_attendance_sheets'
+        unique_together = ('period_code', 'tenant_id')
+
+
 # 5. Student Daily Attendance
 class StudentDailyAttendance(CombinedSharedModel):
     student_id = models.UUIDField(db_index=True)
