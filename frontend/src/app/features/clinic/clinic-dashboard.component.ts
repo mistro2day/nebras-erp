@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ClinicService } from './clinic.service';
+import { StudentsService } from '../students/students.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
@@ -54,7 +55,7 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
             </div>
             @for (row of visits(); track row.id) {
               <div class="tbl-row" (click)="selectVisit(row)">
-                <span class="strong text-indigo">{{ row.patient_user_id | slice:0:8 }}...</span>
+                <span class="strong text-indigo">{{ getStudentName(row.patient_user_id) }}</span>
                 <span>
                   <span [class]="getVisitTypeClass(row.visit_type)">{{ getVisitTypeText(row.visit_type) }}</span>
                 </span>
@@ -81,7 +82,7 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
             </div>
             @for (row of leaves(); track row.id) {
               <div class="tbl-row">
-                <span class="strong">{{ row.patient_user_id | slice:0:8 }}...</span>
+                <span class="strong">{{ getStudentName(row.patient_user_id) }}</span>
                 <span>من {{ row.start_date }} إلى {{ row.end_date }}</span>
                 <span>{{ row.reason }}</span>
                 <span>
@@ -102,9 +103,21 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
     <!-- نافذة تسجيل زيارة جديدة -->
     <nb-modal [open]="isNewVisitModalOpen()" title="تسجيل زيارة طبية جديدة" subtitle="إدخال بيانات الكشف وتوثيق الزيارة" (closed)="isNewVisitModalOpen.set(false)">
       <div class="form-container">
-        <div class="form-group">
-          <label>معرف المريض (UUID للطالب أو الموظف)</label>
-          <input type="text" [(ngModel)]="newVisitData.patient_user_id" placeholder="مثال: 550e8400-e29b-41d4-a716-446655440000" class="nb-input" />
+        <div class="form-group" style="position: relative;">
+          <label>البحث واختيار الطالب / المريض</label>
+          <input type="text" [(ngModel)]="patientSearchQuery" (focus)="showPatientDropdown.set(true)" placeholder="اكتب اسم الطالب للبحث..." class="nb-input" />
+          @if (showPatientDropdown()) {
+            <div class="search-dropdown">
+              @for (s of filteredStudents(patientSearchQuery); track s.id) {
+                <div class="dropdown-item" (click)="selectPatient(s)">
+                  {{ s.profile.arabic_name }} ({{ s.student_number }})
+                </div>
+              }
+              @if (filteredStudents(patientSearchQuery).length === 0) {
+                <div class="dropdown-empty">لا توجد نتائج مطابقة</div>
+              }
+            </div>
+          }
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -139,7 +152,7 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
     <!-- نافذة صرف الدواء -->
     <nb-modal [open]="isDispenseModalOpen()" title="💊 صرف دواء ومستلزمات علاجية" subtitle="خصم فوري وتلقائي من مستودع العيادة" (closed)="isDispenseModalOpen.set(false)">
       <div class="form-container">
-        <p class="summary-text">صرف دواء للمريض ذي المعرف: <strong class="text-indigo">{{ selectedVisitForDispense()?.patient_user_id }}</strong></p>
+        <p class="summary-text">صرف دواء للمريض: <strong class="text-indigo">{{ getStudentName(selectedVisitForDispense()?.patient_user_id) }}</strong></p>
         <div class="form-group">
           <label>البند الطبي / الدواء</label>
           <select [(ngModel)]="dispenseData.medication_id" class="nb-input">
@@ -172,7 +185,7 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
         <div class="visit-detail-sheet">
           <div class="detail-card">
             <h3>الملف الأساسي</h3>
-            <p><strong>المريض:</strong> {{ visit.patient_user_id }}</p>
+            <p><strong>المريض:</strong> {{ getStudentName(visit.patient_user_id) }}</p>
             <p><strong>نوع الزيارة:</strong> <span [class]="getVisitTypeClass(visit.visit_type)">{{ getVisitTypeText(visit.visit_type) }}</span></p>
             <p><strong>الحالة الحالية:</strong> <span [class]="getStatusClass(visit.status)">{{ getStatusText(visit.status) }}</span></p>
             <p><strong>وقت الدخول:</strong> {{ visit.check_in_time | date:'medium' }}</p>
@@ -277,10 +290,42 @@ import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
       background: var(--nb-success);
       color: #fff;
     }
+    
+    .search-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      box-shadow: var(--nb-shadow-dialog);
+      z-index: 10;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .dropdown-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--nb-text);
+      transition: background 0.15s ease;
+    }
+    .dropdown-item:hover {
+      background: var(--nb-primary-50);
+      color: var(--nb-primary-600);
+    }
+    .dropdown-empty {
+      padding: 10px;
+      font-size: 12px;
+      color: var(--nb-text-muted);
+      text-align: center;
+    }
   `]
 })
 export class ClinicDashboardComponent implements OnInit {
   clinicService = inject(ClinicService);
+  studentsService = inject(StudentsService);
 
   visits = signal<any[]>([]);
   leaves = signal<any[]>([]);
@@ -300,6 +345,9 @@ export class ClinicDashboardComponent implements OnInit {
     notes: ''
   };
 
+  patientSearchQuery = '';
+  showPatientDropdown = signal(false);
+
   dispenseData = {
     medication_id: '',
     quantity: 1,
@@ -315,15 +363,31 @@ export class ClinicDashboardComponent implements OnInit {
     this.clinicService.getDashboardStats().subscribe();
     this.clinicService.getVisits().subscribe(data => this.visits.set(data));
     this.clinicService.getLeaves().subscribe(data => this.leaves.set(data));
+    this.studentsService.getStudents({ page_size: 500 }).subscribe();
   }
 
   loadMetadata() {
-    // جلب العيادات والأدوية المتاحة لتعبئة القوائم المنسدلة
     this.clinicService.getMedications().subscribe(data => this.medications.set(data));
-    // سنستخدم استدعاء تجريبي للعيادات أو نفترض وجود عيادة افتراضية إن لم تكن مسجلة
     this.clinicService.getVisits().subscribe(() => {
       this.clinics.set([{ id: 'default', name_ar: 'العيادة الرئيسية المدرسية' }]);
     });
+  }
+
+  filteredStudents(query: string): any[] {
+    const list = this.studentsService.students() || [];
+    if (!query) return list;
+    return list.filter(s => s.profile.arabic_name.includes(query) || s.student_number.includes(query));
+  }
+
+  selectPatient(student: any) {
+    this.newVisitData.patient_user_id = student.id;
+    this.patientSearchQuery = `${student.profile.arabic_name} (${student.student_number})`;
+    this.showPatientDropdown.set(false);
+  }
+
+  getStudentName(userId: string): string {
+    const s = (this.studentsService.students() || []).find(st => st.id === userId);
+    return s ? s.profile.arabic_name : (userId ? `${userId.slice(0, 8)}...` : 'غير معروف');
   }
 
   selectVisit(visit: any) {
@@ -337,6 +401,8 @@ export class ClinicDashboardComponent implements OnInit {
       clinic_id: this.clinics()[0]?.id || '',
       notes: ''
     };
+    this.patientSearchQuery = '';
+    this.showPatientDropdown.set(false);
     this.isNewVisitModalOpen.set(true);
   }
 
@@ -418,4 +484,5 @@ export class ClinicDashboardComponent implements OnInit {
     }
   }
 }
+
 

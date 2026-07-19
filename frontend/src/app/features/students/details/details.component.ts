@@ -7,6 +7,8 @@ import { StudentsService } from '../students.service';
 import { StudentFinanceService } from '../../student-finance/student-finance.service';
 import { SfDocumentDrawerComponent, SfDoc } from '../../student-finance/shared/sf-document-drawer.component';
 import { HttpClient } from '@angular/common/http';
+import { ClinicService } from '../../clinic/clinic.service';
+import { LibraryService } from '../../library/library.service';
 import {
   ConfirmDialogComponent, ConfirmDialogData,
 } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -261,18 +263,21 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                     <span>تاريخ الإرجاع المتوقع</span>
                     <span>حالة الاستعارة</span>
                   </div>
-                  <div class="tbl-row library-tbl">
-                    <span class="strong">مبادئ الرياضيات الحديثة</span>
-                    <span>2026-06-01</span>
-                    <span>2026-06-15</span>
-                    <span><span class="badge success">مسترجع</span></span>
-                  </div>
-                  <div class="tbl-row library-tbl">
-                    <span class="strong">تاريخ الأدب العربي</span>
-                    <span>2026-07-02</span>
-                    <span>2026-07-20</span>
-                    <span><span class="badge warning">قيد الاستعارة</span></span>
-                  </div>
+                  @for (row of studentBorrows(); track row.id) {
+                    <div class="tbl-row library-tbl">
+                      <span class="strong">{{ getBookTitle(row.copy) }}</span>
+                      <span>{{ row.borrow_date }}</span>
+                      <span>{{ row.due_date }}</span>
+                      <span>
+                        <span class="badge" [class.success]="row.status === 'returned'" [class.warning]="row.status === 'borrowed'" [class.danger]="row.status === 'overdue'">
+                          {{ getBorrowStatusText(row.status) }}
+                        </span>
+                      </span>
+                    </div>
+                  }
+                  @if (studentBorrows().length === 0) {
+                    <div class="tbl-empty">لا توجد استعارات مسجلة لهذا الطالب.</div>
+                  }
                 </div>
               </div>
             </mat-tab>
@@ -325,15 +330,24 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <div class="tbl-head clinic-tbl">
                     <span>التاريخ والوقت</span>
                     <span>السبب / الشكوى</span>
-                    <span>الإجراء المتخذ</span>
-                    <span>الممرض المناوب</span>
+                    <span>الحالة</span>
+                    <span>وقت الدخول</span>
                   </div>
-                  <div class="tbl-row clinic-tbl">
-                    <span>2026-06-12 10:15 ص</span>
-                    <span class="strong">صداع خفيف وارتفاع طفيف بالحرارة</span>
-                    <span>إعطاء مسكن الباراسيتامول مع الراحة بالعيادة</span>
-                    <span>م. سارة علي</span>
-                  </div>
+                  @for (row of studentVisits(); track row.id) {
+                    <div class="tbl-row clinic-tbl">
+                      <span>{{ row.visit_date || (row.check_in_time | date:'yyyy-MM-dd') }}</span>
+                      <span class="strong">{{ row.notes || 'لا يوجد ملاحظات' }}</span>
+                      <span>
+                        <span class="badge" [class.success]="row.status === 'discharged'" [class.warning]="row.status === 'referred'" [class.info]="row.status === 'checked_in'">
+                          {{ getVisitStatusText(row.status) }}
+                        </span>
+                      </span>
+                      <span>{{ row.check_in_time | date:'shortTime' }}</span>
+                    </div>
+                  }
+                  @if (studentVisits().length === 0) {
+                    <div class="tbl-empty">لا توجد زيارات عيادة مسجلة لهذا الطالب.</div>
+                  }
                 </div>
               </div>
             </mat-tab>
@@ -898,6 +912,8 @@ export class StudentDetailsComponent implements OnInit {
   private router = inject(Router);
   private studentsService = inject(StudentsService);
   private sfService = inject(StudentFinanceService);
+  private clinicService = inject(ClinicService);
+  private libraryService = inject(LibraryService);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
 
@@ -910,6 +926,11 @@ export class StudentDetailsComponent implements OnInit {
   doc = signal<SfDoc>(null);
   totalPaid = computed(() => this.invoices().reduce((s, i) => s + (Number(i.paid_amount) || 0), 0));
   totalCollected = computed(() => this.receipts().reduce((s, r) => s + (Number(r.amount) || 0), 0));
+
+  studentVisits = signal<any[]>([]);
+  studentBorrows = signal<any[]>([]);
+  books = signal<any[]>([]);
+  copies = signal<any[]>([]);
 
   openDoc(type: 'invoice' | 'receipt' | 'receivable', data: any) { this.doc.set({ type, data }); }
 
@@ -1021,6 +1042,22 @@ export class StudentDetailsComponent implements OnInit {
         if (res) this.schoolInfo.set(res);
       }
     });
+
+    // جلب زيارات العيادة الخاصة بالطالب
+    this.clinicService.getVisits().subscribe((visits) => {
+      if (visits) {
+        this.studentVisits.set(visits.filter((v: any) => v.patient_user_id === this.id));
+      }
+    });
+
+    // جلب كتب واستعارات المكتبة الخاصة بالطالب
+    this.libraryService.getBooks().subscribe(b => this.books.set(b || []));
+    this.libraryService.getCopies().subscribe(c => this.copies.set(c || []));
+    this.libraryService.getBorrowTransactions().subscribe((borrows) => {
+      if (borrows) {
+        this.studentBorrows.set(borrows.filter((b: any) => b.borrower_user_id === this.id));
+      }
+    });
     
     // جلب الحساب المالي والفواتير الصادرة للطالب (عبر خدمة فوترة الطلاب — المسار الصحيح مع المعترضات)
     this.billingAccount.set(null);
@@ -1037,6 +1074,33 @@ export class StudentDetailsComponent implements OnInit {
         this.sfService.listPaymentMethods().subscribe((pmRes) => this.paymentMethods.set(pmRes?.data || []));
       }
     });
+  }
+
+  getBookTitle(copyId: string): string {
+    const copy = this.copies().find(c => c.id === copyId);
+    if (!copy) return 'نسخة غير معروفة';
+    const book = this.books().find(b => b.id === copy.book);
+    return book ? book.title_ar : 'كتاب غير معروف';
+  }
+
+  getBorrowStatusText(status: string): string {
+    switch (status) {
+      case 'borrowed': return 'قيد الاستعارة';
+      case 'returned': return 'مسترجع';
+      case 'overdue': return 'متأخر';
+      case 'lost': return 'مفقود';
+      default: return status;
+    }
+  }
+
+  getVisitStatusText(status: string): string {
+    switch (status) {
+      case 'checked_in': return 'دخل العيادة';
+      case 'diagnosed': return 'تم التشخيص';
+      case 'discharged': return 'غادر العيادة';
+      case 'referred': return 'تمت الإحالة';
+      default: return status;
+    }
   }
 
   onPhotoSelected(event: any, student: any) {

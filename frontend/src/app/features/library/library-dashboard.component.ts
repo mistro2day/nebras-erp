@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LibraryService } from './library.service';
+import { StudentsService } from '../students/students.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
@@ -76,15 +77,15 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
             <nb-panel title="سجل الاستعارات النشطة والمعلقة" [flush]="true">
               <div class="tbl tbl-borrows">
                 <div class="tbl-head">
-                  <span>معرف المستعير</span>
+                  <span>المستعير</span>
                   <span>نسخة الكتاب (Barcode)</span>
                   <span>تاريخ الاستحقاق</span>
                   <span>الإجراءات</span>
                 </div>
                 @for (row of borrows(); track row.id) {
                   <div class="tbl-row">
-                    <span class="strong">{{ row.borrower_user_id | slice:0:8 }}...</span>
-                    <span>{{ row.book_copy_id | slice:0:8 }}...</span>
+                    <span class="strong">{{ getStudentName(row.borrower_user_id) }}</span>
+                    <span>{{ getCopyBarcode(row.copy) }}</span>
                     <span class="text-danger">{{ row.due_date }}</span>
                     <span>
                       @if (!row.actual_return_date) {
@@ -105,13 +106,13 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
             <nb-panel title="سجل الغرامات المالية لمتأخرات الكتب" [flush]="true">
               <div class="tbl tbl-fines">
                 <div class="tbl-head">
-                  <span>المعاملة</span>
+                  <span>المستعير</span>
                   <span>قيمة الغرامة</span>
                   <span>الحالة</span>
                 </div>
                 @for (row of fines(); track row.id) {
                   <div class="tbl-row">
-                    <span class="strong">معاملة استعارة رقم {{ row.borrow_transaction_id | slice:0:8 }}...</span>
+                    <span class="strong">{{ getStudentName(getBorrowerFromTx(row.borrow_transaction)) }}</span>
                     <span class="text-danger strong">{{ row.fine_amount | currency:'SAR ':'symbol':'1.2-2' }}</span>
                     <span>
                       <span [class]="row.status === 'paid' ? 'nb-badge-success' : 'nb-badge-danger'">
@@ -131,9 +132,21 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
     <!-- نافذة استعارة كتاب جديدة -->
     <nb-modal [open]="isBorrowModalOpen()" title="📖 طلب استعارة نسخة كتاب فزيائية" subtitle="تسجيل المعاملة وتخصيص المدة الزمنية" (closed)="isBorrowModalOpen.set(false)">
       <div class="form-container">
-        <div class="form-group">
-          <label>معرف المستعير (UUID للطالب أو الموظف)</label>
-          <input type="text" [(ngModel)]="borrowData.borrower_user_id" placeholder="مثال: 550e8400-e29b-41d4-a716-446655440000" class="nb-input" />
+        <div class="form-group" style="position: relative;">
+          <label>البحث واختيار الطالب المستعير</label>
+          <input type="text" [(ngModel)]="borrowerSearchQuery" (focus)="showBorrowerDropdown.set(true)" placeholder="اكتب اسم الطالب للبحث..." class="nb-input" />
+          @if (showBorrowerDropdown()) {
+            <div class="search-dropdown">
+              @for (s of filteredStudents(borrowerSearchQuery); track s.id) {
+                <div class="dropdown-item" (click)="selectBorrower(s)">
+                  {{ s.profile.arabic_name }} ({{ s.student_number }})
+                </div>
+              }
+              @if (filteredStudents(borrowerSearchQuery).length === 0) {
+                <div class="dropdown-empty">لا توجد نتائج مطابقة</div>
+              }
+            </div>
+          }
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -160,7 +173,7 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
     <!-- نافذة إرجاع كتاب -->
     <nb-modal [open]="isReturnModalOpen()" title="🔄 إرجاع كتاب مستعار" subtitle="توثيق تاريخ الإرجاع واحتساب الغرامات التلقائي" (closed)="isReturnModalOpen.set(false)">
       <div class="form-container">
-        <p class="summary-text">تأكيد إرجاع المعاملة الخاصة بالمستعير: <strong class="text-indigo">{{ selectedBorrowForReturn()?.borrower_user_id }}</strong></p>
+        <p class="summary-text">تأكيد إرجاع المعاملة الخاصة بالمستعير: <strong class="text-indigo">{{ getStudentName(selectedBorrowForReturn()?.borrower_user_id) }}</strong></p>
         <div class="form-group">
           <label>تاريخ الإرجاع الفعلي</label>
           <input type="date" [(ngModel)]="returnData.actual_return_date" class="nb-input" />
@@ -258,10 +271,42 @@ import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
     .form-group label { font-size: 11.5px; font-weight: 600; color: var(--nb-text-secondary); }
     
     .summary-text { font-size: 13px; color: var(--nb-text-secondary); margin-bottom: 8px; }
+    
+    .search-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius);
+      box-shadow: var(--nb-shadow-dialog);
+      z-index: 10;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .dropdown-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--nb-text);
+      transition: background 0.15s ease;
+    }
+    .dropdown-item:hover {
+      background: var(--nb-primary-50);
+      color: var(--nb-primary-600);
+    }
+    .dropdown-empty {
+      padding: 10px;
+      font-size: 12px;
+      color: var(--nb-text-muted);
+      text-align: center;
+    }
   `]
 })
 export class LibraryDashboardComponent implements OnInit {
   libraryService = inject(LibraryService);
+  studentsService = inject(StudentsService);
 
   books = signal<any[]>([]);
   borrows = signal<any[]>([]);
@@ -280,6 +325,9 @@ export class LibraryDashboardComponent implements OnInit {
     loan_period_days: 14
   };
 
+  borrowerSearchQuery = '';
+  showBorrowerDropdown = signal(false);
+
   returnData = {
     actual_return_date: new Date().toISOString().split('T')[0]
   };
@@ -294,10 +342,38 @@ export class LibraryDashboardComponent implements OnInit {
     this.libraryService.getBooks().subscribe(data => this.books.set(data));
     this.libraryService.getBorrowTransactions().subscribe(data => this.borrows.set(data));
     this.libraryService.getFines().subscribe(data => this.fines.set(data));
+    this.studentsService.getStudents({ page_size: 500 }).subscribe();
   }
 
   loadMetadata() {
     this.libraryService.getCopies().subscribe(data => this.copies.set(data));
+  }
+
+  filteredStudents(query: string): any[] {
+    const list = this.studentsService.students() || [];
+    if (!query) return list;
+    return list.filter(s => s.profile.arabic_name.includes(query) || s.student_number.includes(query));
+  }
+
+  selectBorrower(student: any) {
+    this.borrowData.borrower_user_id = student.id;
+    this.borrowerSearchQuery = `${student.profile.arabic_name} (${student.student_number})`;
+    this.showBorrowerDropdown.set(false);
+  }
+
+  getStudentName(userId: string): string {
+    const s = (this.studentsService.students() || []).find(st => st.id === userId);
+    return s ? s.profile.arabic_name : (userId ? `${userId.slice(0, 8)}...` : 'غير معروف');
+  }
+
+  getCopyBarcode(copyId: string): string {
+    const c = this.copies().find(cp => cp.id === copyId);
+    return c ? c.barcode : (copyId ? `${copyId.slice(0, 8)}...` : 'غير معروف');
+  }
+
+  getBorrowerFromTx(txId: string): string {
+    const tx = this.borrows().find(b => b.id === txId);
+    return tx ? tx.borrower_user_id : '';
   }
 
   openBorrowModal() {
@@ -306,6 +382,8 @@ export class LibraryDashboardComponent implements OnInit {
       copy_id: '',
       loan_period_days: 14
     };
+    this.borrowerSearchQuery = '';
+    this.showBorrowerDropdown.set(false);
     this.isBorrowModalOpen.set(true);
   }
 
