@@ -1371,7 +1371,9 @@ export class PayrollRunsComponent implements OnInit {
     return this.filteredPayslips().reduce((s, p) => {
       let ded = Number(p.total_deductions);
       this.availableCols().forEach(c => {
-        if (c.type === 'deduction' && c.visible) ded += this.getDynamicVal(p, c.key);
+        if (c.type === 'deduction' && c.visible && c.key !== 'delay_deduction' && c.key !== 'absence_deduction') {
+          ded += this.getDynamicVal(p, c.key);
+        }
       });
       return s + ded;
     }, 0);

@@ -52,98 +52,100 @@ def seed_attendance_payroll():
     )
     print("تمت تهيئة سياسات الحضور والورديات.")
 
-    # 4. تعريف بيانات الموظفين التجريبيين
-    employees_data = [
-        {
-            "username": "committed_ahmed",
-            "name": "أحمد الملتزم",
-            "email": "ahmed.committed@nebras.edu",
-            "pos": "معلم أول رياضيات",
-            "type": "committed"
-        },
-        {
-            "username": "late_mohamed",
-            "name": "محمد المتأخر",
-            "email": "mohamed.late@nebras.edu",
-            "pos": "معلم لغة عربية",
-            "type": "late"
-        },
-        {
-            "username": "absent_omar",
-            "name": "عمر الغائب",
-            "email": "omar.absent@nebras.edu",
-            "pos": "معلم لغة إنجليزية",
-            "type": "absent"
-        },
-        {
-            "username": "trouble_ali",
-            "name": "علي المشاغب (متأخر وغائب)",
-            "email": "ali.trouble@nebras.edu",
-            "pos": "معلم تربية بدنية",
-            "type": "trouble"
-        },
-        {
-            "username": "full_absent_khaled",
-            "name": "خالد الغياب الكامل",
-            "email": "khaled.full@nebras.edu",
-            "pos": "معلم فنون",
-            "type": "full_absent"
-        }
-    ]
+    # 4. جلب الموظفين الحقيقيين من قاعدة البيانات
+    real_employees = list(Employee.objects.filter(deleted_at__isnull=True))
+    if tenant_id:
+        real_employees = [e for e in real_employees if e.tenant_id == tenant_id]
 
-    employees = []
-    for emp_info in employees_data:
-        emp, emp_created = Employee.objects.get_or_create(
-            email=emp_info["email"],
-            tenant_id=tenant_id,
-            defaults={
-                "employee_number": f"EMP-TEST-{emp_info['username'].upper()}",
-                "full_name_ar": emp_info["name"],
-                "full_name_en": emp_info["username"].replace('_', ' ').title(),
-                "status": "active",
-                "department": "التربية والتعليم",
-                "position": emp_info["pos"],
-                "date_joined": datetime.date(2026, 1, 1),
-                "gender": "male"
-            }
-        )
-        employees.append((emp, emp_info["type"]))
-        print(f"الموظف: {emp.full_name_ar} | {'تم إنشاؤه' if emp_created else 'موجود مسبقاً'}")
+    if not real_employees:
+        print("خطأ: لم يتم العثور على أي موظف حقيقي في قاعدة البيانات.")
+        return
+    
+    print(f"تم العثور على {len(real_employees)} موظف حقيقي.")
 
-        # هيكل الراتب: أساسي 10,000 وبدلات 3,500
-        SalaryStructure.objects.get_or_create(
+    # 5. تهيئة هياكل الرواتب وتوزيع الغياب والتأخير على كافة الموظفين
+    print("جاري توليد سجلات الحضور والانصراف لشهر يونيو 2026 للموظفين الحقيقيين...")
+    
+    # حذف سجلات يونيو القديمة لهؤلاء الموظفين لتجنب التكرار
+    AttendanceRecord.objects.filter(employee__in=real_employees, date__year=2026, date__month=6).delete()
+
+    start_date = datetime.date(2026, 6, 1)
+    end_date = datetime.date(2026, 6, 30)
+    
+    for idx, emp in enumerate(real_employees):
+        # 5.1 ضمان وجود هيكل راتب نشط للموظف
+        struct, struct_created = SalaryStructure.objects.get_or_create(
             employee=emp,
             tenant_id=tenant_id,
             defaults={
-                "basic_salary": Decimal("10000.00"),
+                "basic_salary": Decimal("10000.00") if idx % 2 == 0 else Decimal("12000.00"),
                 "housing_allowance": Decimal("2000.00"),
                 "transport_allowance": Decimal("1000.00"),
                 "other_allowances": Decimal("500.00"),
                 "is_active": True
             }
         )
+        if struct_created:
+            print(f"تم إنشاء هيكل راتب للموظف: {emp.full_name_ar}")
 
-    # 5. توليد سجلات الحضور لشهر يونيو 2026 (أيام العمل فقط من الأحد للخميس)
-    print("جاري توليد سجلات الحضور والانصراف لشهر يونيو 2026...")
-    AttendanceRecord.objects.filter(employee__in=[e[0] for e in employees], date__year=2026, date__month=6).delete()
+        # 5.2 تحديد سيناريو الحضور والغياب للموظف
+        # نريد لكل موظف أن يكون لديه غياب وتأخير
+        # الغياب: بين 1 إلى 4 أيام
+        absent_days_count = (idx % 4) + 1 
+        # التأخير: عدد دقائق التأخير في الأيام التي يحضر فيها
+        late_days_count = 3
+        late_minutes_per_day = 15 + (idx % 4) * 10 # 15, 25, 35, 45 دقيقة
 
-    start_date = datetime.date(2026, 6, 1)
-    end_date = datetime.date(2026, 6, 30)
-    current_date = start_date
+        # نحدد عشوائياً/بشكل ثابت الأيام التي سيغيب فيها والأيام التي سيتأخر فيها
+        # أيام العمل الفعلية في يونيو 2026 (تجاوز الأسبوعي)
+        current_date = start_date
+        work_days_count = 0
+        
+        # مصفوفة لتوزيع الأيام
+        absent_days_indices = []
+        late_days_indices = []
+        
+        # سنوزع الأيام بناءً على الترتيب
+        # مثلاً الغياب في الأيام الأولى والـ late في الأيام اللاحقة
+        for d in range(1, 23): # افتراض 22 يوم عمل كحد أقصى
+            if len(absent_days_indices) < absent_days_count:
+                absent_days_indices.append(d)
+            elif len(late_days_indices) < late_days_count:
+                late_days_indices.append(d)
 
-    work_days_count = 0
-    while current_date <= end_date:
-        # 0 = الاثنين, 1 = الثلاثاء, 2 = الأربعاء, 3 = الخميس, 4 = الجمعة, 5 = السبت, 6 = الأحد
-        # أيام العمل: الأحد إلى الخميس (0, 1, 2, 3, 6) والجمعة والسبت عطلة (4, 5)
-        weekday = current_date.weekday()
-        is_workday = weekday not in (4, 5)  # استبعاد الجمعة والسبت
-
-        if is_workday:
-            work_days_count += 1
-            for emp, emp_type in employees:
-                # توليد السجل حسب حالة الموظف
-                if emp_type == "committed":
-                    # ملتزم: حضور كامل بدون تأخير
+        current_date = start_date
+        work_days_count = 0
+        
+        while current_date <= end_date:
+            weekday = current_date.weekday()
+            is_workday = weekday not in (4, 5) # استبعاد الجمعة والسبت
+            
+            if is_workday:
+                work_days_count += 1
+                
+                if work_days_count in absent_days_indices:
+                    # يوم غياب
+                    AttendanceRecord.objects.create(
+                        employee=emp,
+                        tenant_id=tenant_id,
+                        date=current_date,
+                        status="absent",
+                        late_minutes=0
+                    )
+                elif work_days_count in late_days_indices:
+                    # يوم تأخير
+                    check_in_time = (datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0)) + datetime.timedelta(minutes=late_minutes_per_day)).time()
+                    AttendanceRecord.objects.create(
+                        employee=emp,
+                        tenant_id=tenant_id,
+                        date=current_date,
+                        check_in=check_in_time,
+                        check_out=datetime.time(16, 0),
+                        status="late",
+                        late_minutes=late_minutes_per_day
+                    )
+                else:
+                    # يوم حضور عادي
                     AttendanceRecord.objects.create(
                         employee=emp,
                         tenant_id=tenant_id,
@@ -153,77 +155,10 @@ def seed_attendance_payroll():
                         status="present",
                         late_minutes=0
                     )
-                elif emp_type == "late":
-                    # متأخر: يتأخر 15 دقيقة في 8 أيام متفرقة (إجمالي 120 دقيقة تأخير)
-                    is_late_day = (work_days_count % 3 == 0) and (work_days_count <= 24)
-                    late_min = 15 if is_late_day else 0
-                    check_in_time = datetime.time(8, 15) if is_late_day else datetime.time(8, 0)
-                    AttendanceRecord.objects.create(
-                        employee=emp,
-                        tenant_id=tenant_id,
-                        date=current_date,
-                        check_in=check_in_time,
-                        check_out=datetime.time(16, 0),
-                        status="late" if is_late_day else "present",
-                        late_minutes=late_min
-                    )
-                elif emp_type == "absent":
-                    # غائب: غياب 3 أيام (مثلاً اليوم 5 و 10 و 15 من أيام العمل)
-                    is_absent_day = work_days_count in (5, 10, 15)
-                    if is_absent_day:
-                        AttendanceRecord.objects.create(
-                            employee=emp,
-                            tenant_id=tenant_id,
-                            date=current_date,
-                            status="absent",
-                            late_minutes=0
-                        )
-                    else:
-                        AttendanceRecord.objects.create(
-                            employee=emp,
-                            tenant_id=tenant_id,
-                            date=current_date,
-                            check_in=datetime.time(8, 0),
-                            check_out=datetime.time(16, 0),
-                            status="present",
-                            late_minutes=0
-                        )
-                elif emp_type == "trouble":
-                    # مشاغب: غياب يومين (اليوم 4 و 12) وتأخير 30 دقيقة في 3 أيام (اليوم 2 و 8 و 14)
-                    is_absent_day = work_days_count in (4, 12)
-                    is_late_day = work_days_count in (2, 8, 14)
-                    if is_absent_day:
-                        AttendanceRecord.objects.create(
-                            employee=emp,
-                            tenant_id=tenant_id,
-                            date=current_date,
-                            status="absent",
-                            late_minutes=0
-                        )
-                    else:
-                        check_in_time = datetime.time(8, 30) if is_late_day else datetime.time(8, 0)
-                        AttendanceRecord.objects.create(
-                            employee=emp,
-                            tenant_id=tenant_id,
-                            date=current_date,
-                            check_in=check_in_time,
-                            check_out=datetime.time(16, 0),
-                            status="late" if is_late_day else "present",
-                            late_minutes=30 if is_late_day else 0
-                        )
-                elif emp_type == "full_absent":
-                    # غياب كامل: غائب طوال الشهر
-                    AttendanceRecord.objects.create(
-                        employee=emp,
-                        tenant_id=tenant_id,
-                        date=current_date,
-                        status="absent",
-                        late_minutes=0
-                    )
-
-        current_date += datetime.timedelta(days=1)
-
-    print(f"تمت تهيئة حضور {work_days_count} يوم عمل لشهر يونيو 2026 بنجاح.")
+            
+            current_date += datetime.timedelta(days=1)
+            
+        print(f"تم توليد حضور الموظف {emp.full_name_ar}: غياب {absent_days_count} يوم، تأخير {late_days_count * late_minutes_per_day} دقيقة إجمالاً.")
 
     # 6. إنشاء مسير الرواتب draft
     run, run_created = PayrollRun.objects.get_or_create(
@@ -241,8 +176,8 @@ def seed_attendance_payroll():
     viewset = PayrollRunViewSet()
     viewset.process_payroll_logic(run, preview_only=True)
     
-    print("\n================== نتائج احتساب كشوف الرواتب لشهر يونيو 2026 ==================")
-    for slip in run.payslips.all():
+    print("\n================== نتائج احتساب كشوف الرواتب لشهر يونيو 2026 للموظفين الحقيقيين ==================")
+    for slip in run.payslips.all()[:10]: # عرض أول 10 للتأكيد
         print(f"الموظف: {slip.employee.full_name_ar}")
         print(f"  الراتب الأساسي: {slip.basic_salary} ج.س")
         print(f"  إجمالي المستحقات: {slip.gross_earnings} ج.س")

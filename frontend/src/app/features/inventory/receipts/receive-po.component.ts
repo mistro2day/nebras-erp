@@ -315,13 +315,19 @@ export class ReceivePoComponent implements OnInit {
     });
   }
 
-  /** يقترح الصنف المخزني بمطابقة الاسم — ويترك القرار للمستخدم. */
+  /**
+   * يحدّد الصنف المخزني لكل بند: الرابط المحمول من طلب الشراء أولاً،
+   * فإن غاب (بنود قديمة أو أصناف غير مخزنية) يقترح بمطابقة الاسم.
+   */
   private buildLines(poItems: any[]) {
     if (!poItems.length) return;
     const inv = this.items();
     this.lines.set(poItems.map((it: any) => {
       const name = (it.item_name || '').trim();
-      const guess = inv.find((x) =>
+      const linked = it.inventory_item_id
+        ? inv.find((x) => x.id === it.inventory_item_id)
+        : null;
+      const guess = linked || inv.find((x) =>
         (x.name_ar || '').trim() === name ||
         (name && (x.name_ar || '').includes(name)) ||
         (name && name.includes((x.name_ar || '').trim()) && (x.name_ar || '').length > 3));

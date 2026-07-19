@@ -7,7 +7,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 
 interface ItemRow {
-  item_name: string; quantity: number | null; unit: string;
+  item_name: string; quantity: number | null; unit: string; inventory_item_id: string;
   estimated_unit_price: number | null; budget_account_id: string; cost_center_id: string;
 }
 
@@ -66,9 +66,19 @@ interface ItemRow {
         </div>
         @for (it of items(); track $index) {
           <div class="item">
-            <input [(ngModel)]="it.item_name" placeholder="اسم الصنف" />
+            <div class="item-cell">
+              <select [ngModel]="it.inventory_item_id" (ngModelChange)="pickItem($index, $event)">
+                <option value="">— صنف غير مخزني (اسم حر) —</option>
+                @for (inv of inventoryItems(); track inv.id) {
+                  <option [value]="inv.id">{{ inv.name }} ({{ inv.sku }})</option>
+                }
+              </select>
+              @if (!it.inventory_item_id) {
+                <input [(ngModel)]="it.item_name" placeholder="اكتب اسم الصنف" />
+              }
+            </div>
             <input type="number" min="0" [(ngModel)]="it.quantity" placeholder="0" />
-            <input [(ngModel)]="it.unit" placeholder="حبة" />
+            <input [(ngModel)]="it.unit" placeholder="حبة" [readonly]="!!it.inventory_item_id" />
             <input type="number" min="0" [(ngModel)]="it.estimated_unit_price" placeholder="0.00" />
             <select [(ngModel)]="it.budget_account_id" class="dim-in">
               <option value="">—</option>
@@ -127,7 +137,10 @@ interface ItemRow {
       text-decoration: none; font-size: 11.5px; white-space: nowrap; }
     .dn-link:hover { text-decoration: underline; }
 
-    .items-head, .item { display: grid; grid-template-columns: 1.6fr 0.7fr 0.7fr 0.9fr 1.4fr 1.4fr 32px; gap: 8px; align-items: center; }
+    .items-head, .item { display: grid; grid-template-columns: 1.9fr 0.7fr 0.7fr 0.9fr 1.4fr 1.4fr 32px; gap: 8px; align-items: center; }
+    /* خلية الصنف تحمل المُنتقي، ويظهر تحته حقل الاسم الحر عند عدم اختيار صنف مخزني */
+    .item-cell { display: flex; flex-direction: column; gap: 5px; }
+    .item-cell input[readonly] { background: var(--nb-surface-raised); color: var(--nb-text-muted); }
     .items-head { font-size: 11px; font-weight: 700; color: var(--nb-text-muted); padding: 0 2px 6px; }
     /* تمييز الأبعاد المالية بصرياً عن حقول الصنف */
     .dim-h { color: var(--nb-primary-700); }
@@ -179,6 +192,7 @@ export class PrCreateFormComponent implements OnInit {
         this.departments.set(d.departments || []);
         this.accounts.set(d.accounts || []);
         this.costCenters.set(d.cost_centers || []);
+        this.inventoryItems.set(d.inventory_items || []);
       },
       // معترض الأخطاء يُسطّح الخطأ إلى {status, message, details} — نعرض سببه الحقيقي
       error: (e) => this.refError.set(
@@ -189,8 +203,21 @@ export class PrCreateFormComponent implements OnInit {
     });
   }
 
+  readonly inventoryItems = signal<any[]>([]);
+
   blank(): ItemRow {
-    return { item_name: '', quantity: null, unit: 'حبة', estimated_unit_price: null, budget_account_id: '', cost_center_id: '' };
+    return { item_name: '', quantity: null, unit: 'حبة', estimated_unit_price: null,
+      budget_account_id: '', cost_center_id: '', inventory_item_id: '' };
+  }
+
+  /** اختيار صنف مخزني يملأ الاسم والوحدة — فيصل الرابط حتى الاستلام بلا مطابقة يدوية. */
+  pickItem(index: number, invId: string) {
+    const inv = this.inventoryItems().find((x) => x.id === invId);
+    this.items.update((list) => list.map((row, i) => {
+      if (i !== index) return row;
+      if (!invId) return { ...row, inventory_item_id: '' };
+      return { ...row, inventory_item_id: invId, item_name: inv?.name || row.item_name, unit: inv?.unit || row.unit };
+    }));
   }
   addItem() { this.items.update(l => [...l, this.blank()]); }
   removeItem(i: number) { this.items.update(l => l.filter((_, idx) => idx !== i)); }
@@ -213,6 +240,7 @@ export class PrCreateFormComponent implements OnInit {
         item_name: i.item_name.trim(), quantity: i.quantity, unit: i.unit || 'حبة',
         estimated_unit_price: i.estimated_unit_price,
         budget_account_id: i.budget_account_id, cost_center_id: i.cost_center_id,
+        inventory_item_id: i.inventory_item_id || null,
       })),
     };
     this.saving.set(true);
