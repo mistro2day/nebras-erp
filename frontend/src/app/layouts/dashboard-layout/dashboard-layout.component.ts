@@ -716,7 +716,16 @@ export class DashboardLayoutComponent {
         { label: 'النقل', link: '/transport' },
         { label: 'المكتبة', link: '/library' },
         { label: 'العيادة', link: '/clinic' },
-        { label: 'الصيانة', link: '/maintenance' },
+        {
+          label: 'الصيانة',
+          match: '/maintenance',
+          link: '/maintenance/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/maintenance/dashboard' },
+            { label: 'بلاغات الصيانة', link: '/maintenance/requests' },
+            { label: 'أوامر العمل', link: '/maintenance/work-orders' },
+          ],
+        },
       ],
     },
     {

@@ -2,6 +2,7 @@ from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.maintenance.domain.models import (
@@ -98,13 +99,17 @@ class WorkOrderViewSet(BaseCRUDViewSet):
         actual_hours = request.data.get('actual_labor_hours', 0.0)
         summary = request.data.get('summary', 'تمت عملية الصيانة الفنية بنجاح')
 
-        wo = WorkOrderService.complete_work_order(
-            tenant_id=tenant_id,
-            work_order_id=pk,
-            actual_hours=actual_hours,
-            summary=summary,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            wo = WorkOrderService.complete_work_order(
+                tenant_id=tenant_id,
+                work_order_id=pk,
+                actual_hours=actual_hours,
+                summary=summary,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = self.get_serializer(wo)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -117,13 +122,20 @@ class WorkOrderViewSet(BaseCRUDViewSet):
         if not warehouse_id or not items:
             return Response({'error': 'warehouse_id and items are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        maint_cost = WorkOrderService.consume_parts_for_work_order(
-            tenant_id=tenant_id,
-            work_order_id=pk,
-            warehouse_id=warehouse_id,
-            items=items,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            maint_cost = WorkOrderService.consume_parts_for_work_order(
+                tenant_id=tenant_id,
+                work_order_id=pk,
+                warehouse_id=warehouse_id,
+                items=items,
+                # حساب مصروف الصيانة ومركز التكلفة يُمرَّران لقيد الاستهلاك المخزني
+                expense_account_id=request.data.get('expense_account_id'),
+                cost_center_id=request.data.get('cost_center_id'),
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = MaintenanceCostSerializer(maint_cost)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -137,14 +149,17 @@ class WorkOrderViewSet(BaseCRUDViewSet):
         if not maintenance_expense_gl_account_id or not offset_gl_account_id:
             return Response({'error': 'maintenance_expense_gl_account_id and offset_gl_account_id are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        cost_record = MaintenanceCostService.post_maintenance_costs_to_finance(
-            tenant_id=tenant_id,
-            work_order_id=pk,
-            maintenance_expense_gl_account_id=maintenance_expense_gl_account_id,
-            offset_gl_account_id=offset_gl_account_id,
-            cost_center_id=cost_center_id,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            cost_record = MaintenanceCostService.post_maintenance_costs_to_finance(
+                tenant_id=tenant_id,
+                work_order_id=pk,
+                maintenance_expense_gl_account_id=maintenance_expense_gl_account_id,
+                offset_gl_account_id=offset_gl_account_id,
+                cost_center_id=cost_center_id,
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
         serializer = MaintenanceCostSerializer(cost_record)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

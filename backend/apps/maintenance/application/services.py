@@ -60,30 +60,45 @@ class WorkOrderService:
 
     @staticmethod
     @transaction.atomic
-    def consume_parts_for_work_order(tenant_id, work_order_id, warehouse_id, items, user_id=None):
+    def consume_parts_for_work_order(tenant_id, work_order_id, warehouse_id, items,
+                                     expense_account_id=None, cost_center_id=None, user_id=None):
         """
         استهلاك وصرف قطع الغيار الفعلي لأمر العمل من خلال استدعاء موديول المستودعات (Inventory).
-        items: قائمة بالمواد والكميات المصروفة [{ 'item_id': UUID, 'qty': 2.0 }]
+        items: قائمة بالمواد والكميات المصروفة [{ 'item_id': UUID, 'qty': 2.0, 'unit_cost': 18.5 }]
+
+        تكلفة الوحدة: تُؤخذ مما يُمرَّر، وإلا فمن آخر حركة فعلية للصنف. خدمة الصرف
+        بالمستودعات لا تحسب التكلفة بنفسها، وتمريرها صفراً يجعل تكلفة الصيانة صفراً
+        فيتعذّر ترحيلها للمالية لاحقاً.
         """
+        from apps.inventory.domain.models import InventoryTransaction
+
         wo = WorkOrder.objects.get(tenant_id=tenant_id, id=work_order_id)
-        
+
         # 1. إعداد قائمة الأصناف المخزنية لعملية الصرف
         inventory_items = []
         for it in items:
+            unit_cost = it.get('unit_cost')
+            if unit_cost in (None, '', 0):
+                last_trx = InventoryTransaction.objects.filter(
+                    tenant_id=tenant_id, item_id=it['item_id']
+                ).order_by('-created_at').first()
+                unit_cost = last_trx.unit_cost if last_trx else Decimal('0.00')
+
             inventory_items.append({
                 'item_id': it['item_id'],
                 'qty_issued': Decimal(str(it['qty'])),
-                'unit_cost': Decimal('0.00')  # تحسب تلقائياً من خلال خدمة الصرف بالمستودعات
+                'unit_cost': Decimal(str(unit_cost)),
+                'expense_account_id': expense_account_id,
+                'cost_center_id': cost_center_id,
             })
 
         # 2. استدعاء خدمة الصرف الفعلي بموديول المخازن
-        # يقلل الأرصدة بالمخزن ويولد قيد المحاسبة المخزني (مدين مصروفات صيانة / دائن مخزون)
+        # يقلل الأرصدة بالمخزن ويولد قيد استهلاك يصل المالية كمسودة
         receipt = GoodsIssueService.issue_stock(
             tenant_id=tenant_id,
             warehouse_id=warehouse_id,
-            issue_type='department',
-            destination_reference_id=wo.id,
-            items=inventory_items,
+            issue_type='maintenance',
+            items_data=inventory_items,
             user_id=user_id
         )
 
