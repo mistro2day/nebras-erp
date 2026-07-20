@@ -3,8 +3,12 @@ import { Routes } from '@angular/router';
 export const PORTAL_ROUTES: Routes = [
   {
     path: '',
-    redirectTo: 'student/dashboard',
+    redirectTo: 'overview',
     pathMatch: 'full'
+  },
+  {
+    path: 'overview',
+    loadComponent: () => import('./portal-overview.component').then(m => m.PortalOverviewComponent)
   },
   {
     path: 'parent/dashboard',

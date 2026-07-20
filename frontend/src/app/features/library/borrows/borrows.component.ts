@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { LibraryService } from '../library.service';
@@ -17,7 +17,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
   selector: 'app-library-borrows',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الإعارة والإرجاع" subtitle="إعارة النسخ للطلاب والموظفين، وإرجاعها مع احتساب التأخير.">

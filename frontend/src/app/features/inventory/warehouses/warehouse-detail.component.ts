@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { InventoryService } from '../inventory.service';
@@ -21,7 +21,7 @@ interface ZoneNode { id: string; code: string; name: string; aisles: AisleNode[]
   selector: 'app-warehouse-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header [title]="wh()?.name_ar || 'المستودع'"

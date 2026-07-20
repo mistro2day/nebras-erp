@@ -4,8 +4,7 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
 /**
- * بوابة أولياء الأمور — لغة تصميم Nebras OS.
- * المنطق كما هو — استُبدلت طبقة العرض فقط.
+ * بوابة أولياء الأمور — لغة تصميم Nebras OS (سودان / SDG).
  */
 @Component({
   selector: 'app-parent-dashboard',
@@ -15,8 +14,8 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
-        title="بوابة أولياء الأمور"
-        subtitle="مرحباً بك، أحمد! تابع أداء أبنائك الدراسي والمالي والصحي بكل سهولة."
+        title="بوابة ولي الأمر"
+        subtitle="مرحباً بك، عثمان الكباشي! تابع أداء أبنائك الدراسي والمالي في مدارس نبراس السودان."
       >
         <button class="nb-btn-secondary">تحديث البيانات</button>
       </nb-page-header>
@@ -27,11 +26,11 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
           <div class="nb-card child-card">
             <div class="child-head">
               <div class="avatar">{{ child.name.charAt(0) }}</div>
-              <div><strong>{{ child.name }}</strong><span class="sub">طالب - الصف العاشر</span></div>
+              <div><strong>{{ child.name }}</strong><span class="sub">طالب - مدارس نبراس الخرطوم</span></div>
             </div>
             <div class="child-stats">
               <div class="cs"><span class="cs-label">نسبة الحضور</span><span class="cs-val ok">{{ child.attendance_rate }}%</span></div>
-              <div class="cs"><span class="cs-label">الرسوم المتبقية</span><span class="cs-val" [class.bad]="child.outstanding_fees > 0">{{ child.outstanding_fees }} ر.س</span></div>
+              <div class="cs"><span class="cs-label">الرسوم المتبقية</span><span class="cs-val" [class.bad]="child.outstanding_fees > 0">{{ child.outstanding_fees }} ج.س</span></div>
             </div>
             <div class="child-meta">
               <p>📅 الاختبار القادم: {{ child.next_exam }}</p>
@@ -43,16 +42,16 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
       <nb-panel [flush]="true">
         <mat-tab-group class="nb-tabs">
-          <mat-tab label="الفواتير والمدفوعات">
+          <mat-tab label="الفواتير والمدفوعات (بنكك / فوري)">
             <div class="list">
-              <h3>الملخص المالي</h3>
-              <div class="row"><span class="nb-dot success"></span><div><strong>تم سداد دفعة الفصل الدراسي الأول</strong><span class="meta">المبلغ: 3,750 ر.س - 2026-06-15</span></div></div>
-              <div class="row"><span class="nb-dot warning"></span><div><strong>فاتورة مستحقة - رسوم حافلة النقل</strong><span class="meta danger">المبلغ: 1,250 ر.س - يستحق في 2026-07-20</span></div></div>
+              <h3>الملخص المالي بالجنيه السوداني (SDG)</h3>
+              <div class="row"><span class="nb-dot success"></span><div><strong>تم سداد قسط الفصل الدراسي الأول عبر تطبيق بنكك</strong><span class="meta">المبلغ: 450,000 ج.س - 2026-06-15</span></div></div>
+              <div class="row"><span class="nb-dot warning"></span><div><strong>فاتورة مستحقة - رسوم حافلة خط أم درمان</strong><span class="meta danger">المبلغ: 120,000 ج.س - يستحق في 2026-07-20</span></div></div>
             </div>
           </mat-tab>
           <mat-tab label="الإعلانات والرسائل">
             <div class="list">
-              <h3>آخر الإعلانات</h3>
+              <h3>آخر الإعلانات والتنبيهات</h3>
               @for (ann of announcements(); track ann.id) {
                 <div class="row"><span class="ico">📣</span><div><strong>{{ ann.title }}</strong><span class="meta">{{ ann.content }}</span></div></div>
               }
@@ -87,30 +86,31 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
     .row strong { display: block; font-size: 13px; color: var(--nb-text); }
     .row .meta { font-size: 11px; color: var(--nb-text-muted); }
     .row .meta.danger { color: var(--nb-danger); }
+    .nb-btn-secondary { background: var(--nb-surface); border: 1px solid var(--nb-border); color: var(--nb-text); padding: 8px 16px; border-radius: var(--nb-radius); font-size: 13px; cursor: pointer; }
   `]
 })
 export class ParentDashboardComponent {
   children = signal([
     {
       student_id: '1',
-      name: 'خالد أحمد الجميل',
+      name: 'خالد عثمان إبراهيم الكباشي',
       attendance_rate: 98.4,
-      outstanding_fees: 1250,
-      next_exam: 'رياضيات نهائي (2026-07-12)',
-      transport_status: 'مسار حافلة 14 - جاري التوصيل'
+      outstanding_fees: 120000,
+      next_exam: 'رياضيات نهائي (2026-07-25)',
+      transport_status: 'مسار حافلة خط أم درمان - واصل للمدرسة'
     },
     {
       student_id: '2',
-      name: 'سارة أحمد الجميل',
-      attendance_rate: 95.1,
+      name: 'سارة عثمان إبراهيم الكباشي',
+      attendance_rate: 96.5,
       outstanding_fees: 0,
-      next_exam: 'علوم نهائي (2026-07-14)',
-      transport_status: 'مسار حافلة 08 - واصل للمدرسة'
+      next_exam: 'علوم نهائي (2026-07-27)',
+      transport_status: 'مسار حافلة خط أم درمان - وصل للمنزل'
     }
   ]);
 
   announcements = signal([
-    { id: 1, title: 'بدء التسجيل للنقل المدرسي للفصل القادم', content: 'نرجو من السادة أولياء الأمور المسارعة بتسجيل أبنائهم في خدمة الحافلات قبل انتهاء الموعد.' },
+    { id: 1, title: 'بدء التسجيل لخدمة النقل المدرسي بفرع أم درمان والخرطوم', content: 'نرجو من السادة أولياء الأمور حجز مقاعد أبنائهم قبل انتهاء الموعد المضي المحدد.' },
     { id: 2, title: 'جدول امتحانات الفصل الدراسي الثاني الموحد', content: 'تم نشر جدول الامتحانات النهائية بمركز التحميل، يرجى الاطلاع والمتابعة.' }
   ]);
 }

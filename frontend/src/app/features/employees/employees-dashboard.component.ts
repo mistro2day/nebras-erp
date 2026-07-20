@@ -126,11 +126,11 @@ export class EmployeesDashboardComponent implements OnInit {
     this.http.post<any>(`/api/v1/employees/employees/${emp.id}/activate-account/`, {}).subscribe({
       next: (res) => {
         this.activatingId.set(null);
-        alert(res?.message || 'تم تفعيل حساب الموظف وإرسال بيانات الدخول بنجاح.');
+        console.log(res?.message || 'تم تفعيل حساب الموظف وإرسال بيانات الدخول بنجاح.');
       },
       error: (err) => {
         this.activatingId.set(null);
-        alert(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل حساب الموظف.');
+        console.error(err?.error?.error?.message || err?.error?.message || 'فشل تفعيل حساب الموظف.');
       }
     });
   }

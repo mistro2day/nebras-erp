@@ -186,7 +186,7 @@ export class ExamDashboardComponent implements OnInit {
     this.examService.enterStudentMark(element.id, element.tempMark, 'رصد درجة من لوحة التحكم الأكاديمية').subscribe({
       next: (res) => {
         if (res && res.success) {
-          alert('تم حفظ ورصد درجة الطالب بنجاح بالمسار الأمني.');
+          console.log('تم حفظ ورصد درجة الطالب بنجاح بالمسار الأمني.');
         }
       }
     });
@@ -196,7 +196,7 @@ export class ExamDashboardComponent implements OnInit {
     this.examService.resolveAppeal(appealId, newMarks).subscribe({
       next: (res) => {
         if (res && res.success) {
-          alert('تم معالجة التظلم وتحديث حالة الطالب بنجاح.');
+          console.log('تم معالجة التظلم وتحديث حالة الطالب بنجاح.');
           this.loadData();
         }
       }

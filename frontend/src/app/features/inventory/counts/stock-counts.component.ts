@@ -93,7 +93,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               <span class="c-name">{{ itemName(ci.item) }}</span>
               @if (!a.is_blind) { <span class="ta-end mono muted">{{ ci.qty_book | number:'1.0-2' }}</span> }
               <input class="ta-end" type="number" min="0"
-                [ngModel]="physical()[ci.id] ?? null" (ngModelChange)="setPhysical(ci.id, $event)"
+                [ngModel]="physical()[ci.id]" (ngModelChange)="setPhysical(ci.id, $event)"
                 placeholder="—" />
               <span class="ta-end mono var" [class.neg]="variance(ci) < 0" [class.pos]="variance(ci) > 0">
                 @if (physical()[ci.id] === undefined || physical()[ci.id] === null) { — }

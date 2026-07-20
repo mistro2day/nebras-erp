@@ -751,9 +751,38 @@ export class DashboardLayoutComponent {
       label: 'العلاقات والاتصال',
       permission: 'settings:read',
       items: [
-        { label: 'إدارة علاقات العملاء', link: '/crm' },
-        { label: 'الاتصالات', link: '/communications' },
-        { label: 'البوابات', link: '/portal' },
+        {
+          label: 'إدارة علاقات العملاء (CRM)',
+          match: '/crm',
+          link: '/crm/dashboard',
+          children: [
+            { label: 'لوحة القيادة CRM', link: '/crm/dashboard' },
+            { label: 'استقطاب العملاء المحتملين', link: '/crm/leads' },
+            { label: 'تذاكر الدعم والشكاوى', link: '/crm/cases' },
+            { label: 'استطلاعات الرأي والرضا', link: '/crm/surveys' },
+          ],
+        },
+        {
+          label: 'مركز الاتصالات',
+          match: '/communications',
+          link: '/communications/dashboard',
+          children: [
+            { label: 'لوحة التحكم والعمليات', link: '/communications/dashboard' },
+            { label: 'قوالب الرسائل والمتغيرات', link: '/communications/templates' },
+            { label: 'قنوات ومزودات الخدمة', link: '/communications/channels' },
+          ],
+        },
+        {
+          label: 'البوابات الإلكترونية',
+          match: '/portal',
+          link: '/portal/overview',
+          children: [
+            { label: 'نظرة عامة على البوابات', link: '/portal/overview' },
+            { label: 'بوابة ولي الأمر', link: '/portal/parent/dashboard' },
+            { label: 'بوابة الطالب', link: '/portal/student/dashboard' },
+            { label: 'بوابة المتقدم', link: '/portal/applicant/dashboard' },
+          ],
+        },
       ],
     },
     {
@@ -831,7 +860,7 @@ export class DashboardLayoutComponent {
     ai: 'مساعد نبراس',
   };
 
-  private readonly currentUrl = toSignal(
+  readonly currentUrl = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
       map((e) => e.urlAfterRedirects)

@@ -543,6 +543,7 @@ export class StudentCreateComponent implements OnInit {
   applicants = signal<any[]>([]);
   selectedApplicant = signal<any | null>(null);
   submitting = signal(false);
+  errorMessage = signal('');
 
   // حقول النموذج اليدوي
   personalForm = {
@@ -619,7 +620,7 @@ export class StudentCreateComponent implements OnInit {
   submitManualStudent(event: Event) {
     event.preventDefault();
     if (!this.personalForm.arabic_name || !this.personalForm.date_of_birth) {
-      alert('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
+      this.errorMessage.set('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
       return;
     }
 

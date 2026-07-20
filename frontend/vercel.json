@@ -9,6 +9,10 @@
       "source": "/api/v1/(.*)",
       "destination": "https://nebras-erp-api-85v9.onrender.com/api/v1/$1"
     },
+    {
+      "source": "/whatsapp-api/(.*)",
+      "destination": "https://nebras-whatsapp-engine.onrender.com/$1"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
