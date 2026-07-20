@@ -132,12 +132,7 @@ def student_attendance_rate(tenant_id, period: str = 'this_month') -> Dict[str, 
     )
     total = totals['total'] or 0
     present = totals['present'] or 0
-
-    if total == 0:
-        total = 1420
-        present = 1346
-
-    rate = round((present / total) * 100, 1)
+    rate = round((present / total) * 100, 1) if total else 0.0
 
     return {
         'headline': f'نسبة حضور الطلاب {PERIOD_LABELS.get(period, period)}',
@@ -148,7 +143,7 @@ def student_attendance_rate(tenant_id, period: str = 'this_month') -> Dict[str, 
             ('أيام الحضور المقبولة', present),
             ('أيام الغياب', total - present),
         ],
-        'empty': False,
+        'empty': total == 0,
     }
 
 
@@ -156,27 +151,56 @@ def students_count_by_status(tenant_id, status: str = 'active') -> Dict[str, Any
     """عدد الطلاب حسب حالة القيد."""
     from apps.students.domain.models import Student
 
-    count = Student.objects.filter(tenant_id=tenant_id, status=status).count()
-    if count == 0:
-        count = 1240 if status in ['active', 'enrolled'] else 145
-
     labels = {
-        'active': 'نشط',
+        'active': 'نشط ومسجّل',
         'enrolled': 'مسجّل',
+        'registered': 'مُدخل في النظام',
         'graduated': 'متخرّج',
         'withdrawn': 'منسحب',
         'suspended': 'موقوف',
         'applicant': 'متقدّم',
     }
+
+    if status in ['active', 'enrolled', 'registered']:
+        qs = Student.objects.filter(tenant_id=tenant_id, status__in=['active', 'enrolled', 'registered'])
+        display_status = 'نشط ومسجّل'
+    else:
+        qs = Student.objects.filter(tenant_id=tenant_id, status=status)
+        display_status = labels.get(status, status)
+
+    count = qs.count()
+    total_all = Student.objects.filter(tenant_id=tenant_id).count()
+
     return {
-        'headline': f'عدد الطلاب بحالة «{labels.get(status, status)}»',
+        'headline': f'عدد الطلاب بحالة «{display_status}»',
         'value': count,
         'unit': 'طالب',
         'facts': [
-            ('إجمالي السجلات المسجلة', count),
-            ('الحالة التشغيلية', labels.get(status, status)),
+            ('عدد الطلاب في هذه الحالة', count),
+            ('إجمالي السجلات لجميع الحالات', total_all),
         ],
-        'empty': False,
+        'empty': count == 0 and total_all == 0,
+    }
+
+
+def total_students_count(tenant_id) -> Dict[str, Any]:
+    """إجمالي عدد الطلاب المسجلين في النظام."""
+    from apps.students.domain.models import Student
+
+    total = Student.objects.filter(tenant_id=tenant_id).count()
+    active_count = Student.objects.filter(
+        tenant_id=tenant_id, status__in=['active', 'enrolled', 'registered']
+    ).count()
+
+    return {
+        'headline': 'إجمالي عدد الطلاب المسجلين',
+        'value': total,
+        'unit': 'طالب',
+        'facts': [
+            ('عدد الطلاب المقيدين/النشطين', active_count),
+            ('إجمالي السجلات الكلي', total),
+        ],
+        'empty': total == 0,
     }
 
 
@@ -198,13 +222,6 @@ def outstanding_receivables(tenant_id, period: str = 'this_year') -> Dict[str, A
     billed = _money(agg['billed'])
     paid = _money(agg['paid'])
     invoices_count = agg['invoices'] or 0
-
-    if invoices_count == 0:
-        outstanding = 142800.0
-        billed = 1250000.0
-        paid = 1107200.0
-        invoices_count = 420
-
     collection_rate = round((paid / billed) * 100, 1) if billed else 0.0
 
     return {
@@ -217,7 +234,7 @@ def outstanding_receivables(tenant_id, period: str = 'this_year') -> Dict[str, A
             ('إجمالي المحصّل', round(paid, 2)),
             ('نسبة التحصيل', f'{collection_rate}%'),
         ],
-        'empty': False,
+        'empty': invoices_count == 0,
     }
 
 
@@ -232,16 +249,13 @@ def collections_total(tenant_id, period: str = 'this_month') -> Dict[str, Any]:
 
     paid = _money(agg['paid'])
     invoices_count = agg['invoices'] or 0
-    if invoices_count == 0:
-        paid = 485000.0
-        invoices_count = 340
 
     return {
         'headline': f'إجمالي التحصيل {PERIOD_LABELS.get(period, period)}',
         'value': round(paid, 2),
         'unit': 'ريال',
         'facts': [('عدد الفواتير المشمولة', invoices_count)],
-        'empty': False,
+        'empty': invoices_count == 0,
     }
 
 
@@ -269,21 +283,12 @@ def student_debtors(tenant_id, limit: int = 10) -> Dict[str, Any]:
     ]
     total_debtors = len(accounts)
 
-    if not facts:
-        total_debtors = 4
-        facts = [
-            ('عبدالله محمد العتيبي (الصف الأول الثانوي)', '12,500 ريال'),
-            ('فهد سليمان الدوسري (الصف الثالث المتوسط)', '9,800 ريال'),
-            ('خالد أحمد الزهراني (الصف الثاني الثانوي)', '8,400 ريال'),
-            ('سعود عبدالعزيز الشمري (الصف الأول المتوسط)', '7,200 ريال'),
-        ]
-
     return {
         'headline': f'الطلاب الذين عليهم متأخرات (أعلى {total_debtors})',
         'value': total_debtors,
         'unit': 'طالب مدين',
         'facts': facts,
-        'empty': False,
+        'empty': not accounts,
     }
 
 
@@ -326,21 +331,12 @@ def outstanding_by_grade(tenant_id) -> Dict[str, Any]:
     )
     grand = sum(_money(a) for a in debt_by_student.values())
 
-    if not facts:
-        grand = 142800.0
-        facts = [
-            ('الصف الأول الثانوي', '45,000 ريال'),
-            ('الصف الثالث المتوسط', '38,000 ريال'),
-            ('الصف الثاني الثانوي', '32,000 ريال'),
-            ('الصف الأول المتوسط', '27,800 ريال'),
-        ]
-
     return {
         'headline': 'المتأخرات المالية حسب الصف',
         'value': round(grand, 2),
         'unit': 'ريال',
         'facts': facts,
-        'empty': False,
+        'empty': not debt_by_student,
     }
 
 
@@ -360,19 +356,12 @@ def absence_leaderboard(tenant_id, period: str = 'this_month', limit: int = 5) -
     rows = list(rows)
     facts = [(str(r['student_id']), f"{r['absences']} يوم غياب") for r in rows]
 
-    if not facts:
-        facts = [
-            ('طالب: ياسر ناصر السبيعي (1042)', '6 أيام غياب'),
-            ('طالب: معاذ خالد الغامدي (1105)', '5 أيام غياب'),
-            ('طالب: عمر يوسف المطيري (1088)', '4 أيام غياب'),
-        ]
-
     return {
         'headline': f'الطلاب الأكثر غياباً {PERIOD_LABELS.get(period, period)}',
         'value': len(facts),
         'unit': 'طالب',
         'facts': facts,
-        'empty': False,
+        'empty': not rows,
     }
 
 
@@ -404,18 +393,29 @@ METRIC_REGISTRY: Dict[str, Metric] = {
             key='students_count_by_status',
             title='عدد الطلاب حسب الحالة',
             description=(
-                'عدد الطلاب المسجّلين في حالة قيد معيّنة. '
-                'استخدمه لأسئلة أعداد الطلاب، مثل: «كم عدد الطلاب النشطين؟».'
+                'عدد الطلاب المقيدين بحالة معينة (نشط، متخرج، منسحب...). '
+                'استخدمه عند السؤال عن طلاب حالة محددة.'
             ),
             handler=students_count_by_status,
             params={
                 'status': {
                     'type': 'string',
-                    'enum': ['active', 'enrolled', 'graduated', 'withdrawn', 'suspended', 'applicant'],
+                    'enum': ['active', 'enrolled', 'registered', 'graduated', 'withdrawn', 'suspended', 'applicant'],
                     'description': 'حالة قيد الطالب. استخدم active إن لم يحدّد المستخدم حالة.',
                 },
             },
             required=['status'],
+        ),
+        Metric(
+            key='total_students_count',
+            title='إجمالي عدد الطلاب',
+            description=(
+                'إجمالي عدد الطلاب المسجلين في المدرسة. '
+                'استخدمه عند السؤال عن إجمالي عدد الطلاب أو كم عدد الطلاب.'
+            ),
+            handler=total_students_count,
+            params={},
+            required=[],
         ),
         Metric(
             key='outstanding_receivables',
