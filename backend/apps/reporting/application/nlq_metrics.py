@@ -70,19 +70,49 @@ class Metric:
     params: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     required: List[str] = field(default_factory=list)
 
-    def tool_schema(self) -> Dict[str, Any]:
-        """توليد تعريف الأداة بصيغة Claude مع تحقّق صارم من المعاملات."""
+    def _json_schema(self) -> Dict[str, Any]:
         return {
-            'name': self.key,
-            'description': self.description,
-            'strict': True,
-            'input_schema': {
-                'type': 'object',
-                'properties': self.params,
-                'required': self.required,
-                'additionalProperties': False,
+            'type': 'object',
+            'properties': self.params,
+            'required': self.required,
+            'additionalProperties': False,
+        }
+
+    def tool_schema(self) -> Dict[str, Any]:
+        """تعريف الأداة بصيغة OpenAI — يفهمها Gemini وGroq وCerebras وOllama."""
+        return {
+            'type': 'function',
+            'function': {
+                'name': self.key,
+                'description': self.description,
+                'parameters': self._json_schema(),
             },
         }
+
+    def validate(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        تحقّق من المعاملات في الـ Python.
+
+        ضروري لأن ضمان المخطط الصارم (strict) غير متاح لدى كل المزوّدين —
+        فلا نعتمد على النموذج في احترام الـ enum، بل نفرضه هنا. أي قيمة
+        خارج المسموح تُستبدل بالافتراضي بدل تمريرها إلى الاستعلام.
+        """
+        clean: Dict[str, Any] = {}
+        for name, spec in self.params.items():
+            if name not in (params or {}):
+                continue
+            value = params[name]
+            if spec.get('type') == 'integer':
+                try:
+                    value = int(value)
+                except (TypeError, ValueError):
+                    continue
+            elif spec.get('type') == 'string':
+                value = str(value)
+                if 'enum' in spec and value not in spec['enum']:
+                    continue  # قيمة مهلوسة — نتجاهلها ونترك الافتراضي
+            clean[name] = value
+        return clean
 
 
 # ============================================================
@@ -313,7 +343,7 @@ def run_metric(tenant_id, key: str, params: Dict[str, Any]) -> Dict[str, Any]:
     if metric is None:
         raise KeyError(f'مقياس غير معروف: {key}')
 
-    allowed = {k: v for k, v in (params or {}).items() if k in metric.params}
+    allowed = metric.validate(params)
     result = metric.handler(tenant_id=tenant_id, **allowed)
     result['metric_key'] = key
     result['metric_title'] = metric.title

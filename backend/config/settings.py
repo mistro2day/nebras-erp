@@ -312,8 +312,19 @@ LOGGING = {
 
 
 # ---------------------------------------------------------------------------
-# التحليل الذكي (NLQ) — مزوّد Anthropic Claude
-# يُستخدم في محرّك الاستعلام باللغة الطبيعية بموديول التقارير.
-# النموذج يختار المقياس فقط؛ لا يولّد SQL ولا يصل إلى قاعدة البيانات.
+# التحليل الذكي (NLQ) — الاستعلام باللغة الطبيعية في موديول التقارير
+#
+# نستخدم الواجهة المتوافقة مع OpenAI، فالتحويل بين المزوّدين يتم بتغيير
+# NLQ_BASE_URL و NLQ_MODEL فقط دون تعديل أي شيفرة:
+#   Gemini (الافتراضي، مجاني): https://generativelanguage.googleapis.com/v1beta/openai/
+#   Groq:     https://api.groq.com/openai/v1            + NLQ_MODEL=llama-3.3-70b-versatile
+#   Ollama:   http://localhost:11434/v1                 + NLQ_MODEL=llama3.1
+#
+# النموذج يستقبل نص السؤال وأسماء المقاييس فقط — لا تمرّ عليه أي بيانات طلاب
+# أو مالية، فالنتائج تُحسب في الـ ORM بعد اختيار المقياس.
 # ---------------------------------------------------------------------------
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+NLQ_API_KEY = os.environ.get('GEMINI_API_KEY', '') or os.environ.get('NLQ_API_KEY', '')
+NLQ_BASE_URL = os.environ.get(
+    'NLQ_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/'
+)
+NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-2.5-flash')

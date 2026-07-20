@@ -1,5 +1,5 @@
 """
-محرّك الاستعلام باللغة الطبيعية (NLQ) — مبني على Claude.
+محرّك الاستعلام باللغة الطبيعية (NLQ) — مبني على Gemini.
 
 النموذج اللغوي يقوم بمهمة واحدة فقط: **فهم السؤال واختيار المقياس المناسب
 وتعبئة معاملاته**. لا يولّد SQL، ولا يصل إلى قاعدة البيانات، ولا يكتب الأرقام.
@@ -7,8 +7,13 @@
 الأرقام تأتي من الـ ORM عبر `nlq_metrics.run_metric`، وصياغة الجواب العربي
 تتم في الشيفرة بشكل حتمي من تلك الأرقام — فلا مجال لاختلاق قيمة.
 
-عزل المستأجر مفروض في طبقة الـ ORM؛ `tenant_id` لا يصل إلى النموذج أصلاً.
+عزل المستأجر مفروض في طبقة الـ ORM؛ `tenant_id` لا يصل إلى النموذج أصلاً،
+ولا تمرّ عليه نتائج الاستعلام — يُرسَل نص السؤال وأسماء المقاييس فقط.
+
+نستخدم الواجهة المتوافقة مع OpenAI التي يوفّرها Gemini، فيمكن التحويل إلى
+Groq أو Cerebras أو Ollama بتغيير NLQ_BASE_URL و NLQ_MODEL دون تعديل شيفرة.
 """
+import json
 import logging
 from typing import Any, Dict, List
 
@@ -20,7 +25,6 @@ from apps.reporting.application.nlq_metrics import (
 
 logger = logging.getLogger('nebras.reporting.nlq')
 
-MODEL_ID = 'claude-opus-4-8'
 MAX_TOKENS = 1024
 
 SYSTEM_PROMPT = """أنت مساعد التحليلات في نظام «نبراس» لإدارة المدارس.
@@ -42,25 +46,26 @@ class NLQUnavailable(RuntimeError):
 
 def _client():
     """
-    إنشاء عميل Anthropic.
+    إنشاء عميل متوافق مع OpenAI موجّه إلى Gemini.
 
-    إن ضُبط ANTHROPIC_API_KEY في الإعدادات استُخدم مباشرة؛ وإلا تُرك للـ SDK
-    ليحلّ بيانات الاعتماد من البيئة أو من ملف تعريف `ant auth login`.
+    نفس الشيفرة تعمل مع Groq أو Cerebras أو Ollama بتغيير NLQ_BASE_URL
+    و NLQ_MODEL في الإعدادات — لا حاجة لتعديل أي منطق هنا.
     """
     try:
-        import anthropic
+        from openai import OpenAI
     except ImportError as exc:  # pragma: no cover
         raise NLQUnavailable(
-            'حزمة anthropic غير مثبّتة. نفّذ: pip install anthropic'
+            'حزمة openai غير مثبّتة. نفّذ: pip install openai'
         ) from exc
 
-    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '') or ''
-    try:
-        return anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
-    except Exception as exc:
+    api_key = getattr(settings, 'NLQ_API_KEY', '') or ''
+    if not api_key:
         raise NLQUnavailable(
-            'خدمة التحليل الذكي غير مهيّأة — اضبط ANTHROPIC_API_KEY أو سجّل الدخول عبر `ant auth login`.'
-        ) from exc
+            'خدمة التحليل الذكي غير مهيّأة — اضبط GEMINI_API_KEY في متغيّرات البيئة. '
+            'يمكنك الحصول على مفتاح مجاني من https://aistudio.google.com/apikey'
+        )
+
+    return OpenAI(api_key=api_key, base_url=settings.NLQ_BASE_URL)
 
 
 def _format_answer(result: Dict[str, Any]) -> str:
@@ -100,52 +105,57 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
 
     client = _client()
 
-    # بيانات الاعتماد تُحلّ عند الاستدعاء لا عند إنشاء العميل، فيُلتقط غيابها هنا.
     try:
-        message = client.messages.create(
-            model=MODEL_ID,
+        completion = client.chat.completions.create(
+            model=settings.NLQ_MODEL,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
             tools=tool_definitions(),
-            thinking={'type': 'disabled'},
-            messages=[{'role': 'user', 'content': question}],
+            tool_choice='auto',
+            messages=[
+                {'role': 'system', 'content': SYSTEM_PROMPT},
+                {'role': 'user', 'content': question},
+            ],
         )
-    except TypeError as exc:
-        # الـ SDK يرفع TypeError عند تعذّر تحديد وسيلة المصادقة.
-        if 'authentication' in str(exc).lower():
-            raise NLQUnavailable(
-                'خدمة التحليل الذكي غير مهيّأة — اضبط ANTHROPIC_API_KEY '
-                'أو سجّل الدخول عبر `ant auth login`.'
-            ) from exc
-        raise
     except Exception as exc:
-        import anthropic
+        from openai import AuthenticationError, RateLimitError
 
-        if isinstance(exc, anthropic.AuthenticationError):
+        if isinstance(exc, AuthenticationError):
             raise NLQUnavailable(
-                'مفتاح Anthropic غير صالح — راجع إعداد ANTHROPIC_API_KEY.'
+                'مفتاح الوصول غير صالح — راجع إعداد GEMINI_API_KEY.'
+            ) from exc
+        if isinstance(exc, RateLimitError):
+            # الحصة المجانية محدودة يومياً؛ نوضّح السبب بدل خطأ عام.
+            raise NLQUnavailable(
+                'تم تجاوز الحصة المجانية للتحليل الذكي. حاول لاحقاً أو ارفع الحصة.'
             ) from exc
         raise
 
-    tool_use = next((b for b in message.content if b.type == 'tool_use'), None)
+    choice = completion.choices[0].message
+    tool_calls = getattr(choice, 'tool_calls', None) or []
+    usage = getattr(completion, 'usage', None)
+    tokens_used = getattr(usage, 'total_tokens', 0) or 0
 
-    if tool_use is None:
+    if not tool_calls:
         # النموذج لم يجد مقياساً مناسباً — نصرّح بذلك بدل اختلاق جواب.
-        note = next(
-            (b.text for b in message.content if b.type == 'text'),
-            'لا يوجد مقياس متاح يجيب عن هذا السؤال حالياً.',
-        )
         return {
             'answered': False,
-            'answer': note,
+            'answer': (choice.content or '').strip()
+            or 'لا يوجد مقياس متاح يجيب عن هذا السؤال حالياً.',
             'available': _available(),
-            'tokens_used': message.usage.input_tokens + message.usage.output_tokens,
+            'tokens_used': tokens_used,
         }
 
+    call = tool_calls[0]
     try:
-        result = run_metric(tenant_id, tool_use.name, dict(tool_use.input))
+        raw_args = json.loads(call.function.arguments or '{}')
+    except json.JSONDecodeError:
+        logger.warning('معاملات غير صالحة من النموذج: %s', call.function.arguments)
+        raw_args = {}
+
+    try:
+        result = run_metric(tenant_id, call.function.name, raw_args)
     except KeyError:
-        logger.warning('اختار النموذج مقياساً غير مسجّل: %s', tool_use.name)
+        logger.warning('اختار النموذج مقياساً غير مسجّل: %s', call.function.name)
         return {
             'answered': False,
             'answer': 'تعذّر تنفيذ هذا الاستعلام — المقياس المطلوب غير معرّف.',
@@ -161,7 +171,7 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
         'value': result['value'],
         'unit': result.get('unit', ''),
         'facts': [{'label': k, 'value': v} for k, v in result.get('facts', [])],
-        'tokens_used': message.usage.input_tokens + message.usage.output_tokens,
+        'tokens_used': tokens_used,
     }
     _log_conversation(tenant_id, user_id, question, payload)
     return payload
