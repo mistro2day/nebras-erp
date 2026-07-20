@@ -51,6 +51,14 @@ def _money(value) -> float:
     return float(value or Decimal('0'))
 
 
+def _normalize_text(text: str) -> str:
+    """تنظيف وتوحيد نص البحث."""
+    text = (text or '').lower()
+    text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+    text = text.replace('ة', 'ه').replace('ى', 'ي')
+    return text
+
+
 # ============================================================
 # تعريف المقياس
 # ============================================================
@@ -201,6 +209,60 @@ def total_students_count(tenant_id) -> Dict[str, Any]:
             ('إجمالي السجلات الكلي', total),
         ],
         'empty': total == 0,
+    }
+
+
+def students_count_by_grade_name(tenant_id, grade_keyword: str = 'الأول') -> Dict[str, Any]:
+    """عدد الطلاب المسجلين في صف معين حسب اسمه (مثل الأول، الثاني، الثالث...)."""
+    from apps.academics.domain.models import Grade
+    from apps.students.domain.models import StudentEnrollment, Student
+
+    k = _normalize_text(grade_keyword or 'الأول')
+
+    aliases = {
+        'الاول': ['الاول', 'اول', '1'],
+        'الثاني': ['الثاني', 'ثاني', '2'],
+        'الثالث': ['الثالث', 'ثالث', '3'],
+        'الرابع': ['الرابع', 'رابع', '4'],
+        'الخامس': ['الخامس', 'خامس', '5'],
+        'السادس': ['السادس', 'سادس', '6'],
+    }
+
+    search_terms = [k]
+    for key, terms in aliases.items():
+        if any(t in k for t in terms):
+            search_terms = terms
+            break
+
+    all_grades = Grade.objects.filter(tenant_id=tenant_id)
+    matching_grades = []
+    for g in all_grades:
+        g_name_norm = _normalize_text(g.name)
+        if any(term in g_name_norm for term in search_terms):
+            matching_grades.append(g)
+
+    grade_ids = [g.id for g in matching_grades]
+    grade_names = [g.name for g in matching_grades]
+
+    if grade_ids:
+        student_ids = StudentEnrollment.objects.filter(
+            tenant_id=tenant_id, grade_id__in=grade_ids
+        ).values_list('student_id', flat=True).distinct()
+        count = student_ids.count()
+    else:
+        count = Student.objects.filter(tenant_id=tenant_id).count()
+
+    display_name = "، ".join(grade_names) if grade_names else grade_keyword
+
+    return {
+        'headline': f'عدد طلاب «{display_name}»',
+        'value': count,
+        'unit': 'طالب',
+        'facts': [
+            ('الصفوف المطابقة للبحث', display_name or 'جميع الصفوف'),
+            ('عدد الطلاب في هذا الصف', count),
+        ],
+        'empty': count == 0,
     }
 
 
@@ -416,6 +478,22 @@ METRIC_REGISTRY: Dict[str, Metric] = {
             handler=total_students_count,
             params={},
             required=[],
+        ),
+        Metric(
+            key='students_count_by_grade_name',
+            title='عدد طلاب صف معين',
+            description=(
+                'عدد الطلاب المسجلين في صف دراسي معين حسب اسمه (الأول، الثاني، الثالث...). '
+                'استخدمه عند السؤال عن عدد طلاب صف محدد مثل: «كم عدد طلاب الصف الأول؟».'
+            ),
+            handler=students_count_by_grade_name,
+            params={
+                'grade_keyword': {
+                    'type': 'string',
+                    'description': 'اسم أو الكلمة المفتاحية للصف (الأول، الثاني، الثالث، الرابع، الخامس، السادس...).',
+                },
+            },
+            required=['grade_keyword'],
         ),
         Metric(
             key='outstanding_receivables',

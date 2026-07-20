@@ -18,8 +18,19 @@ class AIConversationViewSet(BaseCRUDViewSet):
     serializer_class = AIConversationSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        return qs.order_by('-created_at')
+        tenant_id = None
+        if hasattr(self.request, 'tenant') and self.request.tenant:
+            tenant_id = self.request.tenant.id
+        elif hasattr(self.request.user, 'tenant_id') and getattr(self.request.user, 'tenant_id', None):
+            tenant_id = self.request.user.tenant_id
+        else:
+            from apps.tenants.domain.models import Tenant
+            first_t = Tenant.objects.first()
+            tenant_id = first_t.id if first_t else None
+
+        if tenant_id:
+            return AIConversation.objects.filter(tenant_id=tenant_id).order_by('-created_at')
+        return AIConversation.objects.all().order_by('-created_at')
 
     @action(detail=False, methods=['post'], url_path='ask')
     def ask_prompt(self, request):

@@ -275,12 +275,12 @@ export class AIAssistantComponent implements OnInit {
   toastSuccess = signal(true);
 
   suggestions: Suggestion[] = [
+    { category: 'الصف الأول', icon: '🏫', query: 'كم عدد طلاب الصف الأول؟' },
+    { category: 'الصف الثاني', icon: '🏫', query: 'كم عدد طلاب الصف الثاني؟' },
     { category: 'حضور', icon: '📊', query: 'ما نسبة حضور الطلاب هذا الشهر؟' },
-    { category: 'أكاديمي', icon: '🎓', query: 'أعلى ٥ صفوف في التحصيل الدراسي' },
-    { category: 'مالي', icon: '💳', query: 'إجمالي المتأخرات المالية حسب الصف' },
+    { category: 'مالي', icon: '💳', query: 'المتأخرات المالية حسب الصف' },
     { category: 'مدينون', icon: '👥', query: 'من الطلاب الذين عليهم متأخرات؟' },
-    { category: 'تحصيل', icon: '💰', query: 'إجمالي التحصيل هذا الشهر' },
-    { category: 'طلاب', icon: '👨‍🎓', query: 'كم عدد الطلاب النشطين؟' },
+    { category: 'إجمالي', icon: '👨‍🎓', query: 'كم عدد الطلاب المسجلين؟' },
   ];
 
   ngOnInit(): void {
@@ -290,13 +290,12 @@ export class AIAssistantComponent implements OnInit {
   loadHistory(): void {
     this.api.getConversations().subscribe({
       next: (res: any) => {
-        if (res?.data) {
-          const list = Array.isArray(res.data) ? res.data : (res.data.results ?? []);
-          this.history.set(list);
-        }
+        const raw = res?.data ?? res;
+        const list = Array.isArray(raw) ? raw : (raw?.results ?? []);
+        this.history.set(list);
       },
-      error: () => {
-        // Fallback for demonstration
+      error: (err: any) => {
+        console.error('فشل في جلب سجل المحادثات:', err);
       },
     });
   }

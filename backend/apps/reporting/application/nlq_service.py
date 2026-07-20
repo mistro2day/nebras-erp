@@ -119,9 +119,26 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
     elif any(k in q for k in ['تحصيل', 'ايرادات', 'مقبوضات', 'تم سداده', 'المبالغ المحصله']):
         matched_key = 'collections_total'
         params = {'period': 'this_month'}
+    elif any(k in q for k in ['طلاب الصف', 'عدد طلاب الصف', 'طلاب صف', 'صف اول', 'صف ثاني', 'صف ثالث', 'صف رابع', 'صف خامس', 'صف سادس']):
+        grade_kw = 'الأول'
+        if 'ثاني' in q or '2' in q:
+            grade_kw = 'الثاني'
+        elif 'ثالث' in q or '3' in q:
+            grade_kw = 'الثالث'
+        elif 'رابع' in q or '4' in q:
+            grade_kw = 'الرابع'
+        elif 'خامس' in q or '5' in q:
+            grade_kw = 'الخامس'
+        elif 'سادس' in q or '6' in q:
+            grade_kw = 'السادس'
+        elif 'اول' in q or '1' in q:
+            grade_kw = 'الأول'
+
+        matched_key = 'students_count_by_grade_name'
+        params = {'grade_keyword': grade_kw}
     elif any(k in q for k in ['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب']):
-        matched_key = 'students_count_by_status'
-        params = {'status': 'active'}
+        matched_key = 'total_students_count'
+        params = {}
 
     if matched_key:
         try:
