@@ -13,6 +13,8 @@ from apps.workflow.models import WorkflowDefinition, WorkflowInstance
 from apps.workflow.services import WorkflowEngine
 from apps.admissions.domain.models import Applicant
 from apps.common.exceptions import BusinessException
+# الحقائق الطبية مرجعها العيادة — لا تُكتب ولا تُقرأ إلا عبرها
+from apps.clinic.application import profile_service as clinic_profiles
 import uuid
 import datetime
 
@@ -76,17 +78,10 @@ class StudentApplicationService:
             created_by=user_id
         )
         
-        # 5. إنشاء الملف الطبي للطالب
+        # 5. إنشاء الملف الطبي للطالب — الحقائق الطبية مرجعها العيادة،
+        # وهذا السجل يبقى للربط فقط (حقول JSON فيه لم تعد تُستخدم).
         StudentMedicalProfile.objects.create(
             student=student,
-            allergies=[],
-            chronic_diseases=[],
-            medication=[],
-            doctor="",
-            medical_notes="",
-            emergency_medical_contact={},
-            vaccination_placeholder=[],
-            medical_attachments=[],
             tenant_id=tenant_id,
             created_by=user_id
         )
@@ -166,16 +161,23 @@ class StudentApplicationService:
             created_by=user_id
         )
         
-        # 4. إنشاء الملف الطبي
+        # 4. إنشاء الملف الطبي — يُكتب في سجلّات العيادة وحدها.
+        # العيادة هي مرجع الحقائق الطبية للطلاب والموظفين معاً؛ حفظها هنا
+        # أيضاً كان يخلق مصدرين يتباعدان. راجع clinic/application/profile_service.
         StudentMedicalProfile.objects.create(
-            student=student,
-            allergies=profile_data.get('allergies', []),
-            chronic_diseases=profile_data.get('chronic_diseases', []),
-            medication=profile_data.get('medication', []),
-            doctor=profile_data.get('doctor', ''),
-            medical_notes=profile_data.get('medical_notes', ''),
+            student=student, tenant_id=tenant_id, created_by=user_id,
+        )
+        clinic_profiles.write_intake(
             tenant_id=tenant_id,
-            created_by=user_id
+            person_type='student',
+            person_id=student.id,
+            data={
+                'allergies': profile_data.get('allergies', []),
+                'chronic_diseases': profile_data.get('chronic_diseases', []),
+                'medical_notes': profile_data.get('medical_notes', ''),
+                'blood_group': profile_data.get('blood_group'),
+            },
+            user_id=user_id,
         )
         
         # 5. نشر حدث النطاق
@@ -459,11 +461,18 @@ class StudentApplicationService:
         تحديث الملف الطبي للطالب
         """
         med_profile = StudentMedicalProfile.objects.get(student_id=student_id, tenant_id=tenant_id)
-        for key, val in medical_data.items():
-            if hasattr(med_profile, key):
-                setattr(med_profile, key, val)
+
+        # الحقائق الطبية تُكتب في العيادة وحدها — مصدر واحد يراه الوليّ والممرضة.
+        clinic_profiles.write_intake(
+            tenant_id=tenant_id,
+            person_type='student',
+            person_id=student_id,
+            data=medical_data,
+            user_id=user_id,
+        )
+
         med_profile.updated_by = user_id
-        med_profile.save()
+        med_profile.save(update_fields=['updated_by', 'updated_at'])
         
         # نشر حدث النطاق
         DomainEventPublisher.publish("StudentMedicalUpdated", {

@@ -32,10 +32,49 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
 
 class StudentMedicalProfileSerializer(serializers.ModelSerializer):
+    """يعرض الحقائق الطبية من سجلّات العيادة — مرجعها الوحيد.
+
+    شكل المخرجات يبقى كما تتوقّعه شاشات الطالب (allergies / chronic_diseases
+    / …) بينما صار مصدرها جداول العيادة، فلا تنكسر الشاشات ولا يتعدّد المصدر.
+    أعمدة JSON في هذا النموذج لم تعد تُقرأ.
+    """
+    allergies = serializers.SerializerMethodField()
+    chronic_diseases = serializers.SerializerMethodField()
+    medication = serializers.SerializerMethodField()
+    medical_notes = serializers.SerializerMethodField()
+    blood_group = serializers.SerializerMethodField()
+    disabilities = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentMedicalProfile
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id', 'student']
+
+    def _intake(self, obj):
+        from apps.clinic.application.profile_service import read_intake
+        cached = getattr(obj, '_clinic_intake', None)
+        if cached is None:
+            cached = read_intake(obj.tenant_id, 'student', obj.student_id)
+            setattr(obj, '_clinic_intake', cached)
+        return cached
+
+    def get_allergies(self, obj):
+        return self._intake(obj)['allergies']
+
+    def get_chronic_diseases(self, obj):
+        return self._intake(obj)['chronic_diseases']
+
+    def get_medication(self, obj):
+        return self._intake(obj)['medication']
+
+    def get_medical_notes(self, obj):
+        return self._intake(obj)['medical_notes']
+
+    def get_blood_group(self, obj):
+        return self._intake(obj)['blood_group']
+
+    def get_disabilities(self, obj):
+        return self._intake(obj)['disabilities']
 
 
 class StudentAddressSerializer(serializers.ModelSerializer):
