@@ -223,7 +223,7 @@ class AnalyticsViewViewSet(BaseCRUDViewSet):
                 data=None,
                 message="تعذّر تحديد المستأجر لهذا الطلب.",
                 success=False,
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         user_id = getattr(request.user, 'id', None)
@@ -239,7 +239,7 @@ class AnalyticsViewViewSet(BaseCRUDViewSet):
                 data=None,
                 message=str(exc),
                 success=False,
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except Exception:
             logger.exception("فشل تنفيذ استعلام NLQ")
@@ -247,7 +247,7 @@ class AnalyticsViewViewSet(BaseCRUDViewSet):
                 data=None,
                 message="تعذّر تنفيذ التحليل الذكي حالياً.",
                 success=False,
-                status_code=status.HTTP_502_BAD_GATEWAY,
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
         message = (
