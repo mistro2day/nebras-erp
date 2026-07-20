@@ -325,17 +325,31 @@ LOGGING = {
 # ---------------------------------------------------------------------------
 # يُختار المفتاح تلقائياً حسب المزوّد المضبوط في NLQ_BASE_URL، فيمكن إبقاء
 # مفاتيح عدة مزوّدين في .env معاً والتبديل بينهم بتغيير NLQ_BASE_URL وحده.
-_NLQ_BASE_URL_RAW = os.environ.get(
-    'NLQ_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/'
-)
+_GROQ_KEY = os.environ.get('GROQ_API_KEY', '')
+_GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
+_NLQ_KEY = os.environ.get('NLQ_API_KEY', '')
+
+_NLQ_BASE_URL_RAW = os.environ.get('NLQ_BASE_URL', '')
+
+if not _NLQ_BASE_URL_RAW:
+    if _GROQ_KEY:
+        _NLQ_BASE_URL_RAW = 'https://api.groq.com/openai/v1'
+    elif _GEMINI_KEY:
+        _NLQ_BASE_URL_RAW = 'https://generativelanguage.googleapis.com/v1beta/openai/'
+    else:
+        _NLQ_BASE_URL_RAW = 'https://api.groq.com/openai/v1'
+
 if 'groq.com' in _NLQ_BASE_URL_RAW:
-    NLQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+    NLQ_API_KEY = _GROQ_KEY or _NLQ_KEY
+    NLQ_MODEL = os.environ.get('NLQ_MODEL', 'llama-3.3-70b-versatile')
 elif 'cerebras' in _NLQ_BASE_URL_RAW:
-    NLQ_API_KEY = os.environ.get('CEREBRAS_API_KEY', '')
+    NLQ_API_KEY = os.environ.get('CEREBRAS_API_KEY', '') or _NLQ_KEY
+    NLQ_MODEL = os.environ.get('NLQ_MODEL', 'llama3.1-70b')
 elif 'localhost' in _NLQ_BASE_URL_RAW or '127.0.0.1' in _NLQ_BASE_URL_RAW:
-    NLQ_API_KEY = os.environ.get('NLQ_API_KEY', 'ollama')  # Ollama لا يتطلّب مفتاحاً
+    NLQ_API_KEY = _NLQ_KEY or 'ollama'
+    NLQ_MODEL = os.environ.get('NLQ_MODEL', 'llama3.1')
 else:
-    NLQ_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-NLQ_API_KEY = NLQ_API_KEY or os.environ.get('NLQ_API_KEY', '')
+    NLQ_API_KEY = _GEMINI_KEY or _NLQ_KEY
+    NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-1.5-flash')
+
 NLQ_BASE_URL = _NLQ_BASE_URL_RAW
-NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-1.5-flash')
