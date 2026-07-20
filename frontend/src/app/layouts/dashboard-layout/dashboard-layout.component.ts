@@ -46,6 +46,20 @@ interface NavGroup {
           <div class="logo-title">نبراس <span>OS</span></div>
         </a>
 
+        <!-- فلتر تصفية القائمة السريع -->
+        <div class="sidebar-search-box">
+          <input
+            type="text"
+            class="sidebar-search-input"
+            placeholder="🔍 تصفية القائمة السريعة..."
+            [value]="navFilterQuery()"
+            (input)="updateNavFilter($event)"
+          />
+          @if (navFilterQuery()) {
+            <button class="clear-filter-btn" (click)="clearNavFilter()">×</button>
+          }
+        </div>
+
         <nav class="sidebar-nav">
           @for (group of filteredNavGroups(); track group.label ?? 'root') {
             @if (group.label) {
@@ -238,7 +252,7 @@ interface NavGroup {
       }
 
       .sidebar-nav {
-        padding: 12px 10px;
+        padding: 8px 8px;
         display: flex;
         flex-direction: column;
         gap: 2px;
@@ -246,14 +260,73 @@ interface NavGroup {
         flex: 1;
       }
 
+      .sidebar-nav::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-nav::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .sidebar-nav::-webkit-scrollbar-thumb {
+        background: var(--nb-border);
+        border-radius: 4px;
+      }
+      .sidebar-nav::-webkit-scrollbar-thumb:hover {
+        background: var(--nb-text-muted);
+      }
+
+      .sidebar-search-box {
+        padding: 8px 10px 4px;
+        position: relative;
+        flex-shrink: 0;
+      }
+      .sidebar-search-input {
+        width: 100%;
+        height: 32px;
+        padding: 0 10px;
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border-soft);
+        border-radius: var(--nb-radius);
+        font-family: var(--nb-font-family);
+        font-size: 12px;
+        color: var(--nb-text);
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .sidebar-search-input:focus {
+        border-color: var(--nb-primary-500);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+      }
+      .clear-filter-btn {
+        position: absolute;
+        left: 16px;
+        top: 12px;
+        background: none;
+        border: none;
+        color: var(--nb-text-muted);
+        font-size: 15px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .nav-group-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nb-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 10px 10px 4px;
+      }
+
       .nav-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 7px 10px;
+        padding: 5.5px 10px;
         border-radius: var(--nb-radius);
         color: var(--nb-text-secondary);
-        font-size: 13px;
+        font-size: 12.5px;
         text-decoration: none;
         cursor: pointer;
 
@@ -513,6 +586,16 @@ export class DashboardLayoutComponent {
   private readonly notifications = inject(NotificationsService);
 
   readonly searchQuery = signal('');
+  readonly navFilterQuery = signal('');
+
+  updateNavFilter(event: Event): void {
+    const val = (event.target as HTMLInputElement).value || '';
+    this.navFilterQuery.set(val);
+  }
+
+  clearNavFilter(): void {
+    this.navFilterQuery.set('');
+  }
 
   // مركز الإشعارات
   readonly notifItems = this.notifications.items;
@@ -547,6 +630,7 @@ export class DashboardLayoutComponent {
 
   /** الفرع مفتوح إذا كان نشطًا (تلقائيًا) أو فتحه المستخدم يدويًا (مع احترام الإغلاق اليدوي). */
   isExpanded(item: NavItem): boolean {
+    if (this.navFilterQuery().trim().length > 0) return true;
     const manual = this.manuallyToggled()[item.label];
     if (manual !== undefined) return manual;
     return this.isBranchActive(item);
