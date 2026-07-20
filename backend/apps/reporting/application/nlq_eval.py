@@ -152,10 +152,44 @@ def _pick_only(question: str):
     return name, clean, ''
 
 
+def _preflight() -> Optional[str]:
+    """
+    فحص مسبق باستدعاء واحد قبل تشغيل المجموعة كاملة.
+
+    بدونه يستهلك خطأ إعداد واحد كل حالات الاختبار من الحصة المجانية
+    ويغرق المخرجات بنفس الرسالة مكرّرة. يعيد نص الخطأ أو None عند السلامة.
+    """
+    key = getattr(settings, 'NLQ_API_KEY', '') or ''
+    if not key:
+        return 'لم يُضبط مفتاح — راجع GEMINI_API_KEY في .env'
+
+    # تحقّق شكلي سريع لمفاتيح Gemini قبل إهدار أي طلب على الشبكة.
+    if 'generativelanguage.googleapis.com' in settings.NLQ_BASE_URL:
+        if '.' in key or len(key) != 39:
+            return (
+                f'المفتاح مشوّه (طوله {len(key)} والمتوقع 39'
+                f"{'، ويحتوي نقطة' if '.' in key else ''}). "
+                'تأكّد أن السطر في .env يحوي المفتاح وحده دون أي نصّ ملتصق به.'
+            )
+
+    try:
+        _pick_only('اختبار')
+    except Exception as exc:
+        return f'{type(exc).__name__}: {exc}'
+    return None
+
+
 def main(verbose: bool = True) -> Dict[str, Any]:
     """تشغيل مجموعة التقييم كاملة وطباعة تقرير."""
     print(f'\nالمزوّد: {settings.NLQ_BASE_URL}')
     print(f'النموذج: {settings.NLQ_MODEL}')
+
+    problem = _preflight()
+    if problem:
+        print(f'\n❌ توقّف الفحص المسبق — لم يُستهلك من حصتك شيء.\n   {problem}\n')
+        return {'accuracy': 0.0, 'counts': {}, 'avg_latency': 0, 'results': [],
+                'aborted': problem}
+
     print(f'عدد الحالات: {len(CASES)}\n')
     print('=' * 78)
 
