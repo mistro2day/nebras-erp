@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal, effect, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal, effect, OnChanges, SimpleChanges, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer } from '@angular/platform-browser';
 import { CommunicationsService, CommunicationChannel, CommunicationTemplate } from '../communications.service';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 
@@ -57,8 +58,19 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 
         @if (selectedTemplateId) {
           <div class="form-group">
-            <label>معاينة ونص الرسالة</label>
-            <textarea class="nb-input" [(ngModel)]="messageBody" rows="6" placeholder="اكتب رسالتك هنا..."></textarea>
+            <label>تعديل قالب الرسالة</label>
+            <textarea #messageTextarea class="nb-input" [(ngModel)]="messageBody" rows="5" placeholder="اكتب رسالتك هنا..."></textarea>
+            
+            <div class="vars-toolbar" style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px;">
+              @for (v of availableVariables(); track v) {
+                <button class="var-btn" (click)="insertVar(v)" title="إدراج متغير">+ {{ v }}</button>
+              }
+            </div>
+
+            <div class="preview-block" style="margin-top: 15px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+              <strong style="font-size: 11px; color: #64748b; margin-bottom: 8px; display: block;">معاينة الرسالة النهائية (كيف ستظهر للمستلم):</strong>
+              <div [innerHTML]="previewBody()" style="font-size: 13.5px; color: #1e293b; line-height: 1.6; white-space: pre-wrap; word-break: break-word;"></div>
+            </div>
             <div class="debug-toggle" style="margin-top: 10px;">
               <label style="font-size: 12px; color: var(--nb-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px;">
                 <input type="checkbox" [(ngModel)]="showDebugVars">
@@ -112,10 +124,13 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
     .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-left: 0.5rem; }
+    .var-btn { background: var(--nb-surface-raised); border: 1px dashed var(--nb-primary-400); color: var(--nb-primary-600); font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; direction: ltr; }
+    .var-btn:hover { background: var(--nb-primary-50); border-style: solid; }
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class SendMessageModalComponent implements OnChanges {
+  @ViewChild('messageTextarea') messageTextarea!: ElementRef<HTMLTextAreaElement>;
   @Input() open = false;
   @Input() recipientName = '';
   @Input() recipientPhone = '';
@@ -128,6 +143,7 @@ export class SendMessageModalComponent implements OnChanges {
   @Output() messageSent = new EventEmitter<any>();
 
   private commService = inject(CommunicationsService);
+  private sanitizer = inject(DomSanitizer);
 
   channels = signal<CommunicationChannel[]>([]);
   templates = signal<CommunicationTemplate[]>([]);
@@ -136,6 +152,11 @@ export class SendMessageModalComponent implements OnChanges {
     const list = this.templates();
     if (!this.allowedCategories || this.allowedCategories.length === 0) return list;
     return list.filter(t => this.allowedCategories.includes(t.category));
+  });
+
+  availableVariables = computed(() => {
+    const vars = { name: this.recipientName, ...this.contextVariables };
+    return Object.keys(vars);
   });
 
   selectedChannelCode = '';
@@ -233,24 +254,48 @@ export class SendMessageModalComponent implements OnChanges {
     }
     const template = this.templates().find(t => t.id === this.selectedTemplateId);
     if (template) {
-      let body = template.body;
-      const vars = {
-        name: this.recipientName,
-        ...this.contextVariables
-      };
+      this.messageBody = template.body;
+      const vars = { name: this.recipientName, ...this.contextVariables };
       
       // DEBUG:
       this._debugVars = JSON.stringify(vars);
-      
-      // Replace all {{key}} with value from vars
-      for (const [key, value] of Object.entries(vars)) {
-        if (value !== undefined && value !== null) {
-          const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-          body = body.replace(regex, String(value));
-        }
-      }
-      this.messageBody = body;
     }
+  }
+
+  insertVar(v: string) {
+    const el = this.messageTextarea?.nativeElement;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = this.messageBody;
+      const insertion = `{{${v}}}`;
+      this.messageBody = text.substring(0, start) + insertion + text.substring(end);
+      setTimeout(() => {
+        el.selectionStart = el.selectionEnd = start + insertion.length;
+        el.focus();
+      });
+    } else {
+      this.messageBody += `{{${v}}}`;
+    }
+  }
+
+  previewBody() {
+    let body = this.messageBody || '';
+    // Escape HTML
+    body = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    const vars = { name: this.recipientName, ...this.contextVariables };
+    
+    // Highlight variables
+    for (const [key, value] of Object.entries(vars)) {
+      if (value !== undefined && value !== null) {
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+        const valStr = String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        body = body.replace(regex, `<mark style="background: #dbeafe; color: #1e40af; padding: 0 4px; border-radius: 4px; font-weight: 600;">${valStr}</mark>`);
+      }
+    }
+    
+    return this.sanitizer.bypassSecurityTrustHtml(body);
   }
 
   _debugVars = '';
@@ -273,11 +318,20 @@ export class SendMessageModalComponent implements OnChanges {
     this.errorMsg.set('');
     this.sending.set(true);
 
+    let finalBody = this.messageBody;
+    const vars = { name: this.recipientName, ...this.contextVariables };
+    for (const [key, value] of Object.entries(vars)) {
+      if (value !== undefined && value !== null) {
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+        finalBody = finalBody.replace(regex, String(value));
+      }
+    }
+
     const payload = {
       channel: this.selectedChannelCode,
       recipient_name: this.recipientName,
       recipient_address: this.editableContact,
-      body: this.messageBody
+      body: finalBody
     };
 
     this.commService.sendMessage(payload).subscribe(res => {
