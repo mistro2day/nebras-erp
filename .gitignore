@@ -11,3 +11,7 @@ dist/
 
 # WhatsApp Session Files
 backend/baileys_auth_info/
+
+# نسخ احتياطية من ملفات البيئة — تحوي مفاتيح
+.env.backup
+.env.*
