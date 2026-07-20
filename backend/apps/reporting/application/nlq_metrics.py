@@ -250,8 +250,8 @@ def general_entity_counter(tenant_id, entity_type: str = 'students') -> Dict[str
         }
 
     if any(k in entity for k in ['clinic', 'health', 'عيادة', 'زيارة صحية', 'طبي']):
-        from apps.clinic.domain.models import MedicalVisit
-        count = MedicalVisit.objects.filter(tenant_id=tenant_id).count()
+        from apps.clinic.domain.models import ClinicVisit
+        count = ClinicVisit.objects.filter(tenant_id=tenant_id).count()
         return {
             'headline': 'إجمالي زيارات العيادة المدرسية',
             'value': count,
@@ -259,6 +259,55 @@ def general_entity_counter(tenant_id, entity_type: str = 'students') -> Dict[str
             'facts': [('عدد الزيارات والفحوصات المسجلة', count)],
             'empty': count == 0,
         }
+
+
+def latest_clinic_visit(tenant_id) -> Dict[str, Any]:
+    """آخر طالب زار العيادة المدرسية تفصيلياً من قاعدة البيانات."""
+    from apps.clinic.domain.models import ClinicVisit
+    from apps.students.domain.models import StudentProfile, Student
+
+    visit = ClinicVisit.objects.filter(tenant_id=tenant_id, patient_type='student').order_by('-check_in_time').first()
+    if not visit:
+        visit = ClinicVisit.objects.filter(tenant_id=tenant_id).order_by('-check_in_time').first()
+
+    if visit:
+        student_name = 'طالب مسجّل'
+        sp = StudentProfile.objects.filter(tenant_id=tenant_id, student_id=visit.patient_user_id).first()
+        if sp:
+            student_name = sp.arabic_name
+        else:
+            st = Student.objects.filter(tenant_id=tenant_id, id=visit.patient_user_id).first()
+            if st and hasattr(st, 'profile'):
+                student_name = st.profile.arabic_name
+
+        visit_type_labels = {
+            'walk_in': 'حالة عابرة/طارئة',
+            'scheduled': 'كشف دوري',
+            'emergency': 'حالة طارئة جداً',
+            'follow_up': 'متابعة حالة صحية',
+        }
+        type_str = visit_type_labels.get(visit.visit_type, 'كشف طبي')
+        created_str = visit.check_in_time.strftime('%Y-%m-%d %H:%M') if visit.check_in_time else 'مؤخراً'
+
+        return {
+            'headline': f'آخر طالب زار العيادة المدرسية: {student_name}',
+            'value': student_name,
+            'unit': '',
+            'facts': [
+                ('اسم الطالب', student_name),
+                ('نوع الزيارة', type_str),
+                ('تاريخ ووقت الدخول للعيادة', created_str),
+            ],
+            'empty': False,
+        }
+
+    return {
+        'headline': 'آخر طالب زار العيادة المدرسية',
+        'value': 'لا يوجد زيارات مسجلة',
+        'unit': '',
+        'facts': [('عدد الزيارات الطبية في العيادة', 0)],
+        'empty': True,
+    }
 
     if any(k in entity for k in ['application', 'admission', 'قبول', 'طلب تسجيل', 'متقدم']):
         from apps.admissions.domain.models import Applicant
@@ -671,6 +720,17 @@ METRIC_REGISTRY: Dict[str, Metric] = {
                 },
             },
             required=['entity_type'],
+        ),
+        Metric(
+            key='latest_clinic_visit',
+            title='آخر طالب زار العيادة المدرسية',
+            description=(
+                'تفاصيل الطالب وسبب وتاريخ آخر زيارة صحية للعيادة المدرسية. '
+                'استخدمه عند السؤال عن: «من آخر طالب زار العيادة؟» أو «آخر زيارة للعيادة».'
+            ),
+            handler=latest_clinic_visit,
+            params={},
+            required=[],
         ),
     ]
 }

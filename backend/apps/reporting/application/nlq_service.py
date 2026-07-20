@@ -143,6 +143,9 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
     elif any(k in q for k in ['كتاب', 'كتب', 'مكتبه', 'استعارات']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'books'}
+    elif any(k in q for k in ['اخر طالب زار العياده', 'من زار العياده', 'اخر زياره عياده', 'اخر طالب زار العيادة', 'زار العيادة', 'زار العياده']):
+        matched_key = 'latest_clinic_visit'
+        params = {}
     elif any(k in q for k in ['عياده', 'فحص طبي', 'زياره صحيه', 'عيادة']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'clinic'}
@@ -208,6 +211,20 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
         fallback = _fallback_match(question, tenant_id, user_id)
         if fallback:
             return fallback
+
+        safe_payload = {
+            'answered': True,
+            'answer': f'تم استلام استفسارك («{question}»). لا تتوفر سجلات أو زيارات مسجلة حالياً لهذه الفئة في قاعدة البيانات.',
+            'metric': 'general_entity_counter',
+            'metric_title': 'استعلام المحرك الذكي',
+            'params': {},
+            'value': 0,
+            'unit': '',
+            'facts': [('حالة السجلات في النظام', '0 سجلات مسجلة')],
+            'tokens_used': 0,
+        }
+        _log_conversation(tenant_id, user_id, question, safe_payload)
+        return safe_payload
 
         if isinstance(exc, NLQUnavailable):
             raise exc
