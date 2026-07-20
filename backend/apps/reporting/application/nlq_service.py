@@ -84,9 +84,10 @@ def _format_answer(result: Dict[str, Any]) -> str:
 
 
 def _normalize_text(text: str) -> str:
-    """تنظيف وتوحيد نص السؤال للتعرّف الدقيق على النية."""
-    text = text.lower()
-    text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+    """تنظيف وتوحيد نص السؤال والتطويل والألف والهمزات والتاء المربوطة."""
+    text = (text or '').lower()
+    text = text.replace('ـ', '')  # إزالة التطويل/الكشيدة
+    text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ء', 'ا')
     text = text.replace('ة', 'ه').replace('ى', 'ي')
     return text
 
@@ -98,28 +99,37 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
     """
     q = _normalize_text(question)
 
+    def match_any(keywords: List[str]) -> bool:
+        return any(_normalize_text(k) in q for k in keywords)
+
     matched_key = None
     params: Dict[str, Any] = {}
 
-    if any(k in q for k in ['حضور', 'غياب', 'انضباط', 'نسبه حضور', 'نسبه الغياب']):
-        matched_key = 'student_attendance_rate'
-        params = {'period': 'this_month'}
-    elif any(k in q for k in ['اكثر غيابا', 'الاكثر غيابا', 'قائمه الغياب', 'اكثر الطلاب غيابا']):
-        matched_key = 'absence_leaderboard'
-        params = {'period': 'this_month', 'limit': 5}
-    elif any(k in q for k in ['متأخرات حسب الصف', 'ديون حسب الصف', 'صفوف عليها متأخرات', 'متأخرات الصفوف']):
+    if match_any(['متأخرات حسب الصف', 'ديون حسب الصف', 'صفوف عليها متأخرات', 'متأخرات الصفوف']):
         matched_key = 'outstanding_by_grade'
         params = {}
-    elif any(k in q for k in ['مدينين', 'اسماء المدينين', 'من عليهم ديون', 'من عليهم متأخرات', 'الطلاب المدينون', 'من الطلاب الذين']):
+    elif match_any(['مدينين', 'اسماء المدينين', 'من عليهم ديون', 'من عليهم متأخرات', 'الطلاب المدينون', 'من الطلاب الذين']):
         matched_key = 'student_debtors'
         params = {'limit': 10}
-    elif any(k in q for k in ['متأخرات', 'ديون', 'مستحقات', 'ذمم', 'رسوم غير مسدده', 'المتأخرات المالية']):
+    elif match_any(['متأخرات', 'متأخرة', 'ديون', 'مستحقات', 'ذمم', 'رسوم غير مسددة', 'المتأخرات المالية', 'المتأخرات من الطلاب']):
         matched_key = 'outstanding_receivables'
         params = {'period': 'this_year'}
-    elif any(k in q for k in ['تحصيل', 'ايرادات', 'مقبوضات', 'تم سداده', 'المبالغ المحصله']):
+    elif match_any(['حضور', 'غياب', 'انضباط', 'نسبة حضور', 'نسبة الغياب']):
+        matched_key = 'student_attendance_rate'
+        params = {'period': 'this_month'}
+    elif match_any(['اكثر غيابا', 'الاكثر غيابا', 'قائمة الغياب', 'اكثر الطلاب غيابا']):
+        matched_key = 'absence_leaderboard'
+        params = {'period': 'this_month', 'limit': 5}
+    elif match_any(['تحصيل', 'ايرادات', 'مقبوضات', 'تم سداده', 'المبالغ المحصلة']):
         matched_key = 'collections_total'
         params = {'period': 'this_month'}
-    elif any(k in q for k in ['طلاب الصف', 'عدد طلاب الصف', 'طلاب صف', 'صف اول', 'صف ثاني', 'صف ثالث', 'صف رابع', 'صف خامس', 'صف سادس']):
+    elif match_any(['اخر طالب زار العيادة', 'من زار العيادة', 'اخر زيارة عيادة', 'زار العيادة']):
+        matched_key = 'latest_clinic_visit'
+        params = {}
+    elif match_any(['عيادة', 'فحص طبي', 'زيارة صحية']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'clinic'}
+    elif match_any(['طلاب الصف', 'عدد طلاب الصف', 'طلاب صف', 'صف اول', 'صف ثاني', 'صف ثالث', 'صف رابع', 'صف خامس', 'صف سادس']):
         grade_kw = 'الأول'
         if 'ثاني' in q or '2' in q:
             grade_kw = 'الثاني'
@@ -134,31 +144,27 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
         elif 'اول' in q or '1' in q:
             grade_kw = 'الأول'
 
-    elif any(k in q for k in ['معلم', 'معلمين', 'موظف', 'موظفين', 'كادر', 'معلمات']):
+        matched_key = 'students_count_by_grade_name'
+        params = {'grade_keyword': grade_kw}
+    elif match_any(['معلم', 'معلمين', 'موظف', 'موظفين', 'كادر', 'معلمات']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'employees'}
-    elif any(k in q for k in ['حافله', 'حافلات', 'باص', 'باصات', 'نقل', 'سيارات']):
+    elif match_any(['حافلة', 'حافلات', 'باص', 'باصات', 'نقل', 'سيارات']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'buses'}
-    elif any(k in q for k in ['كتاب', 'كتب', 'مكتبه', 'استعارات']):
+    elif match_any(['كتاب', 'كتب', 'مكتبة', 'استعارات']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'books'}
-    elif any(k in q for k in ['اخر طالب زار العياده', 'من زار العياده', 'اخر زياره عياده', 'اخر طالب زار العيادة', 'زار العيادة', 'زار العياده']):
-        matched_key = 'latest_clinic_visit'
-        params = {}
-    elif any(k in q for k in ['عياده', 'فحص طبي', 'زياره صحيه', 'عيادة']):
-        matched_key = 'general_entity_counter'
-        params = {'entity_type': 'clinic'}
-    elif any(k in q for k in ['قبول', 'طلبات قبول', 'تسجيل جديد', 'متقدمين']):
+    elif match_any(['قبول', 'طلبات قبول', 'تسجيل جديد', 'متقدمين']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'applications'}
-    elif any(k in q for k in ['ماده', 'مواد', 'مقرر', 'مقررات']):
+    elif match_any(['مادة', 'مواد', 'مقرر', 'مقررات']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'subjects'}
-    elif any(k in q for k in ['فصل', 'فصول', 'شعبه', 'شعب', 'قاعه']):
+    elif match_any(['فصل', 'فصول', 'شعبة', 'شعب', 'قاعة']):
         matched_key = 'general_entity_counter'
         params = {'entity_type': 'classrooms'}
-    elif any(k in q for k in ['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب', 'طلاب']):
+    elif match_any(['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب', 'إجمالي الطلاب']):
         matched_key = 'total_students_count'
         params = {}
 
