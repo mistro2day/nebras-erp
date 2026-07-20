@@ -134,9 +134,28 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
         elif 'اول' in q or '1' in q:
             grade_kw = 'الأول'
 
-        matched_key = 'students_count_by_grade_name'
-        params = {'grade_keyword': grade_kw}
-    elif any(k in q for k in ['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب']):
+    elif any(k in q for k in ['معلم', 'معلمين', 'موظف', 'موظفين', 'كادر', 'معلمات']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'employees'}
+    elif any(k in q for k in ['حافله', 'حافلات', 'باص', 'باصات', 'نقل', 'سيارات']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'buses'}
+    elif any(k in q for k in ['كتاب', 'كتب', 'مكتبه', 'استعارات']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'books'}
+    elif any(k in q for k in ['عياده', 'فحص طبي', 'زياره صحيه', 'عيادة']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'clinic'}
+    elif any(k in q for k in ['قبول', 'طلبات قبول', 'تسجيل جديد', 'متقدمين']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'applications'}
+    elif any(k in q for k in ['ماده', 'مواد', 'مقرر', 'مقررات']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'subjects'}
+    elif any(k in q for k in ['فصل', 'فصول', 'شعبه', 'شعب', 'قاعه']):
+        matched_key = 'general_entity_counter'
+        params = {'entity_type': 'classrooms'}
+    elif any(k in q for k in ['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب', 'طلاب']):
         matched_key = 'total_students_count'
         params = {}
 

@@ -212,6 +212,98 @@ def total_students_count(tenant_id) -> Dict[str, Any]:
     }
 
 
+def general_entity_counter(tenant_id, entity_type: str = 'students') -> Dict[str, Any]:
+    """إحصاء وحساب شامل لجميع الكيانات والموديولات في نظام نبراس ERP حسب الكلمة المفتاحية."""
+    entity = _normalize_text(entity_type or 'students')
+
+    if any(k in entity for k in ['teacher', 'employee', 'معلم', 'موظف', 'كادر']):
+        from apps.employees.domain.models import Employee
+        count = Employee.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي المعلمين والموظفين في المدرسة',
+            'value': count,
+            'unit': 'موظف/معلم',
+            'facts': [('عدد الموظفين المعينين', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['bus', 'vehicle', 'حافلة', 'باص', 'نقل', 'سيارة']):
+        from apps.transport.domain.models import Vehicle
+        count = Vehicle.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي حافلات ومركبات النقل المدرسي',
+            'value': count,
+            'unit': 'مركبة',
+            'facts': [('عدد الحافلات المسجلة', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['book', 'library', 'كتاب', 'مكتبة', 'استعارة']):
+        from apps.library.domain.models import Book
+        count = Book.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي الكتب المتاحة في المكتبة',
+            'value': count,
+            'unit': 'كتاب',
+            'facts': [('عدد عناوين الكتب المسجلة', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['clinic', 'health', 'عيادة', 'زيارة صحية', 'طبي']):
+        from apps.clinic.domain.models import MedicalVisit
+        count = MedicalVisit.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي زيارات العيادة المدرسية',
+            'value': count,
+            'unit': 'زيارة',
+            'facts': [('عدد الزيارات والفحوصات المسجلة', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['application', 'admission', 'قبول', 'طلب تسجيل', 'متقدم']):
+        from apps.admissions.domain.models import Applicant
+        count = Applicant.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي المتقدمين لطلبات القبول والتسجيل',
+            'value': count,
+            'unit': 'متقدم/طلب',
+            'facts': [('عدد طلبات الالتحاق المستلمة', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['subject', 'course', 'مادة', 'مقرر']):
+        from apps.academics.domain.models import Grade
+        count = Grade.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي الصفوف والمناهج المقررة',
+            'value': count,
+            'unit': 'منهج/صف',
+            'facts': [('عدد الخواص والصفوف المسجلة بالخطة', count)],
+            'empty': count == 0,
+        }
+
+    if any(k in entity for k in ['class', 'classroom', 'شعبة', 'فصل', 'قاعة']):
+        from apps.academics.domain.models import Section
+        count = Section.objects.filter(tenant_id=tenant_id).count()
+        return {
+            'headline': 'إجمالي الشعب والفصول الدراسية',
+            'value': count,
+            'unit': 'شعبة/فصل',
+            'facts': [('عدد الشعب الدراسية المفعلة', count)],
+            'empty': count == 0,
+        }
+
+    from apps.students.domain.models import Student
+    count = Student.objects.filter(tenant_id=tenant_id).count()
+    return {
+        'headline': 'إجمالي عدد الطلاب المسجلين',
+        'value': count,
+        'unit': 'طالب',
+        'facts': [('إجمالي الطلاب المسجلين بالنظام', count)],
+        'empty': count == 0,
+    }
+
+
 def students_count_by_grade_name(tenant_id, grade_keyword: str = 'الأول') -> Dict[str, Any]:
     """عدد الطلاب المسجلين في صف معين حسب اسمه (مثل الأول، الثاني، الثالث...)."""
     from apps.academics.domain.models import Grade
@@ -562,6 +654,23 @@ METRIC_REGISTRY: Dict[str, Metric] = {
                 },
             },
             required=['period', 'limit'],
+        ),
+        Metric(
+            key='general_entity_counter',
+            title='استعلام مفتوح عن جميع الموديولات',
+            description=(
+                'استعلام عام ومفتوح عن أي موديول أو جدول في النظام '
+                '(المعلمين، الموظفين، الحافلات، العيادة، الكتب، القبول، المواد، الفصول...). '
+                'استخدمه لأي سؤال مفتوح عن عناصر النظام.'
+            ),
+            handler=general_entity_counter,
+            params={
+                'entity_type': {
+                    'type': 'string',
+                    'description': 'الكلمة المفتاحية للكيان (employees, teachers, buses, books, clinic, applications, subjects, classrooms, students).',
+                },
+            },
+            required=['entity_type'],
         ),
     ]
 }
