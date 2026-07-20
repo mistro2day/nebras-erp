@@ -62,67 +62,81 @@ interface NavGroup {
 
         <nav class="sidebar-nav">
           @for (group of filteredNavGroups(); track group.label ?? 'root') {
-            @if (group.label) {
-              <div class="nav-group-label">{{ group.label }}</div>
-            }
-            @for (item of group.items; track item.label) {
-              @if (item.children && item.children.length) {
-                <!-- عنصر أب بقائمة فرعية قابلة للطي -->
-                @if (item.link) {
-                  <a
-                    [routerLink]="item.link"
-                    class="nav-item nav-parent"
-                    [class.active]="isBranchActive(item)"
-                    (click)="toggleGroup(item.label)"
-                  >
-                    <span>{{ item.label }}</span>
-                    <span class="chevron" [class.open]="isExpanded(item)">‹</span>
-                  </a>
-                } @else {
-                  <button
-                    type="button"
-                    class="nav-item nav-parent"
-                    [class.active]="isBranchActive(item)"
-                    (click)="toggleGroup(item.label)"
-                  >
-                    <span>{{ item.label }}</span>
-                    <span class="chevron" [class.open]="isExpanded(item)">‹</span>
-                  </button>
-                }
-                @if (isExpanded(item)) {
-                  <div class="submenu">
-                    @for (child of item.children; track child.label) {
+            <div class="nav-group">
+              @if (group.label) {
+                <button
+                  type="button"
+                  class="nav-group-header"
+                  [class.active]="isGroupActive(group)"
+                  (click)="toggleNavGroup(group.label)"
+                >
+                  <span class="group-title">{{ group.label }}</span>
+                  <span class="chevron" [class.open]="isGroupExpanded(group.label)">‹</span>
+                </button>
+              }
+              @if (!group.label || isGroupExpanded(group.label)) {
+                <div class="nav-group-items">
+                  @for (item of group.items; track item.label) {
+                    @if (item.children && item.children.length) {
+                      <!-- عنصر أب بقائمة فرعية قابلة للطي -->
+                      @if (item.link) {
+                        <a
+                          [routerLink]="item.link"
+                          class="nav-item nav-parent"
+                          [class.active]="isBranchActive(item)"
+                          (click)="toggleGroup(item.label)"
+                        >
+                          <span>{{ item.label }}</span>
+                          <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                        </a>
+                      } @else {
+                        <button
+                          type="button"
+                          class="nav-item nav-parent"
+                          [class.active]="isBranchActive(item)"
+                          (click)="toggleGroup(item.label)"
+                        >
+                          <span>{{ item.label }}</span>
+                          <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                        </button>
+                      }
+                      @if (isExpanded(item)) {
+                        <div class="submenu">
+                          @for (child of item.children; track child.label) {
+                            <a
+                              class="nav-item nav-child"
+                              [routerLink]="child.link"
+                              routerLinkActive="active"
+                            >
+                              <span>{{ child.label }}</span>
+                              @if (child.count) {
+                                <span class="nav-count" [class]="'nav-count ' + child.countKind">{{ child.count }}</span>
+                              }
+                            </a>
+                          }
+                        </div>
+                      }
+                    } @else if (item.link) {
                       <a
-                        class="nav-item nav-child"
-                        [routerLink]="child.link"
+                        class="nav-item"
+                        [class.ai]="item.ai"
+                        [routerLink]="item.link"
                         routerLinkActive="active"
                       >
-                        <span>{{ child.label }}</span>
-                        @if (child.count) {
-                          <span class="nav-count" [class]="'nav-count ' + child.countKind">{{ child.count }}</span>
+                        <span>{{ item.label }}</span>
+                        @if (item.count) {
+                          <span class="nav-count" [class]="'nav-count ' + item.countKind">{{ item.count }}</span>
                         }
                       </a>
+                    } @else {
+                      <div class="nav-item">
+                        <span>{{ item.label }}</span>
+                      </div>
                     }
-                  </div>
-                }
-              } @else if (item.link) {
-                <a
-                  class="nav-item"
-                  [class.ai]="item.ai"
-                  [routerLink]="item.link"
-                  routerLinkActive="active"
-                >
-                  <span>{{ item.label }}</span>
-                  @if (item.count) {
-                    <span class="nav-count" [class]="'nav-count ' + item.countKind">{{ item.count }}</span>
                   }
-                </a>
-              } @else {
-                <div class="nav-item">
-                  <span>{{ item.label }}</span>
                 </div>
               }
-            }
+            </div>
           }
         </nav>
 
@@ -310,13 +324,56 @@ interface NavGroup {
         line-height: 1;
       }
 
-      .nav-group-label {
-        font-size: 10.5px;
+      .nav-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-bottom: 4px;
+      }
+
+      .nav-group-header {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        background: transparent;
+        border: none;
+        border-radius: var(--nb-radius);
+        font-family: var(--nb-font-family);
+        font-size: 11px;
         font-weight: 700;
         color: var(--nb-text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        padding: 10px 10px 4px;
+        cursor: pointer;
+        transition: background 150ms ease, color 150ms ease;
+
+        &:hover {
+          background: var(--nb-surface-raised);
+          color: var(--nb-text);
+        }
+
+        &.active {
+          color: var(--nb-primary-600);
+        }
+
+        .chevron {
+          font-size: 14px;
+          transition: transform 180ms ease;
+          display: inline-block;
+          color: var(--nb-text-muted);
+        }
+
+        .chevron.open {
+          transform: rotate(-90deg);
+        }
+      }
+
+      .nav-group-items {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       .nav-item {
@@ -616,6 +673,36 @@ export class DashboardLayoutComponent {
 
   reloadNotifications(): void {
     this.notifications.load().subscribe();
+  }
+
+  /** حالة الأقسام الرئيسية المفتوحة/المغلقة يدويًا */
+  private readonly toggledGroups = signal<Record<string, boolean>>({});
+
+  isGroupActive(group: NavGroup): boolean {
+    return group.items.some(
+      (item) =>
+        this.isBranchActive(item) ||
+        (item.link && (this.currentUrl() === item.link || this.currentUrl().startsWith(item.link + '/')))
+    );
+  }
+
+  isGroupExpanded(groupLabel?: string): boolean {
+    if (!groupLabel) return true;
+    if (this.navFilterQuery().trim().length > 0) return true;
+    const manual = this.toggledGroups()[groupLabel];
+    if (manual !== undefined) return manual;
+    const group = this.navGroups.find((g) => g.label === groupLabel);
+    if (group) return this.isGroupActive(group);
+    return false;
+  }
+
+  toggleNavGroup(groupLabel?: string): void {
+    if (!groupLabel) return;
+    const currentlyOpen = this.isGroupExpanded(groupLabel);
+    this.toggledGroups.update((state) => ({
+      ...state,
+      [groupLabel]: !currentlyOpen,
+    }));
   }
 
   /** القوائم الفرعية المفتوحة يدويًا (بالإضافة إلى الفرع النشط الذي يُفتح تلقائيًا) */
