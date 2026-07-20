@@ -162,6 +162,8 @@ interface NavGroup {
               }
             </div>
           }
+        </nav>
+
         <!-- مساعد نبراس الذكي - الميزة المحورية المميزة أعلى اسم المستخدم -->
         <div class="sidebar-ai-section">
           <a
