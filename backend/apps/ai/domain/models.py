@@ -3,7 +3,9 @@ from apps.common.models import CombinedBaseModel
 import uuid
 
 class AIConversation(CombinedBaseModel):
-    user_id = models.UUIDField(db_index=True, verbose_name="المستخدم")
+    # يقبل الفراغ لأن بعض الاستعلامات تأتي من مهام مجدولة أو جلسات غير مصادَقة،
+    # وسجل التدقيق يجب أن يلتقطها لا أن يسقطها.
+    user_id = models.UUIDField(db_index=True, null=True, blank=True, verbose_name="المستخدم")
     prompt = models.TextField(verbose_name="السؤال")
     response = models.TextField(verbose_name="الرد")
     tokens_used = models.IntegerField(default=0, verbose_name="عدد الرموز المستهلكة")
