@@ -323,8 +323,19 @@ LOGGING = {
 # النموذج يستقبل نص السؤال وأسماء المقاييس فقط — لا تمرّ عليه أي بيانات طلاب
 # أو مالية، فالنتائج تُحسب في الـ ORM بعد اختيار المقياس.
 # ---------------------------------------------------------------------------
-NLQ_API_KEY = os.environ.get('GEMINI_API_KEY', '') or os.environ.get('NLQ_API_KEY', '')
-NLQ_BASE_URL = os.environ.get(
+# يُختار المفتاح تلقائياً حسب المزوّد المضبوط في NLQ_BASE_URL، فيمكن إبقاء
+# مفاتيح عدة مزوّدين في .env معاً والتبديل بينهم بتغيير NLQ_BASE_URL وحده.
+_NLQ_BASE_URL_RAW = os.environ.get(
     'NLQ_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/'
 )
+if 'groq.com' in _NLQ_BASE_URL_RAW:
+    NLQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+elif 'cerebras' in _NLQ_BASE_URL_RAW:
+    NLQ_API_KEY = os.environ.get('CEREBRAS_API_KEY', '')
+elif 'localhost' in _NLQ_BASE_URL_RAW or '127.0.0.1' in _NLQ_BASE_URL_RAW:
+    NLQ_API_KEY = os.environ.get('NLQ_API_KEY', 'ollama')  # Ollama لا يتطلّب مفتاحاً
+else:
+    NLQ_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+NLQ_API_KEY = NLQ_API_KEY or os.environ.get('NLQ_API_KEY', '')
+NLQ_BASE_URL = _NLQ_BASE_URL_RAW
 NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-2.5-flash')
