@@ -1,165 +1,226 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AutomationService } from './automation.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
-import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
-interface NavItem { route: string; iconSvg: string; title: string; desc: string; }
+interface EngineCard {
+  route: string;
+  glyph: string;
+  title: string;
+  desc: string;
+  countKey?: string;
+}
 
+interface Lane {
+  key: string;
+  label: string;
+  hint: string;
+  cards: EngineCard[];
+}
+
+/**
+ * منصة الأتمتة المؤسسية (Automation Studio) — لغة تصميم نبراس.
+ *
+ * التوقيع البصري: «مسارات الأتمتة الثلاثة» — تُرتَّب المحركات في ثلاث مسارات
+ * متتابعة (صمّم ← نفّذ ← شغّل) بدل شبكة مسطّحة، فيقرأ المستخدم دورة حياة
+ * الأتمتة كاملة من الأعلى للأسفل ويعرف أين يبدأ. يعلوها صفّ عدّادات حيّة.
+ */
 @Component({
   selector: 'app-automation-studio',
   standalone: true,
-  imports: [CommonModule, RouterLink, NbPageHeaderComponent, NbPanelComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, RouterLink, NbPageHeaderComponent],
   template: `
     <div class="page" dir="rtl">
-      <!-- Nebras Page Header -->
       <nb-page-header
-        title="منصة الأتمتة المؤسسية (Automation Studio)"
-        subtitle="مصمم مسارات العمل · مصمم القواعد وجداول القرار · المنصة منخفضة الشيفرة · مركز العمليات · DevOps"
-      ></nb-page-header>
+        title="منصة الأتمتة المؤسسية"
+        subtitle="مصمّم مسارات العمل · جداول القرار · الاستوديو منخفض الشيفرة · مركز العمليات · DevOps والإضافات.">
+        <button class="btn ghost" (click)="load()">تحديث</button>
+      </nb-page-header>
 
-      <!-- Stats Grid Row -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-icon purple">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-val">{{ diagrams() }}</span>
-            <span class="stat-lbl">مخططات مسارات العمل</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon blue">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-val">{{ flows() }}</span>
-            <span class="stat-lbl">تدفقات الأتمتة</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon green">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-val">{{ tables() }}</span>
-            <span class="stat-lbl">جداول القرار</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon amber">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-val">{{ plugins() }}</span>
-            <span class="stat-lbl">الإضافات المثبتة</span>
-          </div>
-        </div>
-      </div>
+      <!-- عدّادات المنصة -->
+      <section class="stats">
+        @for (s of stats; track s.key) {
+          <article class="stat">
+            <span class="stat-ic" [attr.data-t]="s.tone" aria-hidden="true">{{ s.glyph }}</span>
+            <span class="stat-body">
+              <span class="stat-val">{{ counts()[s.key] ?? 0 }}</span>
+              <span class="stat-lbl">{{ s.label }}</span>
+            </span>
+          </article>
+        }
+      </section>
 
-      <!-- Nebras Panel for Main Navigation Grid -->
-      <nb-panel title="محركات وأدوات الأتمتة المتاحة" subtitle="اختر الأداة المطلوبة للبدء بالتصميم أو المراقبة">
-        <div class="nav-grid">
-          <a class="nav-card" *ngFor="let item of navItems" [routerLink]="item.route">
-            <div class="nav-icon-wrapper" [innerHTML]="item.iconSvg"></div>
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.desc }}</p>
-          </a>
-        </div>
-      </nb-panel>
+      <!-- التوقيع البصري: مسارات الأتمتة الثلاثة -->
+      @for (lane of lanes; track lane.key) {
+        <section class="lane">
+          <header class="lane-head">
+            <span class="lane-step" aria-hidden="true">{{ $index + 1 }}</span>
+            <span class="lane-text">
+              <h2>{{ lane.label }}</h2>
+              <p>{{ lane.hint }}</p>
+            </span>
+          </header>
+          <div class="cards">
+            @for (c of lane.cards; track c.route) {
+              <a class="card" [routerLink]="c.route">
+                <span class="card-ic" aria-hidden="true">{{ c.glyph }}</span>
+                <span class="card-title">
+                  {{ c.title }}
+                  @if (c.countKey && counts()[c.countKey]) {
+                    <span class="card-count">{{ counts()[c.countKey] }}</span>
+                  }
+                </span>
+                <span class="card-desc">{{ c.desc }}</span>
+                <span class="card-go" aria-hidden="true">←</span>
+              </a>
+            }
+          </div>
+        </section>
+      }
     </div>
   `,
   styles: [`
-    .page { display: flex; flex-direction: column; gap: 16px; padding: 20px; width: 100%; box-sizing: border-box; }
+    .page { flex: 1; padding: 22px; overflow-y: auto; min-width: 0; box-sizing: border-box;
+      background: var(--nb-bg); color: var(--nb-text); font-family: var(--nb-font-family); }
 
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .stat-card {
-      background: var(--nb-surface, #ffffff); border: 1px solid var(--nb-border, #e5e7eb);
-      border-radius: var(--nb-radius-card, 12px); padding: 16px; display: flex; align-items: center; gap: 14px;
-    }
-    .stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .stat-icon.purple { background: #eef2ff; color: #4f46e5; }
-    .stat-icon.blue { background: #e0f2fe; color: #0284c7; }
-    .stat-icon.green { background: #dcfce7; color: #16a34a; }
-    .stat-icon.amber { background: #fef3c7; color: #d97706; }
-    .stat-info { display: flex; flex-direction: column; }
-    .stat-val { font-size: 1.4rem; font-weight: 800; color: var(--nb-text, #111827); }
-    .stat-lbl { font-size: 12px; color: var(--nb-text-muted, #6b7280); font-weight: 500; }
+    .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+      border-radius: var(--nb-radius); cursor: pointer; border: none; }
+    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn.ghost:hover { border-color: var(--nb-primary-400); }
 
-    .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    .nav-card {
-      background: var(--nb-surface, #ffffff); border: 1px solid var(--nb-border, #e5e7eb);
-      border-radius: 12px; padding: 20px; text-decoration: none; color: inherit; display: flex; flex-direction: column;
-      transition: all 0.2s ease;
-    }
-    .nav-card:hover { transform: translateY(-2px); border-color: #c7d2fe; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .nav-icon-wrapper {
-      width: 40px; height: 40px; border-radius: 10px; background: #eef2ff; color: #4f46e5;
-      display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
-    }
-    .nav-card h3 { font-size: 15px; font-weight: 700; color: var(--nb-text, #111827); margin: 0 0 6px 0; }
-    .nav-card p { font-size: 13px; color: var(--nb-text-muted, #6b7280); line-height: 1.5; margin: 0; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 22px; }
+    .stat { display: flex; align-items: center; gap: 12px; padding: 14px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); }
+    .stat-ic { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 17px; }
+    .stat-ic[data-t='indigo'] { background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .stat-ic[data-t='blue'] { background: #e0f2fe; color: #0284c7; }
+    .stat-ic[data-t='green'] { background: #dcfce7; color: #15803d; }
+    .stat-ic[data-t='amber'] { background: #fef3c7; color: #b45309; }
+    .stat-body { display: flex; flex-direction: column; min-width: 0; }
+    .stat-val { font-size: 22px; font-weight: 800; color: var(--nb-text); line-height: 1.2;
+      font-variant-numeric: tabular-nums; }
+    .stat-lbl { font-size: 12px; font-weight: 600; color: var(--nb-text-muted); }
+
+    /* المسارات */
+    .lane { margin-bottom: 22px; }
+    .lane-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .lane-step { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--nb-primary-600); color: #fff; font-size: 13px; font-weight: 800; }
+    .lane-text h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nb-text); }
+    .lane-text p { margin: 2px 0 0; font-size: 12px; color: var(--nb-text-muted); }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px;
+      padding-inline-start: 40px; position: relative; }
+    .cards::before { content: ''; position: absolute; inset-inline-start: 13px; top: -14px; bottom: -14px;
+      width: 2px; background: var(--nb-border); border-radius: 2px; }
+    .lane:last-child .cards::before { bottom: 50%; }
+    @media (max-width: 700px) { .cards { padding-inline-start: 0; } .cards::before { display: none; } }
+
+    .card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 16px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); text-decoration: none; color: inherit;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .card:hover { transform: translateY(-2px); border-color: var(--nb-primary-400);
+      box-shadow: 0 6px 18px rgba(48,63,159,.10); }
+    .card-ic { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 15px; background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .card-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .card-count { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+      background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .card-desc { font-size: 12px; line-height: 1.6; color: var(--nb-text-muted); }
+    .card-go { position: absolute; top: 16px; inset-inline-end: 16px; font-size: 14px;
+      color: var(--nb-text-muted); opacity: 0; transition: opacity .15s ease; }
+    .card:hover .card-go { opacity: 1; color: var(--nb-primary-600); }
+
+    @media (prefers-reduced-motion: reduce) { .card:hover { transform: none; } }
+    @media (max-width: 700px) { .page { padding: 14px; } }
   `],
 })
 export class AutomationStudioComponent implements OnInit {
   private api = inject(AutomationService);
 
-  diagrams = signal(0);
-  flows = signal(0);
-  tables = signal(0);
-  plugins = signal(0);
+  readonly stats = [
+    { key: 'workflow-diagrams', label: 'مخططات مسارات العمل', glyph: '▦', tone: 'indigo' },
+    { key: 'flows', label: 'تدفقات الأتمتة', glyph: '⚡', tone: 'blue' },
+    { key: 'decision-tables', label: 'جداول القرار', glyph: '▤', tone: 'green' },
+    { key: 'plugin-installations', label: 'الإضافات المثبّتة', glyph: '◈', tone: 'amber' },
+  ];
 
-  navItems: NavItem[] = [
+  readonly lanes: Lane[] = [
     {
-      route: 'workflow-designer',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-      title: 'مصمم مسارات العمل المرئي',
-      desc: 'كانفس لبناء العقد والوصلات والموافقات، مع تحقق ومحاكاة ونشر إلى محرك مسارات العمل.',
+      key: 'design',
+      label: 'صمّم',
+      hint: 'ابنِ المسار أو القاعدة أو الكيان بصرياً قبل نشره إلى المحرّك.',
+      cards: [
+        {
+          route: 'workflow-designer', glyph: '▦', countKey: 'workflow-diagrams',
+          title: 'مصمّم مسارات العمل المرئي',
+          desc: 'كانفس لبناء العقد والوصلات والموافقات، مع تحقّق ومحاكاة ونشر إلى محرّك مسارات العمل.',
+        },
+        {
+          route: 'rule-designer', glyph: '▤', countKey: 'decision-tables',
+          title: 'مصمّم القواعد وجداول القرار',
+          desc: 'جداول وأشجار قرار ومجموعات قواعد فوق محرّك القواعد الحالي مع محاكاة واختبار.',
+        },
+        {
+          route: 'lowcode', glyph: '◇',
+          title: 'الاستوديو منخفض الشيفرة',
+          desc: 'باني الكيانات والنماذج والصفحات وواجهات الـ API — يولّد شيفرة متوافقة مع بنية DDD.',
+        },
+      ],
     },
     {
-      route: 'rule-designer',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
-      title: 'مصمم القواعد وجداول القرار',
-      desc: 'جداول وأشجار قرار ومجموعات قواعد فوق محرك القواعد الحالي مع محاكاة واختبار.',
+      key: 'run',
+      label: 'نفّذ',
+      hint: 'اربط المحفّزات بالإجراءات ودع المحرّك ينفّذ تلقائياً.',
+      cards: [
+        {
+          route: 'automation', glyph: '⚡', countKey: 'flows',
+          title: 'محرّك أتمتة الأحداث',
+          desc: 'محفّزات الأحداث والجدولة والـ Webhooks وإجراءات تُنفَّذ عبر المحرّكات القائمة.',
+        },
+      ],
     },
     {
-      route: 'automation',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
-      title: 'محرك أتمتة الأحداث',
-      desc: 'محفّزات الأحداث والجدولة والـ Webhooks وإجراءات تنفّذ عبر المحركات القائمة.',
-    },
-    {
-      route: 'lowcode',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-      title: 'الاستوديو منخفض الشيفرة',
-      desc: 'باني الكيانات والنماذج والصفحات والـ APIs — يولّد شيفرة متوافقة مع DDD.',
-    },
-    {
-      route: 'operations',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
-      title: 'مركز العمليات والمراقبة',
-      desc: 'صحة النظام والطوابير والعمّال والكاش وقواعد البيانات والتنبيهات التشغيلية.',
-    },
-    {
-      route: 'devops',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>',
-      title: 'مركز DevOps ورايات الميزات',
-      desc: 'البيئات والأسرار ورايات الميزات وسجل النشر والتراجع ووضع الصيانة.',
-    },
-    {
-      route: 'plugins',
-      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
-      title: 'مدير الإضافات المخصصة',
-      desc: 'سجل الإضافات والإصدارات والاعتماديات والفحص الأمني والتثبيت الآمن للمستأجرين.',
+      key: 'operate',
+      label: 'شغّل وراقب',
+      hint: 'تابع صحة المنصة وأدر النشر والرايات والإضافات.',
+      cards: [
+        {
+          route: 'operations', glyph: '◉',
+          title: 'مركز العمليات والمراقبة',
+          desc: 'صحة النظام والطوابير والعمّال والكاش وقواعد البيانات والتنبيهات التشغيلية.',
+        },
+        {
+          route: 'devops', glyph: '⚑',
+          title: 'مركز DevOps ورايات الميزات',
+          desc: 'البيئات والأسرار ورايات الميزات وسجل النشر والتراجع ووضع الصيانة.',
+        },
+        {
+          route: 'plugins', glyph: '◈', countKey: 'plugin-installations',
+          title: 'مدير الإضافات المخصّصة',
+          desc: 'سجل الإضافات والإصدارات والاعتماديات والفحص الأمني والتثبيت الآمن للمستأجرين.',
+        },
+      ],
     },
   ];
 
+  counts = signal<Record<string, number | undefined>>({});
+
   ngOnInit(): void {
-    this.api.list('workflow-diagrams').subscribe((d: any) => this.diagrams.set(d?.length ?? 2));
-    this.api.list('flows').subscribe((d: any) => this.flows.set(d?.length ?? 3));
-    this.api.list('decision-tables').subscribe((d: any) => this.tables.set(d?.length ?? 2));
-    this.api.list('plugin-installations').subscribe((d: any) => this.plugins.set(d?.length ?? 2));
+    this.load();
+  }
+
+  load(): void {
+    for (const s of this.stats) {
+      this.api.list(s.key).subscribe({
+        next: (d: any) => this.counts.update((c) => ({ ...c, [s.key]: Array.isArray(d) ? d.length : 0 })),
+        error: () => this.counts.update((c) => ({ ...c, [s.key]: 0 })),
+      });
+    }
   }
 }
