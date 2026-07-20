@@ -209,8 +209,10 @@ export class SendMessageModalComponent implements OnChanges {
       
       // Replace all {{key}} with value from vars
       for (const [key, value] of Object.entries(vars)) {
-        const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-        body = body.replace(regex, String(value));
+        if (value !== undefined && value !== null) {
+          const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+          body = body.replace(regex, String(value));
+        }
       }
       this.messageBody = body;
     }
