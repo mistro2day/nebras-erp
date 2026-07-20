@@ -187,6 +187,7 @@ import { SendMessageModalComponent } from '../communications/components/send-mes
         [recipientPhone]="selectedLead()?.phone || ''"
         [recipientEmail]="selectedLead()?.email || ''"
         [contextVariables]="{ lead_id: selectedLead()?.id, source: selectedLead()?.source_name }"
+        [allowedCategories]="['sales', 'marketing']"
         defaultTemplateCode="LEAD_FOLLOWUP"
       ></app-send-message-modal>
     </div>

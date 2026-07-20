@@ -307,6 +307,7 @@ interface LeaveRequest {
         [recipientPhone]="selectedEmployee()?.phone || ''"
         [recipientEmail]="selectedEmployee()?.email || ''"
         [contextVariables]="{ employee_name: selectedEmployee()?.name, job_title: selectedEmployee()?.jobTitle }"
+        [allowedCategories]="['hr']"
       ></app-send-message-modal>
 
     </div>

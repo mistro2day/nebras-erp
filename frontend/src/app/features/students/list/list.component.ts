@@ -201,7 +201,12 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         [(open)]="showMsgModal"
         [recipientName]="selectedStudent()?.profile?.arabic_name || ''"
         [recipientPhone]="selectedStudent()?.family_relations?.[0]?.phone || ''"
-        [contextVariables]="{ student_number: selectedStudent()?.student_number }"
+        [contextVariables]="{ 
+          student_number: selectedStudent()?.student_number,
+          student_name: selectedStudent()?.profile?.arabic_name,
+          date: (selectedStudent() ? todayDate : '')
+        }"
+        [allowedCategories]="['attendance']"
       ></app-send-message-modal>
     </div>
   `,
@@ -421,6 +426,8 @@ export class StudentsListComponent implements OnInit {
   private readonly studentsService = inject(StudentsService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+
+  todayDate = new Date().toLocaleDateString('ar-EG');
 
   readonly students = this.studentsService.students;
   readonly loading = this.studentsService.loading;

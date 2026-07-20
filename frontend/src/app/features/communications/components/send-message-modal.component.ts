@@ -31,17 +31,17 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
             </select>
           </div>
           <!-- Input Contact -->
-        <div class="form-group" style="margin-top: 15px;">
-          <label>جهة الاتصال (الرقم أو البريد) <span style="color:red">*</span></label>
-          <div class="contact-input-wrapper" style="display:flex; flex-direction:column; gap:4px;">
-            <input type="text" class="nb-input" [(ngModel)]="editableContact" dir="ltr" style="text-align: right;" placeholder="مثال: +249912345678 أو +966500000000">
-            @if (selectedChannelCode === 'whatsapp' || selectedChannelCode === 'sms') {
-              <small style="color: var(--nb-text-faint); font-size: 11px;">
-                الرجاء إدخال الرقم بالصيغة الدولية (بدون أصفار بالبداية) لضمان وصول الرسالة (مثال: 2499... أو 9665...)
-              </small>
-            }
+          <div class="form-group">
+            <label>جهة الاتصال (الرقم أو البريد) <span style="color:red">*</span></label>
+            <div class="contact-input-wrapper" style="display:flex; flex-direction:column; gap:4px;">
+              <input type="text" class="nb-input" [(ngModel)]="editableContact" dir="ltr" style="text-align: right;" placeholder="مثال: +249912345678 أو +966500000000">
+              @if (selectedChannelCode === 'whatsapp' || selectedChannelCode === 'sms') {
+                <small style="color: var(--nb-text-faint); font-size: 11px;">
+                  الرجاء إدخال الرقم بالصيغة الدولية (بدون أصفار بالبداية) لضمان وصول الرسالة (مثال: 2499... أو 9665...)
+                </small>
+              }
+            </div>
           </div>
-        </div>
         </div>
 
         <div class="form-group">
@@ -49,7 +49,7 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
           <select class="nb-input" [(ngModel)]="selectedTemplateId" (change)="onTemplateSelect()">
             <option value="" disabled>-- اختر القالب --</option>
             <option value="custom">رسالة حرة (بدون قالب)</option>
-            @for (t of templates(); track t.id) {
+            @for (t of filteredTemplates(); track t.id) {
               <option [value]="t.id">{{ t.name }} ({{ t.category }})</option>
             }
           </select>
@@ -114,6 +114,7 @@ export class SendMessageModalComponent implements OnChanges {
   @Input() recipientEmail = '';
   @Input() contextVariables: any = {};
   @Input() defaultTemplateCode = '';
+  @Input() allowedCategories: string[] = [];
 
   @Output() openChange = new EventEmitter<boolean>();
   @Output() messageSent = new EventEmitter<any>();
@@ -122,6 +123,12 @@ export class SendMessageModalComponent implements OnChanges {
 
   channels = signal<CommunicationChannel[]>([]);
   templates = signal<CommunicationTemplate[]>([]);
+
+  filteredTemplates = computed(() => {
+    const list = this.templates();
+    if (!this.allowedCategories || this.allowedCategories.length === 0) return list;
+    return list.filter(t => this.allowedCategories.includes(t.category));
+  });
 
   selectedChannelCode = '';
   selectedTemplateId = '';

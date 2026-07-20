@@ -151,6 +151,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
           guardian_name: selectedInvoice()?.guardian_name || 'ولي الأمر'
         }"
         defaultTemplateCode="INVOICE_ISSUED"
+        [allowedCategories]="['finance']"
       ></app-send-message-modal>
     </div>
   `,
