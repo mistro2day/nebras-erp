@@ -73,17 +73,20 @@ class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
 
     def get_student_name(self, obj):
         try:
-            return obj.student_billing_account.student.profile.arabic_name
+            from apps.students.domain.models import Student
+            student = Student.objects.get(id=obj.student_billing_account.student_id)
+            return student.profile.arabic_name
         except Exception:
             return ""
 
     def get_guardian_name(self, obj):
         try:
-            # Assuming guardian name is on billing_account or student profile
-            # We don't have the exact structure of student module here, but we will access it dynamically
-            student = obj.student_billing_account.student
+            from apps.students.domain.models import Student
+            student = Student.objects.get(id=obj.student_billing_account.student_id)
             family = student.family_relations.first()
-            if family:
+            if family and getattr(family, 'guardian', None):
+                return family.guardian.arabic_name
+            elif family:
                 return family.name
             return ""
         except Exception:
@@ -91,7 +94,8 @@ class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
 
     def get_guardian_phone(self, obj):
         try:
-            student = obj.student_billing_account.student
+            from apps.students.domain.models import Student
+            student = Student.objects.get(id=obj.student_billing_account.student_id)
             family = student.family_relations.first()
             if family:
                 return family.phone

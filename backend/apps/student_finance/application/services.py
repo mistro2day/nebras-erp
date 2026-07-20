@@ -195,6 +195,21 @@ class BillingService:
         )
 
         # 9. إرسال حدث لمنصة الاتصالات
+        student_name = ""
+        guardian_name = ""
+        guardian_phone = ""
+        try:
+            from apps.students.domain.models import Student
+            st = Student.objects.filter(id=account.student_id).first()
+            if st:
+                student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
+                fam = st.family_relations.first()
+                if fam:
+                    guardian_name = fam.guardian.arabic_name if getattr(fam, 'guardian', None) else fam.name
+                    guardian_phone = fam.phone or ""
+        except Exception as e:
+            logger.warning(f"Failed to resolve student info for event: {e}")
+
         EventBusConsumer.publish(
             tenant_id=tenant_id,
             event_type='InvoiceCreated',
@@ -203,7 +218,13 @@ class BillingService:
                 'invoice_id': str(invoice.id),
                 'invoice_number': invoice.invoice_number,
                 'student_id': str(account.student_id),
-                'amount': float(final_total)
+                'student_name': student_name,
+                'guardian_name': guardian_name,
+                'guardian_phone': guardian_phone,
+                'recipients': [{'address': guardian_phone, 'type': 'to', 'entity_type': 'guardian', 'name': guardian_name}] if guardian_phone else [],
+                'amount': float(final_total),
+                'due_date': str(due_date),
+                'date': str(date.today())
             }
         )
 
@@ -329,6 +350,21 @@ class PaymentService:
             details={'receipt_id': str(receipt.id), 'receipt_number': receipt.receipt_number, 'amount': float(pay_amount)}
         )
 
+        student_name = ""
+        guardian_name = ""
+        guardian_phone = ""
+        try:
+            from apps.students.domain.models import Student
+            st = Student.objects.filter(id=account.student_id).first()
+            if st:
+                student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
+                fam = st.family_relations.first()
+                if fam:
+                    guardian_name = fam.guardian.arabic_name if getattr(fam, 'guardian', None) else fam.name
+                    guardian_phone = fam.phone or ""
+        except Exception as e:
+            logger.warning(f"Failed to resolve student info for payment event: {e}")
+
         EventBusConsumer.publish(
             tenant_id=tenant_id,
             event_type='PaymentReceived',
@@ -337,7 +373,12 @@ class PaymentService:
                 'receipt_id': str(receipt.id),
                 'receipt_number': receipt.receipt_number,
                 'student_id': str(account.student_id),
-                'amount': float(pay_amount)
+                'student_name': student_name,
+                'guardian_name': guardian_name,
+                'guardian_phone': guardian_phone,
+                'recipients': [{'address': guardian_phone, 'type': 'to', 'entity_type': 'guardian', 'name': guardian_name}] if guardian_phone else [],
+                'amount': float(pay_amount),
+                'date': str(date.today())
             }
         )
 
