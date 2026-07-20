@@ -117,7 +117,7 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
             ],
         )
     except Exception as exc:
-        from openai import AuthenticationError, RateLimitError
+        from openai import AuthenticationError, BadRequestError, RateLimitError
 
         if isinstance(exc, AuthenticationError):
             raise NLQUnavailable(
@@ -128,6 +128,16 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
             raise NLQUnavailable(
                 'تم تجاوز الحصة المجانية للتحليل الذكي. حاول لاحقاً أو ارفع الحصة.'
             ) from exc
+        if isinstance(exc, BadRequestError):
+            # جوجل تعيد 400 (لا 401) عند المفتاح المشوّه — نشخّصه بوضوح
+            # بدل رسالة عامة، لأن هذا أشيع خطأ في الإعداد.
+            if 'api key' in str(exc).lower():
+                raise NLQUnavailable(
+                    'مفتاح GEMINI_API_KEY غير صالح. تأكّد أنه مفتاح API من '
+                    'aistudio.google.com/apikey (يبدأ بـ AIzaSy وطوله ٣٩ محرفاً '
+                    'ولا يحتوي نقطة) — لا رمز OAuth ولا رمز تفويض.'
+                ) from exc
+            raise NLQUnavailable(f'طلب غير صالح إلى مزوّد التحليل: {exc}') from exc
         raise
 
     choice = completion.choices[0].message
