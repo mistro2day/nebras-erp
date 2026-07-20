@@ -1,324 +1,425 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ReportingService } from './reporting.service';
+import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 
+type TabKey = 'reports' | 'dashboards' | 'sources';
+
+/**
+ * منصة ذكاء الأعمال والتقارير والتحليلات — لغة تصميم نبراس.
+ *
+ * التوقيع البصري: «شريط نبراس الذكي» (NLQ) في صدر الصفحة، يليه صفّ مؤشرات
+ * بأعمدة تقدّم نحو المستهدف — تُقرأ الفجوة بين المحقّق والمستهدف بصرياً
+ * قبل قراءة الرقم. لا اعتماد على Angular Material (تفادياً لأخطاء البناء).
+ */
 @Component({
   selector: 'app-reporting-dashboard',
   standalone: true,
-  imports: [
-    CommonModule, FormsModule, MatCardModule, MatIconModule,
-    MatButtonModule, MatTableModule, MatTabsModule, MatFormFieldModule, MatInputModule
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
   template: `
-    <div class="reporting-dashboard" dir="rtl">
-      <!-- Header -->
-      <header class="dashboard-header">
-        <div class="header-info">
-          <h1>منصة ذكاء الأعمال والتقارير والتحليلات</h1>
-          <p>لوحة التحكم المركزية لتوليد تقارير الموديولات وتتبع مؤشرات الأداء والتحليل الذكي</p>
-        </div>
-      </header>
+    <div class="page" dir="rtl">
+      <nb-page-header
+        title="منصة ذكاء الأعمال والتقارير والتحليلات"
+        subtitle="توليد تقارير الموديولات، تتبّع مؤشرات الأداء، والتحليل الذكي باللغة الطبيعية.">
+        <button class="btn ghost" (click)="loadData()">تحديث</button>
+      </nb-page-header>
 
-      <!-- AI Natural Language Query Box (شريط الأمر الذكي — نمط لوحة مساعد نبراس) -->
-      <div class="ai-bar">
-        <span class="ai-mark">✦</span>
+      <!-- التوقيع البصري: شريط نبراس الذكي (NLQ) -->
+      <section class="ai-bar" [class.busy]="aiLoading()">
+        <span class="ai-mark" aria-hidden="true">✦</span>
         <input
           class="ai-input"
+          type="text"
+          name="nlq"
           [(ngModel)]="aiQuestion"
-          placeholder="اسأل نبراس عن أي تقارير أو مؤشرات باللغة العربية… مثال: ما هي نسبة حضور الطلاب هذا الشهر؟"
-          (keyup.enter)="askAI()"
-        />
-        <button class="nb-btn-primary" (click)="askAI()">اسأل نبراس</button>
-      </div>
-      <div class="ai-response" *ngIf="aiResponse()">
-        <p><strong>استعلام SQL المقترح:</strong> <code>{{ aiResponse().interpreted_query }}</code></p>
-        <p><strong>الملخص الفوري:</strong> {{ aiResponse().summary }}</p>
-      </div>
+          [disabled]="aiLoading()"
+          aria-label="اسأل نبراس عن التقارير والمؤشرات"
+          placeholder="اسأل نبراس… مثال: ما نسبة حضور الطلاب هذا الشهر؟"
+          (keyup.enter)="askAI()" />
+        <button class="btn primary" [disabled]="aiLoading() || !aiQuestion.trim()" (click)="askAI()">
+          {{ aiLoading() ? 'جارٍ التحليل…' : 'اسأل نبراس' }}
+        </button>
+      </section>
 
-      <!-- Stats Grid / KPIs -->
-      <div class="kpi-grid">
-        <div class="kpi-card" *ngFor="let k of kpis()">
-          <div class="kpi-header">
-            <span class="kpi-label">{{ k.name }}</span>
-            <span class="trend-badge" [ngClass]="k.trend">
-              {{ k.trend === 'up' ? '▲' : k.trend === 'down' ? '▼' : '▬' }}
-            </span>
-          </div>
-          <span class="kpi-value">{{ k.current_value }}%</span>
-          <span class="kpi-target">المستهدف: {{ k.target_value }}%</span>
+      @if (aiSuggestions().length && !aiResponse()) {
+        <div class="ai-chips">
+          <span class="chips-label">جرّب:</span>
+          @for (s of aiSuggestions(); track s) {
+            <button class="chip" (click)="askSuggestion(s)">{{ s }}</button>
+          }
         </div>
-      </div>
+      }
 
-      <!-- Main Tabs -->
-      <mat-tab-group class="dashboard-tabs">
-        <!-- Tab 1: Available Reports -->
-        <mat-tab label="التقارير المتوفرة">
-          <div class="tab-content">
-            <table mat-table [dataSource]="reports()" class="mat-elevation-z8 reporting-table">
-              <ng-container matColumnDef="code">
-                <th mat-header-cell *matHeaderCellDef>رمز التقرير</th>
-                <td mat-cell *matCellDef="let element">{{ element.code }}</td>
-              </ng-container>
+      @if (aiResponse(); as ans) {
+        <section class="ai-answer">
+          <div class="aa-head">
+            <strong>إجابة نبراس</strong>
+            <button class="link-btn" (click)="clearAI()">إغلاق</button>
+          </div>
+          <p class="aa-summary">{{ ans.summary || 'تعذّر توليد ملخّص لهذا الاستعلام.' }}</p>
+          @if (ans.interpreted_query) {
+            <div class="aa-sql">
+              <span class="aa-sql-label">الاستعلام المُفسَّر</span>
+              <code>{{ ans.interpreted_query }}</code>
+            </div>
+          }
+        </section>
+      }
 
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>اسم التقرير</th>
-                <td mat-cell *matCellDef="let element"><strong>{{ element.name }}</strong></td>
-              </ng-container>
+      <!-- مؤشرات الأداء مع تقدّم نحو المستهدف -->
+      <section class="kpis">
+        @for (k of kpis(); track k.id || k.name) {
+          <article class="kpi">
+            <header class="kpi-head">
+              <span class="kpi-label">{{ k.name }}</span>
+              <span class="trend" [attr.data-t]="k.trend || 'stable'">
+                {{ trendGlyph(k.trend) }} {{ trendText(k.trend) }}
+              </span>
+            </header>
+            <span class="kpi-value">{{ k.current_value | number: '1.0-1' }}<em>%</em></span>
+            <div class="meter" role="img"
+                 [attr.aria-label]="'المحقق ' + k.current_value + ' من مستهدف ' + k.target_value">
+              <span class="meter-fill" [style.width.%]="pct(k)"></span>
+              <span class="meter-target" [style.inset-inline-start.%]="targetPct(k)"></span>
+            </div>
+            <span class="kpi-foot">المستهدف {{ k.target_value | number: '1.0-1' }}%</span>
+          </article>
+        }
+        @if (kpis().length === 0) {
+          <div class="kpi placeholder">لا توجد مؤشرات أداء معرّفة بعد.</div>
+        }
+      </section>
 
-              <ng-container matColumnDef="category">
-                <th mat-header-cell *matHeaderCellDef>التصنيف</th>
-                <td mat-cell *matCellDef="let element">{{ element.category_name }}</td>
-              </ng-container>
+      <!-- تبويبات محلية (بدون Material) -->
+      <section class="card">
+        <nav class="tabs" role="tablist">
+          @for (t of tabs; track t.key) {
+            <button class="tab" role="tab" [class.on]="tab() === t.key"
+                    [attr.aria-selected]="tab() === t.key" (click)="tab.set(t.key)">
+              {{ t.label }}
+              <span class="tab-count">{{ tabCount(t.key) }}</span>
+            </button>
+          }
+        </nav>
 
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>إجراءات</th>
-                <td mat-cell *matCellDef="let element">
-                  <button mat-flat-button color="primary" class="action-btn" (click)="runReport(element.id)">تشغيل</button>
-                  <button mat-stroked-button color="accent" class="action-btn" (click)="exportReport(element.id)">تصدير CSV</button>
-                </td>
-              </ng-container>
+        @if (tab() === 'reports') {
+          <div class="list">
+            <div class="row head">
+              <span>رمز التقرير</span><span>اسم التقرير</span><span>التصنيف</span><span class="ta-end">إجراءات</span>
+            </div>
+            @for (r of reports(); track r.id) {
+              <div class="row">
+                <span class="mono">{{ r.code || '—' }}</span>
+                <span class="strong">{{ r.name }}</span>
+                <span class="muted">{{ r.category_name || 'غير مصنّف' }}</span>
+                <span class="ta-end acts">
+                  <button class="btn sm primary" [disabled]="running() === r.id" (click)="runReport(r.id)">
+                    {{ running() === r.id ? 'جارٍ…' : 'تشغيل' }}
+                  </button>
+                  <button class="btn sm ghost" (click)="exportReport(r.id)">تصدير CSV</button>
+                </span>
+              </div>
+            }
+            @if (reports().length === 0) {
+              <div class="empty">لا توجد تقارير معرّفة في النظام بعد.</div>
+            }
+          </div>
+        }
 
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        @if (tab() === 'dashboards') {
+          <div class="tiles">
+            @for (d of dashboards(); track d.id) {
+              <article class="tile">
+                <span class="tile-ic" aria-hidden="true">▦</span>
+                <strong>{{ d.name }}</strong>
+                <p>{{ d.description || 'لوحة تفاعلية للمستويات التنفيذية والأقسام.' }}</p>
+                <span class="tile-meta">{{ d.widget_count || 0 }} عنصر عرض</span>
+              </article>
+            }
+            @if (dashboards().length === 0) {
+              <div class="empty">لا توجد لوحات قيادة منشورة بعد.</div>
+            }
+          </div>
+        }
+
+        @if (tab() === 'sources') {
+          <div class="list">
+            <div class="row head src">
+              <span>المصدر</span><span>النوع</span><span>الموديول</span>
+            </div>
+            @for (s of sources(); track s.id) {
+              <div class="row src">
+                <span class="strong">{{ s.name }}</span>
+                <span class="mono">{{ s.source_type || 'model' }}</span>
+                <span class="muted">{{ s.module || '—' }}</span>
+              </div>
+            }
+            @if (sources().length === 0) {
+              <div class="empty">لا توجد مصادر بيانات مسجّلة.</div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- عارض نتائج التقرير -->
+      @if (executedData().length > 0) {
+        <section class="card">
+          <div class="card-head">
+            <h3>نتائج التقرير — {{ executedData().length }} سجل</h3>
+            <button class="link-btn" (click)="executedData.set([])">إخفاء</button>
+          </div>
+          <div class="scroll-x">
+            <table class="data">
+              <thead>
+                <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
+              </thead>
+              <tbody>
+                @for (row of executedData(); track $index) {
+                  <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
+                }
+              </tbody>
             </table>
           </div>
-        </mat-tab>
-
-        <!-- Tab 2: Dashboard Preview -->
-        <mat-tab label="لوحات القيادة">
-          <div class="tab-content dashboard-grid-preview">
-            <div class="dashboard-preview-card" *ngFor="let d of dashboards()">
-              <mat-icon class="dash-icon">dashboard</mat-icon>
-              <h3>{{ d.name }}</h3>
-              <p>{{ d.description || 'لوحة تحكم تفاعلية للمستويات التنفيذية والأقسام.' }}</p>
-              <button mat-flat-button color="accent">عرض اللوحة</button>
-            </div>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
-
-      <!-- Executed Report Data Viewer -->
-      <mat-card class="data-viewer-card" *ngIf="executedData().length > 0">
-        <mat-card-header>
-          <mat-card-title>بيانات التقرير الحالي</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <table mat-table [dataSource]="executedData()" class="mat-elevation-z8 viewer-table">
-            <ng-container *ngFor="let key of dataColumns()" [matColumnDef]="key">
-              <th mat-header-cell *matHeaderCellDef>{{ key }}</th>
-              <td mat-cell *matCellDef="let row">{{ row[key] }}</td>
-            </ng-container>
-            <tr mat-header-row *matHeaderRowDef="dataColumns()"></tr>
-            <tr mat-row *matRowDef="let row; columns: dataColumns();"></tr>
-          </table>
-        </mat-card-content>
-      </mat-card>
+        </section>
+      }
     </div>
   `,
   styles: [`
-    .reporting-dashboard {
-      flex: 1;
-      padding: 20px;
-      min-width: 0;
-      overflow-y: auto;
-      background: var(--nb-bg);
-      color: var(--nb-text);
-    }
-    .dashboard-header { margin-bottom: 16px; }
-    .dashboard-header h1 { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0; }
-    .dashboard-header p { color: var(--nb-text-muted); font-size: 12px; margin: 4px 0 0; }
+    .page { flex: 1; padding: 22px; overflow-y: auto; min-width: 0;
+      background: var(--nb-bg); color: var(--nb-text); font-family: var(--nb-font-family); }
 
-    .ai-bar {
-      height: 40px;
-      background: var(--nb-primary-50);
-      border: 1px solid var(--nb-primary-200);
-      border-radius: var(--nb-radius-card);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 14px;
-      margin-bottom: 12px;
-    }
-    .ai-mark {
-      width: 20px;
-      height: 20px;
-      background: var(--nb-primary-600);
-      border-radius: var(--nb-radius-compact);
-      color: var(--nb-on-primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      flex-shrink: 0;
-    }
-    .ai-input {
-      flex: 1;
-      border: none;
-      background: transparent;
-      outline: none;
-      font-family: var(--nb-font-family);
-      font-size: 13px;
-      color: var(--nb-text);
-    }
+    .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+      border-radius: var(--nb-radius); cursor: pointer; border: none; transition: filter .15s ease, background .15s ease; }
+    .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn.ghost:hover { border-color: var(--nb-primary-400); }
+    .btn.primary { background: var(--nb-primary-600); color: #fff; }
+    .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .link-btn { background: none; border: none; font-family: inherit; font-size: 12px; font-weight: 600;
+      color: var(--nb-primary-600); cursor: pointer; padding: 0; }
+
+    /* شريط نبراس الذكي — التوقيع البصري */
+    .ai-bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px;
+      background: linear-gradient(180deg, var(--nb-primary-50) 0%, var(--nb-surface) 140%);
+      border: 1px solid var(--nb-primary-200); border-radius: var(--nb-radius-card); margin-bottom: 10px;
+      transition: border-color .2s ease, box-shadow .2s ease; }
+    .ai-bar:focus-within { border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(48,63,159,.10); }
+    .ai-bar.busy { opacity: .85; }
+    .ai-mark { width: 26px; height: 26px; flex-shrink: 0; border-radius: var(--nb-radius-compact);
+      background: var(--nb-primary-600); color: var(--nb-on-primary, #fff);
+      display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .ai-bar.busy .ai-mark { animation: pulse 1.1s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .45; } }
+    @media (prefers-reduced-motion: reduce) { .ai-bar.busy .ai-mark { animation: none; } }
+    .ai-input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; height: 26px;
+      font-family: inherit; font-size: 13px; color: var(--nb-text); }
     .ai-input::placeholder { color: var(--nb-primary-400); }
-    .ai-response {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 14px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      color: var(--nb-text-secondary);
-    }
-    .ai-response code { color: var(--nb-primary-600); background: var(--nb-primary-50); padding: 2px 6px; border-radius: var(--nb-radius-sm); }
 
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .kpi-card {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .kpi-header { display: flex; justify-content: space-between; align-items: center; }
-    .kpi-label { font-size: 12px; color: var(--nb-text-muted); }
-    .trend-badge { font-size: 11px; font-weight: 700; }
-    .trend-badge.up { color: var(--nb-success); }
-    .trend-badge.down { color: var(--nb-danger); }
-    .trend-badge.stable { color: var(--nb-warning); }
-    .kpi-value { font-size: 20px; font-weight: 700; color: var(--nb-text); }
-    .kpi-target { font-size: 11px; color: var(--nb-text-faint); }
+    .ai-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+    .chips-label { font-size: 11.5px; color: var(--nb-text-muted); font-weight: 600; }
+    .chip { height: 26px; padding: 0 10px; font-family: inherit; font-size: 11.5px; cursor: pointer;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: 999px; color: var(--nb-text-secondary); }
+    .chip:hover { border-color: var(--nb-primary-400); color: var(--nb-primary-600); }
 
-    .dashboard-tabs {
-      background: var(--nb-surface);
-      border-radius: var(--nb-radius-card);
-      border: 1px solid var(--nb-border);
-      padding: 8px 16px 16px;
-      margin-bottom: 16px;
-    }
-    .tab-content { padding: 16px 0; }
+    .ai-answer { background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-inline-start: 3px solid var(--nb-primary-500);
+      border-radius: var(--nb-radius-card); padding: 14px 16px; margin-bottom: 16px; }
+    .aa-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .aa-head strong { font-size: 13px; font-weight: 700; color: var(--nb-text); }
+    .aa-summary { margin: 0 0 10px; font-size: 13px; line-height: 1.7; color: var(--nb-text-secondary); }
+    .aa-sql { display: flex; flex-direction: column; gap: 4px; }
+    .aa-sql-label { font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
+    .aa-sql code { display: block; overflow-x: auto; direction: ltr; text-align: left;
+      font-size: 12px; padding: 8px 10px; border-radius: var(--nb-radius-sm);
+      background: var(--nb-primary-50); color: var(--nb-primary-600); }
 
-    .reporting-table, .viewer-table { width: 100%; background: var(--nb-surface); }
-    ::ng-deep .reporting-table .mat-mdc-header-cell,
-    ::ng-deep .viewer-table .mat-mdc-header-cell {
-      color: var(--nb-text-muted) !important;
-      font-weight: 700;
-      font-size: 11px;
-      background: var(--nb-surface-raised);
-      border-bottom: 1px solid var(--nb-border-soft) !important;
-    }
-    ::ng-deep .reporting-table .mat-mdc-cell,
-    ::ng-deep .viewer-table .mat-mdc-cell {
-      border-bottom: 1px solid var(--nb-border-row) !important;
-      color: var(--nb-text) !important;
-      font-size: 13px;
-    }
-    .action-btn { margin-left: 8px; }
+    /* مؤشرات الأداء */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpi { display: flex; flex-direction: column; gap: 6px; background: var(--nb-surface);
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px; }
+    .kpi.placeholder { grid-column: 1 / -1; align-items: center; color: var(--nb-text-muted); font-size: 13px; padding: 24px; }
+    .kpi-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .kpi-label { font-size: 12px; color: var(--nb-text-muted); font-weight: 600; }
+    .trend { font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .trend[data-t='up'] { color: var(--nb-success); }
+    .trend[data-t='down'] { color: var(--nb-danger); }
+    .trend[data-t='stable'] { color: var(--nb-text-muted); }
+    .kpi-value { font-size: 26px; font-weight: 800; color: var(--nb-text); line-height: 1;
+      font-variant-numeric: tabular-nums; }
+    .kpi-value em { font-size: 14px; font-weight: 600; font-style: normal; color: var(--nb-text-muted); }
+    .meter { position: relative; height: 6px; border-radius: 999px; background: var(--nb-border-soft); overflow: hidden; }
+    .meter-fill { position: absolute; inset-block: 0; inset-inline-start: 0;
+      background: var(--nb-primary-500); border-radius: 999px; transition: width .35s ease; }
+    .meter-target { position: absolute; inset-block: -2px; width: 2px; background: var(--nb-text); opacity: .55; }
+    .kpi-foot { font-size: 11px; color: var(--nb-text-faint, var(--nb-text-muted)); }
 
-    .dashboard-grid-preview {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    .dashboard-preview-card {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      align-items: center;
-      text-align: center;
-    }
-    .dash-icon { font-size: 32px; width: 32px; height: 32px; color: var(--nb-primary-600); }
-    .dashboard-preview-card h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
-    .dashboard-preview-card p { color: var(--nb-text-muted); font-size: 12px; margin: 0; }
+    /* البطاقات والتبويبات */
+    .card { background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); overflow: hidden; margin-bottom: 16px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-bottom: 1px solid var(--nb-border-soft); }
+    .card-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--nb-text); }
 
-    .data-viewer-card {
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card);
-      padding: 16px;
+    .tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--nb-border-soft);
+      background: var(--nb-surface-raised); overflow-x: auto; }
+    .tab { position: relative; height: 40px; padding: 0 14px; background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 600; color: var(--nb-text-muted); white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px; }
+    .tab:hover { color: var(--nb-text); }
+    .tab.on { color: var(--nb-primary-600); }
+    .tab.on::after { content: ''; position: absolute; inset-inline: 8px; bottom: -1px; height: 2px;
+      background: var(--nb-primary-600); border-radius: 2px 2px 0 0; }
+    .tab-count { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+      background: var(--nb-border-soft); color: var(--nb-text-muted); }
+    .tab.on .tab-count { background: var(--nb-primary-50); color: var(--nb-primary-600); }
+
+    .list { display: flex; flex-direction: column; }
+    .row { display: grid; grid-template-columns: 1fr 2.2fr 1.2fr 1.6fr; gap: 10px;
+      align-items: center; padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--nb-border-row); }
+    .row.src { grid-template-columns: 2fr 1fr 1fr; }
+    .row:last-child { border-bottom: none; }
+    .row.head { background: var(--nb-surface-raised); font-size: 11px; font-weight: 700;
+      color: var(--nb-text-muted); padding: 8px 16px; }
+    .row:not(.head):hover { background: var(--nb-surface-raised); }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--nb-text-secondary); }
+    .strong { font-weight: 600; color: var(--nb-text); }
+    .muted { color: var(--nb-text-muted); font-size: 12px; }
+    .ta-end { text-align: end; }
+    .acts { display: flex; gap: 6px; justify-content: flex-end; }
+    .empty { padding: 32px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 16px; }
+    .tile { display: flex; flex-direction: column; gap: 6px; padding: 16px;
+      background: var(--nb-surface-raised); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
+      transition: border-color .15s ease, transform .15s ease; }
+    .tile:hover { border-color: var(--nb-primary-400); transform: translateY(-2px); }
+    .tile-ic { font-size: 20px; color: var(--nb-primary-600); }
+    .tile strong { font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .tile p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--nb-text-muted); }
+    .tile-meta { font-size: 11px; font-weight: 600; color: var(--nb-primary-600); }
+
+    .scroll-x { overflow-x: auto; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.data th { position: sticky; top: 0; text-align: start; padding: 8px 12px; white-space: nowrap;
+      background: var(--nb-surface-raised); font-size: 11px; font-weight: 700; color: var(--nb-text-muted);
+      border-bottom: 1px solid var(--nb-border-soft); }
+    table.data td { padding: 8px 12px; white-space: nowrap; color: var(--nb-text);
+      border-bottom: 1px solid var(--nb-border-row); font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 900px) {
+      .page { padding: 14px; }
+      .row, .row.src { grid-template-columns: 1fr 1fr; row-gap: 4px; }
+      .ta-end, .acts { justify-content: flex-start; text-align: start; }
     }
   `]
 })
 export class ReportingDashboardComponent implements OnInit {
-  repService = inject(ReportingService);
+  private repService = inject(ReportingService);
 
+  readonly tabs: { key: TabKey; label: string }[] = [
+    { key: 'reports', label: 'التقارير المتوفرة' },
+    { key: 'dashboards', label: 'لوحات القيادة' },
+    { key: 'sources', label: 'مصادر البيانات' },
+  ];
+
+  readonly aiSuggestions = signal<string[]>([
+    'ما نسبة حضور الطلاب هذا الشهر؟',
+    'أعلى ٥ صفوف في التحصيل الدراسي',
+    'إجمالي المتأخرات المالية حسب الصف',
+  ]);
+
+  tab = signal<TabKey>('reports');
   aiQuestion = '';
+  aiLoading = signal(false);
   aiResponse = signal<any>(null);
+  running = signal<string | null>(null);
+
   kpis = signal<any[]>([]);
   reports = signal<any[]>([]);
   dashboards = signal<any[]>([]);
-  
+  sources = signal<any[]>([]);
   executedData = signal<any[]>([]);
   dataColumns = signal<string[]>([]);
-  displayedColumns: string[] = ['code', 'name', 'category', 'actions'];
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.loadData();
   }
 
-  loadData() {
-    this.repService.getKPIs().subscribe({
-      next: (res) => {
-        if (res && res.success) this.kpis.set(res.data);
-      }
-    });
+  loadData(): void {
+    this.repService.getKPIs().subscribe({ next: (r) => r?.success && this.kpis.set(r.data ?? []) });
+    this.repService.getReports().subscribe({ next: (r) => r?.success && this.reports.set(r.data ?? []) });
+    this.repService.getDashboards().subscribe({ next: (r) => r?.success && this.dashboards.set(r.data ?? []) });
+    this.repService.getDataSources().subscribe({ next: (r) => r?.success && this.sources.set(r.data ?? []) });
+  }
 
-    this.repService.getReports().subscribe({
-      next: (res) => {
-        if (res && res.success) this.reports.set(res.data);
-      }
-    });
+  tabCount(key: TabKey): number {
+    return key === 'reports' ? this.reports().length
+      : key === 'dashboards' ? this.dashboards().length
+      : this.sources().length;
+  }
 
-    this.repService.getDashboards().subscribe({
+  /** نسبة تعبئة العمود — تُقاس على مقياس موحّد يستوعب تجاوز المستهدف. */
+  pct(k: any): number {
+    const scale = Math.max(Number(k?.target_value) || 100, Number(k?.current_value) || 0);
+    return scale ? Math.min(100, ((Number(k?.current_value) || 0) / scale) * 100) : 0;
+  }
+
+  targetPct(k: any): number {
+    const scale = Math.max(Number(k?.target_value) || 100, Number(k?.current_value) || 0);
+    return scale ? Math.min(100, ((Number(k?.target_value) || 0) / scale) * 100) : 0;
+  }
+
+  trendGlyph(t?: string): string {
+    return t === 'up' ? '▲' : t === 'down' ? '▼' : '▬';
+  }
+
+  trendText(t?: string): string {
+    return t === 'up' ? 'صاعد' : t === 'down' ? 'هابط' : 'مستقر';
+  }
+
+  askSuggestion(q: string): void {
+    this.aiQuestion = q;
+    this.askAI();
+  }
+
+  askAI(): void {
+    const q = this.aiQuestion.trim();
+    if (!q || this.aiLoading()) return;
+    this.aiLoading.set(true);
+    this.repService.askAI(q).subscribe({
       next: (res) => {
-        if (res && res.success) this.dashboards.set(res.data);
-      }
+        this.aiResponse.set(res?.success ? res.data : { summary: 'تعذّر تفسير السؤال. حاول صياغته بشكل أوضح.' });
+        this.aiLoading.set(false);
+      },
+      error: () => {
+        this.aiResponse.set({ summary: 'تعذّر الوصول إلى خدمة التحليل الذكي حالياً.' });
+        this.aiLoading.set(false);
+      },
     });
   }
 
-  askAI() {
-    if (!this.aiQuestion.trim()) return;
-    this.repService.askAI(this.aiQuestion).subscribe({
-      next: (res) => {
-        if (res && res.success) this.aiResponse.set(res.data);
-      }
-    });
+  clearAI(): void {
+    this.aiResponse.set(null);
+    this.aiQuestion = '';
   }
 
-  runReport(id: string) {
+  runReport(id: string): void {
+    this.running.set(id);
     this.repService.executeReport(id, {}).subscribe({
       next: (res) => {
-        if (res && res.success && res.data.data) {
-          const list = res.data.data;
-          this.executedData.set(list);
-          if (list.length > 0) {
-            this.dataColumns.set(Object.keys(list[0]));
-          }
-        }
-      }
+        const list = res?.data?.data ?? [];
+        this.executedData.set(list);
+        this.dataColumns.set(list.length ? Object.keys(list[0]) : []);
+        this.running.set(null);
+      },
+      error: () => this.running.set(null),
     });
   }
 
-  exportReport(id: string) {
+  exportReport(id: string): void {
     this.repService.exportReportCsv(id, {}).subscribe({
       next: (blob: any) => {
         const url = window.URL.createObjectURL(blob);
@@ -326,7 +427,8 @@ export class ReportingDashboardComponent implements OnInit {
         a.href = url;
         a.download = `report_${id}.csv`;
         a.click();
-      }
+        window.URL.revokeObjectURL(url);
+      },
     });
   }
 }

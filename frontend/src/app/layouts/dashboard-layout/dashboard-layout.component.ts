@@ -9,6 +9,7 @@ import { NotificationsService, AppNotification } from '../../core/services/notif
 
 interface NavItem {
   label: string;
+  icon?: string;
   link?: string;
   count?: number;
   countKind?: 'danger' | 'info' | 'warning';
@@ -23,6 +24,7 @@ interface NavItem {
 
 interface NavGroup {
   label?: string;
+  icon?: string;
   items: NavItem[];
   /** صلاحية مطلوبة لإظهار المجموعة كاملة (اختياري) */
   permission?: string;
@@ -70,8 +72,13 @@ interface NavGroup {
                   [class.active]="isGroupActive(group)"
                   (click)="toggleNavGroup(group.label)"
                 >
-                  <span class="group-title">{{ group.label }}</span>
-                  <span class="chevron" [class.open]="isGroupExpanded(group.label)">‹</span>
+                  <span class="group-title">
+                    @if (group.icon) { <span class="group-icon">{{ group.icon }}</span> }
+                    <span>{{ group.label }}</span>
+                  </span>
+                  <svg class="chevron-svg" [class.open]="isGroupExpanded(group.label)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
                 </button>
               }
               @if (!group.label || isGroupExpanded(group.label)) {
@@ -86,8 +93,13 @@ interface NavGroup {
                           [class.active]="isBranchActive(item)"
                           (click)="toggleGroup(item.label)"
                         >
-                          <span>{{ item.label }}</span>
-                          <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                          <span class="item-title">
+                            @if (item.icon) { <span class="item-icon">{{ item.icon }}</span> }
+                            <span>{{ item.label }}</span>
+                          </span>
+                          <svg class="chevron-svg" [class.open]="isExpanded(item)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                          </svg>
                         </a>
                       } @else {
                         <button
@@ -96,8 +108,13 @@ interface NavGroup {
                           [class.active]="isBranchActive(item)"
                           (click)="toggleGroup(item.label)"
                         >
-                          <span>{{ item.label }}</span>
-                          <span class="chevron" [class.open]="isExpanded(item)">‹</span>
+                          <span class="item-title">
+                            @if (item.icon) { <span class="item-icon">{{ item.icon }}</span> }
+                            <span>{{ item.label }}</span>
+                          </span>
+                          <svg class="chevron-svg" [class.open]="isExpanded(item)" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                          </svg>
                         </button>
                       }
                       @if (isExpanded(item)) {
@@ -108,6 +125,7 @@ interface NavGroup {
                               [routerLink]="child.link"
                               routerLinkActive="active"
                             >
+                              <span class="child-dot">•</span>
                               <span>{{ child.label }}</span>
                               @if (child.count) {
                                 <span class="nav-count" [class]="'nav-count ' + child.countKind">{{ child.count }}</span>
@@ -123,14 +141,20 @@ interface NavGroup {
                         [routerLink]="item.link"
                         routerLinkActive="active"
                       >
-                        <span>{{ item.label }}</span>
+                        <span class="item-title">
+                          @if (item.icon) { <span class="item-icon">{{ item.icon }}</span> }
+                          <span>{{ item.label }}</span>
+                        </span>
                         @if (item.count) {
                           <span class="nav-count" [class]="'nav-count ' + item.countKind">{{ item.count }}</span>
                         }
                       </a>
                     } @else {
                       <div class="nav-item">
-                        <span>{{ item.label }}</span>
+                        <span class="item-title">
+                          @if (item.icon) { <span class="item-icon">{{ item.icon }}</span> }
+                          <span>{{ item.label }}</span>
+                        </span>
                       </div>
                     }
                   }
@@ -366,19 +390,33 @@ interface NavGroup {
         .group-title {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
         }
 
-        .chevron {
+        .group-icon, .item-icon {
           font-size: 14px;
-          transition: transform 180ms ease;
-          display: inline-block;
-          color: var(--nb-text-muted);
           line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .chevron.open {
-          transform: rotate(-90deg);
+        .item-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .chevron-svg {
+          transition: transform 200ms ease;
+          color: var(--nb-text-muted, #64748b);
+          flex-shrink: 0;
+          display: inline-block;
+        }
+
+        .chevron-svg.open {
+          transform: rotate(180deg);
+          color: var(--nb-primary-600, #4f46e5);
         }
       }
 
@@ -436,6 +474,15 @@ interface NavGroup {
         padding: 4.5px 8px;
         font-size: 12px;
         color: var(--nb-text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .child-dot {
+          font-size: 10px;
+          color: var(--nb-primary-400, #818cf8);
+          line-height: 1;
+        }
 
         &:hover {
           color: var(--nb-text);
@@ -446,6 +493,10 @@ interface NavGroup {
           color: var(--nb-primary-600);
           background: var(--nb-primary-50);
           font-weight: 600;
+
+          .child-dot {
+            color: var(--nb-primary-600);
+          }
         }
       }
 
@@ -815,15 +866,17 @@ export class DashboardLayoutComponent {
   readonly navGroups: NavGroup[] = [
     {
       items: [
-        { label: 'لوحة القيادة', link: '/dashboard' },
-        { label: 'الموافقات', link: '/approvals' },
+        { label: 'لوحة القيادة', icon: '🏠', link: '/dashboard' },
+        { label: 'الموافقات', icon: '✍️', link: '/approvals' },
       ],
     },
     {
       label: 'الأكاديمية',
+      icon: '🎓',
       items: [
         {
           label: 'الطلاب',
+          icon: '👨‍🎓',
           match: '/students',
           link: '/students/dashboard',
           children: [
@@ -834,6 +887,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'القبول والتسجيل',
+          icon: '📑',
           match: '/admissions',
           link: '/admissions/dashboard',
           children: [
@@ -852,6 +906,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'الشؤون الأكاديمية',
+          icon: '📚',
           match: '/academics',
           link: '/academics/dashboard',
           children: [
@@ -865,20 +920,22 @@ export class DashboardLayoutComponent {
             { label: 'المواد الدراسية', link: '/academics/subjects' },
           ],
         },
-        { label: 'الجداول الدراسية', link: '/timetable' },
-        { label: 'الجدولة', link: '/scheduling' },
-        { label: 'الامتحانات', link: '/examinations' },
-        { label: 'شؤون المعلمين', link: '/teachers' },
+        { label: 'الجداول الدراسية', icon: '🗓️', link: '/timetable' },
+        { label: 'الجدولة', icon: '⏳', link: '/scheduling' },
+        { label: 'الامتحانات', icon: '📝', link: '/examinations' },
+        { label: 'شؤون المعلمين', icon: '👩‍🏫', link: '/teachers' },
       ],
     },
     {
       label: 'الموارد البشرية',
+      icon: '👥',
       permission: 'employees:read',
       items: [
-        { label: 'الموارد البشرية', link: '/hr' },
-        { label: 'الرواتب', link: '/payroll' },
+        { label: 'الموارد البشرية', icon: '💼', link: '/hr' },
+        { label: 'الرواتب', icon: '💵', link: '/payroll' },
         {
           label: 'الحضور والانصراف',
+          icon: '⏱️',
           match: '/attendance',
           link: '/attendance/dashboard',
           children: [
@@ -895,11 +952,13 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'المالية والمشتريات',
+      icon: '💰',
       permission: 'finance:read',
       items: [
-        { label: 'المالية', link: '/finance' },
+        { label: 'المالية', icon: '🏦', link: '/finance' },
         {
           label: 'حسابات الطلاب المالية',
+          icon: '💳',
           match: '/student-finance',
           link: '/student-finance/dashboard',
           children: [
@@ -913,6 +972,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'المشتريات',
+          icon: '🛒',
           match: '/procurement',
           link: '/procurement/dashboard',
           children: [
@@ -928,10 +988,12 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'سلسلة الإمداد والخدمات',
+      icon: '📦',
       permission: 'settings:read',
       items: [
         {
           label: 'المخزون',
+          icon: '🏢',
           match: '/inventory',
           link: '/inventory/dashboard',
           children: [
@@ -948,6 +1010,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'الأصول',
+          icon: '🏺',
           match: '/assets',
           link: '/assets/dashboard',
           children: [
@@ -957,9 +1020,10 @@ export class DashboardLayoutComponent {
             { label: 'الإهلاك', link: '/assets/depreciation' },
           ],
         },
-        { label: 'النقل', link: '/transport' },
+        { label: 'النقل', icon: '🚌', link: '/transport' },
         {
           label: 'المكتبة',
+          icon: '📖',
           match: '/library',
           link: '/library/dashboard',
           children: [
@@ -971,6 +1035,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'العيادة',
+          icon: '🩺',
           match: '/clinic',
           link: '/clinic/dashboard',
           children: [
@@ -981,6 +1046,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'الصيانة',
+          icon: '🛠️',
           match: '/maintenance',
           link: '/maintenance/dashboard',
           children: [
@@ -993,10 +1059,12 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'العلاقات والاتصال',
+      icon: '🌐',
       permission: 'settings:read',
       items: [
         {
           label: 'إدارة علاقات العملاء (CRM)',
+          icon: '🤝',
           match: '/crm',
           link: '/crm/dashboard',
           children: [
@@ -1008,6 +1076,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'مركز الاتصالات',
+          icon: '💬',
           match: '/communications',
           link: '/communications/dashboard',
           children: [
@@ -1018,6 +1087,7 @@ export class DashboardLayoutComponent {
         },
         {
           label: 'البوابات الإلكترونية',
+          icon: '🚪',
           match: '/portal',
           link: '/portal/overview',
           children: [
@@ -1031,27 +1101,30 @@ export class DashboardLayoutComponent {
     },
     {
       label: 'المعرفة والأتمتة',
+      icon: '🧠',
       permission: 'settings:read',
       items: [
-        { label: 'قاعدة المعرفة', link: '/knowledge' },
-        { label: 'التقارير والتحليلات', link: '/reporting' },
-        { label: 'إدارة المستندات', link: '/documents' },
-        { label: 'النماذج', link: '/forms' },
-        { label: 'الأتمتة ومسارات العمل', link: '/automation' },
-        { label: 'محرك القواعد', link: '/rules' },
+        { label: 'قاعدة المعرفة', icon: '📖', link: '/knowledge' },
+        { label: 'التقارير والتحليلات', icon: '📊', link: '/reporting' },
+        { label: 'إدارة المستندات', icon: '📂', link: '/documents' },
+        { label: 'النماذج', icon: '📋', link: '/forms' },
+        { label: 'الأتمتة ومسارات العمل', icon: '⚡', link: '/automation' },
+        { label: 'محرك القواعد', icon: '⚙️', link: '/rules' },
       ],
     },
     {
       label: 'النظام والإدارة',
+      icon: '⚙️',
       permission: 'settings:read',
       items: [
-        { label: 'منصة النظام', link: '/platform' },
-        { label: 'الإعدادات والميزات', link: '/config' },
-        { label: 'التكامل', link: '/integration' },
-        { label: 'التخصيص', link: '/personalization' },
-        { label: 'لوحة الأوامر', link: '/command' },
+        { label: 'منصة النظام', icon: '🖥️', link: '/platform' },
+        { label: 'الإعدادات والميزات', icon: '🛠️', link: '/config' },
+        { label: 'التكامل', icon: '🔗', link: '/integration' },
+        { label: 'التخصيص', icon: '🎨', link: '/personalization' },
+        { label: 'لوحة الأوامر', icon: '💻', link: '/command' },
         {
           label: 'الهيكل التنظيمي',
+          icon: '🏛️',
           match: '/organization',
           link: '/organization/overview',
           children: [
@@ -1059,7 +1132,7 @@ export class DashboardLayoutComponent {
             { label: 'الأقسام', link: '/organization/departments' },
           ],
         },
-        { label: '✦ مساعد نبراس', link: '/ai', ai: true },
+        { label: '✦ مساعد نبراس', icon: '✨', link: '/ai', ai: true },
       ],
     },
   ];
