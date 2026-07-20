@@ -1,0 +1,9 @@
+{
+  "//": "يوجّه المحرّر إلى مفسّر venv الخاص بالباك إند بدل Python النظامي.",
+  "//2": "بدونه تشتكي أدوات الفحص (Pyrefly/Pylance) من عدم إيجاد الحزم و مجلد apps زوراً.",
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+  "python.analysis.extraPaths": ["${workspaceFolder}/backend"],
+  "python.autoComplete.extraPaths": ["${workspaceFolder}/backend"],
+  "python.analysis.diagnosticMode": "openFilesOnly",
+  "python.terminal.activateEnvironment": true
+}
