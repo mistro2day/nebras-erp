@@ -165,7 +165,7 @@ export const routes: Routes = [
       {
         path: 'ai',
         loadChildren: () =>
-          import('./features/placeholder/placeholder.routes').then((m) => m.PLACEHOLDER_ROUTES),
+          import('./features/ai/ai.routes').then((m) => m.AI_ROUTES),
       },
       {
         path: 'portal',

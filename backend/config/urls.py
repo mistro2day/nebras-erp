@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/v1/config/', include('apps.configuration.interfaces.urls')),
     path('api/v1/approvals/', include('apps.approval_center.interfaces.urls')),
     path('api/v1/automation/', include('apps.automation_platform.interfaces.urls')),
+    path('api/v1/ai/', include('apps.ai.interfaces.urls')),
 ]
 
 from django.conf import settings
