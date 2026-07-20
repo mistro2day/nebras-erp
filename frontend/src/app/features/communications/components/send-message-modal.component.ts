@@ -59,10 +59,18 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
           <div class="form-group">
             <label>معاينة ونص الرسالة</label>
             <textarea class="nb-input" [(ngModel)]="messageBody" rows="6" placeholder="اكتب رسالتك هنا..."></textarea>
-            <div style="font-size: 10px; color: red; margin-top: 10px;">
-              Debug Context Vars: {{ debugVars() }}
+            <div class="debug-toggle" style="margin-top: 10px;">
+              <label style="font-size: 12px; color: var(--nb-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" [(ngModel)]="showDebugVars">
+                إظهار المتغيرات البرمجية المتاحة (للمطورين)
+              </label>
             </div>
-            <p class="help-text">تم استبدال المتغيرات تلقائياً، يمكنك التعديل قبل الإرسال.</p>
+            @if (showDebugVars) {
+              <div style="font-size: 11px; color: var(--nb-text-muted); background: var(--nb-surface-raised); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; direction: ltr; text-align: left; overflow-x: auto;">
+                {{ debugVars() }}
+              </div>
+            }
+            <p class="help-text" style="margin-top: 8px;">تم استبدال المتغيرات تلقائياً، يمكنك التعديل قبل الإرسال.</p>
           </div>
         }
 
@@ -133,6 +141,7 @@ export class SendMessageModalComponent implements OnChanges {
   selectedChannelCode = '';
   selectedTemplateId = '';
   messageBody = '';
+  showDebugVars = false;
 
   sending = signal(false);
   errorMsg = signal('');
