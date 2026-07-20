@@ -205,8 +205,8 @@ class BillingService:
                 student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
                 fam = st.family_relations.first()
                 if fam:
-                    guardian_name = fam.guardian.arabic_name if getattr(fam, 'guardian', None) else fam.name
-                    guardian_phone = fam.phone or ""
+                    guardian_name = getattr(fam, 'full_name', '') or ""
+                    guardian_phone = getattr(fam, 'phone', '') or ""
         except Exception as e:
             logger.warning(f"Failed to resolve student info for event: {e}")
 
@@ -360,8 +360,8 @@ class PaymentService:
                 student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
                 fam = st.family_relations.first()
                 if fam:
-                    guardian_name = fam.guardian.arabic_name if getattr(fam, 'guardian', None) else fam.name
-                    guardian_phone = fam.phone or ""
+                    guardian_name = getattr(fam, 'full_name', '') or ""
+                    guardian_phone = getattr(fam, 'phone', '') or ""
         except Exception as e:
             logger.warning(f"Failed to resolve student info for payment event: {e}")
 

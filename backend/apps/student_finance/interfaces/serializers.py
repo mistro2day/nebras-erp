@@ -74,20 +74,25 @@ class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
     def get_student_name(self, obj):
         try:
             from apps.students.domain.models import Student
-            student = Student.objects.get(id=obj.student_billing_account.student_id)
-            return student.profile.arabic_name
+            if not obj.student_billing_account or not obj.student_billing_account.student_id:
+                return ""
+            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
+            if student and hasattr(student, 'profile') and student.profile:
+                return student.profile.arabic_name or ""
+            return ""
         except Exception:
             return ""
 
     def get_guardian_name(self, obj):
         try:
             from apps.students.domain.models import Student
-            student = Student.objects.get(id=obj.student_billing_account.student_id)
-            family = student.family_relations.first()
-            if family and getattr(family, 'guardian', None):
-                return family.guardian.arabic_name
-            elif family:
-                return family.name
+            if not obj.student_billing_account or not obj.student_billing_account.student_id:
+                return ""
+            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
+            if student:
+                family = student.family_relations.first()
+                if family:
+                    return family.full_name or ""
             return ""
         except Exception:
             return ""
@@ -95,10 +100,13 @@ class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
     def get_guardian_phone(self, obj):
         try:
             from apps.students.domain.models import Student
-            student = Student.objects.get(id=obj.student_billing_account.student_id)
-            family = student.family_relations.first()
-            if family:
-                return family.phone
+            if not obj.student_billing_account or not obj.student_billing_account.student_id:
+                return ""
+            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
+            if student:
+                family = student.family_relations.first()
+                if family:
+                    return family.phone or ""
             return ""
         except Exception:
             return ""
