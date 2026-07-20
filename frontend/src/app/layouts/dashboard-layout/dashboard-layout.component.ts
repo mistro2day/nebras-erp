@@ -714,8 +714,27 @@ export class DashboardLayoutComponent {
           ],
         },
         { label: 'النقل', link: '/transport' },
-        { label: 'المكتبة', link: '/library' },
-        { label: 'العيادة', link: '/clinic' },
+        {
+          label: 'المكتبة',
+          match: '/library',
+          link: '/library/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/library/dashboard' },
+            { label: 'الكتالوج والنسخ', link: '/library/catalog' },
+            { label: 'الإعارة والإرجاع', link: '/library/borrows' },
+            { label: 'الغرامات', link: '/library/fines' },
+          ],
+        },
+        {
+          label: 'العيادة',
+          match: '/clinic',
+          link: '/clinic/dashboard',
+          children: [
+            { label: 'لوحة التحكم', link: '/clinic/dashboard' },
+            { label: 'الزيارات', link: '/clinic/visits' },
+            { label: 'الإجازات المرضية', link: '/clinic/leaves' },
+          ],
+        },
         {
           label: 'الصيانة',
           match: '/maintenance',

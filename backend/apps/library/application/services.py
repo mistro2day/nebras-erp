@@ -73,16 +73,31 @@ class BorrowService:
             settings = LibrarySettings.objects.filter(tenant_id=tenant_id).first()
             fine_rate = settings.fine_per_day if settings else Decimal('1.00')
 
-            if debit_gl_account_id and credit_gl_account_id:
-                FineService.calculate_and_post_fine(
-                    tenant_id=tenant_id,
-                    borrow_transaction_id=tx.id,
-                    days_overdue=days_overdue,
-                    fine_per_day=fine_rate,
-                    debit_gl_account_id=debit_gl_account_id,
-                    credit_gl_account_id=credit_gl_account_id,
-                    user_id=user_id
-                )
+            # الغرامة واقعة مكتبية تُسجَّل دائماً عند التأخير — لا تتوقّف على معرفة
+            # المستدعي بأرقام حسابات الأستاذ العام. أمين المكتبة يُرجع الكتاب،
+            # والحسابات تُحلّ هنا: مدين ذمم مدينة / دائن إيراد الغرامات.
+            if not debit_gl_account_id or not credit_gl_account_id:
+                from apps.finance.application.account_resolver import resolve_account
+                try:
+                    # بلا `prefix` عمداً: إن لم يُعرَّف حساب لإيراد الغرامات فلا
+                    # نُرحّلها على أول حساب إيراد صادفناه — الغرامة تُسجَّل بلا قيد
+                    # وتظهر في الشاشة «بلا قيد» حتى تضبط المالية حسابها الصحيح.
+                    debit_gl_account_id = debit_gl_account_id or resolve_account(
+                        tenant_id, 'receivable').id
+                    credit_gl_account_id = credit_gl_account_id or resolve_account(
+                        tenant_id, 'fine_revenue').id
+                except Exception:  # noqa: BLE001 — نقص الدليل المحاسبي لا يمنع تسجيل الغرامة
+                    debit_gl_account_id = credit_gl_account_id = None
+
+            FineService.calculate_and_post_fine(
+                tenant_id=tenant_id,
+                borrow_transaction_id=tx.id,
+                days_overdue=days_overdue,
+                fine_per_day=fine_rate,
+                debit_gl_account_id=debit_gl_account_id,
+                credit_gl_account_id=credit_gl_account_id,
+                user_id=user_id
+            )
 
         return tx
 
@@ -112,6 +127,12 @@ class FineService:
         # 2. توليد القيد المالي في الحسابات العامة
         # الجانب المدين (Debit): حساب ذمم الطلاب أو المستعيرين (Receivable)
         # الجانب الدائن (Credit): حساب إيرادات غرامات المكتبة
+        #
+        # الغرامة سُجّلت أعلاه على أي حال. أما القيد فلا يُنشأ بلا حسابين
+        # صحيحين — قيد ناقص أسوأ من غيابه، والغرامة تظهر «بلا قيد» في الشاشة.
+        if not debit_gl_account_id or not credit_gl_account_id:
+            return fine
+
         journal_lines = [
             {
                 'account_id': debit_gl_account_id,

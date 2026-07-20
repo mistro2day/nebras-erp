@@ -2,7 +2,9 @@ from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 
+from apps.common.responses import StandardResponse
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.clinic.domain.models import (
     Clinic, ClinicRoom, MedicalStaff, MedicalProfile, ClinicVisit,
@@ -49,6 +51,19 @@ class MedicalProfileViewSet(BaseCRUDViewSet):
 class ClinicVisitViewSet(BaseCRUDViewSet):
     model_class = ClinicVisit
     serializer_class = ClinicVisitSerializer
+
+    @action(detail=False, methods=['get'], url_path='people')
+    def people(self, request):
+        """الطلاب والموظفون في قائمة واحدة — من يُستقبل في العيادة.
+
+        تُجمع هنا لتفادي اعتماد شاشة العيادة على صلاحيات موديولَي الطلاب
+        وشؤون الموظفين، ولتُعرض الأسماء بدل المعرّفات الخام.
+        """
+        from apps.shared.application.people import list_people
+        return StandardResponse(
+            list_people(request.tenant_id),
+            message="الطلاب والموظفون المتاحون للعيادة.",
+        )
 
     @action(detail=False, methods=['get'], url_path='dashboard-stats')
     def get_dashboard_stats(self, request):

@@ -1043,20 +1043,24 @@ export class StudentDetailsComponent implements OnInit {
       }
     });
 
-    // جلب زيارات العيادة الخاصة بالطالب
-    this.clinicService.getVisits().subscribe((visits) => {
-      if (visits) {
-        this.studentVisits.set(visits.filter((v: any) => v.patient_user_id === this.id));
-      }
+    // الاستجابات مغلّفة بـ StandardResponse — نستخرج الصفوف قبل الترشيح
+    const rows = (d: any) => (Array.isArray(d) ? d : (d?.data ?? d?.results ?? []));
+
+    // زيارات العيادة الخاصة بهذا الطالب — يُطابَق نوع الشخص أيضاً لأن
+    // المعرّفات قد تتشابه بين الطلاب والموظفين في جداول مختلفة
+    this.clinicService.getVisits().subscribe((res) => {
+      this.studentVisits.set(
+        rows(res).filter((v: any) => v.patient_user_id === this.id && v.patient_type === 'student'),
+      );
     });
 
-    // جلب كتب واستعارات المكتبة الخاصة بالطالب
-    this.libraryService.getBooks().subscribe(b => this.books.set(b || []));
-    this.libraryService.getCopies().subscribe(c => this.copies.set(c || []));
-    this.libraryService.getBorrowTransactions().subscribe((borrows) => {
-      if (borrows) {
-        this.studentBorrows.set(borrows.filter((b: any) => b.borrower_user_id === this.id));
-      }
+    // كتب المكتبة واستعارات هذا الطالب
+    this.libraryService.getBooks().subscribe((res) => this.books.set(rows(res)));
+    this.libraryService.getCopies().subscribe((res) => this.copies.set(rows(res)));
+    this.libraryService.getBorrows().subscribe((res) => {
+      this.studentBorrows.set(
+        rows(res).filter((b: any) => b.borrower_user_id === this.id && b.borrower_type === 'student'),
+      );
     });
     
     // جلب الحساب المالي والفواتير الصادرة للطالب (عبر خدمة فوترة الطلاب — المسار الصحيح مع المعترضات)

@@ -189,6 +189,10 @@ class BorrowTransaction(CombinedSharedModel):
     )
     copy = models.ForeignKey(BookCopy, on_delete=models.PROTECT, related_name='borrows', verbose_name="نسخة الكتاب")
     borrower_user_id = models.UUIDField(db_index=True, verbose_name="معرف المستعير (طالب/معلم/موظف)")
+    borrower_type = models.CharField(max_length=20,
+                                    choices=(('student', 'طالب'), ('employee', 'موظف/معلم')),
+                                    default='student', db_index=True,
+                                    verbose_name="نوع المستعير — يحدّد أي سجل يُقرأ منه الاسم")
     borrow_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الاستعارة")
     due_date = models.DateField(verbose_name="تاريخ الإرجاع المستحق")
     actual_return_date = models.DateField(blank=True, null=True, verbose_name="تاريخ الإرجاع الفعلي")

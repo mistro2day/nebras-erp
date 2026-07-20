@@ -68,9 +68,28 @@ class BookCopySerializer(BaseLibrarySerializer):
         fields = '__all__'
 
 class BorrowTransactionSerializer(BaseLibrarySerializer):
+    # اسم المستعير وعنوان الكتاب يُرفقان مع كل سطر — بدونهما تعرض الشاشة
+    # معرّفات خاماً، وتضطر لاستدعاء منفصل لكل صف.
+    borrower_name = serializers.SerializerMethodField()
+    book_title = serializers.SerializerMethodField()
+    barcode = serializers.CharField(source='copy.barcode', read_only=True)
+
     class Meta(BaseLibrarySerializer.Meta):
         model = BorrowTransaction
         fields = '__all__'
+
+    def get_borrower_name(self, obj):
+        from apps.shared.application.people import resolve_person
+        index = self.context.get('people_index')
+        if index is None:
+            from apps.shared.application.people import build_people_index
+            index = build_people_index(obj.tenant_id)
+            self.context['people_index'] = index
+        return resolve_person(index, obj.borrower_type, obj.borrower_user_id)['name']
+
+    def get_book_title(self, obj):
+        book = getattr(getattr(obj, 'copy', None), 'book', None)
+        return getattr(book, 'title_ar', None) or getattr(book, 'title_en', None) or '—'
 
 class ReservationSerializer(BaseLibrarySerializer):
     class Meta(BaseLibrarySerializer.Meta):

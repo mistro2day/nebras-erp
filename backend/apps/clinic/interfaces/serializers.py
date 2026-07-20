@@ -28,12 +28,35 @@ class MedicalStaffSerializer(BaseClinicSerializer):
         model = MedicalStaff
         fields = '__all__'
 
-class MedicalProfileSerializer(BaseClinicSerializer):
+class PatientNameMixin(serializers.Serializer):
+    """يُرفق اسم المريض مع كل سطر بدل تركه معرّفاً خاماً.
+
+    الخريطة تُبنى مرة واحدة وتُخزَّن في سياق المُسلسِل، فلا يُستعلم لكل صف.
+    """
+    patient_name = serializers.SerializerMethodField()
+    patient_type_label = serializers.SerializerMethodField()
+
+    def _person(self, obj):
+        from apps.shared.application.people import build_people_index, resolve_person
+        index = self.context.get('people_index')
+        if index is None:
+            index = build_people_index(obj.tenant_id)
+            self.context['people_index'] = index
+        return resolve_person(index, getattr(obj, 'patient_type', 'student'), obj.patient_user_id)
+
+    def get_patient_name(self, obj):
+        return self._person(obj)['name']
+
+    def get_patient_type_label(self, obj):
+        return self._person(obj)['type_label']
+
+
+class MedicalProfileSerializer(PatientNameMixin, BaseClinicSerializer):
     class Meta(BaseClinicSerializer.Meta):
         model = MedicalProfile
         fields = '__all__'
 
-class ClinicVisitSerializer(BaseClinicSerializer):
+class ClinicVisitSerializer(PatientNameMixin, BaseClinicSerializer):
     class Meta(BaseClinicSerializer.Meta):
         model = ClinicVisit
         fields = '__all__'
@@ -128,7 +151,7 @@ class EmergencyContactSerializer(BaseClinicSerializer):
         model = EmergencyContact
         fields = '__all__'
 
-class MedicalLeaveSerializer(BaseClinicSerializer):
+class MedicalLeaveSerializer(PatientNameMixin, BaseClinicSerializer):
     class Meta(BaseClinicSerializer.Meta):
         model = MedicalLeave
         fields = '__all__'

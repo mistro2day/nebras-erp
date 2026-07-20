@@ -1,8 +1,12 @@
+import uuid
+
 from rest_framework import status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from django.core.exceptions import ValidationError as DjangoValidationError
 
+from apps.common.responses import StandardResponse
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.library.domain.models import (
     LibraryBranch, LibrarySection, Shelf, Book, BookCopy, BookEdition,
@@ -112,17 +116,30 @@ class BookCopyViewSet(BaseCRUDViewSet):
         loan_period_days = request.data.get('loan_period_days', 14)
 
         if not borrower_user_id_str:
-            return Response({'error': 'borrower_user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'يجب تحديد المستعير.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        borrower_user_id = uuid.UUID(borrower_user_id_str)
+        try:
+            borrower_user_id = uuid.UUID(str(borrower_user_id_str))
+        except (ValueError, AttributeError, TypeError):
+            return Response({'error': 'معرّف المستعير غير صالح.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        tx = BorrowService.borrow_book(
-            tenant_id=tenant_id,
-            copy_id=pk,
-            borrower_user_id=borrower_user_id,
-            loan_period_days=loan_period_days,
-            user_id=request.user.id if request.user else None
-        )
+        try:
+            tx = BorrowService.borrow_book(
+                tenant_id=tenant_id,
+                copy_id=pk,
+                borrower_user_id=borrower_user_id,
+                loan_period_days=int(loan_period_days or 14),
+                user_id=request.user.id if request.user else None
+            )
+        except DjangoValidationError as exc:
+            return Response({'error': '، '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # نوع المستعير يُحفظ بعد الإنشاء ليُقرأ منه الاسم لاحقاً من السجل الصحيح
+        borrower_type = request.data.get('borrower_type')
+        if borrower_type in ('student', 'employee'):
+            tx.borrower_type = borrower_type
+            tx.save(update_fields=['borrower_type'])
+
         serializer = BorrowTransactionSerializer(tx)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -130,6 +147,19 @@ class BookCopyViewSet(BaseCRUDViewSet):
 class BorrowTransactionViewSet(BaseCRUDViewSet):
     model_class = BorrowTransaction
     serializer_class = BorrowTransactionSerializer
+
+    @action(detail=False, methods=['get'], url_path='people')
+    def people(self, request):
+        """الطلاب والموظفون في قائمة واحدة — من يحقّ له الاستعارة.
+
+        تُجمع هنا لتفادي اعتماد شاشة المكتبة على صلاحيات موديولَي الطلاب
+        وشؤون الموظفين، ولتُعرض الأسماء بدل المعرّفات الخام.
+        """
+        from apps.shared.application.people import list_people
+        return StandardResponse(
+            list_people(request.tenant_id),
+            message="الطلاب والموظفون المتاحون للاستعارة.",
+        )
 
     @action(detail=True, methods=['post'], url_path='return')
     def return_book(self, request, pk=None):

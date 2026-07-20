@@ -1,488 +1,308 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ClinicService } from './clinic.service';
-import { StudentsService } from '../students/students.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
-import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
-import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
-import { NbModalComponent } from '../../shared/nebras/nb-modal.component';
-import { NbDrawerComponent } from '../../shared/nebras/nb-drawer.component';
+import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
+interface QueueRow {
+  id: string;
+  patient: string;
+  kind: string;
+  visitType: string;
+  status: string;
+  waitedMinutes: number;
+  urgent: boolean;
+}
+
+/**
+ * مساحة عمل العيادة.
+ *
+ * التوقيع البصري: «طابور اليوم» — العيادة مكان يُنتظر فيه، والسؤال العملي
+ * ليس كم زيارة سُجّلت بل مَن ينتظر الآن ومنذ متى. لذلك تُرتَّب الحالات
+ * المفتوحة بطول الانتظار، وتُبرز الطارئة فوقها جميعاً.
+ */
 @Component({
   selector: 'app-clinic-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    CommonModule,
-    FormsModule,
-    NbPageHeaderComponent,
-    NbPanelComponent,
-    NbStatCardComponent,
-    NbModalComponent,
-    NbDrawerComponent
-  ],
+  imports: [CommonModule, NbPageHeaderComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
-        title="نظام العيادة المدرسية والسجلات الصحية (SHIS)"
-        subtitle="مراقبة الزيارات الطبية اليومية، الحالات الطارئة، صرف الأدوية والمستلزمات، واعتماد التقارير والإجازات المرضية"
-      >
-        <div class="actions-group">
-          <button class="nb-btn-primary" (click)="openNewVisitModal()">🩺 تسجيل زيارة جديدة</button>
-          <button class="nb-btn-secondary" (click)="loadDashboard()">🔄 تحديث البيانات</button>
-        </div>
+        title="العيادة المدرسية"
+        subtitle="زيارات الطلاب والموظفين، صرف الأدوية، والإجازات المرضية.">
+        <button class="btn ghost" (click)="load()">تحديث</button>
+        <button class="btn primary" (click)="go('/clinic/visits')">الزيارات</button>
       </nb-page-header>
 
-      @if (clinicService.stats(); as stats) {
-        <div class="stats-grid">
-          <nb-stat-card label="زيارات اليوم" [value]="stats.today_visits" suffix="زيارة" valueKind="info"></nb-stat-card>
-          <nb-stat-card label="الحالات الإسعافية" [value]="stats.emergency_cases" suffix="حالة" [valueKind]="stats.emergency_cases ? 'danger' : 'default'"></nb-stat-card>
-          <nb-stat-card label="حالات العزل الوقائي" [value]="stats.active_isolations" suffix="نشطة" [valueKind]="stats.active_isolations ? 'warning' : 'default'"></nb-stat-card>
-          <nb-stat-card label="تقارير وإجازات معلقة" [value]="stats.pending_leaves" suffix="إجازة" [valueKind]="stats.pending_leaves ? 'warning' : 'default'"></nb-stat-card>
-        </div>
+      @if (!loading() && pendingLeaves().length > 0) {
+        <button class="alert" (click)="go('/clinic/leaves')">
+          <span class="a-ic">◔</span>
+          <span class="a-body">
+            <strong>{{ pendingLeaves().length }}</strong> إجازة مرضية بانتظار اعتماد الطبيب.
+            <span class="a-hint">الاعتماد يُبرّر غياب المريض تلقائياً في الحضور.</span>
+          </span>
+          <span class="a-go">مراجعة الإجازات ‹</span>
+        </button>
       }
 
-      <div class="grid-layout">
-        <!-- سجل الزيارات -->
-        <nb-panel title="سجل مراجعات وزيارات العيادة الحديثة" [flush]="true">
-          <div class="tbl">
-            <div class="tbl-head">
-              <span>المريض</span>
-              <span>نوع الزيارة</span>
-              <span>الحالة</span>
-              <span>الإجراءات</span>
-            </div>
-            @for (row of visits(); track row.id) {
-              <div class="tbl-row" (click)="selectVisit(row)">
-                <span class="strong text-indigo">{{ getStudentName(row.patient_user_id) }}</span>
-                <span>
-                  <span [class]="getVisitTypeClass(row.visit_type)">{{ getVisitTypeText(row.visit_type) }}</span>
-                </span>
-                <span>
-                  <span [class]="getStatusClass(row.status)">{{ getStatusText(row.status) }}</span>
-                </span>
-                <span class="row-actions" (click)="$event.stopPropagation()">
-                  <button class="nb-btn-secondary nb-btn-compact" (click)="openDispenseModal(row)">💊 صرف دواء</button>
-                </span>
-              </div>
-            }
-            @if (visits().length === 0) { <div class="tbl-empty">لا توجد زيارات مسجلة اليوم.</div> }
-          </div>
-        </nb-panel>
+      <section class="kpis">
+        <button class="kpi" (click)="go('/clinic/visits')">
+          <span class="k-label">زيارات اليوم</span>
+          <span class="k-val">{{ todayCount() }}</span>
+          <span class="k-hint">من إجمالي {{ visits().length }} زيارة مسجّلة</span>
+        </button>
+        <button class="kpi" [class.warn]="queue().length > 0" (click)="go('/clinic/visits')">
+          <span class="k-label">في الانتظار الآن</span>
+          <span class="k-val">{{ queue().length }}</span>
+          <span class="k-hint">لم تُغلق زيارتهم بعد</span>
+        </button>
+        <button class="kpi" [class.danger]="urgentCount() > 0" (click)="go('/clinic/visits')">
+          <span class="k-label">حالات طارئة</span>
+          <span class="k-val">{{ urgentCount() }}</span>
+          <span class="k-hint">تحتاج أولوية فورية</span>
+        </button>
+        <button class="kpi" (click)="go('/clinic/leaves')">
+          <span class="k-label">إجازات معتمدة</span>
+          <span class="k-val">{{ approvedLeaves() }}</span>
+          <span class="k-hint">أثّرت في سجل الحضور</span>
+        </button>
+      </section>
 
-        <!-- الإجازات المرضية -->
-        <nb-panel title="الطلبات والتقارير الطبية المعلقة" [flush]="true">
-          <div class="tbl">
-            <div class="tbl-head">
-              <span>المريض</span>
-              <span>الفترة</span>
-              <span>السبب</span>
-              <span>الإجراء</span>
-            </div>
-            @for (row of leaves(); track row.id) {
-              <div class="tbl-row">
-                <span class="strong">{{ getStudentName(row.patient_user_id) }}</span>
-                <span>من {{ row.start_date }} إلى {{ row.end_date }}</span>
-                <span>{{ row.reason }}</span>
-                <span>
-                  @if (row.status === 'submitted') {
-                    <button class="nb-btn-primary nb-btn-compact success" (click)="approveLeave(row.id)">✅ اعتماد</button>
-                  } @else {
-                    <span class="nb-badge-success">معتمد</span>
-                  }
-                </span>
-              </div>
-            }
-            @if (leaves().length === 0) { <div class="tbl-empty">لا توجد طلبات إجازة معلقة.</div> }
+      <!-- التوقيع: طابور اليوم -->
+      <section class="panel">
+        <div class="p-head">
+          <div>
+            <h3>طابور العيادة</h3>
+            <p>الحالات المفتوحة مرتّبة بطول الانتظار — الطارئ أولاً.</p>
           </div>
-        </nb-panel>
-      </div>
+          <div class="legend">
+            <span><i class="sw urg"></i>طارئ</span>
+            <span><i class="sw wait"></i>انتظار طويل</span>
+            <span><i class="sw ok"></i>ضمن المعتاد</span>
+          </div>
+        </div>
+
+        @if (loading()) {
+          <nb-loading message="جارٍ تحميل طابور العيادة…"></nb-loading>
+        } @else if (!queue().length) {
+          <div class="empty">
+            <p>لا أحد في الانتظار.</p>
+            <p class="hint">كل الزيارات المسجّلة أُغلقت. تُفتح زيارة جديدة من صفحة الزيارات.</p>
+          </div>
+        } @else {
+          <div class="queue">
+            @for (q of queue(); track q.id) {
+              <button class="qrow" [class.urgent]="q.urgent" [class.long]="q.waitedMinutes >= 30"
+                (click)="go('/clinic/visits')">
+                <span class="q-who">
+                  <strong>{{ q.patient }}</strong>
+                  <span class="q-meta">{{ q.kind }} · {{ q.visitType }}</span>
+                </span>
+                <span class="q-bar">
+                  <span class="q-fill" [style.width.%]="waitWidth(q)"></span>
+                </span>
+                <span class="q-wait">
+                  <strong>{{ q.waitedMinutes }}</strong>
+                  <span class="q-unit">دقيقة انتظار</span>
+                </span>
+                <span class="q-state">
+                  @if (q.urgent) { <span class="tag urg">طارئ</span> }
+                  @else { <span class="tag st">{{ statusText(q.status) }}</span> }
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
+      <h3 class="sec-title">إدارة العيادة</h3>
+      <section class="tiles">
+        @for (t of tiles; track t.route) {
+          <button class="tile" (click)="go(t.route)">
+            <span class="t-ic">{{ t.icon }}</span>
+            <span class="t-title">{{ t.title }}</span>
+            <span class="t-desc">{{ t.desc }}</span>
+          </button>
+        }
+      </section>
     </div>
-
-    <!-- نافذة تسجيل زيارة جديدة -->
-    <nb-modal [open]="isNewVisitModalOpen()" title="تسجيل زيارة طبية جديدة" subtitle="إدخال بيانات الكشف وتوثيق الزيارة" (closed)="isNewVisitModalOpen.set(false)">
-      <div class="form-container">
-        <div class="form-group" style="position: relative;">
-          <label>البحث واختيار الطالب / المريض</label>
-          <input type="text" [(ngModel)]="patientSearchQuery" (focus)="showPatientDropdown.set(true)" placeholder="اكتب اسم الطالب للبحث..." class="nb-input" />
-          @if (showPatientDropdown()) {
-            <div class="search-dropdown">
-              @for (s of filteredStudents(patientSearchQuery); track s.id) {
-                <div class="dropdown-item" (click)="selectPatient(s)">
-                  {{ s.profile.arabic_name }} ({{ s.student_number }})
-                </div>
-              }
-              @if (filteredStudents(patientSearchQuery).length === 0) {
-                <div class="dropdown-empty">لا توجد نتائج مطابقة</div>
-              }
-            </div>
-          }
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>نوع الزيارة</label>
-            <select [(ngModel)]="newVisitData.visit_type" class="nb-input">
-              <option value="walk_in">حالة طارئة/عابرة</option>
-              <option value="scheduled">موعد كشف دوري</option>
-              <option value="emergency">حالة طارئة جداً</option>
-              <option value="follow_up">متابعة حالة</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>العيادة</label>
-            <select [(ngModel)]="newVisitData.clinic_id" class="nb-input">
-              @for (c of clinics(); track c.id) {
-                <option [value]="c.id">{{ c.name_ar }}</option>
-              }
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>ملاحظات الكشف والأعراض</label>
-          <textarea [(ngModel)]="newVisitData.notes" placeholder="اكتب شكوى المريض أو الأعراض الطارئة هنا..." class="nb-input" rows="3"></textarea>
-        </div>
-      </div>
-      <div modal-actions>
-        <button class="nb-btn-secondary" (click)="isNewVisitModalOpen.set(false)">إلغاء</button>
-        <button class="nb-btn-primary" (click)="submitNewVisit()">حفظ الزيارة</button>
-      </div>
-    </nb-modal>
-
-    <!-- نافذة صرف الدواء -->
-    <nb-modal [open]="isDispenseModalOpen()" title="💊 صرف دواء ومستلزمات علاجية" subtitle="خصم فوري وتلقائي من مستودع العيادة" (closed)="isDispenseModalOpen.set(false)">
-      <div class="form-container">
-        <p class="summary-text">صرف دواء للمريض: <strong class="text-indigo">{{ getStudentName(selectedVisitForDispense()?.patient_user_id) }}</strong></p>
-        <div class="form-group">
-          <label>البند الطبي / الدواء</label>
-          <select [(ngModel)]="dispenseData.medication_id" class="nb-input">
-            <option value="">-- اختر الدواء --</option>
-            @for (m of medications(); track m.id) {
-              <option [value]="m.id">{{ m.trade_name }} ({{ m.generic_name }})</option>
-            }
-          </select>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>الكمية المصروفة</label>
-            <input type="number" [(ngModel)]="dispenseData.quantity" min="1" class="nb-input" />
-          </div>
-          <div class="form-group">
-            <label>المستودع</label>
-            <input type="text" [(ngModel)]="dispenseData.warehouse_id" placeholder="اختياري (معرف المستودع)" class="nb-input" />
-          </div>
-        </div>
-      </div>
-      <div modal-actions>
-        <button class="nb-btn-secondary" (click)="isDispenseModalOpen.set(false)">إلغاء</button>
-        <button class="nb-btn-primary" (click)="submitDispenseMedication()">تأكيد الصرف</button>
-      </div>
-    </nb-modal>
-
-    <!-- لوح تفاصيل الزيارة منزلق -->
-    <nb-drawer [open]="!!selectedVisit()" [title]="'تفاصيل الزيارة الطبية'" [subtitle]="'سجل المريض وبياناته الحيوية'" (closed)="selectedVisit.set(null)">
-      @if (selectedVisit(); as visit) {
-        <div class="visit-detail-sheet">
-          <div class="detail-card">
-            <h3>الملف الأساسي</h3>
-            <p><strong>المريض:</strong> {{ getStudentName(visit.patient_user_id) }}</p>
-            <p><strong>نوع الزيارة:</strong> <span [class]="getVisitTypeClass(visit.visit_type)">{{ getVisitTypeText(visit.visit_type) }}</span></p>
-            <p><strong>الحالة الحالية:</strong> <span [class]="getStatusClass(visit.status)">{{ getStatusText(visit.status) }}</span></p>
-            <p><strong>وقت الدخول:</strong> {{ visit.check_in_time | date:'medium' }}</p>
-          </div>
-
-          @if (visit.notes) {
-            <div class="detail-card">
-              <h3>ملاحظات الكشف والأعراض</h3>
-              <p class="notes-content">{{ visit.notes }}</p>
-            </div>
-          }
-        </div>
-      }
-      <div drawer-actions>
-        <button class="nb-btn-secondary" (click)="selectedVisit.set(null)">إغلاق</button>
-      </div>
-    </nb-drawer>
   `,
   styles: [`
-    .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-    .actions-group { display: flex; gap: 8px; }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
+    .page { flex: 1; padding: 22px; overflow-y: auto; background: var(--nb-bg); font-family: var(--nb-font-family); }
+    .btn { font-family: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px;
+      border-radius: var(--nb-radius); cursor: pointer; border: none; }
+    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn.primary { background: var(--nb-primary-600); color: #fff; }
+
+    .alert { display: flex; align-items: center; gap: 14px; width: 100%; text-align: start;
+      font-family: inherit; cursor: pointer; background: var(--nb-primary-50, #f5f6ff);
+      border: 1px solid var(--nb-primary-100, #e3e6fb);
+      border-inline-start: 4px solid var(--nb-primary-500);
+      border-radius: var(--nb-radius-card); padding: 13px 16px; margin-bottom: 16px; }
+    .a-ic { font-size: 18px; color: var(--nb-primary-700); }
+    .a-body { flex: 1; font-size: 13px; color: var(--nb-text); }
+    .a-body strong { font-weight: 800; }
+    .a-hint { color: var(--nb-text-muted); margin-inline-start: 6px; }
+    .a-go { font-size: 12px; font-weight: 700; color: var(--nb-primary-700); }
+
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+    .kpi { text-align: start; font-family: inherit; cursor: pointer;
+      background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 3px;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(48,63,159,.1);
+      border-color: var(--nb-primary-400); }
+    .kpi:focus-visible { outline: 2px solid var(--nb-primary-500); outline-offset: 2px; }
+    .kpi.warn { border-color: #fde9c8; background: #fffdf8; }
+    .kpi.danger { border-color: #fecaca; background: #fffafa; }
+    .k-label { font-size: 12px; font-weight: 700; color: var(--nb-text-muted); }
+    .k-val { font-size: 25px; font-weight: 800; color: var(--nb-text); line-height: 1.15;
+      font-variant-numeric: tabular-nums; }
+    .k-hint { font-size: 11px; color: var(--nb-text-muted); }
+
+    .panel { background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 16px 18px; margin-bottom: 20px; }
+    .p-head { display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .p-head h3 { margin: 0 0 2px; font-size: 15px; font-weight: 700; color: var(--nb-text); }
+    .p-head p { margin: 0; font-size: 12px; color: var(--nb-text-muted); }
+    .legend { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--nb-text-muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    .sw.urg { background: #DC2626; } .sw.wait { background: #F59E0B; } .sw.ok { background: #16A34A; }
+
+    .queue { display: flex; flex-direction: column; }
+    .qrow { display: grid; grid-template-columns: 1.8fr 1.8fr 1fr 0.9fr; align-items: center; gap: 14px;
+      width: 100%; text-align: start; font-family: inherit; cursor: pointer; background: none;
+      border: none; border-top: 1px solid var(--nb-border-soft, #f0f1f5); padding: 11px 8px;
+      border-radius: 8px; transition: background .15s ease; }
+    .qrow:first-child { border-top: none; }
+    .qrow:hover { background: var(--nb-surface-raised); }
+    .qrow:focus-visible { outline: 2px solid var(--nb-primary-500); outline-offset: -2px; }
+    .qrow.urgent { background: #fffafa; }
+    @media (max-width: 820px) { .qrow { grid-template-columns: 1fr 1fr; row-gap: 8px; } }
+
+    .q-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .q-who strong { font-size: 13px; font-weight: 700; color: var(--nb-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .q-meta { font-size: 11px; color: var(--nb-text-muted); }
+
+    .q-bar { position: relative; height: 8px; border-radius: 5px; background: #eef0f5; }
+    .q-fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 5px;
+      background: #16A34A; transition: width .5s cubic-bezier(.4,0,.2,1); }
+    .qrow.long .q-fill { background: #F59E0B; }
+    .qrow.urgent .q-fill { background: #DC2626; }
+
+    .q-wait { display: flex; flex-direction: column; gap: 0; }
+    .q-wait strong { font-size: 16px; font-weight: 800; color: var(--nb-text);
+      font-variant-numeric: tabular-nums; }
+    .q-unit { font-size: 10.5px; color: var(--nb-text-muted); }
+    .q-state { text-align: end; }
+
+    .tag { font-size: 11px; font-weight: 700; border-radius: 20px; padding: 3px 10px; display: inline-block; }
+    .tag.urg { background: #fef2f2; color: #B91C1C; }
+    .tag.st { background: var(--nb-primary-50); color: var(--nb-primary-700); }
+
+    .empty { padding: 26px; text-align: center; }
+    .empty p { margin: 0 0 4px; font-size: 13px; color: var(--nb-text); }
+    .empty .hint { font-size: 12px; color: var(--nb-text-muted); }
+
+    .sec-title { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
+    .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+    .tile { text-align: start; font-family: inherit; cursor: pointer; background: var(--nb-surface);
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px;
+      display: flex; flex-direction: column; gap: 3px;
+      transition: transform .15s ease, box-shadow .15s ease; }
+    .tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(48,63,159,.1);
+      border-color: var(--nb-primary-400); }
+    .t-ic { font-size: 19px; }
+    .t-title { font-size: 13px; font-weight: 700; color: var(--nb-text); }
+    .t-desc { font-size: 11px; color: var(--nb-text-muted); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .kpi, .tile, .qrow, .q-fill { transition: none; }
+      .kpi:hover, .tile:hover { transform: none; }
     }
-    .grid-layout {
-      display: grid;
-      grid-template-columns: 1.5fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 992px) {
-      .grid-layout { grid-template-columns: 1fr; }
-    }
-    .tbl { display: flex; flex-direction: column; }
-    .tbl-head, .tbl-row {
-      display: grid;
-      grid-template-columns: 1.5fr 1.2fr 1.2fr 1fr;
-      gap: 8px;
-      padding: 10px 16px;
-      align-items: center;
-    }
-    .tbl-head {
-      background: var(--nb-surface-raised);
-      border-bottom: 1px solid var(--nb-border-soft);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--nb-text-muted);
-    }
-    .tbl-row {
-      border-bottom: 1px solid var(--nb-border-row);
-      font-size: 13px;
-      color: var(--nb-text);
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-    .tbl-row:last-child { border-bottom: none; }
-    .tbl-row:hover { background: var(--nb-surface-raised); }
-    .strong { font-weight: 600; }
-    .text-indigo { color: var(--nb-primary-600); }
-    .tbl-empty { padding: 32px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
-    
-    .nb-input {
-      width: 100%;
-      height: var(--nb-input-height);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius);
-      padding: 0 10px;
-      font-size: 13px;
-      outline: none;
-      background: var(--nb-surface);
-      color: var(--nb-text);
-      font-family: var(--nb-font-family);
-    }
-    .nb-input:focus { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); }
-    textarea.nb-input { height: auto; padding: 10px; }
-    
-    .form-container { display: flex; flex-direction: column; gap: 14px; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .form-group { display: flex; flex-direction: column; gap: 4px; }
-    .form-group label { font-size: 11.5px; font-weight: 600; color: var(--nb-text-secondary); }
-    
-    .summary-text { font-size: 13px; color: var(--nb-text-secondary); margin-bottom: 8px; }
-    
-    .visit-detail-sheet { display: flex; flex-direction: column; gap: 12px; }
-    .detail-card {
-      background: var(--nb-surface-raised);
-      border: 1px solid var(--nb-border-soft);
-      border-radius: var(--nb-radius-card);
-      padding: 14px;
-    }
-    .detail-card h3 { font-size: 13.5px; font-weight: 700; margin: 0 0 10px 0; color: var(--nb-text); border-bottom: 1px solid var(--nb-border-soft); padding-bottom: 6px; }
-    .detail-card p { margin: 6px 0; font-size: 13px; color: var(--nb-text-secondary); }
-    .notes-content { background: var(--nb-surface); padding: 10px; border-radius: var(--nb-radius); border: 1px solid var(--nb-border); font-style: italic; }
-    
-    .nb-btn-compact.success {
-      background: var(--nb-success-bg);
-      color: var(--nb-success);
-      border: 1px solid var(--nb-success);
-    }
-    .nb-btn-compact.success:hover {
-      background: var(--nb-success);
-      color: #fff;
-    }
-    
-    .search-dropdown {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: var(--nb-surface);
-      border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius);
-      box-shadow: var(--nb-shadow-dialog);
-      z-index: 10;
-      max-height: 180px;
-      overflow-y: auto;
-    }
-    .dropdown-item {
-      padding: 8px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--nb-text);
-      transition: background 0.15s ease;
-    }
-    .dropdown-item:hover {
-      background: var(--nb-primary-50);
-      color: var(--nb-primary-600);
-    }
-    .dropdown-empty {
-      padding: 10px;
-      font-size: 12px;
-      color: var(--nb-text-muted);
-      text-align: center;
-    }
-  `]
+  `],
 })
 export class ClinicDashboardComponent implements OnInit {
-  clinicService = inject(ClinicService);
-  studentsService = inject(StudentsService);
+  private svc = inject(ClinicService);
+  private router = inject(Router);
 
-  visits = signal<any[]>([]);
-  leaves = signal<any[]>([]);
-  clinics = signal<any[]>([]);
-  medications = signal<any[]>([]);
+  readonly loading = signal(true);
+  readonly visits = signal<any[]>([]);
+  private leaves = signal<any[]>([]);
 
-  isNewVisitModalOpen = signal(false);
-  isDispenseModalOpen = signal(false);
-  
-  selectedVisit = signal<any | null>(null);
-  selectedVisitForDispense = signal<any | null>(null);
+  readonly tiles = [
+    { icon: '🩺', title: 'الزيارات', desc: 'تسجيل الزيارات والمؤشرات وصرف الدواء.', route: '/clinic/visits' },
+    { icon: '📄', title: 'الإجازات المرضية', desc: 'اعتمادها يُبرّر الغياب تلقائياً.', route: '/clinic/leaves' },
+    { icon: '💊', title: 'مخزون الأدوية', desc: 'أرصدة العيادة في المستودعات.', route: '/inventory/items' },
+  ];
 
-  newVisitData = {
-    patient_user_id: '',
-    visit_type: 'walk_in',
-    clinic_id: '',
-    notes: ''
-  };
+  private today(): string { return new Date().toISOString().slice(0, 10); }
 
-  patientSearchQuery = '';
-  showPatientDropdown = signal(false);
+  readonly todayCount = computed(
+    () => this.visits().filter((v) => v.visit_date === this.today()).length,
+  );
 
-  dispenseData = {
-    medication_id: '',
-    quantity: 1,
-    warehouse_id: ''
-  };
+  /** الزيارة المفتوحة هي من لم يُسجَّل خروجه بعد. */
+  readonly queue = computed<QueueRow[]>(() =>
+    this.visits()
+      .filter((v) => !['discharged', 'closed', 'cancelled'].includes(v.status))
+      .map((v) => {
+        const start = v.check_in_time ? new Date(v.check_in_time).getTime() : Date.now();
+        const waited = Math.max(0, Math.round((Date.now() - start) / 60000));
+        return {
+          id: v.id,
+          patient: v.patient_name || 'غير معروف',
+          kind: v.patient_type_label || '—',
+          visitType: this.visitTypeText(v.visit_type),
+          status: v.status,
+          waitedMinutes: waited,
+          urgent: v.visit_type === 'emergency',
+        };
+      })
+      .sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || b.waitedMinutes - a.waitedMinutes),
+  );
 
-  ngOnInit() {
-    this.loadDashboard();
-    this.loadMetadata();
+  readonly urgentCount = computed(() => this.queue().filter((q) => q.urgent).length);
+  readonly pendingLeaves = computed(
+    () => this.leaves().filter((l) => ['draft', 'submitted', 'pending'].includes(l.status)),
+  );
+  readonly approvedLeaves = computed(
+    () => this.leaves().filter((l) => l.status === 'approved').length,
+  );
+
+  /** الشريط يمثّل طول الانتظار مقابل ساعة كاملة. */
+  waitWidth(q: QueueRow): number {
+    return Math.max(4, Math.min(100, (q.waitedMinutes / 60) * 100));
   }
 
-  loadDashboard() {
-    this.clinicService.getDashboardStats().subscribe();
-    this.clinicService.getVisits().subscribe(data => this.visits.set(data));
-    this.clinicService.getLeaves().subscribe(data => this.leaves.set(data));
-    this.studentsService.getStudents({ page_size: 500 }).subscribe();
+  statusText(s: string): string {
+    return ({ checked_in: 'بانتظار الفحص', in_progress: 'قيد الفحص', diagnosed: 'شُخِّص',
+      discharged: 'خرج', closed: 'مغلقة', cancelled: 'ملغاة' } as any)[s] || s;
+  }
+  visitTypeText(t: string): string {
+    return ({ walk_in: 'زيارة عادية', emergency: 'طارئة', scheduled: 'موعد',
+      follow_up: 'متابعة' } as any)[t] || t;
   }
 
-  loadMetadata() {
-    this.clinicService.getMedications().subscribe(data => this.medications.set(data));
-    this.clinicService.getVisits().subscribe(() => {
-      this.clinics.set([{ id: 'default', name_ar: 'العيادة الرئيسية المدرسية' }]);
+  ngOnInit() { this.load(); }
+
+  load() {
+    this.loading.set(true);
+    const rows = (d: any) => (Array.isArray(d) ? d : (d?.data ?? d?.results ?? []));
+    this.svc.getVisits().subscribe({
+      next: (d) => { this.visits.set(rows(d)); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
+    this.svc.getLeaves().subscribe({ next: (d) => this.leaves.set(rows(d)), error: () => {} });
   }
 
-  filteredStudents(query: string): any[] {
-    const list = this.studentsService.students() || [];
-    if (!query) return list;
-    return list.filter(s => s.profile.arabic_name.includes(query) || s.student_number.includes(query));
-  }
-
-  selectPatient(student: any) {
-    this.newVisitData.patient_user_id = student.id;
-    this.patientSearchQuery = `${student.profile.arabic_name} (${student.student_number})`;
-    this.showPatientDropdown.set(false);
-  }
-
-  getStudentName(userId: string): string {
-    const s = (this.studentsService.students() || []).find(st => st.id === userId);
-    return s ? s.profile.arabic_name : (userId ? `${userId.slice(0, 8)}...` : 'غير معروف');
-  }
-
-  selectVisit(visit: any) {
-    this.selectedVisit.set(visit);
-  }
-
-  openNewVisitModal() {
-    this.newVisitData = {
-      patient_user_id: '',
-      visit_type: 'walk_in',
-      clinic_id: this.clinics()[0]?.id || '',
-      notes: ''
-    };
-    this.patientSearchQuery = '';
-    this.showPatientDropdown.set(false);
-    this.isNewVisitModalOpen.set(true);
-  }
-
-  submitNewVisit() {
-    if (!this.newVisitData.patient_user_id) return;
-    this.clinicService.recordVisit({
-      patient_user_id: this.newVisitData.patient_user_id,
-      visit_type: this.newVisitData.visit_type,
-      clinic: this.newVisitData.clinic_id,
-      notes: this.newVisitData.notes
-    }).subscribe(() => {
-      this.isNewVisitModalOpen.set(false);
-      this.loadDashboard();
-    });
-  }
-
-  openDispenseModal(visit: any) {
-    this.selectedVisitForDispense.set(visit);
-    this.dispenseData = {
-      medication_id: '',
-      quantity: 1,
-      warehouse_id: ''
-    };
-    this.isDispenseModalOpen.set(true);
-  }
-
-  submitDispenseMedication() {
-    const visit = this.selectedVisitForDispense();
-    if (!visit || !this.dispenseData.medication_id) return;
-    this.clinicService.dispenseMedication(visit.id, {
-      medication_id: this.dispenseData.medication_id,
-      quantity: this.dispenseData.quantity,
-      warehouse_id: this.dispenseData.warehouse_id || undefined
-    }).subscribe(() => {
-      this.isDispenseModalOpen.set(false);
-      this.loadDashboard();
-    });
-  }
-
-  approveLeave(leaveId: string) {
-    this.clinicService.approveMedicalLeave(leaveId).subscribe(() => {
-      this.loadDashboard();
-    });
-  }
-
-  getVisitTypeText(type: string): string {
-    switch (type) {
-      case 'walk_in': return 'حالة عابرة';
-      case 'scheduled': return 'موعد دوري';
-      case 'emergency': return 'حالة طارئة';
-      case 'follow_up': return 'متابعة';
-      default: return type;
-    }
-  }
-
-  getVisitTypeClass(type: string): string {
-    switch (type) {
-      case 'emergency': return 'nb-badge-danger';
-      case 'walk_in': return 'nb-badge-info';
-      default: return 'nb-badge-success';
-    }
-  }
-
-  getStatusText(status: string): string {
-    switch (status) {
-      case 'checked_in': return 'دخل العيادة';
-      case 'diagnosed': return 'تم التشخيص';
-      case 'discharged': return 'غادر العيادة';
-      case 'referred': return 'تمت الإحالة';
-      default: return status;
-    }
-  }
-
-  getStatusClass(status: string): string {
-    switch (status) {
-      case 'discharged': return 'nb-badge-success';
-      case 'referred': return 'nb-badge-warning';
-      default: return 'nb-badge-info';
-    }
-  }
+  go(route: string) { this.router.navigateByUrl(route); }
 }
-
-

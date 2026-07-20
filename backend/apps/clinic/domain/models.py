@@ -51,6 +51,10 @@ class MedicalProfile(CombinedSharedModel):
         ('O+', 'O+'), ('O-', 'O-'),
     )
     patient_user_id = models.UUIDField(unique=True, db_index=True, verbose_name="معرف المريض (طالب/موظف)")
+    patient_type = models.CharField(max_length=20,
+                                    choices=(('student', 'طالب'), ('employee', 'موظف/معلم')),
+                                    default='student', db_index=True,
+                                    verbose_name="نوع المريض — يحدّد أي سجل يُقرأ منه الاسم")
     blood_group = models.CharField(max_length=5, choices=BLOOD_CHOICES, blank=True, null=True, verbose_name="فصيلة الدم")
     medical_alerts = models.TextField(blank=True, null=True, verbose_name="تنبيهات طبية حرجة (مثال: ربو حاد، صرع)")
     disabilities = models.TextField(blank=True, null=True, verbose_name="الإعاقات أو الاحتياجات الخاصة")
@@ -77,6 +81,10 @@ class ClinicVisit(CombinedSharedModel):
     )
     clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, verbose_name="العيادة")
     patient_user_id = models.UUIDField(db_index=True, verbose_name="معرف المريض")
+    patient_type = models.CharField(max_length=20,
+                                    choices=(('student', 'طالب'), ('employee', 'موظف/معلم')),
+                                    default='student', db_index=True,
+                                    verbose_name="نوع المريض — يحدّد أي سجل يُقرأ منه الاسم")
     visit_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ الزيارة")
     visit_type = models.CharField(max_length=20, choices=VISIT_TYPES, default='walk_in', verbose_name="نوع الزيارة")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='checked_in', verbose_name="حالة الزيارة")
@@ -321,6 +329,10 @@ class MedicalLeave(CombinedSharedModel):
         ('rejected', 'مرفوضة وغير مقبولة'),
     )
     patient_user_id = models.UUIDField(db_index=True, verbose_name="المريض الممنوح للإجازة")
+    patient_type = models.CharField(max_length=20,
+                                    choices=(('student', 'طالب'), ('employee', 'موظف/معلم')),
+                                    default='student', db_index=True,
+                                    verbose_name="نوع المريض — يحدّد أي سجل يُقرأ منه الاسم")
     start_date = models.DateField(verbose_name="تاريخ بدء الإجازة المرضية")
     end_date = models.DateField(verbose_name="تاريخ انتهاء الإجازة المرضية")
     reason = models.TextField(verbose_name="السبب الطبي والتشخيص المعني")
