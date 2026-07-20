@@ -48,6 +48,12 @@ CASES: List[Case] = [
     Case('كام واحد متخرج عندنا؟', 'students_count_by_status', {'status': 'graduated'}, 'عامية + حالة غير افتراضية'),
     Case('إيراداتنا من الرسوم السنة دي', 'collections_total', {'period': 'this_year'}, 'مرادف: إيرادات = تحصيل'),
 
+    # --- قوائم بالأسماء والتوزيع ---
+    Case('أعطني أسماء الطلاب الذين عليهم متأخرات', 'student_debtors', None),
+    Case('مين الطلبة اللي عليهم فلوس؟', 'student_debtors', None, 'عامية لقائمة المدينين'),
+    Case('إجمالي المتأخرات المالية حسب الصف', 'outstanding_by_grade', None),
+    Case('أي صف عليه ديون أكثر؟', 'outstanding_by_grade', None, 'توزيع حسب الصف'),
+
     # --- استدلال على الفترة ---
     Case('نسبة الحضور اليوم', 'student_attendance_rate', {'period': 'today'}),
     Case('ما نسبة الحضور؟', 'student_attendance_rate', {'period': 'this_month'}, 'بلا فترة → الافتراضي'),

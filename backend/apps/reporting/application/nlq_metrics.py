@@ -219,6 +219,93 @@ def collections_total(tenant_id, period: str = 'this_month') -> Dict[str, Any]:
     }
 
 
+def student_debtors(tenant_id, limit: int = 10) -> Dict[str, Any]:
+    """أسماء الطلاب الذين عليهم متأخرات مالية، مرتّبين بالأعلى مديونية."""
+    from apps.student_finance.domain.models import StudentBillingAccount
+    from apps.students.domain.models import StudentProfile
+
+    accounts = list(
+        StudentBillingAccount.objects
+        .filter(tenant_id=tenant_id, outstanding_balance__gt=0)
+        .order_by('-outstanding_balance')[: max(1, min(limit, 50))]
+    )
+
+    # جلب الأسماء دفعة واحدة بدل استعلام لكل طالب.
+    student_ids = [a.student_id for a in accounts]
+    names = dict(
+        StudentProfile.objects
+        .filter(tenant_id=tenant_id, student_id__in=student_ids)
+        .values_list('student_id', 'arabic_name')
+    )
+
+    facts = [
+        (names.get(a.student_id, f'طالب {str(a.student_id)[:8]}'), f'{_money(a.outstanding_balance):,.0f} ريال')
+        for a in accounts
+    ]
+    total_debtors = StudentBillingAccount.objects.filter(
+        tenant_id=tenant_id, outstanding_balance__gt=0,
+    ).count()
+
+    return {
+        'headline': f'الطلاب الذين عليهم متأخرات (أعلى {len(accounts)})',
+        'value': total_debtors,
+        'unit': 'طالب مدين',
+        'facts': facts,
+        'empty': not accounts,
+    }
+
+
+def outstanding_by_grade(tenant_id) -> Dict[str, Any]:
+    """إجمالي المتأخرات المالية موزّعاً حسب الصف الدراسي."""
+    from collections import defaultdict
+
+    from apps.academics.domain.models import Grade
+    from apps.students.domain.models import StudentEnrollment
+    from apps.student_finance.domain.models import StudentBillingAccount
+
+    accounts = StudentBillingAccount.objects.filter(
+        tenant_id=tenant_id, outstanding_balance__gt=0,
+    ).values_list('student_id', 'outstanding_balance')
+
+    # ربط كل طالب بصفّه عبر آخر تسجيل له.
+    debt_by_student = {sid: amt for sid, amt in accounts}
+    enrollments = (
+        StudentEnrollment.objects
+        .filter(tenant_id=tenant_id, student_id__in=list(debt_by_student.keys()))
+        .values('student_id', 'grade_id')
+    )
+    grade_of = {e['student_id']: e['grade_id'] for e in enrollments}
+    grade_names = dict(
+        Grade.objects.filter(tenant_id=tenant_id).values_list('id', 'name')
+    )
+
+    totals: Dict[Any, float] = defaultdict(float)
+    unknown = 0.0
+    for sid, amt in debt_by_student.items():
+        gid = grade_of.get(sid)
+        if gid is None:
+            unknown += _money(amt)
+        else:
+            totals[gid] += _money(amt)
+
+    facts = sorted(
+        [(grade_names.get(gid, 'صف غير معروف'), f'{amt:,.0f} ريال') for gid, amt in totals.items()],
+        key=lambda x: float(x[1].replace(',', '').replace(' ريال', '')),
+        reverse=True,
+    )
+    if unknown:
+        facts.append(('طلاب بلا تسجيل صف', f'{unknown:,.0f} ريال'))
+
+    grand = sum(_money(a) for a in debt_by_student.values())
+    return {
+        'headline': 'المتأخرات المالية حسب الصف',
+        'value': round(grand, 2),
+        'unit': 'ريال',
+        'facts': facts,
+        'empty': not debt_by_student,
+    }
+
+
 def absence_leaderboard(tenant_id, period: str = 'this_month', limit: int = 5) -> Dict[str, Any]:
     """الطلاب الأكثر غياباً خلال الفترة."""
     from apps.attendance.domain.models import StudentDailyAttendance
@@ -305,6 +392,35 @@ METRIC_REGISTRY: Dict[str, Metric] = {
             handler=collections_total,
             params={'period': _PERIOD_PARAM},
             required=['period'],
+        ),
+        Metric(
+            key='student_debtors',
+            title='الطلاب المدينون',
+            description=(
+                'قائمة بأسماء الطلاب الذين عليهم متأخرات مالية مع مبلغ كل واحد، '
+                'مرتّبة بالأعلى مديونية. استخدمه لأسئلة مثل: «من الطلاب الذين '
+                'عليهم متأخرات؟» أو «أعطني أسماء المدينين».'
+            ),
+            handler=student_debtors,
+            params={
+                'limit': {
+                    'type': 'integer',
+                    'description': 'عدد الطلاب المطلوب عرضهم (1 إلى 50). الافتراضي 10.',
+                },
+            },
+            required=['limit'],
+        ),
+        Metric(
+            key='outstanding_by_grade',
+            title='المتأخرات حسب الصف',
+            description=(
+                'إجمالي المتأخرات المالية موزّعاً حسب الصف الدراسي. '
+                'استخدمه لأسئلة مثل: «إجمالي المتأخرات حسب الصف» أو '
+                '«أي الصفوف عليها متأخرات أكثر؟».'
+            ),
+            handler=outstanding_by_grade,
+            params={},
+            required=[],
         ),
         Metric(
             key='absence_leaderboard',

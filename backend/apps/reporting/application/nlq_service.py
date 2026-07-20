@@ -146,11 +146,13 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
     tokens_used = getattr(usage, 'total_tokens', 0) or 0
 
     if not tool_calls:
-        # النموذج لم يجد مقياساً مناسباً — نصرّح بذلك بدل اختلاق جواب.
+        # النموذج لم يجد مقياساً مناسباً. لا نعرض نصّه الخام لأن النماذج
+        # المفتوحة (Llama) تردّ أحياناً بالإنجليزية أو برموز؛ نستبدله برسالة
+        # عربية حتمية ونعرض المتاح ليعرف المستخدم ما يمكن سؤاله.
         return {
             'answered': False,
-            'answer': (choice.content or '').strip()
-            or 'لا يوجد مقياس متاح يجيب عن هذا السؤال حالياً.',
+            'answer': 'هذا السؤال خارج نطاق المقاييس المتاحة حالياً. '
+                      'يمكنك السؤال عن أحد المقاييس أدناه.',
             'available': _available(),
             'tokens_used': tokens_used,
         }
