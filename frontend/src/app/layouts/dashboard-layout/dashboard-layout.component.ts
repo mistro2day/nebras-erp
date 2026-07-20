@@ -324,11 +324,12 @@ interface NavGroup {
         line-height: 1;
       }
 
+      /* ---------- 1. مجموعات القائمة الرئيسية (Level 1) ---------- */
       .nav-group {
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        margin-bottom: 4px;
+        gap: 3px;
+        margin-bottom: 8px;
       }
 
       .nav-group-header {
@@ -336,26 +337,36 @@ interface NavGroup {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 6px 10px;
-        background: transparent;
-        border: none;
-        border-radius: var(--nb-radius);
+        padding: 7px 10px;
+        background: var(--nb-surface-raised, #f8fafc);
+        border: 1px solid var(--nb-border-soft, #e2e8f0);
+        border-right: 3px solid var(--nb-primary-500, #3b82f6);
+        border-radius: var(--nb-radius, 6px);
         font-family: var(--nb-font-family);
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
-        color: var(--nb-text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        color: var(--nb-text);
         cursor: pointer;
-        transition: background 150ms ease, color 150ms ease;
+        transition: all 180ms ease;
+        box-sizing: border-box;
 
         &:hover {
-          background: var(--nb-surface-raised);
-          color: var(--nb-text);
+          background: var(--nb-primary-50, #eff6ff);
+          border-color: var(--nb-primary-300, #93c5fd);
+          border-right-color: var(--nb-primary-600, #2563eb);
+          color: var(--nb-primary-700, #1d4ed8);
         }
 
         &.active {
-          color: var(--nb-primary-600);
+          background: var(--nb-primary-50, #eff6ff);
+          border-right-color: var(--nb-primary-600, #2563eb);
+          color: var(--nb-primary-700, #1d4ed8);
+        }
+
+        .group-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
 
         .chevron {
@@ -363,6 +374,7 @@ interface NavGroup {
           transition: transform 180ms ease;
           display: inline-block;
           color: var(--nb-text-muted);
+          line-height: 1;
         }
 
         .chevron.open {
@@ -374,6 +386,67 @@ interface NavGroup {
         display: flex;
         flex-direction: column;
         gap: 2px;
+        padding-top: 2px;
+      }
+
+      /* ---------- 2. العناصر والوحدات الرئيسية (Level 2) ---------- */
+      .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border-radius: var(--nb-radius, 6px);
+        color: var(--nb-text-secondary);
+        font-size: 12.5px;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 150ms ease, color 150ms ease;
+
+        &:hover {
+          background: var(--nb-bg, #f1f5f9);
+          color: var(--nb-text);
+        }
+
+        &.active {
+          background: var(--nb-primary-50, #eff6ff);
+          color: var(--nb-primary-600, #2563eb);
+          font-weight: 600;
+        }
+
+        &.nav-parent {
+          font-weight: 600;
+          color: var(--nb-text);
+        }
+      }
+
+      /* ---------- 3. القوائم الفرعية المتشعبة (Level 3) ---------- */
+      .submenu {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding-right: 10px;
+        margin-right: 12px;
+        border-right: 1.5px dashed var(--nb-border, #cbd5e1);
+        margin-top: 2px;
+        margin-bottom: 4px;
+      }
+
+      .nav-item.nav-child {
+        padding: 4.5px 8px;
+        font-size: 12px;
+        color: var(--nb-text-muted);
+
+        &:hover {
+          color: var(--nb-text);
+          background: var(--nb-bg, #f1f5f9);
+        }
+
+        &.active {
+          color: var(--nb-primary-600);
+          background: var(--nb-primary-50);
+          font-weight: 600;
+        }
       }
 
       .nav-item {
@@ -999,18 +1072,43 @@ export class DashboardLayoutComponent {
     this.authService.userPermissions();
 
     const canSee = (perm?: string) => !perm || this.authService.hasPermission(perm);
+    const query = this.navFilterQuery().trim().toLowerCase();
 
     return this.navGroups
       .filter((group) => canSee(group.permission))
-      .map((group) => ({
-        ...group,
-        items: group.items
+      .map((group) => {
+        const groupMatches = Boolean(query && group.label?.toLowerCase().includes(query));
+
+        const matchingItems = group.items
           .filter((item) => canSee(item.permission))
-          .map((item) => ({
-            ...item,
-            children: item.children?.filter((child) => canSee(child.permission)),
-          })),
-      }))
+          .map((item) => {
+            const matchesParent = !query || groupMatches || item.label.toLowerCase().includes(query);
+            const matchingChildren = item.children?.filter(
+              (child) => canSee(child.permission) && (!query || groupMatches || child.label.toLowerCase().includes(query) || matchesParent)
+            );
+
+            if (!query) {
+              return {
+                ...item,
+                children: item.children?.filter((child) => canSee(child.permission)),
+              };
+            }
+
+            if (matchesParent || (matchingChildren && matchingChildren.length > 0)) {
+              return {
+                ...item,
+                children: matchingChildren || item.children,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean) as NavItem[];
+
+        return {
+          ...group,
+          items: matchingItems,
+        };
+      })
       .filter((group) => group.items.length > 0);
   });
 
