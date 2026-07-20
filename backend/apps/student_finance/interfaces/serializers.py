@@ -62,10 +62,42 @@ class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     discounts = InvoiceDiscountSerializer(many=True, read_only=True)
     adjustments = InvoiceAdjustmentSerializer(many=True, read_only=True)
+    
+    student_name = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
 
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = StudentInvoice
         fields = '__all__'
+
+    def get_student_name(self, obj):
+        try:
+            return obj.student_billing_account.student.profile.arabic_name
+        except Exception:
+            return ""
+
+    def get_guardian_name(self, obj):
+        try:
+            # Assuming guardian name is on billing_account or student profile
+            # We don't have the exact structure of student module here, but we will access it dynamically
+            student = obj.student_billing_account.student
+            family = student.family_relations.first()
+            if family:
+                return family.name
+            return ""
+        except Exception:
+            return ""
+
+    def get_guardian_phone(self, obj):
+        try:
+            student = obj.student_billing_account.student
+            family = student.family_relations.first()
+            if family:
+                return family.phone
+            return ""
+        except Exception:
+            return ""
 
 class ScholarshipSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):

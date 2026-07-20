@@ -30,11 +30,18 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
               }
             </select>
           </div>
-
-          <div class="form-group">
-            <label>وجهة الاتصال (رقم / بريد)</label>
-            <input type="text" class="nb-input ltr-input" [(ngModel)]="editableContact" />
+          <!-- Input Contact -->
+        <div class="form-group" style="margin-top: 15px;">
+          <label>جهة الاتصال (الرقم أو البريد) <span style="color:red">*</span></label>
+          <div class="contact-input-wrapper" style="display:flex; flex-direction:column; gap:4px;">
+            <input type="text" class="nb-input" [(ngModel)]="editableContact" dir="ltr" style="text-align: right;" placeholder="مثال: +249912345678 أو +966500000000">
+            @if (selectedChannelCode === 'whatsapp' || selectedChannelCode === 'sms') {
+              <small style="color: var(--nb-text-faint); font-size: 11px;">
+                الرجاء إدخال الرقم بالصيغة الدولية (بدون أصفار بالبداية) لضمان وصول الرسالة (مثال: 2499... أو 9665...)
+              </small>
+            }
           </div>
+        </div>
         </div>
 
         <div class="form-group">
@@ -51,7 +58,10 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
         @if (selectedTemplateId) {
           <div class="form-group">
             <label>معاينة ونص الرسالة</label>
-            <textarea class="nb-input preview-box" rows="5" [(ngModel)]="messageBody"></textarea>
+            <textarea class="nb-input" [(ngModel)]="messageBody" rows="6" placeholder="اكتب رسالتك هنا..."></textarea>
+            <div style="font-size: 10px; color: red; margin-top: 10px;">
+              Debug Context Vars: {{ debugVars() }}
+            </div>
             <p class="help-text">تم استبدال المتغيرات تلقائياً، يمكنك التعديل قبل الإرسال.</p>
           </div>
         }
@@ -130,11 +140,17 @@ export class SendMessageModalComponent implements OnChanges {
   }
 
   updateEditableContact() {
-    let contact = this.selectedChannelCode === 'email' ? this.recipientEmail : this.recipientPhone;
-    if (this.selectedChannelCode === 'whatsapp' || this.selectedChannelCode === 'sms') {
-      contact = this.formatPhoneNumber(contact);
+    if (this.selectedChannelCode === 'email') {
+      this.editableContact = this.recipientEmail;
+    } else {
+      let phone = this.recipientPhone || '';
+      // توحيد مبدئي للرقم
+      if (phone.startsWith('0')) {
+        // إذا كان يبدأ بصفر، نقوم بإزالته لتشجيع كتابة الرمز الدولي
+        phone = phone.substring(1);
+      }
+      this.editableContact = phone;
     }
-    this.editableContact = contact || '';
   }
 
   formatPhoneNumber(phone: string): string {
@@ -207,6 +223,9 @@ export class SendMessageModalComponent implements OnChanges {
         ...this.contextVariables
       };
       
+      // DEBUG:
+      this._debugVars = JSON.stringify(vars);
+      
       // Replace all {{key}} with value from vars
       for (const [key, value] of Object.entries(vars)) {
         if (value !== undefined && value !== null) {
@@ -216,6 +235,11 @@ export class SendMessageModalComponent implements OnChanges {
       }
       this.messageBody = body;
     }
+  }
+
+  _debugVars = '';
+  debugVars() {
+    return this._debugVars;
   }
 
   isValid() {

@@ -142,13 +142,13 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 
       <app-send-message-modal
         [(open)]="showMsgModal"
-        [recipientName]="selectedInvoice()?.billing_account?.guardian_name || selectedInvoice()?.student?.profile?.arabic_name || 'ولي الأمر'"
-        [recipientPhone]="selectedInvoice()?.billing_account?.phone || selectedInvoice()?.student?.family_relations?.[0]?.phone || ''"
+        [recipientName]="selectedInvoice()?.guardian_name || 'ولي الأمر'"
+        [recipientPhone]="selectedInvoice()?.guardian_phone || ''"
         [contextVariables]="{ 
           invoice_number: selectedInvoice()?.invoice_number,
           amount: selectedInvoice()?.total_amount,
-          student_name: selectedInvoice()?.student?.profile?.arabic_name || '',
-          guardian_name: selectedInvoice()?.billing_account?.guardian_name || 'ولي الأمر'
+          student_name: selectedInvoice()?.student_name || '',
+          guardian_name: selectedInvoice()?.guardian_name || 'ولي الأمر'
         }"
         defaultTemplateCode="INVOICE_ISSUED"
       ></app-send-message-modal>
