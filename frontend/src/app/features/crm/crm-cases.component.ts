@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { CrmService, SupportCase } from './crm.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { SendMessageModalComponent } from '../communications/components/send-message-modal.component';
 
 @Component({
   selector: 'app-crm-cases',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -97,6 +98,9 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
                 <div class="actions">
                   @if (c.status !== 'resolved') {
+                    <button class="action-btn message" (click)="openMessageModal(c)">
+                      💬 مراسلة
+                    </button>
                     <button class="action-btn escalate" (click)="escalate(c.id!)">
                       ⚠️ تصعيد للإدارة
                     </button>
@@ -165,6 +169,14 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
           </div>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedCase()?.contact_name || ''"
+        [recipientPhone]="selectedCase()?.contact_phone || ''"
+        [contextVariables]="{ ticket: selectedCase()?.id, subject: selectedCase()?.subject }"
+        defaultTemplateCode="CASE_UPDATE"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [`
@@ -229,6 +241,9 @@ export class CrmCasesComponent {
   activeStatus = signal<'all' | 'open' | 'in_progress' | 'resolved'>('all');
   showNewCaseModal = signal(false);
 
+  showMsgModal = false;
+  selectedCase = signal<SupportCase | null>(null);
+
   newCase: Partial<SupportCase> = {
     contact_name: '',
     contact_phone: '',
@@ -263,6 +278,11 @@ export class CrmCasesComponent {
 
   toggleNewCaseModal(): void {
     this.showNewCaseModal.update((v) => !v);
+  }
+
+  openMessageModal(c: SupportCase) {
+    this.selectedCase.set(c);
+    this.showMsgModal = true;
   }
 
   saveNewCase(): void {

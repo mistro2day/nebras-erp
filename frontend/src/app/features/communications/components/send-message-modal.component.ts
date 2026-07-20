@@ -1,0 +1,226 @@
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal, effect, OnChanges, SimpleChanges } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { CommunicationsService, CommunicationChannel, CommunicationTemplate } from '../communications.service';
+import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
+
+@Component({
+  selector: 'app-send-message-modal',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, FormsModule, NbModalComponent],
+  template: `
+    <nb-modal [open]="open" (closed)="closeModal()" title="إرسال رسالة فورية" subtitle="إرسال إشعار أو تحديث للعميل/المستفيد عبر القنوات المتاحة.">
+      
+      <div class="msg-form" dir="rtl">
+        <div class="form-row">
+          <div class="form-group">
+            <label>المستلم (الاسم)</label>
+            <input type="text" class="nb-input" [value]="recipientName" readonly disabled />
+          </div>
+        </div>
+
+        <div class="form-row two-cols">
+          <div class="form-group">
+            <label>قناة الاتصال</label>
+            <select class="nb-input" [(ngModel)]="selectedChannelCode">
+              <option value="" disabled>-- اختر القناة --</option>
+              @for (ch of activeChannels(); track ch.id) {
+                <option [value]="ch.code">{{ ch.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>وجهة الاتصال (رقم / بريد)</label>
+            <input type="text" class="nb-input ltr-input" [value]="recipientContact()" readonly disabled />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>قالب الرسالة (Template)</label>
+          <select class="nb-input" [(ngModel)]="selectedTemplateId" (change)="onTemplateSelect()">
+            <option value="" disabled>-- اختر القالب --</option>
+            <option value="custom">رسالة حرة (بدون قالب)</option>
+            @for (t of templates(); track t.id) {
+              <option [value]="t.id">{{ t.name }} ({{ t.category }})</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedTemplateId) {
+          <div class="form-group">
+            <label>معاينة ونص الرسالة</label>
+            <textarea class="nb-input preview-box" rows="5" [(ngModel)]="messageBody"></textarea>
+            <p class="help-text">تم استبدال المتغيرات تلقائياً، يمكنك التعديل قبل الإرسال.</p>
+          </div>
+        }
+
+        @if (errorMsg()) {
+          <div class="alert alert-error">{{ errorMsg() }}</div>
+        }
+        @if (successMsg()) {
+          <div class="alert alert-success">{{ successMsg() }}</div>
+        }
+      </div>
+
+      <div modal-actions class="actions-footer">
+        <button class="nb-btn-outline" (click)="closeModal()" [disabled]="sending()">إلغاء</button>
+        <button class="nb-btn-primary send-btn" (click)="send()" [disabled]="sending() || !isValid()">
+          @if (sending()) {
+            <span class="spinner"></span> جاري الإرسال...
+          } @else {
+            <span class="icon">💬</span> إرسال الآن
+          }
+        </button>
+      </div>
+
+    </nb-modal>
+  `,
+  styles: [`
+    .msg-form { display: flex; flex-direction: column; gap: 1rem; }
+    .form-row { display: flex; gap: 1rem; width: 100%; }
+    .two-cols > .form-group { flex: 1; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-size: 0.85rem; font-weight: 600; color: #4b5563; }
+    .nb-input { padding: 0.6rem 0.8rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
+    .nb-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+    .nb-input:disabled { background: #f3f4f6; color: #6b7280; }
+    .ltr-input { text-align: left; direction: ltr; }
+    .preview-box { resize: vertical; line-height: 1.5; background: #fafafa; }
+    .help-text { font-size: 0.75rem; color: #6b7280; margin: 0; }
+    .actions-footer { display: flex; justify-content: flex-end; gap: 0.75rem; width: 100%; }
+    .alert { padding: 0.75rem; border-radius: 6px; font-size: 0.9rem; }
+    .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-left: 0.5rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  `]
+})
+export class SendMessageModalComponent implements OnChanges {
+  @Input() open = false;
+  @Input() recipientName = '';
+  @Input() recipientPhone = '';
+  @Input() recipientEmail = '';
+  @Input() contextVariables: any = {};
+  @Input() defaultTemplateCode = '';
+
+  @Output() openChange = new EventEmitter<boolean>();
+  @Output() messageSent = new EventEmitter<any>();
+
+  private commService = inject(CommunicationsService);
+
+  channels = signal<CommunicationChannel[]>([]);
+  templates = signal<CommunicationTemplate[]>([]);
+
+  selectedChannelCode = '';
+  selectedTemplateId = '';
+  messageBody = '';
+
+  sending = signal(false);
+  errorMsg = signal('');
+  successMsg = signal('');
+
+  activeChannels = computed(() => this.channels().filter(c => c.is_active));
+
+  recipientContact = computed(() => {
+    if (this.selectedChannelCode === 'email') return this.recipientEmail;
+    return this.recipientPhone;
+  });
+
+  constructor() {
+    this.commService.getChannels().subscribe(c => this.channels.set(c));
+    this.commService.getTemplates().subscribe(t => {
+      this.templates.set(t);
+      if (this.open && this.defaultTemplateCode) {
+        this.applyDefaultTemplate();
+      }
+    });
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['open'] && this.open) {
+      this.resetState();
+      this.applyDefaultTemplate();
+    }
+  }
+
+  resetState() {
+    this.errorMsg.set('');
+    this.successMsg.set('');
+    this.selectedTemplateId = '';
+    this.messageBody = '';
+    const waChannel = this.activeChannels().find(c => c.code === 'whatsapp');
+    if (waChannel) {
+      this.selectedChannelCode = waChannel.code;
+    } else if (this.activeChannels().length > 0) {
+      this.selectedChannelCode = this.activeChannels()[0].code;
+    }
+  }
+
+  applyDefaultTemplate() {
+    const defaultTemp = this.templates().find(t => t.code === this.defaultTemplateCode);
+    if (defaultTemp) {
+      this.selectedTemplateId = defaultTemp.id!;
+      this.onTemplateSelect();
+    }
+  }
+
+  onTemplateSelect() {
+    if (this.selectedTemplateId === 'custom') {
+      this.messageBody = '';
+      return;
+    }
+    const template = this.templates().find(t => t.id === this.selectedTemplateId);
+    if (template) {
+      let body = template.body;
+      const vars = {
+        name: this.recipientName,
+        ...this.contextVariables
+      };
+      
+      // Replace all {{key}} with value from vars
+      for (const [key, value] of Object.entries(vars)) {
+        const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+        body = body.replace(regex, String(value));
+      }
+      this.messageBody = body;
+    }
+  }
+
+  isValid() {
+    return this.selectedChannelCode && this.recipientContact() && this.messageBody.trim().length > 0;
+  }
+
+  closeModal() {
+    this.open = false;
+    this.openChange.emit(false);
+  }
+
+  send() {
+    if (!this.isValid()) return;
+    
+    this.errorMsg.set('');
+    this.sending.set(true);
+
+    const payload = {
+      channel: this.selectedChannelCode,
+      recipient_name: this.recipientName,
+      recipient_address: this.recipientContact(),
+      body: this.messageBody
+    };
+
+    this.commService.sendMessage(payload).subscribe(res => {
+      this.sending.set(false);
+      if (res.status === 'success') {
+        this.successMsg.set('تم إرسال الرسالة بنجاح عبر ' + this.selectedChannelCode);
+        setTimeout(() => {
+          this.messageSent.emit(res);
+          this.closeModal();
+        }, 1500);
+      } else {
+        this.errorMsg.set(res.message || 'فشل في الإرسال');
+      }
+    });
+  }
+}

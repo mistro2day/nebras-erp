@@ -13,12 +13,13 @@ import {
 import { pickList } from '../../admissions/shared/admissions.shared';
 
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 
 @Component({
   selector: 'app-students-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent, SendMessageModalComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -136,6 +137,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <span>{{ element.profile.nationality || '—' }}</span>
                   <span><span [class]="statusBadge(element.status)">{{ statusText(element.status) }}</span></span>
                   <span class="row-actions">
+                    <button class="nb-btn-ghost sm" (click)="openMessageModal(element)">مراسلة</button>
                     <button class="nb-btn-ghost sm" (click)="viewDetails(element.id)">عرض</button>
                     <button class="nb-btn-secondary sm" (click)="edit(element.id)">تعديل</button>
                     <button class="nb-btn-danger sm" (click)="archive(element)">أرشفة</button>
@@ -174,6 +176,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               <div class="card-footer">
                 <span [class]="statusBadge(student.status)">{{ statusText(student.status) }}</span>
                 <div class="card-actions" (click)="$event.stopPropagation()">
+                  <button class="action-icon-btn" title="مراسلة" (click)="openMessageModal(student)">💬</button>
                   <button class="action-icon-btn" title="تعديل" (click)="edit(student.id)">✏️</button>
                   <button class="action-icon-btn danger" title="أرشفة" (click)="archive(student)">🗑️</button>
                 </div>
@@ -193,6 +196,13 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedStudent()?.profile?.arabic_name || ''"
+        [recipientPhone]="selectedStudent()?.family_relations?.[0]?.phone || ''"
+        [contextVariables]="{ student_number: selectedStudent()?.student_number }"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [
@@ -446,6 +456,14 @@ export class StudentsListComponent implements OnInit {
 
   countByStatus(status: string): number {
     return this.students().filter(s => s.status === status).length;
+  }
+
+  showMsgModal = false;
+  selectedStudent = signal<any | null>(null);
+
+  openMessageModal(student: any) {
+    this.selectedStudent.set(student);
+    this.showMsgModal = true;
   }
 
   percentOf(status: string): number {

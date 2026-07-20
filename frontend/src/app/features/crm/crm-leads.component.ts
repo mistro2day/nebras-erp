@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { CrmService, Lead } from './crm.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
+import { SendMessageModalComponent } from '../communications/components/send-message-modal.component';
 
 @Component({
   selector: 'app-crm-leads',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -101,9 +102,14 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
                   </td>
                   <td>{{ lead.created_at || '2026-07-20' }}</td>
                   <td>
-                    <button class="btn-action convert" (click)="convertLead(lead.id!)">
-                      تحويل إلى مستهدف ➔
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                      <button class="btn-action convert" (click)="convertLead(lead.id!)">
+                        تحويل إلى مستهدف ➔
+                      </button>
+                      <button class="btn-action message" (click)="openMessageModal(lead)">
+                        💬 مراسلة
+                      </button>
+                    </div>
                   </td>
                 </tr>
               } @empty {
@@ -174,6 +180,15 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
           </div>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="(selectedLead()?.first_name || '') + ' ' + (selectedLead()?.last_name || '')"
+        [recipientPhone]="selectedLead()?.phone || ''"
+        [recipientEmail]="selectedLead()?.email || ''"
+        [contextVariables]="{ lead_id: selectedLead()?.id, source: selectedLead()?.source_name }"
+        defaultTemplateCode="LEAD_FOLLOWUP"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [`
@@ -221,8 +236,11 @@ export class CrmLeadsComponent {
 
   leads = signal<Lead[]>([]);
   searchTerm = signal('');
-  selectedLevel = signal<'all' | 'high' | 'medium'>('all');
+  selectedLevel = signal<'all' | 'high' | 'medium' | 'low'>('all');
   showNewLeadModal = signal(false);
+
+  showMsgModal = false;
+  selectedLead = signal<Lead | null>(null);
 
   newLeadData: Partial<Lead> = {
     first_name: '',
@@ -265,6 +283,11 @@ export class CrmLeadsComponent {
 
   toggleNewLeadModal(): void {
     this.showNewLeadModal.update((v) => !v);
+  }
+
+  openMessageModal(lead: Lead) {
+    this.selectedLead.set(lead);
+    this.showMsgModal = true;
   }
 
   saveNewLead(): void {

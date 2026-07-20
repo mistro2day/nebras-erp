@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { LibraryService } from '../library.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 
 /**
  * الإعارة والإرجاع.
@@ -17,7 +18,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
   selector: 'app-library-borrows',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbLoadingComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الإعارة والإرجاع" subtitle="إعارة النسخ للطلاب والموظفين، وإرجاعها مع احتساب التأخير.">
@@ -111,6 +112,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
               </span>
               <span class="ta-end">
                 @if (b.status !== 'returned') {
+                  <button class="act" style="margin-left: 4px; border-color: #3b82f6; color: #3b82f6;" (click)="openMessageModal(b)">💬 مراسلة</button>
                   <button class="act" (click)="openReturn(b)">تسجيل الإرجاع</button>
                 } @else { <span class="muted mono">{{ b.actual_return_date }}</span> }
               </span>
@@ -161,6 +163,14 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           </section>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedBorrow()?.borrower_name || ''"
+        [recipientPhone]="selectedBorrow()?.borrower_phone || ''"
+        [contextVariables]="{ book_title: selectedBorrow()?.book_title, due_date: selectedBorrow()?.due_date, late_days: selectedBorrow()?.lateDays }"
+        defaultTemplateCode="LIBRARY_OVERDUE"
+      ></app-send-message-modal>
     </div>
   `,
   styleUrl: '../../procurement/shared/procurement-table.scss',
@@ -237,6 +247,9 @@ export class LibraryBorrowsComponent implements OnInit {
   readonly filter = signal('');
   readonly returnFor = signal<any | null>(null);
 
+  showMsgModal = false;
+  selectedBorrow = signal<any | null>(null);
+
   private borrows = signal<any[]>([]);
   private copies = signal<any[]>([]);
   private books = signal<any[]>([]);
@@ -294,6 +307,11 @@ export class LibraryBorrowsComponent implements OnInit {
     this.retDate = new Date().toISOString().slice(0, 10);
     this.error.set('');
     this.returnFor.set(b);
+  }
+
+  openMessageModal(b: any) {
+    this.selectedBorrow.set(b);
+    this.showMsgModal = true;
   }
 
   borrow() {
