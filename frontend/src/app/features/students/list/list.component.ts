@@ -204,6 +204,11 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         [contextVariables]="{ 
           student_number: selectedStudent()?.student_number,
           student_name: selectedStudent()?.profile?.arabic_name,
+          guardian_name: selectedStudent()?.family_relations?.[0]?.guardian?.arabic_name || 'ولي الأمر',
+          guardian_phone: selectedStudent()?.family_relations?.[0]?.phone || '',
+          grade: selectedStudent()?.enrollments?.[0]?.grade?.name || '',
+          academic_year: selectedStudent()?.enrollments?.[0]?.academic_year?.name || '',
+          term: selectedStudent()?.enrollments?.[0]?.term?.name || '',
           date: (selectedStudent() ? todayDate : '')
         }"
         [allowedCategories]="['attendance']"

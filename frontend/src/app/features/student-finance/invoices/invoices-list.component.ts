@@ -147,8 +147,12 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         [contextVariables]="{ 
           invoice_number: selectedInvoice()?.invoice_number,
           amount: selectedInvoice()?.total_amount,
-          student_name: selectedInvoice()?.student_name || '',
-          guardian_name: selectedInvoice()?.guardian_name || 'ولي الأمر'
+          due_date: selectedInvoice()?.due_date,
+          student_name: selectedInvoice()?.student_name,
+          guardian_name: selectedInvoice()?.guardian_name,
+          guardian_phone: selectedInvoice()?.guardian_phone,
+          academic_year: selectedInvoice()?.academic_year_name || '',
+          date: todayDate
         }"
         defaultTemplateCode="INVOICE_ISSUED"
         [allowedCategories]="['finance']"
@@ -216,6 +220,7 @@ export class SfInvoicesListComponent implements OnInit {
 
   showMsgModal = false;
   selectedInvoice = signal<any | null>(null);
+  todayDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
 
   openMessageModal(invoice: any) {
     this.selectedInvoice.set(invoice);
