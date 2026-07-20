@@ -53,17 +53,40 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
       }
 
       @if (aiResponse(); as ans) {
-        <section class="ai-answer">
+        <section class="ai-answer" [class.unanswered]="!ans.answered">
           <div class="aa-head">
-            <strong>إجابة نبراس</strong>
+            <strong>{{ ans.answered ? 'إجابة نبراس' : 'تعذّرت الإجابة' }}</strong>
             <button class="link-btn" (click)="clearAI()">إغلاق</button>
           </div>
-          <p class="aa-summary">{{ ans.summary || 'تعذّر توليد ملخّص لهذا الاستعلام.' }}</p>
-          @if (ans.interpreted_query) {
-            <div class="aa-sql">
-              <span class="aa-sql-label">الاستعلام المُفسَّر</span>
-              <code>{{ ans.interpreted_query }}</code>
+
+          @if (ans.answered) {
+            <div class="aa-value">
+              <span class="aa-num">{{ ans.value | number: '1.0-2' }}</span>
+              <span class="aa-unit">{{ ans.unit }}</span>
             </div>
+            <p class="aa-metric">{{ ans.metric_title }}</p>
+
+            @if (ans.facts?.length) {
+              <ul class="aa-facts">
+                @for (f of ans.facts; track f.label) {
+                  <li><span>{{ f.label }}</span><b>{{ f.value }}</b></li>
+                }
+              </ul>
+            }
+
+            <p class="aa-source">
+              الأرقام محسوبة مباشرة من قاعدة بيانات مؤسستك، لا من النموذج اللغوي.
+            </p>
+          } @else {
+            <p class="aa-summary">{{ ans.answer }}</p>
+            @if (ans.available?.length) {
+              <div class="aa-avail">
+                <span class="aa-avail-label">المقاييس المتاحة حالياً:</span>
+                @for (m of ans.available; track m.key) {
+                  <span class="chip static">{{ m.title }}</span>
+                }
+              </div>
+            }
           }
         </section>
       }
@@ -230,11 +253,24 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
     .aa-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
     .aa-head strong { font-size: 13px; font-weight: 700; color: var(--nb-text); }
     .aa-summary { margin: 0 0 10px; font-size: 13px; line-height: 1.7; color: var(--nb-text-secondary); }
-    .aa-sql { display: flex; flex-direction: column; gap: 4px; }
-    .aa-sql-label { font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
-    .aa-sql code { display: block; overflow-x: auto; direction: ltr; text-align: left;
-      font-size: 12px; padding: 8px 10px; border-radius: var(--nb-radius-sm);
-      background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .ai-answer.unanswered { border-inline-start-color: var(--nb-warning, #f59e0b); }
+    .aa-value { display: flex; align-items: baseline; gap: 6px; }
+    .aa-num { font-size: 30px; font-weight: 800; color: var(--nb-text); line-height: 1;
+      font-variant-numeric: tabular-nums; }
+    .aa-unit { font-size: 13px; font-weight: 600; color: var(--nb-text-muted); }
+    .aa-metric { margin: 4px 0 10px; font-size: 12.5px; font-weight: 600; color: var(--nb-text-secondary); }
+    .aa-facts { list-style: none; margin: 0 0 10px; padding: 0; display: flex;
+      flex-direction: column; gap: 4px; }
+    .aa-facts li { display: flex; justify-content: space-between; gap: 12px;
+      font-size: 12.5px; padding: 5px 0; border-bottom: 1px solid var(--nb-border-row); }
+    .aa-facts li:last-child { border-bottom: none; }
+    .aa-facts span { color: var(--nb-text-muted); }
+    .aa-facts b { color: var(--nb-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .aa-source { margin: 0; font-size: 11px; color: var(--nb-text-muted); }
+    .aa-avail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+    .aa-avail-label { font-size: 11.5px; font-weight: 600; color: var(--nb-text-muted); }
+    .chip.static { cursor: default; }
+    .chip.static:hover { border-color: var(--nb-border); color: var(--nb-text-secondary); }
 
     /* مؤشرات الأداء */
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -391,11 +427,19 @@ export class ReportingDashboardComponent implements OnInit {
     this.aiLoading.set(true);
     this.repService.askAI(q).subscribe({
       next: (res) => {
-        this.aiResponse.set(res?.success ? res.data : { summary: 'تعذّر تفسير السؤال. حاول صياغته بشكل أوضح.' });
+        this.aiResponse.set(
+          res?.success && res.data
+            ? res.data
+            : { answered: false, answer: res?.message || 'تعذّر تفسير السؤال. حاول صياغته بشكل أوضح.' },
+        );
         this.aiLoading.set(false);
       },
-      error: () => {
-        this.aiResponse.set({ summary: 'تعذّر الوصول إلى خدمة التحليل الذكي حالياً.' });
+      error: (err) => {
+        // 503 يعني أن المزوّد غير مهيّأ — نعرض رسالة الخادم كما هي لأنها تشخيصية.
+        this.aiResponse.set({
+          answered: false,
+          answer: err?.error?.message || 'تعذّر الوصول إلى خدمة التحليل الذكي حالياً.',
+        });
         this.aiLoading.set(false);
       },
     });

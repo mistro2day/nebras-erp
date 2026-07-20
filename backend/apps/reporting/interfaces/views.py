@@ -1,7 +1,11 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+
+logger = logging.getLogger('nebras.reporting')
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
 from apps.common.responses import StandardResponse
@@ -26,6 +30,8 @@ from apps.reporting.interfaces.serializers import (
     MaterializedViewPlaceholderSerializer, ExecuteReportSerializer, NLQQuerySerializer
 )
 from apps.reporting.application.services import ReportEngineService, ExportService, KPIService
+from apps.reporting.application import nlq_service as NLQService
+from apps.reporting.application.nlq_service import NLQUnavailable
 
 
 # ============================================================
@@ -202,17 +208,54 @@ class AnalyticsViewViewSet(BaseCRUDViewSet):
 
     @action(detail=False, methods=['post'], url_path='nlq-ask')
     def nlq_ask(self, request):
-        """استقبال استعلام باللغة الطبيعية (AI NLQ Placeholder)."""
+        """
+        استعلام باللغة الطبيعية عن مقاييس النظام.
+
+        النموذج اللغوي يختار المقياس ويعبّئ معاملاته فقط؛ الأرقام تُحسب عبر
+        الـ ORM ضمن عزل المستأجر، وصياغة الجواب حتمية في الشيفرة.
+        """
         serializer = NLQQuerySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        # تجاوب تجريبي لتثبيت واجهات الـ AI
-        result = {
-            'interpreted_query': 'SELECT * FROM student_attendance WHERE rate < 90',
-            'suggested_filters': {'attendance_rate_less': 90},
-            'summary': f"تحليل للاستعلام: {serializer.validated_data['question']}",
-        }
-        return StandardResponse(data=result, message="تم تحليل السؤال الذكي بنجاح.")
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        if tenant_id is None:
+            return StandardResponse(
+                data=None,
+                message="تعذّر تحديد المستأجر لهذا الطلب.",
+                success=False,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_id = getattr(request.user, 'id', None)
+
+        try:
+            result = NLQService.ask(
+                question=serializer.validated_data['question'],
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+        except NLQUnavailable as exc:
+            return StandardResponse(
+                data=None,
+                message=str(exc),
+                success=False,
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception:
+            logger.exception("فشل تنفيذ استعلام NLQ")
+            return StandardResponse(
+                data=None,
+                message="تعذّر تنفيذ التحليل الذكي حالياً.",
+                success=False,
+                status_code=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        message = (
+            "تم تنفيذ التحليل بنجاح."
+            if result.get('answered')
+            else "لا يوجد مقياس متاح يجيب عن هذا السؤال."
+        )
+        return StandardResponse(data=result, message=message)
 
 
 class MaterializedViewPlaceholderViewSet(BaseCRUDViewSet):
