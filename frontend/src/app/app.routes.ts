@@ -208,6 +208,11 @@ export const routes: Routes = [
           import('./features/config/config.routes').then((m) => m.CONFIG_ROUTES),
       },
       {
+        path: 'knowledge',
+        loadChildren: () =>
+          import('./features/knowledge/knowledge.routes').then((m) => m.KNOWLEDGE_ROUTES),
+      },
+      {
         path: 'automation',
         loadChildren: () =>
           import('./features/automation/automation.routes').then((m) => m.AUTOMATION_ROUTES),

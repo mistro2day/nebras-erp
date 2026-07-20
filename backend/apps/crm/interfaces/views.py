@@ -5,11 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from apps.crm.domain.models import (
-    Lead, LeadSource, LeadStatus, Prospect, Contact, Campaign, Case, Survey, Feedback
+    Lead, LeadSource, LeadStatus, Prospect, Contact, Campaign, Case, Survey, Feedback, KnowledgeArticle
 )
 from apps.crm.interfaces.serializers import (
     LeadSerializer, LeadSourceSerializer, LeadStatusSerializer, ProspectSerializer,
-    ContactSerializer, CampaignSerializer, CaseSerializer, SurveySerializer, FeedbackSerializer
+    ContactSerializer, CampaignSerializer, CaseSerializer, SurveySerializer, FeedbackSerializer,
+    KnowledgeArticleSerializer
 )
 from apps.crm.application.services import CrmLeadService, CrmCaseService, CrmDashboardService
 
@@ -95,3 +96,27 @@ class FeedbackViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = FeedbackSerializer
     queryset = Feedback.objects.all()
+
+
+class KnowledgeArticleViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = KnowledgeArticleSerializer
+    queryset = KnowledgeArticle.objects.all()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tenant_id = self.request.headers.get('X-Tenant-ID')
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(title__icontains=search) | qs.filter(content__icontains=search)
+        return qs
+
+    def perform_create(self, serializer):
+        tenant_id = self.request.headers.get('X-Tenant-ID')
+        serializer.save(tenant_id=tenant_id)
+

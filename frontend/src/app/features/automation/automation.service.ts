@@ -20,6 +20,10 @@ export class AutomationService {
     return this.unwrap<T>(this.http.get(`${this.base}/${resource}/`));
   }
 
+  create<T = any>(resource: string, body: any): Observable<T> {
+    return this.unwrap<T>(this.http.post(`${this.base}/${resource}/`, body));
+  }
+
   action<T = any>(resource: string, id: string, verb: string, body: any = {}): Observable<T> {
     return this.unwrap<T>(this.http.post(`${this.base}/${resource}/${id}/${verb}/`, body));
   }

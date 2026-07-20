@@ -1033,10 +1033,11 @@ export class DashboardLayoutComponent {
       label: 'المعرفة والأتمتة',
       permission: 'settings:read',
       items: [
+        { label: 'قاعدة المعرفة', link: '/knowledge' },
         { label: 'التقارير والتحليلات', link: '/reporting' },
         { label: 'إدارة المستندات', link: '/documents' },
         { label: 'النماذج', link: '/forms' },
-        { label: 'الأتمتة', link: '/automation' },
+        { label: 'الأتمتة ومسارات العمل', link: '/automation' },
         { label: 'محرك القواعد', link: '/rules' },
       ],
     },

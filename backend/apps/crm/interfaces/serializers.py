@@ -1,7 +1,15 @@
 from rest_framework import serializers
 from apps.crm.domain.models import (
-    Lead, LeadSource, LeadStatus, Prospect, Contact, Campaign, Case, Survey, Feedback
+    Lead, LeadSource, LeadStatus, Prospect, Contact, Campaign, Case, Survey, Feedback, KnowledgeArticle
 )
+
+
+class KnowledgeArticleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KnowledgeArticle
+        fields = ['id', 'title', 'content', 'category', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
 
 class LeadSourceSerializer(serializers.ModelSerializer):
     class Meta:
