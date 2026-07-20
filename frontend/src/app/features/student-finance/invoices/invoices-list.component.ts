@@ -8,6 +8,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { downloadCsv } from '../../../shared/export';
+import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 
 /**
  * فواتير الطلاب — وحدة عاملة (Nebras OS).
@@ -18,7 +19,7 @@ import { downloadCsv } from '../../../shared/export';
   selector: 'app-sf-invoices-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -105,6 +106,7 @@ import { downloadCsv } from '../../../shared/export';
             <span>المدفوع</span>
             <span>المتبقي</span>
             <span>الحالة</span>
+            <span>إجراءات</span>
           </div>
           @if (loading()) {
             <nb-loading message="جارٍ تحميل الفواتير…"></nb-loading>
@@ -118,6 +120,9 @@ import { downloadCsv } from '../../../shared/export';
                 <span class="mono">{{ i.paid_amount | number:'1.2-2' }}</span>
                 <span class="mono" [class.due]="+i.outstanding_amount > 0">{{ i.outstanding_amount | number:'1.2-2' }}</span>
                 <span><span [class]="badge(i.status)">{{ statusText(i.status) }}</span></span>
+                <span class="row-actions">
+                  <button class="nb-btn-ghost sm" (click)="openMessageModal(i)">💬 إرسال</button>
+                </span>
               </div>
             }
             @if (filtered().length === 0) {
@@ -134,6 +139,19 @@ import { downloadCsv } from '../../../shared/export';
           <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedInvoice()?.billing_account?.guardian_name || selectedInvoice()?.student?.profile?.arabic_name || 'ولي الأمر'"
+        [recipientPhone]="selectedInvoice()?.billing_account?.phone || selectedInvoice()?.student?.family_relations?.[0]?.phone || ''"
+        [contextVariables]="{ 
+          invoice_number: selectedInvoice()?.invoice_number,
+          amount: selectedInvoice()?.total_amount,
+          student_name: selectedInvoice()?.student?.profile?.arabic_name || '',
+          guardian_name: selectedInvoice()?.billing_account?.guardian_name || 'ولي الأمر'
+        }"
+        defaultTemplateCode="INVOICE_ISSUED"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [`
@@ -168,7 +186,7 @@ import { downloadCsv } from '../../../shared/export';
     .field select { height: 34px; min-width: 160px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
     .notice { font-size: 12px; color: var(--nb-text-muted); background: var(--nb-info-bg); border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); padding: 8px 12px; margin-bottom: 12px; }
     .tbl { display: flex; flex-direction: column; }
-    .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr 1.1fr; gap: 8px; padding: 9px 16px; align-items: center; }
+    .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 9px 16px; align-items: center; }
     .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); padding: 8px 16px; font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
     .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
     .tbl-row:last-child { border-bottom: none; }
@@ -194,6 +212,14 @@ export class SfInvoicesListComponent implements OnInit {
   readonly feeStructures = signal<any[]>([]);
   readonly selectedFees = signal<string[]>([]);
   gf = { billing_account_id: '', due_date: '' };
+
+  showMsgModal = false;
+  selectedInvoice = signal<any | null>(null);
+
+  openMessageModal(invoice: any) {
+    this.selectedInvoice.set(invoice);
+    this.showMsgModal = true;
+  }
 
   isFeeSelected(id: string): boolean { return this.selectedFees().includes(id); }
   toggleFee(id: string): void {

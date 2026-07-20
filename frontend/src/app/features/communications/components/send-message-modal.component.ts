@@ -23,7 +23,7 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
         <div class="form-row two-cols">
           <div class="form-group">
             <label>قناة الاتصال</label>
-            <select class="nb-input" [(ngModel)]="selectedChannelCode">
+            <select class="nb-input" [(ngModel)]="selectedChannelCode" (ngModelChange)="onChannelChange()">
               <option value="" disabled>-- اختر القناة --</option>
               @for (ch of activeChannels(); track ch.id) {
                 <option [value]="ch.code">{{ ch.name }}</option>
@@ -33,7 +33,7 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 
           <div class="form-group">
             <label>وجهة الاتصال (رقم / بريد)</label>
-            <input type="text" class="nb-input ltr-input" [value]="recipientContact()" readonly disabled />
+            <input type="text" class="nb-input ltr-input" [(ngModel)]="editableContact" />
           </div>
         </div>
 
@@ -83,7 +83,7 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
     .two-cols > .form-group { flex: 1; }
     .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
     label { font-size: 0.85rem; font-weight: 600; color: #4b5563; }
-    .nb-input { padding: 0.6rem 0.8rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
+    .nb-input { padding: 0.6rem 0.8rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
     .nb-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
     .nb-input:disabled { background: #f3f4f6; color: #6b7280; }
     .ltr-input { text-align: left; direction: ltr; }
@@ -123,10 +123,37 @@ export class SendMessageModalComponent implements OnChanges {
 
   activeChannels = computed(() => this.channels().filter(c => c.is_active));
 
-  recipientContact = computed(() => {
-    if (this.selectedChannelCode === 'email') return this.recipientEmail;
-    return this.recipientPhone;
-  });
+  editableContact = '';
+
+  onChannelChange() {
+    this.updateEditableContact();
+  }
+
+  updateEditableContact() {
+    let contact = this.selectedChannelCode === 'email' ? this.recipientEmail : this.recipientPhone;
+    if (this.selectedChannelCode === 'whatsapp' || this.selectedChannelCode === 'sms') {
+      contact = this.formatPhoneNumber(contact);
+    }
+    this.editableContact = contact || '';
+  }
+
+  formatPhoneNumber(phone: string): string {
+    if (!phone) return '';
+    let p = phone.replace(/[^\d+]/g, '');
+    if (p.startsWith('00')) p = '+' + p.substring(2);
+    
+    if (!p.startsWith('+')) {
+      if (p.startsWith('05')) {
+         p = '+966' + p.substring(1);
+      } else if (p.startsWith('09') || p.startsWith('01')) {
+         p = '+249' + p.substring(1);
+      } else if (p.length === 9) {
+         if (p.startsWith('5')) p = '+966' + p;
+         else p = '+249' + p;
+      }
+    }
+    return p;
+  }
 
   constructor() {
     this.commService.getChannels().subscribe(c => this.channels.set(c));
@@ -156,6 +183,7 @@ export class SendMessageModalComponent implements OnChanges {
     } else if (this.activeChannels().length > 0) {
       this.selectedChannelCode = this.activeChannels()[0].code;
     }
+    this.updateEditableContact();
   }
 
   applyDefaultTemplate() {
@@ -189,7 +217,7 @@ export class SendMessageModalComponent implements OnChanges {
   }
 
   isValid() {
-    return this.selectedChannelCode && this.recipientContact() && this.messageBody.trim().length > 0;
+    return this.selectedChannelCode && this.editableContact && this.messageBody.trim().length > 0;
   }
 
   closeModal() {
@@ -206,7 +234,7 @@ export class SendMessageModalComponent implements OnChanges {
     const payload = {
       channel: this.selectedChannelCode,
       recipient_name: this.recipientName,
-      recipient_address: this.recipientContact(),
+      recipient_address: this.editableContact,
       body: this.messageBody
     };
 

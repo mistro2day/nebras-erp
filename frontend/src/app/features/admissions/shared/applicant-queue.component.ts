@@ -13,6 +13,7 @@ import {
   applicantStatusText,
   pickList,
 } from './admissions.shared';
+import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 
 /**
  * طابور المتقدمين القابل لإعادة الاستخدام — محرّك مشترك لشاشات:
@@ -24,7 +25,7 @@ import {
   selector: 'app-applicant-queue',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent, NbDataTableComponent],
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbStatCardComponent, NbDataTableComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header [title]="title" [subtitle]="subtitle">
@@ -68,6 +69,7 @@ import {
               }
               @case ('actions') {
                 <span class="row-actions">
+                  <button class="nb-btn-ghost sm" (click)="openMessageModal(row); $event.stopPropagation()">💬 رسالة</button>
                   <button class="nb-btn-ghost sm" (click)="open(row); $event.stopPropagation()">عرض</button>
                   @for (a of actions; track a.toStatus) {
                     <button [class]="'nb-btn-' + a.kind + ' sm'" (click)="onAction(row, a); $event.stopPropagation()">{{ a.label }}</button>
@@ -79,6 +81,15 @@ import {
           </ng-template>
         </nb-data-table>
       </nb-panel>
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedApplicant()?.arabic_full_name || ''"
+        [recipientPhone]="selectedApplicant()?.phone || selectedApplicant()?.guardian?.phone || ''"
+        [recipientEmail]="selectedApplicant()?.email || selectedApplicant()?.guardian?.email || ''"
+        [contextVariables]="{ applicant_name: selectedApplicant()?.arabic_full_name, app_number: selectedApplicant()?.application_number }"
+      ></app-send-message-modal>
+
     </div>
   `,
   styles: [ADM_PAGE_STYLES],
@@ -133,6 +144,14 @@ export class ApplicantQueueComponent implements OnInit {
 
   statusText = applicantStatusText;
   statusKind = applicantStatusKind;
+
+  showMsgModal = false;
+  selectedApplicant = signal<any | null>(null);
+
+  openMessageModal(row: any) {
+    this.selectedApplicant.set(row);
+    this.showMsgModal = true;
+  }
 
   ngOnInit(): void {
     this.load();

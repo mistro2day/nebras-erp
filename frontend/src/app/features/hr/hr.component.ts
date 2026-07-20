@@ -8,6 +8,7 @@ import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.compon
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NotificationService } from '../../core/services/notification.service';
 import { environment } from '../../../environments/environment';
+import { SendMessageModalComponent } from '../communications/components/send-message-modal.component';
 
 interface Employee {
   id: string;
@@ -38,7 +39,7 @@ interface LeaveRequest {
 @Component({
   selector: 'app-hr',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbPanelComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموارد البشرية" subtitle="إدارة الموظفين، العقود، طلبات الإجازات، والخدمة الذاتية.">
@@ -154,14 +155,14 @@ interface LeaveRequest {
 
         <nb-panel [flush]="true" class="animate-fade">
           <div class="tbl">
-            <div class="tbl-head" style="grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1fr">
-              <span>الموظف</span><span>المسمى الوظيفي</span><span>القسم</span><span>رقم الهاتف</span><span>تاريخ التعيين</span><span>الحالة</span>
+            <div class="tbl-head" style="grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr">
+              <span>الموظف</span><span>المسمى الوظيفي</span><span>القسم</span><span>رقم الهاتف</span><span>تاريخ التعيين</span><span>الحالة</span><span>إجراءات</span>
             </div>
             @if (filteredEmployees().length === 0) {
               <div class="tbl-empty">لا يوجد موظفون يطابقون خيارات البحث.</div>
             } @else {
               @for (emp of filteredEmployees(); track emp.id) {
-                <div class="tbl-row" style="grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1fr">
+                <div class="tbl-row" style="grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1fr 0.8fr">
                   <span class="emp-cell">
                     <span class="avatar">{{ initials(emp.name) }}</span>
                     <div class="details">
@@ -175,6 +176,9 @@ interface LeaveRequest {
                   <span>{{ emp.hireDate }}</span>
                   <span>
                     <span class="badge" [class]="emp.status">{{ statusText(emp.status) }}</span>
+                  </span>
+                  <span class="actions-cell">
+                    <button class="btn-action" (click)="openMessageModal(emp)">💬 رسالة</button>
                   </span>
                 </div>
               }
@@ -296,6 +300,15 @@ interface LeaveRequest {
           </nb-panel>
         </div>
       }
+
+      <app-send-message-modal
+        [(open)]="showMsgModal"
+        [recipientName]="selectedEmployee()?.name || ''"
+        [recipientPhone]="selectedEmployee()?.phone || ''"
+        [recipientEmail]="selectedEmployee()?.email || ''"
+        [contextVariables]="{ employee_name: selectedEmployee()?.name, job_title: selectedEmployee()?.jobTitle }"
+      ></app-send-message-modal>
+
     </div>
   `,
   styles: [`
@@ -421,6 +434,14 @@ export class HRComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly activeTab = signal<'dashboard' | 'directory' | 'contracts' | 'requests' | 'org'>('dashboard');
+
+  showMsgModal = false;
+  selectedEmployee = signal<Employee | null>(null);
+
+  openMessageModal(emp: Employee) {
+    this.selectedEmployee.set(emp);
+    this.showMsgModal = true;
+  }
 
   // الفلاتر والبحث
   searchQuery = '';
