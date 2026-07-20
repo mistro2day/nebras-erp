@@ -162,7 +162,30 @@ interface NavGroup {
               }
             </div>
           }
-        </nav>
+        <!-- مساعد نبراس الذكي - الميزة المحورية المميزة أعلى اسم المستخدم -->
+        <div class="sidebar-ai-section">
+          <a
+            routerLink="/ai"
+            routerLinkActive="active"
+            class="ai-featured-card"
+          >
+            <div class="ai-card-content">
+              <div class="ai-card-badge">
+                <span class="ai-sparkle-icon">✦</span>
+                <span class="ai-badge-text">مساعد نبراس الذكي</span>
+                <span class="ai-live-dot"></span>
+              </div>
+              <div class="ai-card-desc">
+                استشارات وتحليلات ERP التفاعلية
+              </div>
+            </div>
+            <div class="ai-card-arrow">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M15 19l-7-7 7-7"/>
+              </svg>
+            </div>
+          </a>
+        </div>
 
         <div class="sidebar-user" [matMenuTriggerFor]="userMenu">
           <div class="user-avatar">{{ userInitials() }}</div>
@@ -580,6 +603,125 @@ interface NavGroup {
         &.danger  { background: var(--nb-danger-bg);  color: var(--nb-danger); }
         &.info    { background: var(--nb-info-bg);    color: var(--nb-info); }
         &.warning { background: var(--nb-warning-bg); color: var(--nb-warning); }
+      }
+
+      /* ---------- مساعد نبراس الذكي (Featured AI Card above Profile) ---------- */
+      .sidebar-ai-section {
+        padding: 8px 12px;
+        flex-shrink: 0;
+        border-top: 1px solid var(--nb-border-soft, #e2e8f0);
+      }
+
+      .ai-featured-card {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-radius: var(--nb-radius-lg, 12px);
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(147, 51, 234, 0.12) 50%, rgba(236, 72, 153, 0.08) 100%);
+        border: 1px solid rgba(147, 51, 234, 0.25);
+        text-decoration: none;
+        overflow: hidden;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+
+        &::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+          transform: translateX(-100%);
+          transition: transform 0.6s ease;
+        }
+
+        &:hover {
+          transform: translateY(-1.5px);
+          border-color: rgba(147, 51, 234, 0.5);
+          box-shadow: 0 4px 16px -2px rgba(147, 51, 234, 0.22), 0 2px 6px -1px rgba(79, 70, 229, 0.15);
+
+          &::before {
+            transform: translateX(100%);
+          }
+
+          .ai-card-arrow {
+            transform: translateX(-3px);
+            color: var(--nb-primary-600, #4f46e5);
+          }
+
+          .ai-sparkle-icon {
+            transform: scale(1.15) rotate(15deg);
+          }
+        }
+
+        &.active {
+          background: linear-gradient(135deg, rgba(79, 70, 229, 0.18) 0%, rgba(147, 51, 234, 0.22) 100%);
+          border-color: var(--nb-primary-500, #6366f1);
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+
+          .ai-badge-text {
+            color: var(--nb-primary-700, #4338ca);
+            font-weight: 700;
+          }
+        }
+      }
+
+      .ai-card-content {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .ai-card-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .ai-sparkle-icon {
+        font-size: 14px;
+        color: #9333ea;
+        display: inline-block;
+        transition: transform 0.3s ease;
+      }
+
+      .ai-badge-text {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #4c1d95;
+        letter-spacing: -0.2px;
+      }
+
+      .ai-live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+        animation: aiPulse 2s infinite;
+      }
+
+      @keyframes aiPulse {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      }
+
+      .ai-card-desc {
+        font-size: 11px;
+        color: var(--nb-text-muted, #64748b);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .ai-card-arrow {
+        color: #9333ea;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease, color 0.2s ease;
       }
 
       .sidebar-user {
@@ -1134,7 +1276,6 @@ export class DashboardLayoutComponent {
             { label: 'الأقسام', link: '/organization/departments' },
           ],
         },
-        { label: '✦ مساعد نبراس', icon: '✨', link: '/ai', ai: true },
       ],
     },
   ];
