@@ -338,4 +338,4 @@ else:
     NLQ_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 NLQ_API_KEY = NLQ_API_KEY or os.environ.get('NLQ_API_KEY', '')
 NLQ_BASE_URL = _NLQ_BASE_URL_RAW
-NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-2.5-flash')
+NLQ_MODEL = os.environ.get('NLQ_MODEL', 'gemini-1.5-flash')

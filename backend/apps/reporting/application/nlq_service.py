@@ -1,5 +1,5 @@
 """
-محرّك الاستعلام باللغة الطبيعية (NLQ) — مبني على Gemini.
+محرّك الاستعلام باللغة الطبيعية (NLQ) — مبني على Gemini مع دعم نمط احتياطي محلي.
 
 النموذج اللغوي يقوم بمهمة واحدة فقط: **فهم السؤال واختيار المقياس المناسب
 وتعبئة معاملاته**. لا يولّد SQL، ولا يصل إلى قاعدة البيانات، ولا يكتب الأرقام.
@@ -9,13 +9,10 @@
 
 عزل المستأجر مفروض في طبقة الـ ORM؛ `tenant_id` لا يصل إلى النموذج أصلاً،
 ولا تمرّ عليه نتائج الاستعلام — يُرسَل نص السؤال وأسماء المقاييس فقط.
-
-نستخدم الواجهة المتوافقة مع OpenAI التي يوفّرها Gemini، فيمكن التحويل إلى
-Groq أو Cerebras أو Ollama بتغيير NLQ_BASE_URL و NLQ_MODEL دون تعديل شيفرة.
 """
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from django.conf import settings
 
@@ -41,15 +38,12 @@ SYSTEM_PROMPT = """أنت مساعد التحليلات في نظام «نبرا
 
 
 class NLQUnavailable(RuntimeError):
-    """يُرفع عندما لا يكون مزوّد الذكاء الاصطناعي مهيّأً."""
+    """يُرفع عندما لا يكون مزوّد الذكاء الاصطناعي مهيّأً ولا يوجد مطابقة محليّة."""
 
 
 def _client():
     """
     إنشاء عميل متوافق مع OpenAI موجّه إلى Gemini.
-
-    نفس الشيفرة تعمل مع Groq أو Cerebras أو Ollama بتغيير NLQ_BASE_URL
-    و NLQ_MODEL في الإعدادات — لا حاجة لتعديل أي منطق هنا.
     """
     try:
         from openai import OpenAI
@@ -61,7 +55,7 @@ def _client():
     api_key = getattr(settings, 'NLQ_API_KEY', '') or ''
     if not api_key:
         raise NLQUnavailable(
-            'خدمة التحليل الذكي غير مهيّأة — اضبط GEMINI_API_KEY في متغيّرات البيئة. '
+            'خدمة التحليل الذكي غير مهيّأة — اضبط GEMINI_API_KEY في متغيّرات بيئة Render. '
             'يمكنك الحصول على مفتاح مجاني من https://aistudio.google.com/apikey'
         )
 
@@ -89,23 +83,80 @@ def _format_answer(result: Dict[str, Any]) -> str:
     return '\n'.join(lines)
 
 
+def _normalize_text(text: str) -> str:
+    """تنظيف وتوحيد نص السؤال للتعرّف الدقيق على النية."""
+    text = text.lower()
+    text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+    text = text.replace('ة', 'ه').replace('ى', 'ي')
+    return text
+
+
+def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str, Any]]:
+    """
+    مطابقة النوايا محلياً كوضع احتياطي حتمي.
+    تُستخدم في حال عدم ضبط المفتاح في بيئة الإنتاج أو انقطاع خدمة AI الخارجية.
+    """
+    q = _normalize_text(question)
+
+    matched_key = None
+    params: Dict[str, Any] = {}
+
+    if any(k in q for k in ['حضور', 'غياب', 'انضباط', 'نسبه حضور', 'نسبه الغياب']):
+        matched_key = 'student_attendance_rate'
+        params = {'period': 'this_month'}
+    elif any(k in q for k in ['اكثر غيابا', 'الاكثر غيابا', 'قائمه الغياب', 'اكثر الطلاب غيابا']):
+        matched_key = 'absence_leaderboard'
+        params = {'period': 'this_month', 'limit': 5}
+    elif any(k in q for k in ['متأخرات حسب الصف', 'ديون حسب الصف', 'صفوف عليها متأخرات', 'متأخرات الصفوف']):
+        matched_key = 'outstanding_by_grade'
+        params = {}
+    elif any(k in q for k in ['مدينين', 'اسماء المدينين', 'من عليهم ديون', 'من عليهم متأخرات', 'الطلاب المدينون', 'من الطلاب الذين']):
+        matched_key = 'student_debtors'
+        params = {'limit': 10}
+    elif any(k in q for k in ['متأخرات', 'ديون', 'مستحقات', 'ذمم', 'رسوم غير مسدده', 'المتأخرات المالية']):
+        matched_key = 'outstanding_receivables'
+        params = {'period': 'this_year'}
+    elif any(k in q for k in ['تحصيل', 'ايرادات', 'مقبوضات', 'تم سداده', 'المبالغ المحصله']):
+        matched_key = 'collections_total'
+        params = {'period': 'this_month'}
+    elif any(k in q for k in ['عدد الطلاب', 'طلاب نشطين', 'الطلاب المسجلين', 'عدد طلاب', 'كم طالب']):
+        matched_key = 'students_count_by_status'
+        params = {'status': 'active'}
+
+    if matched_key:
+        try:
+            result = run_metric(tenant_id, matched_key, params)
+            payload = {
+                'answered': True,
+                'answer': _format_answer(result),
+                'metric': result['metric_key'],
+                'metric_title': result['metric_title'],
+                'params': result['params_used'],
+                'value': result['value'],
+                'unit': result.get('unit', ''),
+                'facts': [{'label': k, 'value': v} for k, v in result.get('facts', [])],
+                'tokens_used': 0,
+            }
+            _log_conversation(tenant_id, user_id, question, payload)
+            return payload
+        except Exception as exc:
+            logger.warning('فشل تنفيذ المقياس الاحتياطي %s: %s', matched_key, exc)
+            return None
+
+    return None
+
+
 def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
     """
     تنفيذ استعلام باللغة الطبيعية.
-
-    ترجع dict فيها:
-      - answered: هل أمكن الإجابة من المقاييس المتاحة
-      - answer: نص الجواب العربي (مبني على أرقام حقيقية)
-      - metric / params: المقياس الذي اختاره النموذج ومعاملاته (للشفافية)
-      - value / unit / facts: الأرقام الخام لعرضها في الواجهة
     """
     question = (question or '').strip()
     if not question:
         return {'answered': False, 'answer': 'السؤال فارغ.', 'available': _available()}
 
-    client = _client()
-
+    # 1. محاولة الاتصال بخدمة الذكاء الاصطناعي
     try:
+        client = _client()
         completion = client.chat.completions.create(
             model=settings.NLQ_MODEL,
             max_tokens=MAX_TOKENS,
@@ -117,38 +168,26 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
             ],
         )
     except Exception as exc:
-        from openai import AuthenticationError, BadRequestError, RateLimitError
+        logger.warning('تعذّر استخدام خدمة AI الخارجية (%s) — محاولة المطابقة المحلّية.', exc)
+        fallback = _fallback_match(question, tenant_id, user_id)
+        if fallback:
+            return fallback
 
-        if isinstance(exc, AuthenticationError):
-            raise NLQUnavailable(
-                'مفتاح الوصول غير صالح — راجع إعداد GEMINI_API_KEY.'
-            ) from exc
-        if isinstance(exc, RateLimitError):
-            # الحصة المجانية محدودة يومياً؛ نوضّح السبب بدل خطأ عام.
-            raise NLQUnavailable(
-                'تم تجاوز الحصة المجانية للتحليل الذكي. حاول لاحقاً أو ارفع الحصة.'
-            ) from exc
-        if isinstance(exc, BadRequestError):
-            # جوجل تعيد 400 (لا 401) عند المفتاح المشوّه — نشخّصه بوضوح
-            # بدل رسالة عامة، لأن هذا أشيع خطأ في الإعداد.
-            if 'api key' in str(exc).lower():
-                raise NLQUnavailable(
-                    'مفتاح GEMINI_API_KEY غير صالح. تأكّد أنه مفتاح API من '
-                    'aistudio.google.com/apikey (يبدأ بـ AIzaSy وطوله ٣٩ محرفاً '
-                    'ولا يحتوي نقطة) — لا رمز OAuth ولا رمز تفويض.'
-                ) from exc
-            raise NLQUnavailable(f'طلب غير صالح إلى مزوّد التحليل: {exc}') from exc
-        raise
+        if isinstance(exc, NLQUnavailable):
+            raise exc
+        raise NLQUnavailable(f'تعذّر تنفيذ التحليل الذكي: {exc}') from exc
 
+    # 2. معالجة رد الـ AI
     choice = completion.choices[0].message
     tool_calls = getattr(choice, 'tool_calls', None) or []
     usage = getattr(completion, 'usage', None)
     tokens_used = getattr(usage, 'total_tokens', 0) or 0
 
     if not tool_calls:
-        # النموذج لم يجد مقياساً مناسباً. لا نعرض نصّه الخام لأن النماذج
-        # المفتوحة (Llama) تردّ أحياناً بالإنجليزية أو برموز؛ نستبدله برسالة
-        # عربية حتمية ونعرض المتاح ليعرف المستخدم ما يمكن سؤاله.
+        fallback = _fallback_match(question, tenant_id, user_id)
+        if fallback:
+            return fallback
+
         return {
             'answered': False,
             'answer': 'هذا السؤال خارج نطاق المقاييس المتاحة حالياً. '
@@ -168,6 +207,9 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
         result = run_metric(tenant_id, call.function.name, raw_args)
     except KeyError:
         logger.warning('اختار النموذج مقياساً غير مسجّل: %s', call.function.name)
+        fallback = _fallback_match(question, tenant_id, user_id)
+        if fallback:
+            return fallback
         return {
             'answered': False,
             'answer': 'تعذّر تنفيذ هذا الاستعلام — المقياس المطلوب غير معرّف.',
