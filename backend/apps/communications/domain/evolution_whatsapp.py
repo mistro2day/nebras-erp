@@ -30,16 +30,19 @@ class EvolutionWhatsAppClient:
 
     def format_phone_number(self, phone: str) -> str:
         """
-        تنسيق رقم الهاتف السوداني للسيغة الدولية المطلوبة في الواتساب (+249)
-        مثال: 0912345678 -> 249912345678
+        تنسيق رقم الهاتف للصيغة الدولية المطلوبة في الواتساب.
+        - الأرقام المحلية السودانية (تبدأ بـ 0) تُحوّل إلى +249: 0912345678 -> 249912345678
+        - الأرقام الدولية الكاملة (966..., 249..., 20...) تُترك كما هي.
+        - البادئة الدولية 00 تُزال.
         """
         clean = ''.join(filter(str.isdigit, phone))
-        if clean.startswith('0'):
+        if clean.startswith('00'):
+            # صيغة الاتصال الدولي 00 -> رمز الدولة مباشرة
+            clean = clean[2:]
+        elif clean.startswith('0'):
+            # رقم محلي سوداني -> إضافة رمز السودان +249
             clean = '249' + clean[1:]
-        elif clean.startswith('249'):
-            pass
-        else:
-            clean = '249' + clean
+        # غير ذلك: الرقم أصلاً بصيغة دولية كاملة (يحمل رمز دولته) فيُترك كما هو.
         return clean
 
     def get_connection_state(self) -> dict:
@@ -112,18 +115,15 @@ class EvolutionWhatsAppClient:
         """
         formatted_phone = self.format_phone_number(phone_number)
         url = f"{self.base_url}/message/sendText/{self.instance_name}"
-        
+
+        # صيغة Evolution API v2 المسطّحة (الصيغة المتداخلة القديمة textMessage/options
+        # تُرفض بخطأ 400 على v2).
         payload = {
             "number": formatted_phone,
-            "options": {
-                "delay": 1200, # تأخير طبيعي لمكافحة الحظر (1.2 ثانية)
-                "presence": "composing"
-            },
-            "textMessage": {
-                "text": message
-            }
+            "text": message,
+            "delay": 1200,  # تأخير طبيعي لمكافحة الحظر (1.2 ثانية)
         }
-        
+
         try:
             response = requests.post(url, json=payload, headers=self.headers, timeout=15)
             logger.info(f"تم إرسال رسالة واتساب للرقم {formatted_phone}: {response.status_code}")
@@ -139,16 +139,15 @@ class EvolutionWhatsAppClient:
         formatted_phone = self.format_phone_number(phone_number)
         url = f"{self.base_url}/message/sendMedia/{self.instance_name}"
         
+        # صيغة Evolution API v2 المسطّحة (بدل غلاف mediaMessage المتداخل في v1).
         payload = {
             "number": formatted_phone,
-            "mediaMessage": {
-                "mediatype": "document",
-                "fileName": filename,
-                "caption": caption,
-                "media": document_url # رابط المستند أو Base64
-            }
+            "mediatype": "document",
+            "fileName": filename,
+            "caption": caption,
+            "media": document_url,  # رابط المستند أو Base64
         }
-        
+
         try:
             response = requests.post(url, json=payload, headers=self.headers, timeout=20)
             return response.json()
