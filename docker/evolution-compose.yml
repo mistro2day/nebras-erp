@@ -1,0 +1,65 @@
+# خادم واتساب Evolution API لمنصة نبراس (بوابة رسائل واتساب عبر Baileys)
+#
+# الإعداد أولاً: أنشئ ملف docker/.env (غير مُتتبَّع في git) بالمتغيرات التالية:
+#   EVOLUTION_API_KEY=<مفتاح API سري>
+#   EVO_DB_PASSWORD=<كلمة مرور قاعدة البيانات>
+#   EVO_SERVER_URL=http://localhost:8080     # أو رابط النفق العام للإنتاج
+#
+# التشغيل:  docker compose -f docker/evolution-compose.yml --env-file docker/.env up -d
+# الإيقاف:  docker compose -f docker/evolution-compose.yml --env-file docker/.env down
+#
+# ملاحظة مهمة: CONFIG_SESSION_PHONE_VERSION مثبّت على أحدث نسخة واتساب-ويب
+# لتفادي حلقة إعادة الاتصال اللانهائية التي تمنع توليد رمز QR في v2.1.x.
+# عند فشل الاقتران مستقبلاً، حدّث هذه القيمة من:
+#   https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json
+
+services:
+  postgres_evo:
+    image: postgres:16-alpine
+    container_name: evolution_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${EVO_DB_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_pg:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - evolution_net
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution-api
+    restart: unless-stopped
+    depends_on:
+      - postgres_evo
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: ${EVO_SERVER_URL:-http://localhost:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://postgres:${EVO_DB_PASSWORD}@postgres_evo:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_exchange
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      # الإصلاح الحاسم لحلقة QR: تثبيت نسخة واتساب-ويب الحالية
+      CONFIG_SESSION_PHONE_VERSION: 2.3000.1035194821
+      QRCODE_LIMIT: "30"
+      DEL_INSTANCE: "false"
+      TZ: America/Sao_Paulo
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - evolution_net
+
+volumes:
+  evolution_pg:
+  evolution_instances:
+
+networks:
+  evolution_net:
+    driver: bridge
