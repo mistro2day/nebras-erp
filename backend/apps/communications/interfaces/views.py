@@ -136,6 +136,38 @@ class ProviderViewSet(BaseCRUDViewSet):
 # ============================================================
 # 3. القوالب — Templates
 # ============================================================
+# القوالب الافتراضية المعتمدة للقبول — مصدر البذر بالخلفية (ADR-008).
+# تُنشأ ذاتياً عند أول طلب إن غابت، فتصبح قابلة للتحرير من صفحة القوالب.
+ADMISSIONS_DEFAULT_TEMPLATES = {
+    'ADM_SUBMITTED': (
+        'إشعار استلام طلب الالتحاق',
+        'السلام عليكم {{guardian_name}}، تم استلام طلب الالتحاق بنجاح بالرقم: ({{application_number}}) '
+        'للتلميذ/ة ({{student_name}}) بـ ({{school_name}}) - مدارس المورد النموذجية للعام الدراسي ({{academic_year}}). '
+        'نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.'
+    ),
+    'ADM_ACCEPTED': (
+        'إشعار قبول التلميذ المعتمد',
+        'السلام عليكم {{guardian_name}}، نبارك لكم قبول التلميذ/ة {{student_name}} بـ {{school_name}} - '
+        'مدارس المورد النموذجية للعام الدراسي. رقم الطلب: {{application_number}}. نرجو مراجعة قسم التسجيل لاستكمال الإجراءات.'
+    ),
+    'ADM_WAITLIST': (
+        'إشعار قائمة الانتظار المعتمد',
+        'السلام عليكم {{guardian_name}}، نفيدكم بإدراج طلب القبول رقم {{application_number}} للتلميذ/ة {{student_name}} '
+        'ضمن قائمة الانتظار بـ {{school_name}}. سيتم التواصل معكم فور توفر مقعد شاغر.'
+    ),
+    'ADM_REJECTED': (
+        'إشعار نتيجة التنافس ورفض الطلب',
+        'السلام عليكم {{guardian_name}}، نشكركم للتواصل مع مدارس المورد النموذجية. نود إحاطتكم باكتفاء المقاعد المتاحة '
+        'لطلب القبول رقم {{application_number}} للتلميذ/ة {{student_name}}. نتمنى لكم دوام التوفيق.'
+    ),
+    'ADM_INTERVIEW': (
+        'إشعار موعد المقابلة الشخصية',
+        'السلام عليكم {{guardian_name}}، تم تحديد موعد المقابلة الشخصية للتلميذ/ة {{student_name}} بـ {{school_name}} '
+        '(طلب رقم {{application_number}}) بتاريخ {{interview_date}}. نرجو الحضور في الموعد المحدد.'
+    ),
+}
+
+
 class TemplateViewSet(BaseCRUDViewSet):
     model_class = CommunicationTemplate
     serializer_class = CommunicationTemplateSerializer
@@ -145,7 +177,8 @@ class TemplateViewSet(BaseCRUDViewSet):
         """جلب قالب واحد بالرمز للاستهلاك العام (استمارة القبول غير المصادَقة).
 
         يعيد الحقول غير الحساسة فقط (الرمز، العنوان، النص) ليضمن أن نصوص المراسلات
-        العامة تتبع نفس القوالب المعتمدة القابلة للتحرير من صفحة القوالب.
+        العامة تتبع نفس القوالب المعتمدة القابلة للتحرير من صفحة القوالب. عند غياب قالب
+        قبول معروف يُنشأ ذاتياً من القيم الافتراضية (بدل 404) فيصبح قابلاً للتحرير.
         """
         tenant = getattr(request, 'tenant', None)
         code = (request.query_params.get('code') or '').strip()
@@ -155,6 +188,22 @@ class TemplateViewSet(BaseCRUDViewSet):
         tmpl = CommunicationTemplate.objects.filter(
             tenant_id=tenant.id, code=code, is_active=True, deleted_at__isnull=True
         ).first()
+
+        # الإصلاح الذاتي: بذر القالب المعروف إن غاب
+        if not tmpl and code in ADMISSIONS_DEFAULT_TEMPLATES:
+            name, body = ADMISSIONS_DEFAULT_TEMPLATES[code]
+            channel = CommunicationChannel.objects.filter(
+                tenant_id=tenant.id, channel_type='whatsapp', deleted_at__isnull=True
+            ).order_by('-is_active').first()
+            tmpl, _ = CommunicationTemplate.objects.get_or_create(
+                tenant_id=tenant.id, code=code,
+                defaults={
+                    'name': name, 'category': 'admission', 'channel': channel,
+                    'content_type': 'plain_text', 'language': 'ar',
+                    'body': body, 'is_active': True,
+                },
+            )
+
         if not tmpl:
             return StandardResponse(data=None, message="لا يوجد قالب بهذا الرمز.",
                                     status=status.HTTP_404_NOT_FOUND)
