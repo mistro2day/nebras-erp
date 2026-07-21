@@ -134,6 +134,11 @@ DATABASES = {
     )
 }
 
+# مهلة اتصال قصيرة بقاعدة بيانات Neon: عند برودة/تعليق المزوّد يفشل الطلب بسرعة
+# بدل تعليق العامل حتى مهلة gunicorn (120 ثانية) فيفشل فحص الحياة والديبلوي.
+DATABASES['default'].setdefault('OPTIONS', {})
+DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
