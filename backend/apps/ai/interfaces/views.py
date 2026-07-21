@@ -18,19 +18,17 @@ class AIConversationViewSet(BaseCRUDViewSet):
     serializer_class = AIConversationSerializer
 
     def get_queryset(self):
+        # عزل صارم: بلا مستأجر محدَّد لا نعرض شيئاً. لا الرجوع إلى first()
+        # ولا objects.all() — كلاهما يكشف محادثات مستأجرين آخرين.
         tenant_id = None
         if hasattr(self.request, 'tenant') and self.request.tenant:
             tenant_id = self.request.tenant.id
-        elif hasattr(self.request.user, 'tenant_id') and getattr(self.request.user, 'tenant_id', None):
+        elif getattr(self.request.user, 'tenant_id', None):
             tenant_id = self.request.user.tenant_id
-        else:
-            from apps.tenants.domain.models import Tenant
-            first_t = Tenant.objects.first()
-            tenant_id = first_t.id if first_t else None
 
-        if tenant_id:
-            return AIConversation.objects.filter(tenant_id=tenant_id).order_by('-created_at')
-        return AIConversation.objects.all().order_by('-created_at')
+        if tenant_id is None:
+            return AIConversation.objects.none()
+        return AIConversation.objects.filter(tenant_id=tenant_id).order_by('-created_at')
 
     @action(detail=False, methods=['post'], url_path='ask')
     def ask_prompt(self, request):
@@ -43,15 +41,22 @@ class AIConversationViewSet(BaseCRUDViewSet):
         serializer = AIAskPromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # عزل المستأجر: نأخذ المعرّف من الطلب المصادَق فقط. الرجوع إلى
+        # Tenant.objects.first() ثغرة تسريب — يجعل طلباً غير مصادَق أو خاطئ
+        # الإعداد يرى بيانات أول مدرسة في القاعدة. نرفض بدل أن نخمّن.
         tenant_id = None
         if hasattr(request, 'tenant') and request.tenant:
             tenant_id = request.tenant.id
-        elif hasattr(request.user, 'tenant_id') and getattr(request.user, 'tenant_id', None):
+        elif getattr(request.user, 'tenant_id', None):
             tenant_id = request.user.tenant_id
-        else:
-            from apps.tenants.domain.models import Tenant
-            first_t = Tenant.objects.first()
-            tenant_id = first_t.id if first_t else None
+
+        if tenant_id is None:
+            return StandardResponse(
+                data={'answered': False, 'answer': 'تعذّر تحديد المؤسسة لهذا الطلب.'},
+                message="تعذّر تحديد المستأجر لهذا الطلب.",
+                success=False,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user_id = getattr(request.user, 'id', None)
         prompt = serializer.validated_data['prompt']
