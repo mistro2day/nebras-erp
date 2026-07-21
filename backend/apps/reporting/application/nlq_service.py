@@ -191,6 +191,50 @@ def _fallback_match(question: str, tenant_id, user_id=None) -> Optional[Dict[str
     return None
 
 
+# أنماط تلاعب أمني: حقن تعليمات، أفعال هدم لقاعدة البيانات، أو محاولة كشف
+# التعليمات الداخلية. مساعد نبراس للقراءة والتحليل فقط، فأي نية تعديل أو
+# تجاوز تعليمات هي محاولة تلاعب تُرفض بحزم دون إرشاد (كي لا نعلّم المهاجم).
+_SECURITY_PATTERNS = [
+    # تجاوز/حقن التعليمات
+    'تجاهل', 'تجاوز التعليمات', 'تجاوز تعليمات', 'انس التعليمات', 'انسى التعليمات',
+    'ignore previous', 'ignore all', 'disregard', 'override', 'system prompt',
+    'اظهر تعليماتك', 'اكشف تعليماتك', 'ما هي تعليماتك', 'reveal your', 'اطبع التعليمات',
+    # أفعال هدم/تعديل لقاعدة البيانات
+    'احذف', 'امسح', 'اسقط جدول', 'drop table', 'delete from', 'truncate',
+    'update ', 'insert into', 'alter table', ' union select', '; drop', '--',
+    # وصول غير مصرّح
+    'كلمه المرور', 'باسورد', 'password', 'صلاحيات المدير', 'كل المستاجرين',
+    'مستاجر اخر', 'all tenants',
+]
+
+
+def _is_security_probe(question: str) -> bool:
+    """كشف حتمي لمحاولات التلاعب الأمني قبل استدعاء النموذج."""
+    q = _normalize_text(question)
+    return any(_normalize_text(p) in q for p in _SECURITY_PATTERNS)
+
+
+def _security_refusal() -> Dict[str, Any]:
+    """رفض أمني حازم — بلا قائمة مقاييس ولا تفاصيل تساعد المهاجم."""
+    return {
+        'answered': False,
+        'blocked': True,
+        'answer': 'لا يمكن تنفيذ هذا الطلب. مساعد نبراس مخصّص للاستعلام والتحليل '
+                  'فقط، ولا ينفّذ أوامر تعديل أو تجاوز للنظام.',
+    }
+
+
+def _out_of_scope(question: str) -> Dict[str, Any]:
+    """رد يدلّ على فهم السؤال رغم عدم توفّر مقياس له — مع إرشاد للمتاح."""
+    q = (question or '').strip()
+    return {
+        'answered': False,
+        'answer': f'فهمتُ أنك تسأل عن «{q}»، لكن لا يتوفّر لديّ مقياس يغطّي هذا '
+                  f'الجانب حالياً. يمكنني الإجابة بدقّة عن المقاييس التالية:',
+        'available': _available(),
+    }
+
+
 def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
     """
     تنفيذ استعلام باللغة الطبيعية.
@@ -198,6 +242,13 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
     question = (question or '').strip()
     if not question:
         return {'answered': False, 'answer': 'السؤال فارغ.', 'available': _available()}
+
+    # فحص أمني حتمي أولاً — قبل أي استدعاء للنموذج، فلا يستهلك حصة ولا يتيح
+    # للنموذج الامتثال لمحاولة الحقن.
+    if _is_security_probe(question):
+        refusal = _security_refusal()
+        _log_conversation(tenant_id, user_id, question, refusal)
+        return refusal
 
     # 1. محاولة الاتصال بخدمة الذكاء الاصطناعي
     try:
@@ -247,13 +298,9 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
         if fallback:
             return fallback
 
-        return {
-            'answered': False,
-            'answer': 'هذا السؤال خارج نطاق المقاييس المتاحة حالياً. '
-                      'يمكنك السؤال عن أحد المقاييس أدناه.',
-            'available': _available(),
-            'tokens_used': tokens_used,
-        }
+        payload = _out_of_scope(question)
+        payload['tokens_used'] = tokens_used
+        return payload
 
     call = tool_calls[0]
     try:
@@ -269,11 +316,7 @@ def ask(question: str, tenant_id, user_id=None) -> Dict[str, Any]:
         fallback = _fallback_match(question, tenant_id, user_id)
         if fallback:
             return fallback
-        return {
-            'answered': False,
-            'answer': 'تعذّر تنفيذ هذا الاستعلام — المقياس المطلوب غير معرّف.',
-            'available': _available(),
-        }
+        return _out_of_scope(question)
 
     payload = {
         'answered': True,

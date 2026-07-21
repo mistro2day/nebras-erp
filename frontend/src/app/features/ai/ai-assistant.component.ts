@@ -76,11 +76,11 @@ interface Suggestion {
 
       <!-- عرض نتيجة الاستعلام الحالي المباشر -->
       <nb-panel *ngIf="currentAnswer()" [title]="'نتيجة التحليل الذكي'" [subtitle]="currentAnswer().metric_title || 'إجابة محرك نبراس'">
-        <div class="answer-display-box" [class.unanswered]="!currentAnswer().answered">
+        <div class="answer-display-box" [class.unanswered]="!currentAnswer().answered" [class.blocked]="currentAnswer().blocked">
           <div class="ans-header">
             <div class="ans-title-group">
               <span class="status-indicator" [class.success]="currentAnswer().answered"></span>
-              <strong>{{ currentAnswer().answered ? (currentAnswer().metric_title || 'إجابة دقيقة') : 'تنبيه تحليل' }}</strong>
+              <strong>{{ currentAnswer().blocked ? '🛑 طلب مرفوض' : (currentAnswer().answered ? (currentAnswer().metric_title || 'إجابة دقيقة') : 'تنبيه تحليل') }}</strong>
             </div>
             <span class="security-tag">🔒 حساب حتمي من الـ ORM</span>
           </div>
@@ -215,6 +215,8 @@ interface Suggestion {
       border-right: 4px solid #4f46e5; display: flex; flex-direction: column; gap: 14px;
     }
     .answer-display-box.unanswered { border-right-color: #f59e0b; background: #fffbeb; }
+    .answer-display-box.blocked { border-right-color: #dc2626; background: #fef2f2; }
+    .answer-display-box.blocked .ans-title-group strong { color: #dc2626; }
     .ans-header { display: flex; align-items: center; justify-content: space-between; }
     .ans-title-group { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #1e293b; }
     .status-indicator { width: 10px; height: 10px; border-radius: 50%; background: #f59e0b; }
