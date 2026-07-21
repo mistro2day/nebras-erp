@@ -214,25 +214,20 @@ interface StaffGuardianForm {
                   <label>رقم واتساب المتابعة المدرسية <span class="lbl-sub">(مفتاح الدولة + رقم المتابعة لربطه بالرسائل)</span></label>
                   <div class="phone-with-country">
                     <select [(ngModel)]="whatsappCountryCode" (change)="updateFullWhatsappNumber()" class="country-select" title="اختر دولة ومفتاح الواتساب">
-                      <option value="+249" selected>🇸🇩 السودان (+249)</option>
-                      <option value="+966">🇸🇦 السعودية (+966)</option>
-                      <option value="+20">🇪🇬 مصر (+20)</option>
-                      <option value="+971">🇦🇪 الإمارات (+971)</option>
-                      <option value="+974">🇶🇦 قطر (+974)</option>
-                      <option value="+968">🇴🇲 عمان (+968)</option>
-                      <option value="+965">🇰🇼 الكويت (+965)</option>
-                      <option value="+973">🇧🇭 البحرين (+973)</option>
-                      <option value="+962">🇯🇴 الأردن (+962)</option>
-                      <option value="+90">🇹🇷 تركيا (+90)</option>
-                      <option value="+44">🇬🇧 المملكة المتحدة (+44)</option>
-                      <option value="+1">🇺🇸 أمريكا / كندا (+1)</option>
+                      @for (c of waCountries; track c.code) {
+                        <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                      }
                     </select>
-                    <input inputmode="tel" [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()" placeholder="مثال: 912345678" class="phone-body" />
+                    <input inputmode="numeric" [maxlength]="selectedWaCountry().len[1]"
+                           [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()"
+                           [placeholder]="'مثال: ' + selectedWaCountry().sample" class="phone-body" dir="ltr" />
                   </div>
                   @if (whatsappError()) {
                     <span class="val-err">{{ whatsappError() }}</span>
                   } @else if (g.whatsapp_phone) {
-                    <span class="val-ok">✓ الرقم المعتمد لرسائل الواتساب: <b>{{ g.whatsapp_phone }}</b></span>
+                    <span class="val-ok">✓ الرقم المعتمد لرسائل الواتساب: <b dir="ltr">{{ g.whatsapp_phone }}</b></span>
+                  } @else {
+                    <span class="lbl-sub">بدون صفر البداية ولا رمز الدولة — الصيغة المتوقعة: {{ selectedWaCountry().sample }}</span>
                   }
                 </div>
                 
@@ -554,25 +549,72 @@ export class ApplicantFormComponent implements OnInit {
     emergency_contact_address: '',
   };
 
+  // الدول المدعومة لرقم الواتساب: [أدنى، أقصى] عدد خانات الرقم الوطني (بدون رمز الدولة) + مثال.
+  readonly waCountries = [
+    { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
+    { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
+    { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
+    { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
+    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+  ];
+
   whatsappCountryCode = '+249';
   whatsappBody = '';
   readonly whatsappError = signal('');
 
+  selectedWaCountry(): { code: string; name: string; len: number[]; sample: string } {
+    return this.waCountries.find((c) => c.code === this.whatsappCountryCode) || this.waCountries[0];
+  }
+
   updateFullWhatsappNumber(): void {
-    let cleaned = (this.whatsappBody || '').trim().replace(/^0+/, '').replace(/\D/g, '');
+    const country = this.selectedWaCountry();
+    const [min, max] = country.len;
+
+    // ماسك حي: أرقام فقط + إزالة رمز الدولة المكرر + الأصفار البادئة + سقف الطول
+    let cleaned = (this.whatsappBody || '').replace(/\D/g, '');
+    const codeDigits = country.code.replace(/\D/g, '');
+    if (cleaned.startsWith(codeDigits)) cleaned = cleaned.slice(codeDigits.length);
+    cleaned = cleaned.replace(/^0+/, '');
+    if (cleaned.length > max) cleaned = cleaned.slice(0, max);
+    if (cleaned !== this.whatsappBody) this.whatsappBody = cleaned;
+
     if (!cleaned) {
       this.g.whatsapp_phone = '';
       this.whatsappError.set('');
       return;
     }
 
-    if (cleaned.length < 8 || cleaned.length > 12) {
-      this.whatsappError.set('يرجى كتابة رقم هاتف صحيح يتكون من 8 إلى 11 خانة بدون صفر البداية.');
-    } else {
-      this.whatsappError.set('');
+    if (cleaned.length < min || cleaned.length > max) {
+      const lenText = min === max ? `${min}` : `${min}–${max}`;
+      this.whatsappError.set(`رقم ${country.name} يجب أن يكون ${lenText} خانة (مثال: ${country.sample}) بدون صفر البداية ولا رمز الدولة.`);
+      this.g.whatsapp_phone = '';
+      return;
     }
 
+    this.whatsappError.set('');
     this.g.whatsapp_phone = `${this.whatsappCountryCode}${cleaned}`;
+  }
+
+  /** تعبئة الحقلين من رقم E.164 محفوظ مسبقاً (لتحرير الأرقام القديمة). */
+  hydrateWhatsappFields(): void {
+    const full = (this.g.whatsapp_phone || '').replace(/\s/g, '');
+    if (!full.startsWith('+')) return;
+    const match = this.waCountries
+      .slice()
+      .sort((a, b) => b.code.length - a.code.length)
+      .find((c) => full.startsWith(c.code));
+    if (match) {
+      this.whatsappCountryCode = match.code;
+      this.whatsappBody = full.slice(match.code.length);
+      this.updateFullWhatsappNumber();
+    }
   }
 
   valid(): boolean {

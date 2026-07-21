@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, map, of } from 'rxjs';
+import { Observable, catchError, map, of, switchMap } from 'rxjs';
 
 export interface CommunicationChannel {
   id: string;
@@ -203,6 +203,13 @@ export class CommunicationsService {
   private http = inject(HttpClient);
   private baseUrl = '/api/v1/communications';
 
+  // إعدادات Evolution API (تُمرَّر عبر بروكسي /whatsapp-api → http://localhost:8080)
+  private evoInstance = 'nebras-khartoum-instance';
+  private evoApiKey = 'evo_key_998237465';
+  private get evoHeaders() {
+    return { apikey: this.evoApiKey };
+  }
+
   private toArray<T>(res: any, fallback: T[]): T[] {
     if (Array.isArray(res)) return res;
     if (res && Array.isArray(res.results)) return res.results;
@@ -261,49 +268,60 @@ export class CommunicationsService {
     );
   }
 
-  testProviderConnection(id: string): Observable<any> {
-    // For WhatsApp providers, check the real Baileys server
-    return this.http.get<any>('/whatsapp-api/status').pipe(
-      map((res) => ({
-        status: res?.connected ? 'success' : 'error',
-        health_status: res?.connected ? 'healthy' : 'down',
-        ping_ms: res?.connected ? 8 : 0,
-        connected: res?.connected || false,
-        message: res?.connected
-          ? 'سيرفر Baileys متصل والواتساب مقترن بنجاح ✓'
-          : 'سيرفر Baileys يعمل ولكن الواتساب غير مقترن بعد. امسح رمز QR أولاً.',
-      })),
+  testProviderConnection(_id: string): Observable<any> {
+    // فحص حالة الجلسة عبر Evolution API v2: GET /instance/connectionState/{instance}
+    return this.http.get<any>(`/whatsapp-api/instance/connectionState/${this.evoInstance}`, { headers: this.evoHeaders }).pipe(
+      map((res) => {
+        const connected = res?.instance?.state === 'open';
+        return {
+          status: connected ? 'success' : 'error',
+          health_status: connected ? 'healthy' : 'down',
+          ping_ms: connected ? 8 : 0,
+          connected,
+          message: connected
+            ? 'خادم Evolution API متصل والواتساب مقترن بنجاح ✓'
+            : 'الخادم يعمل لكن الواتساب غير مقترن (الحالة: ' + (res?.instance?.state || 'unknown') + '). امسح رمز QR أولاً.',
+        };
+      }),
       catchError(() => of({
         status: 'error',
         health_status: 'down',
         ping_ms: 0,
         connected: false,
-        message: 'تعذر الاتصال بسيرفر Baileys. تأكد من تشغيله على المنفذ 8080.',
+        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيله على المنفذ 8080 وصحة مفتاح apikey.',
       }))
     );
   }
 
-  getProviderQrCode(id: string): Observable<any> {
-    // Call the real Baileys WhatsApp server via Angular proxy to avoid CORS
-    return this.http.get<any>('/whatsapp-api/instance/connect/qr-code').pipe(
-      map((res) => res?.data || res),
-      catchError(() =>
-        // Fallback: try Django backend
-        this.http.get<any>(`${this.baseUrl}/providers/${id}/qr-code/`).pipe(
-          map((res) => res?.data || res),
-          catchError(() => of({
-            status: 'error',
-            instance_name: 'nebras-khartoum-instance',
-            connected: false,
-            qr_code_base64: null,
-            message: 'تعذر الاتصال بسيرفر Baileys. تأكد من تشغيل الخادم على المنفذ 8080.'
-          }))
-        )
-      )
+  getProviderQrCode(_id: string): Observable<any> {
+    // Evolution API v2: GET /instance/connect/{instance}
+    // عند الاتصال يرجع { instance: { state: 'open' } } — لا يوجد QR (الواتساب مربوط أصلاً)
+    // عند عدم الاتصال يرجع { base64, code, pairingCode }
+    return this.http.get<any>(`/whatsapp-api/instance/connect/${this.evoInstance}`, { headers: this.evoHeaders }).pipe(
+      map((res) => {
+        const connected = res?.instance?.state === 'open';
+        return {
+          status: 'success',
+          instance_name: this.evoInstance,
+          connected,
+          qr_code_base64: res?.base64 || null,
+          pairing_code: res?.pairingCode || null,
+          message: connected
+            ? 'الواتساب مقترن ومتصل بالفعل — لا حاجة لمسح رمز QR.'
+            : 'امسح رمز الـ QR أدناه من تطبيق واتساب على هاتفك (أجهزة مرتبطة).',
+        };
+      }),
+      catchError(() => of({
+        status: 'error',
+        instance_name: this.evoInstance,
+        connected: false,
+        qr_code_base64: null,
+        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيل الخادم على المنفذ 8080 وصحة مفتاح apikey.'
+      }))
     );
   }
 
-  // 3. القوالب (Templates)
+  // 3. القوالب (Templates) — المصدر الموحّد لكل المراسلات في النظام
   getTemplates(): Observable<CommunicationTemplate[]> {
     return this.http.get<any>(`${this.baseUrl}/templates/`).pipe(
       map((res) => this.toArray<CommunicationTemplate>(res, FALLBACK_TEMPLATES)),
@@ -311,29 +329,189 @@ export class CommunicationsService {
     );
   }
 
+  createTemplate(data: Partial<CommunicationTemplate>): Observable<CommunicationTemplate> {
+    return this.http.post<any>(`${this.baseUrl}/templates/`, data).pipe(
+      map((res) => (res?.data ?? res) as CommunicationTemplate),
+      catchError(() => of({
+        id: String(Date.now()),
+        name: data.name || '',
+        code: data.code || '',
+        category: data.category || 'general',
+        language: data.language || 'ar',
+        subject: data.subject,
+        body: data.body || '',
+        content_type: data.content_type || 'plain_text',
+        is_active: data.is_active ?? true,
+        version_count: 1,
+      } as CommunicationTemplate))
+    );
+  }
+
+  updateTemplate(id: string, data: Partial<CommunicationTemplate>): Observable<CommunicationTemplate> {
+    return this.http.patch<any>(`${this.baseUrl}/templates/${id}/`, data).pipe(
+      map((res) => (res?.data ?? res) as CommunicationTemplate),
+      catchError(() => of({ ...data, id } as CommunicationTemplate))
+    );
+  }
+
+  /** جلب قالب واحد بالرمز للاستهلاك العام (استمارة القبول غير المصادَقة). null عند التعذّر. */
+  getPublicTemplate(code: string): Observable<{ code: string; name: string; subject: string; body: string } | null> {
+    return this.http.get<any>(`${this.baseUrl}/templates/public-by-code/`, { params: { code } }).pipe(
+      map((res) => (res?.data ?? res) || null),
+      catchError(() => of(null))
+    );
+  }
+
   // 4. الرسائل (Messages)
   getMessages(): Observable<CommunicationMessageItem[]> {
     return this.http.get<any>(`${this.baseUrl}/messages/`).pipe(
-      map((res) => this.toArray<CommunicationMessageItem>(res, FALLBACK_MESSAGES)),
+      map((res) => {
+        const raw = this.toArray<any>(res, []);
+        // إن لم يُرجع الخادم رسائل فعلية، نعرض بيانات العرض التجريبية
+        if (!raw.length) return FALLBACK_MESSAGES;
+        return raw.map((m) => this.normalizeMessage(m));
+      }),
       catchError(() => of(FALLBACK_MESSAGES))
     );
   }
 
+  /**
+   * تحويل رسالة الخادم (CommunicationMessageSerializer) إلى شكل صف الجدول المسطّح.
+   * يستخرج المستلم الرئيسي من مصفوفة recipients ويطابق أسماء الحقول الخلفية.
+   */
+  private normalizeMessage(m: any): CommunicationMessageItem {
+    const primary = Array.isArray(m.recipients) && m.recipients.length ? m.recipients[0] : null;
+    return {
+      id: String(m.id),
+      channel_name: m.channel_name || '',
+      channel_type: this.mapChannelType(m.channel_type),
+      recipient_name: primary?.name || m.recipient_name || m.sender_name || '—',
+      recipient_address: primary?.address || m.recipient_address || '',
+      subject: m.subject || '',
+      status: this.mapStatus(m.status),
+      priority: this.mapPriority(m.priority),
+      sent_at: m.sent_at || undefined,
+      delivered_at: m.delivered_at || primary?.delivered_at || undefined,
+      read_at: m.read_at || primary?.read_at || undefined,
+      attempts: (m.retry_count ?? 0) + (m.status && m.status !== 'draft' && m.status !== 'queued' ? 1 : 0),
+      external_status: m.external_status || undefined,
+      error_message: m.last_error || primary?.error_message || undefined,
+    };
+  }
+
+  private mapChannelType(t?: string): CommunicationMessageItem['channel_type'] {
+    if (t === 'email' || t === 'whatsapp' || t === 'sms' || t === 'push') return t;
+    return 'email';
+  }
+
+  private mapStatus(s?: string): MessageStatus {
+    switch (s) {
+      case 'sent': case 'delivered': case 'read': case 'failed': case 'bounced': case 'queued':
+        return s;
+      case 'draft': case 'processing':
+        return 'queued';
+      case 'cancelled': case 'expired':
+        return 'failed';
+      default:
+        return 'queued';
+    }
+  }
+
+  private mapPriority(p?: string): CommunicationMessageItem['priority'] {
+    if (p === 'critical' || p === 'high') return 'high';
+    if (p === 'low') return 'low';
+    return 'normal';
+  }
+
   sendMessage(data: any): Observable<any> {
-    // Route WhatsApp messages to the real Baileys server
+    // توجيه رسائل الواتساب إلى Evolution API v2 الحقيقية
     const isWhatsApp = data.channel === 'whatsapp' || data.channel_type === 'whatsapp' || data.provider_type?.includes('wa') || data.provider_type?.includes('baileys');
     if (isWhatsApp) {
-      const baileysPayload = {
-        number: (data.recipient_address || data.phone || '').replace(/[^0-9]/g, ''),
-        textMessage: { text: data.body || data.message || data.subject || '' }
+      // Evolution API v2: POST /message/sendText/{instance} مع الترويسة apikey والجسم { number, text }
+      const rawNumber = data.recipient_address || data.phone || '';
+      const number = this.normalizeWhatsappNumber(rawNumber);
+      const payload = {
+        number,
+        text: data.body || data.message || data.subject || '',
       };
-      return this.http.post<any>('/whatsapp-api/message/sendText', baileysPayload).pipe(
-        catchError(() => of({ status: 'error', message: 'فشل إرسال الرسالة. تأكد من تشغيل سيرفر Baileys واقتران الواتساب.' }))
+      return this.http.post<any>(`/whatsapp-api/message/sendText/${this.evoInstance}`, payload, { headers: this.evoHeaders }).pipe(
+        map((res) => ({
+          status: res?.key?.id ? 'success' : 'error',
+          sent: !!res?.key?.id,
+          external_id: res?.key?.id,
+          external_status: res?.status || 'PENDING',
+          message: res?.key?.id
+            ? 'تم إرسال الرسالة فعلياً عبر Evolution API بنجاح.'
+            : 'لم يتم قبول الرسالة من الخادم.',
+        })),
+        catchError((err) => of({
+          status: 'error',
+          sent: false,
+          message: this.describeWhatsappError(err, rawNumber, number),
+        })),
+        // توثيق الرسالة في سجل حركة الرسائل الفورية (لا يعرقل النتيجة عند الفشل)
+        switchMap((result: any) =>
+          this.logExternalMessage(data, result).pipe(map(() => result), catchError(() => of(result)))
+        )
       );
     }
     return this.http.post<any>(`${this.baseUrl}/messages/send/`, data).pipe(
       catchError(() => of({ status: 'success', message: 'تمت إضافة الرسالة إلى طابور الإرسال بنجاح.' }))
     );
+  }
+
+  /**
+   * تطبيع رقم الواتساب إلى صيغة دولية بدون رموز. يزيل الأصفار البادئة ويضيف
+   * رمز الدولة الافتراضي (السودان 249) للأرقام المحلية التي تنقصها.
+   * الأرقام التي تحمل رمز دولة معروف تُترك كما هي.
+   */
+  private normalizeWhatsappNumber(raw: string): string {
+    let n = (raw || '').replace(/[^0-9]/g, '');
+    n = n.replace(/^0+/, ''); // إزالة الأصفار البادئة (0912.. أو 00249..)
+    const knownCodes = /^(249|966|20|971|974|973|965|968|962|218|20|1|44)/;
+    // رقم سوداني محلي (9 خانات) بلا رمز دولة → إضافة 249
+    if (!knownCodes.test(n) && n.length === 9) n = '249' + n;
+    return n;
+  }
+
+  /** رسالة خطأ دقيقة بحسب استجابة Evolution API الفعلية. */
+  private describeWhatsappError(err: any, rawNumber: string, normalized: string): string {
+    if (err?.status === 401) {
+      return 'تعذر الإرسال: مفتاح apikey غير صحيح أو مفقود.';
+    }
+    // Evolution يرجع 400 مع exists:false عند رقم غير مسجّل على واتساب أو ناقص رمز الدولة
+    const respMsg = err?.error?.response?.message;
+    const notExists = Array.isArray(respMsg) && respMsg.some((m: any) => m && m.exists === false);
+    if (err?.status === 400 || notExists) {
+      return `تعذّر الإرسال: الرقم (${rawNumber}) غير مسجّل على واتساب أو ينقصه رمز الدولة (مثال: 249 للسودان). الصيغة المُجرّبة: ${normalized}. رجاءً صحّح رقم الواتساب المعتمد لولي الأمر.`;
+    }
+    if (err?.status === 0 || err?.status === 502 || err?.status === 503 || err?.status === 404) {
+      return 'تعذر الإرسال: تأكد من تشغيل خادم Evolution API على المنفذ 8080 واقتران الواتساب (الحالة open).';
+    }
+    return err?.error?.message || 'تعذر الإرسال حالياً. يرجى التأكد من الرقم والمحاولة لاحقاً.';
+  }
+
+  /**
+   * توثيق رسالة أُرسلت خارجياً (Evolution API) في سجل حركة الرسائل الفورية بالخلفية.
+   * لا يعرقل تدفق الإرسال — يُتجاهل أي فشل بصمت.
+   */
+  private logExternalMessage(data: any, result: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/messages/log-external/`, {
+      channel_type: data.channel_type || data.channel || 'whatsapp',
+      recipient_name: data.recipient_name || '',
+      recipient_address: data.recipient_address || data.phone || '',
+      subject: data.subject || '',
+      body: data.body || data.message || '',
+      priority: data.priority || 'normal',
+      source_module: data.source_module || 'admissions',
+      source_event: data.source_event || (data.template_code || 'external_dispatch'),
+      entity_type: data.entity_type || 'guardian',
+      status: result?.status,
+      sent: result?.sent,
+      external_id: result?.external_id,
+      external_status: result?.external_status,
+      message: result?.message,
+    }).pipe(catchError(() => of(null)));
   }
 
   // 5. Statistics

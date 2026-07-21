@@ -324,8 +324,8 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
                 )
                 if guardian_data.get('full_name'):
                     allowed_guardian = {
-                        'relationship', 'full_name', 'phone', 'email', 'occupation',
-                        'employer', 'national_id', 'address',
+                        'relationship', 'full_name', 'phone', 'phone2', 'whatsapp_phone',
+                        'email', 'occupation', 'employer', 'national_id', 'address',
                     }
                     clean_guardian = {k: v for k, v in guardian_data.items() if k in allowed_guardian and v is not None}
                     clean_guardian.setdefault('relationship', 'guardian')

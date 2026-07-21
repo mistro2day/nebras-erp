@@ -185,14 +185,27 @@ const server = http.createServer(async (req, res) => {
         const text = body.textMessage?.text || body.body || 'إشعار من مدارس نبراس';
         const formattedJid = number.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
 
-        if (waSock && isConnected) {
-          await waSock.sendMessage(formattedJid, { text: text });
-          console.log(`✓ Real WhatsApp Business message dispatched to ${formattedJid}`);
+        // لا يمكن الإرسال إذا لم تكن الجلسة مقترنة (يلزم مسح رمز QR أولاً)
+        if (!waSock || !isConnected) {
+          console.warn(`✕ Cannot send to ${formattedJid}: WhatsApp session not connected (scan QR first).`);
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: 'error',
+            sent: false,
+            connected: false,
+            message: 'تعذر الإرسال: جلسة الواتساب غير مقترنة. امسح رمز الـ QR بهاتفك أولاً ثم أعد المحاولة.'
+          }));
+          return;
         }
+
+        await waSock.sendMessage(formattedJid, { text: text });
+        console.log(`✓ Real WhatsApp Business message dispatched to ${formattedJid}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'success',
+          sent: true,
+          connected: true,
           key: { id: 'BAILEYS_MSG_' + Date.now(), remoteJid: formattedJid, fromMe: true },
           message: 'تم إرسال الرسالة الحقيقية عبر بروتوكول Baileys بنجاح.'
         }));

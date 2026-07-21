@@ -527,26 +527,31 @@ export class CommunicationsTemplatesComponent {
 
   saveTemplate(): void {
     if (!this.formData.name || !this.formData.code || !this.formData.body) return;
+
+    // الحفظ في الخلفية (المصدر الموحّد) — أي تعديل ينعكس على كل الموديولات التي تستهلك هذا القالب.
     if (this.editingTemplate) {
-      this.templates.update((list) =>
-        (Array.isArray(list) ? list : []).map((item) =>
-          item.id === this.editingTemplate!.id ? ({ ...item, ...this.formData } as CommunicationTemplate) : item
-        )
-      );
+      const id = this.editingTemplate.id;
+      this.commService.updateTemplate(id, this.formData).subscribe((saved) => {
+        this.templates.update((list) =>
+          (Array.isArray(list) ? list : []).map((item) =>
+            item.id === id ? ({ ...item, ...this.formData, ...saved } as CommunicationTemplate) : item
+          )
+        );
+      });
     } else {
-      const item: CommunicationTemplate = {
-        id: String(Date.now()),
-        name: this.formData.name || '',
-        code: this.formData.code || '',
+      const payload: Partial<CommunicationTemplate> = {
+        name: this.formData.name,
+        code: this.formData.code,
         category: this.formData.category || 'general',
         language: this.formData.language || 'ar',
         subject: this.formData.subject,
-        body: this.formData.body || '',
-        content_type: 'html',
+        body: this.formData.body,
+        content_type: 'plain_text',
         is_active: true,
-        version_count: 1,
       };
-      this.templates.update((list) => [item, ...(Array.isArray(list) ? list : [])]);
+      this.commService.createTemplate(payload).subscribe((saved) => {
+        this.templates.update((list) => [saved, ...(Array.isArray(list) ? list : [])]);
+      });
     }
     this.showModal.set(false);
   }

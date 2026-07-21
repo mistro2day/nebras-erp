@@ -57,6 +57,9 @@ class Guardian(CombinedBaseModel):
     relationship = models.CharField(max_length=20, choices=RELATION_CHOICES)
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=50)
+    phone2 = models.CharField(max_length=50, blank=True, null=True)
+    # رقم الواتساب المعتمد بصيغة E.164 (مثال: +249912345678) — المصدر الأساسي لكل المراسلات.
+    whatsapp_phone = models.CharField(max_length=30, blank=True, null=True)
     email = models.EmailField()
     occupation = models.CharField(max_length=150, blank=True, null=True)
     employer = models.CharField(max_length=200, blank=True, null=True)

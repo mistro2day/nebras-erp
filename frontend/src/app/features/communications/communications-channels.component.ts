@@ -154,11 +154,25 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
               <div class="qr-scanner-layout">
                 <!-- الرمز والـ QR Image -->
                 <div class="qr-code-box">
-                  <div class="qr-image-wrapper">
-                    <img [src]="qrModalData()?.qr_code_base64" alt="WhatsApp QR Code Scanner" />
-                  </div>
-                  <span class="qr-timer">⏳ ينتهي الرمز خلال {{ qrCountdown() }} ثانية</span>
-                  <button class="btn-refresh-qr" (click)="refreshQrCode()">🔄 إعادة توليد كود QR جديد</button>
+                  @if (qrModalData()?.connected) {
+                    <div class="qr-connected-box">
+                      <div class="qr-connected-icon">✓</div>
+                      <strong>الواتساب مقترن ومتصل</strong>
+                      <span>لا حاجة لمسح رمز QR — الجلسة مربوطة بالفعل. يمكنك الإرسال مباشرة.</span>
+                    </div>
+                  } @else if (qrModalData()?.qr_code_base64) {
+                    <div class="qr-image-wrapper">
+                      <img [src]="qrModalData()?.qr_code_base64" alt="WhatsApp QR Code" />
+                    </div>
+                    <span class="qr-timer">⏳ ينتهي الرمز خلال {{ qrCountdown() }} ثانية</span>
+                    <button class="btn-refresh-qr" (click)="refreshQrCode()">🔄 إعادة توليد كود QR جديد</button>
+                  } @else {
+                    <div class="qr-empty-box">
+                      <div class="qr-empty-icon">📡</div>
+                      <span>{{ qrModalData()?.message || 'تعذر جلب رمز QR. تأكد من تشغيل خادم Evolution API على المنفذ 8080.' }}</span>
+                      <button class="btn-refresh-qr" (click)="refreshQrCode()">🔄 إعادة المحاولة</button>
+                    </div>
+                  }
                 </div>
 
                 <!-- الخطوات والإرشادات -->
@@ -414,15 +428,20 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
             </div>
             <div class="modal-body">
               <div class="wa-result-card">
-                <div class="wa-res-status success">
-                  ✓ تم قبول الطلب وإضافته لطابور إرسال الواتساب (Queued for Delivery)
-                </div>
+                @if (sendWhatsAppResult()?.success) {
+                  <div class="wa-res-status success">
+                    ✓ تم إرسال الرسالة فعلياً عبر خادم الواتساب (Delivered via Baileys)
+                  </div>
+                } @else {
+                  <div class="wa-res-status error">
+                    ✕ لم تُرسل الرسالة — {{ sendWhatsAppResult()?.server_message || 'تعذر الاتصال بخادم الواتساب.' }}
+                  </div>
+                  <div class="real-dispatch-note fail">
+                    ⚠ <strong>سبب عدم الإرسال:</strong>
+                    <p>جلسة الواتساب غير مقترنة أو الخادم متوقف. اضغط زر <code>📱 رمز QR</code>، امسح الكود بهاتفك بالخرطوم، وتأكد من تشغيل خادم Baileys على المنفذ 8080، ثم أعد المحاولة.</p>
+                  </div>
+                }
 
-                <div class="real-dispatch-note">
-                  💡 <strong>ملاحظة الربط الفعلي لهاتفك (Real WhatsApp Setup):</strong>
-                  <p>تم تسجيل الرسالة وطباعتها بنجاح في سجلات النظام. لوصول الرسالة <u>فعلياً لجوالك</u>، تأكد من النقر على زر <code>📱 رمز QR</code> ومسح الكود عبر هاتفكم بالخرطوم.</p>
-                </div>
-                
                 <div class="wa-res-details">
                   <div class="r-row">
                     <span>المستلم:</span>
@@ -438,7 +457,11 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
                   </div>
                   <div class="r-row">
                     <span>حالة الإرسال:</span>
-                    <span class="nb-badge-success">SENT / DELIVERED</span>
+                    @if (sendWhatsAppResult()?.success) {
+                      <span class="nb-badge-success">SENT / DELIVERED</span>
+                    } @else {
+                      <span class="nb-badge-error">FAILED / NOT SENT</span>
+                    }
                   </div>
                   <div class="r-row">
                     <span>تاريخ ووقت الإرسال:</span>
@@ -585,6 +608,13 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
     /* QR Scanner Modal Styles */
     .qr-scanner-layout { display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start; }
     .qr-code-box { display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--nb-bg); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 16px; gap: 10px; }
+    .qr-connected-box { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 20px 10px; }
+    .qr-connected-icon { width: 56px; height: 56px; border-radius: 50%; background: #dcfce7; color: #166534; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; }
+    .qr-connected-box strong { font-size: 14px; color: #166534; }
+    .qr-connected-box span { font-size: 11.5px; color: var(--nb-text-muted); line-height: 1.5; }
+    .qr-empty-box { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 20px 10px; }
+    .qr-empty-icon { font-size: 32px; opacity: .7; }
+    .qr-empty-box span { font-size: 11.5px; color: var(--nb-text-muted); line-height: 1.5; }
     .qr-image-wrapper { width: 190px; height: 190px; background: white; border: 1px solid #cbd5e1; border-radius: var(--nb-radius); padding: 8px; display: flex; align-items: center; justify-content: center; }
     .qr-image-wrapper img { width: 100%; height: 100%; object-fit: contain; }
     .qr-timer { font-size: 11.5px; color: var(--nb-text-muted); font-weight: 600; }
@@ -615,6 +645,9 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
     .wa-result-card { background: var(--nb-bg); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .wa-res-status.success { font-size: 14px; font-weight: 700; color: #166534; }
+    .wa-res-status.error { font-size: 14px; font-weight: 700; color: #991b1b; }
+    .real-dispatch-note.fail { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+    .nb-badge-error { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
     .wa-res-details { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; border-top: 1px dashed var(--nb-border-soft); padding-top: 10px; }
     .r-row { display: flex; justify-content: space-between; color: var(--nb-text-secondary); }
     .r-row strong { color: var(--nb-text); }
@@ -902,8 +935,11 @@ export class CommunicationsChannelsComponent {
       body: this.waTestForm.message,
     };
 
-    this.commService.sendMessage(payload).subscribe(() => {
-      if (chosenProv) {
+    this.commService.sendMessage(payload).subscribe((res: any) => {
+      const ok = res?.status === 'success' && res?.sent !== false;
+
+      // لا نحتسب رسالة مُرسَلة للمزود إلا عند النجاح الفعلي
+      if (ok && chosenProv) {
         this.providers.update((list) =>
           (Array.isArray(list) ? list : []).map((item) =>
             item.id === chosenProv.id ? { ...item, sent_today: (item.sent_today || 0) + 1 } : item
@@ -914,10 +950,12 @@ export class CommunicationsChannelsComponent {
       this.closeSendWhatsAppModal();
 
       this.sendWhatsAppResult.set({
+        success: ok,
         recipient_name: this.waTestForm.recipient_name,
         phone: this.waTestForm.phone,
         provider_name: chosenProv ? chosenProv.name : 'Evolution API (WhatsApp Engine)',
         message: this.waTestForm.message,
+        server_message: res?.message || '',
         timestamp: new Date().toLocaleString('ar-SD'),
       });
     });

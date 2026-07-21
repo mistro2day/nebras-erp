@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import requests
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from django.utils import timezone
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
@@ -138,6 +139,29 @@ class ProviderViewSet(BaseCRUDViewSet):
 class TemplateViewSet(BaseCRUDViewSet):
     model_class = CommunicationTemplate
     serializer_class = CommunicationTemplateSerializer
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-by-code')
+    def public_by_code(self, request):
+        """جلب قالب واحد بالرمز للاستهلاك العام (استمارة القبول غير المصادَقة).
+
+        يعيد الحقول غير الحساسة فقط (الرمز، العنوان، النص) ليضمن أن نصوص المراسلات
+        العامة تتبع نفس القوالب المعتمدة القابلة للتحرير من صفحة القوالب.
+        """
+        tenant = getattr(request, 'tenant', None)
+        code = (request.query_params.get('code') or '').strip()
+        if not tenant or not code:
+            return StandardResponse(data=None, message="رمز القالب مطلوب.",
+                                    status=status.HTTP_400_BAD_REQUEST)
+        tmpl = CommunicationTemplate.objects.filter(
+            tenant_id=tenant.id, code=code, is_active=True, deleted_at__isnull=True
+        ).first()
+        if not tmpl:
+            return StandardResponse(data=None, message="لا يوجد قالب بهذا الرمز.",
+                                    status=status.HTTP_404_NOT_FOUND)
+        return StandardResponse(data={
+            'code': tmpl.code, 'name': tmpl.name,
+            'subject': tmpl.subject or '', 'body': tmpl.body or '',
+        }, message="تم جلب القالب.")
 
     @action(detail=True, methods=['post'], url_path='preview')
     def preview(self, request, pk=None):
@@ -332,6 +356,78 @@ class MessageViewSet(BaseCRUDViewSet):
         return StandardResponse(
             data=CommunicationMessageSerializer(message).data,
             message="تم إعادة إدراج الرسالة في الطابور."
+        )
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], url_path='log-external')
+    def log_external(self, request):
+        """تسجيل رسالة أُرسلت خارجياً (عبر Evolution API مباشرة) في سجل حركة الرسائل الفورية.
+
+        تُستدعى من الواجهة بعد إتمام الإرسال الفعلي عبر بوابة الواتساب، لتوثيق الرسالة
+        في المنصة المركزية دون إعادة إرسالها (لا طابور ولا Celery). مفتوحة للعموم لأن
+        استمارة القبول العامة (غير المصادَقة) تحتاج تسجيل رسالة تأكيد التسجيل أيضاً.
+        """
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return StandardResponse(data=None, message="تعذّر تحديد المستأجر.",
+                                    status=status.HTTP_400_BAD_REQUEST)
+        tenant_id = tenant.id
+
+        data = request.data or {}
+        channel_type = data.get('channel_type') or 'whatsapp'
+        body = (data.get('body') or '').strip()
+        if not body:
+            return StandardResponse(data=None, message="محتوى الرسالة مطلوب.",
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+        # حالة الرسالة القادمة من نتيجة الإرسال الخارجي
+        sent_ok = bool(data.get('sent', True)) and data.get('status') != 'error'
+        msg_status = 'sent' if sent_ok else 'failed'
+
+        # إيجاد القناة بالنوع أو إنشاؤها إن لم تكن موجودة (مرونة بيئة العرض)
+        channel = CommunicationChannel.objects.filter(
+            tenant_id=tenant_id, channel_type=channel_type, deleted_at__isnull=True
+        ).order_by('-is_active').first()
+        if not channel:
+            names = {'whatsapp': 'واتساب الأعمال', 'email': 'البريد الإلكتروني',
+                     'sms': 'الرسائل النصية SMS', 'push': 'الإشعارات الفورية'}
+            channel = CommunicationChannel.objects.create(
+                tenant_id=tenant_id, channel_type=channel_type,
+                code=channel_type, name=names.get(channel_type, channel_type),
+                is_active=True,
+            )
+
+        now = timezone.now()
+        message = CommunicationMessage.objects.create(
+            tenant_id=tenant_id,
+            channel=channel,
+            subject=data.get('subject') or '',
+            body=body,
+            status=msg_status,
+            priority=data.get('priority') or 'normal',
+            source_module=data.get('source_module') or 'admissions',
+            source_event=data.get('source_event') or 'external_dispatch',
+            sent_at=now if sent_ok else None,
+            delivered_at=now if sent_ok else None,
+            external_id=data.get('external_id') or None,
+            external_status=data.get('external_status') or ('SENT' if sent_ok else 'FAILED'),
+            last_error=None if sent_ok else (data.get('message') or 'فشل الإرسال الخارجي'),
+        )
+        CommunicationRecipient.objects.create(
+            tenant_id=tenant_id,
+            message=message,
+            recipient_type='to',
+            entity_type=data.get('entity_type') or 'guardian',
+            name=data.get('recipient_name') or '',
+            address=data.get('recipient_address') or '',
+            status='sent' if sent_ok else 'failed',
+            delivered_at=now if sent_ok else None,
+            error_message=None if sent_ok else (data.get('message') or ''),
+        )
+
+        return StandardResponse(
+            data=CommunicationMessageSerializer(message).data,
+            message="تم توثيق الرسالة في سجل حركة الرسائل الفورية.",
+            status=status.HTTP_201_CREATED
         )
 
 

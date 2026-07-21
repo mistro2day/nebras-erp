@@ -211,6 +211,10 @@ export class AdmissionsService {
     return this.apiClient.post('admissions/guardians/', body);
   }
 
+  updateGuardian(id: string, body: Record<string, any>): Observable<any> {
+    return this.apiClient.patch(`admissions/guardians/${id}/`, body);
+  }
+
   // ---- المستندات ----
   getDocuments(): Observable<any> {
     return this.apiClient.get<any>('admissions/documents/');

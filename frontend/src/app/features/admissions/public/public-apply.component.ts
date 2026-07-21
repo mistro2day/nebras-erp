@@ -264,25 +264,20 @@ interface ExtendedGuardianForm {
                       <label>رقم واتساب المتابعة المدرسية <span class="lbl-sub">(مفتاح الدولة + رقم المتابعة لربطه بالرسائل)</span></label>
                       <div class="phone-with-country">
                         <select [(ngModel)]="whatsappCountryCode" (change)="updateFullWhatsappNumber()" class="country-select" title="اختر دولة ومفتاح الواتساب">
-                          <option value="+249" selected>🇸🇩 السودان (+249)</option>
-                          <option value="+966">🇸🇦 السعودية (+966)</option>
-                          <option value="+20">🇪🇬 مصر (+20)</option>
-                          <option value="+971">🇦🇪 الإمارات (+971)</option>
-                          <option value="+974">🇶🇦 قطر (+974)</option>
-                          <option value="+968">🇴🇲 عمان (+968)</option>
-                          <option value="+965">🇰🇼 الكويت (+965)</option>
-                          <option value="+973">🇧🇭 البحرين (+973)</option>
-                          <option value="+962">🇯🇴 الأردن (+962)</option>
-                          <option value="+90">🇹🇷 تركيا (+90)</option>
-                          <option value="+44">🇬🇧 المملكة المتحدة (+44)</option>
-                          <option value="+1">🇺🇸 أمريكا / كندا (+1)</option>
+                          @for (c of waCountries; track c.code) {
+                            <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                          }
                         </select>
-                        <input inputmode="tel" [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()" placeholder="مثال: 912345678" class="phone-body" />
+                        <input inputmode="numeric" [maxlength]="selectedWaCountry().len[1]"
+                               [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()"
+                               [placeholder]="'مثال: ' + selectedWaCountry().sample" class="phone-body" dir="ltr" />
                       </div>
                       @if (whatsappError()) {
                         <span class="val-err">{{ whatsappError() }}</span>
                       } @else if (g.whatsapp_phone) {
-                        <span class="val-ok">✓ الرقم الدولي المعتمد لرسائل الواتساب: <b>{{ g.whatsapp_phone }}</b></span>
+                        <span class="val-ok">✓ الرقم الدولي المعتمد لرسائل الواتساب: <b dir="ltr">{{ g.whatsapp_phone }}</b></span>
+                      } @else {
+                        <span class="lbl-sub">أدخل رقم الواتساب بدون صفر البداية ولا رمز الدولة — الصيغة المتوقعة: {{ selectedWaCountry().sample }}</span>
                       }
                     </div>
 
@@ -860,25 +855,57 @@ export class PublicApplyComponent implements OnInit {
     });
   }
 
+  // الدول المدعومة لرقم الواتساب: [أدنى، أقصى] عدد خانات الرقم الوطني (بدون رمز الدولة) + مثال.
+  readonly waCountries = [
+    { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
+    { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
+    { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
+    { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
+    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+  ];
+
   whatsappCountryCode = '+249';
   whatsappBody = '';
   readonly whatsappError = signal('');
 
+  selectedWaCountry(): { code: string; name: string; len: number[]; sample: string } {
+    return this.waCountries.find((c) => c.code === this.whatsappCountryCode) || this.waCountries[0];
+  }
+
   updateFullWhatsappNumber(): void {
-    let cleaned = (this.whatsappBody || '').trim().replace(/^0+/, '').replace(/\D/g, '');
+    const country = this.selectedWaCountry();
+    const [min, max] = country.len;
+
+    // ماسك حي: أرقام فقط + إزالة الأصفار البادئة + رمز الدولة إن كُتب بالخطأ + سقف الطول
+    let cleaned = (this.whatsappBody || '').replace(/\D/g, '');
+    const codeDigits = country.code.replace(/\D/g, '');
+    if (cleaned.startsWith(codeDigits)) cleaned = cleaned.slice(codeDigits.length); // أزل رمز الدولة المكرر
+    cleaned = cleaned.replace(/^0+/, '');                                           // أزل الأصفار البادئة
+    if (cleaned.length > max) cleaned = cleaned.slice(0, max);
+    if (cleaned !== this.whatsappBody) this.whatsappBody = cleaned;                 // إعادة الكتابة (الماسك)
+
     if (!cleaned) {
       this.g.whatsapp_phone = '';
       this.whatsappError.set('');
       return;
     }
 
-    if (cleaned.length < 8 || cleaned.length > 12) {
-      this.whatsappError.set('يرجى كتابة رقم هاتف صحيح يتكون من 8 إلى 11 خانة بدون صفر البداية.');
-    } else {
-      this.whatsappError.set('');
+    if (cleaned.length < min || cleaned.length > max) {
+      const lenText = min === max ? `${min}` : `${min}–${max}`;
+      this.whatsappError.set(`رقم ${country.name} يجب أن يكون ${lenText} خانة (مثال: ${country.sample}) بدون صفر البداية ولا رمز الدولة.`);
+      this.g.whatsapp_phone = ''; // امنع تخزين رقم غير صالح — يوقف التقدّم لمرحلة المراجعة
+      return;
     }
 
-    this.g.whatsapp_phone = `${this.whatsappCountryCode}${cleaned}`;
+    this.whatsappError.set('');
+    this.g.whatsapp_phone = `${this.whatsappCountryCode}${cleaned}`; // E.164 معتمد
   }
 
   onFileSelect(event: Event, key: string): void {
@@ -984,17 +1011,35 @@ export class PublicApplyComponent implements OnInit {
     if (!phone) return;
 
     const schoolName = this.a['target_school_type'] === 'girls' ? 'مدرسة البنات' : 'مدرسة البنين';
-    const msg = `السلام عليكم ${this.g.full_name || 'ولي الأمر المحترم'}، تم استلام طلب الالتحاق بنجاح بالرقم : (${appNum}) للتلميذ/ة (${this.a.arabic_full_name}) بـ (${schoolName}) - مدارس المورد النموذجية للعام الدراسي (${this.yearName(this.a.academic_year_id)}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.`;
+    const guardianName = this.g.full_name || 'ولي الأمر المحترم';
+    const studentName = this.a.arabic_full_name;
+    const academicYear = this.yearName(this.a.academic_year_id);
 
-    this.commsSvc.sendMessage({
-      channel: 'whatsapp',
-      channel_type: 'whatsapp',
-      recipient_address: phone,
-      recipient_name: this.g.full_name || 'ولي الأمر',
-      subject: 'تأكيد استلام طلب الالتحاق - مدارس نبراس',
-      body: msg,
-      template_code: 'ADM_SUBMITTED',
-    }).subscribe();
+    // النص الاحتياطي إن تعذّر جلب القالب المعتمد (استمارة عامة غير مصادَقة)
+    const fallback = `السلام عليكم ${guardianName}، تم استلام طلب الالتحاق بنجاح بالرقم : (${appNum}) للتلميذ/ة (${studentName}) بـ (${schoolName}) - مدارس المورد النموذجية للعام الدراسي (${academicYear}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.`;
+
+    // القالب المعتمد (ADM_SUBMITTED) هو المصدر — أي تعديل من صفحة القوالب ينعكس هنا. راجع ADR-008.
+    this.commsSvc.getPublicTemplate('ADM_SUBMITTED').subscribe((tmpl) => {
+      let body = tmpl?.body || fallback;
+      body = body
+        .replace(/\{\{\s*guardian_name\s*\}\}/g, guardianName)
+        .replace(/\{\{\s*student_name\s*\}\}/g, studentName)
+        .replace(/\{\{\s*application_number\s*\}\}/g, appNum)
+        .replace(/\{\{\s*school_name\s*\}\}/g, schoolName)
+        .replace(/\{\{\s*academic_year\s*\}\}/g, academicYear);
+
+      this.commsSvc.sendMessage({
+        channel: 'whatsapp',
+        channel_type: 'whatsapp',
+        recipient_address: phone,
+        recipient_name: guardianName,
+        subject: tmpl?.subject || 'تأكيد استلام طلب الالتحاق - مدارس نبراس',
+        body,
+        template_code: 'ADM_SUBMITTED',
+        source_module: 'admissions',
+        source_event: 'application_submitted',
+      }).subscribe();
+    });
   }
 
   reset(): void {

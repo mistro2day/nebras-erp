@@ -50,6 +50,17 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
 ];
 
 /**
+ * قالب تأكيد استلام طلب التسجيل — يُرسل تلقائياً من الاستمارة العامة.
+ * يُزرع في الخلفية من صفحة التفاصيل (المصادَقة) ليصبح قابلاً للتحرير من صفحة القوالب،
+ * وتقرؤه الاستمارة العامة عبر endpoint عام. راجع ADR-008.
+ */
+const ADM_SUBMITTED_TEMPLATE = {
+  code: 'ADM_SUBMITTED',
+  name: 'إشعار استلام طلب الالتحاق',
+  body: 'السلام عليكم {{guardian_name}}، تم استلام طلب الالتحاق بنجاح بالرقم: ({{application_number}}) للتلميذ/ة ({{student_name}}) بـ ({{school_name}}) - مدارس المورد النموذجية للعام الدراسي ({{academic_year}}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.',
+};
+
+/**
  * تفاصيل طلب الالتحاق وإدارته الشاملة — Nebras OS.
  * يعرض كافة حقول الاستمارة الـ 6 ومتصل بموديول الاتصالات لإرسال الإشعارات التلقائية الفورية عبر الواتساب فور اتخاذ قرار القبول/الرفض/الانتظار/جدولة المقابلة.
  */
@@ -132,14 +143,41 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
                 <div class="g-row"><span>هاتف ولي الأمر (1):</span> <b>{{ g.phone }}</b></div>
                 <div class="g-row"><span>هاتف ولي الأمر (2):</span> <b>{{ g.phone2 || '—' }}</b></div>
                 <div class="g-row">
-                  <span>رقم الواتساب المعتمد:</span> 
-                  <b class="wa-num">{{ g.whatsapp_phone || g.phone }}</b>
+                  <span>رقم الواتساب المعتمد:</span>
+                  <b class="wa-num" [class.wa-invalid]="!isValidE164(g.whatsapp_phone)" dir="ltr">{{ g.whatsapp_phone || g.phone }}</b>
+                  @if (!isValidE164(g.whatsapp_phone)) {
+                    <span class="wa-warn" title="الرقم غير مخزّن بصيغة دولية صحيحة">⚠️ ينقصه رمز الدولة</span>
+                  }
+                  <button type="button" class="mini-edit-btn" (click)="startEditWa(g)">✏️ تصحيح</button>
                   @if (g.whatsapp_phone || g.phone) {
-                    <button type="button" class="mini-wa-btn" (click)="openDirectWhatsapp(g.whatsapp_phone || g.phone)">
+                    <button type="button" class="mini-wa-btn" (click)="openWhatsappModal(a.status)">
                       📱 مراسلة فوريـة
                     </button>
                   }
                 </div>
+                @if (editingWaId() === g.id) {
+                  <div class="wa-edit-box">
+                    <div class="wa-edit-row">
+                      <select [(ngModel)]="waCode" (change)="updateComposedWa()" class="wa-edit-select">
+                        @for (c of waCountries; track c.code) {
+                          <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                        }
+                      </select>
+                      <input inputmode="numeric" [maxlength]="selectedWaCountry().len[1]"
+                             [(ngModel)]="waBody" (input)="updateComposedWa()"
+                             [placeholder]="'مثال: ' + selectedWaCountry().sample" class="wa-edit-input" dir="ltr" />
+                      <button type="button" class="nb-btn-whatsapp" [disabled]="!!waErr() || !composedWa() || savingWa()" (click)="saveWaNumber(g)">
+                        {{ savingWa() ? '⏳' : '💾 حفظ' }}
+                      </button>
+                      <button type="button" class="mini-edit-btn" (click)="editingWaId.set(null)">إلغاء</button>
+                    </div>
+                    @if (waErr()) {
+                      <span class="val-err">{{ waErr() }}</span>
+                    } @else if (composedWa()) {
+                      <span class="val-ok">✓ سيُحفظ بصيغة دولية: <b dir="ltr">{{ composedWa() }}</b></span>
+                    }
+                  </div>
+                }
                 <div class="g-row"><span>المهنة وعنوان العمل:</span> <b>{{ g.occupation || '—' }} · {{ g.work_address || '—' }}</b></div>
                 <div class="g-row"><span>السكن / رقم العمارة:</span> <b>{{ g.address || '—' }} (منزل {{ g.building_number || '—' }})</b></div>
                 <div class="g-row"><span>هاتف والدة التلميذ:</span> <b>{{ g.mother_phone || '—' }} {{ g.mother_proxy_name ? '(' + g.mother_proxy_name + ')' : '' }}</b></div>
@@ -270,10 +308,9 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
               <div class="fld" style="margin-top:10px">
                 <label>نموذج المراسلة المعتمد (Communications Template):</label>
                 <select [(ngModel)]="selectedTemplateCode" (change)="onTemplateSelectChange()" class="tmpl-select">
-                  <option value="ADM_ACCEPTED">✓ نموذج القبول النهائي</option>
-                  <option value="ADM_WAITLIST">⏳ نموذج قائمة الانتظار</option>
-                  <option value="ADM_REJECTED">✕ نموذج نتيجة المفاضلة</option>
-                  <option value="ADM_INTERVIEW">📅 نموذج موعد المقابلة</option>
+                  @for (t of admTemplates(); track t.code) {
+                    <option [value]="t.code">{{ templateOptionIcon(t.code) }} {{ t.name }}</option>
+                  }
                   <option value="CUSTOM">✏️ نص مخصص بدون قالب</option>
                 </select>
               </div>
@@ -383,6 +420,15 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
       .nb-btn-whatsapp:hover { background: #16a34a; }
       .nb-btn-whatsapp:disabled { opacity: 0.6; cursor: not-allowed; }
       .mini-wa-btn { padding: 2px 8px; background: #25d366; color: #fff; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; margin-inline-start: 6px; }
+      .mini-edit-btn { padding: 2px 8px; background: var(--nb-surface); color: var(--nb-text-secondary); border: 1px solid var(--nb-border); border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; margin-inline-start: 6px; }
+      .wa-num.wa-invalid { color: #b45309; }
+      .wa-warn { font-size: 10.5px; color: #b45309; font-weight: 700; margin-inline-start: 6px; }
+      .wa-edit-box { margin: 6px 0 4px; padding: 10px; background: var(--nb-bg); border: 1px dashed var(--nb-border); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; }
+      .wa-edit-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; direction: ltr; justify-content: flex-end; }
+      .wa-edit-select { height: 34px; border: 1px solid var(--nb-border); border-radius: 6px; padding: 0 6px; font-size: 12px; font-weight: 700; font-family: "Segoe UI Emoji","Noto Color Emoji", system-ui, sans-serif; background: var(--nb-surface); color: var(--nb-text); }
+      .wa-edit-input { height: 34px; width: 160px; border: 1px solid var(--nb-border); border-radius: 6px; padding: 0 10px; font-size: 13px; direction: ltr; text-align: left; background: var(--nb-surface); color: var(--nb-text); }
+      .val-err { font-size: 11px; color: #dc2626; font-weight: 600; }
+      .val-ok { font-size: 11px; color: #166534; font-weight: 600; }
       
       .empty-box { padding: 24px; text-align: center; color: var(--nb-text-muted); font-size: 12.5px; }
       .loading { text-align: center; padding: 40px; color: var(--nb-text-muted); font-size: 13px; }
@@ -432,6 +478,31 @@ export class ApplicationDetailsComponent implements OnInit {
 
   selectedTemplateCode = 'ADM_ACCEPTED';
   waMessageText = '';
+
+  // القوالب المعتمدة تُجلب من موديول قوالب الرسائل (المصدر الموحّد). أي تعديل هناك ينعكس هنا.
+  readonly admTemplates = signal<{ code: string; name: string; body: string }[]>(DEFAULT_ADM_TEMPLATES);
+
+  // ---- تصحيح رقم الواتساب المعتمد (E.164) للأرقام القديمة ----
+  readonly waCountries = [
+    { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
+    { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
+    { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
+    { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
+    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+  ];
+  readonly editingWaId = signal<string | null>(null);
+  readonly composedWa = signal('');
+  readonly waErr = signal('');
+  readonly savingWa = signal(false);
+  waCode = '+249';
+  waBody = '';
 
   private id = '';
 
@@ -488,6 +559,55 @@ export class ApplicationDetailsComponent implements OnInit {
       this.id = p['id'];
       if (this.id) this.loadAll();
     });
+    this.loadApprovedTemplates();
+  }
+
+  /**
+   * جلب القوالب المعتمدة من موديول قوالب الرسائل (المصدر الموحّد لكل المراسلات).
+   * القوالب الافتراضية للقبول تُزرع تلقائياً في الخلفية إن لم تكن موجودة، فتظهر في
+   * صفحة القوالب وتصبح قابلة للتعديل، وأي تعديل ينعكس على كل الموديولات.
+   */
+  private loadApprovedTemplates(): void {
+    this.commsService.getTemplates().subscribe((list) => {
+      const all = Array.isArray(list) ? list : [];
+      const adm = all.filter((t) => t.category === 'admission' || (t.code || '').startsWith('ADM_'));
+      const byCode = new Map(adm.map((t) => [t.code, t]));
+
+      // زرع أي قالب قبول افتراضي مفقود في الخلفية (idempotent — مرة واحدة لكل مستأجر)
+      // يشمل قالب تأكيد الاستلام (ADM_SUBMITTED) الذي تستهلكه الاستمارة العامة.
+      const seeds = [...DEFAULT_ADM_TEMPLATES, ADM_SUBMITTED_TEMPLATE];
+      for (const def of seeds) {
+        if (!byCode.has(def.code)) {
+          this.commsService.createTemplate({
+            name: def.name, code: def.code, category: 'admission',
+            language: 'ar', body: def.body, content_type: 'plain_text', is_active: true,
+          }).subscribe((saved) => {
+            if (saved) byCode.set(def.code, saved as CommunicationTemplate);
+          });
+        }
+      }
+
+      const merged = DEFAULT_ADM_TEMPLATES.map((def) => {
+        const remote = byCode.get(def.code);
+        return { code: def.code, name: remote?.name || def.name, body: remote?.body || def.body };
+      });
+      // إضافة أي قوالب قبول أخرى موجودة في الخلفية وليست ضمن الافتراضية
+      // (باستثناء قالب تأكيد الاستلام التلقائي — ليس قرار قبول يدوي)
+      for (const t of adm) {
+        if (t.code === 'ADM_SUBMITTED') continue;
+        if (!merged.some((m) => m.code === t.code)) {
+          merged.push({ code: t.code, name: t.name, body: t.body });
+        }
+      }
+      this.admTemplates.set(merged);
+    });
+  }
+
+  templateOptionIcon(code: string): string {
+    const icons: Record<string, string> = {
+      ADM_ACCEPTED: '✓', ADM_WAITLIST: '⏳', ADM_REJECTED: '✕', ADM_INTERVIEW: '📅',
+    };
+    return icons[code] || '📝';
   }
 
   private loadAll(): void {
@@ -515,7 +635,7 @@ export class ApplicationDetailsComponent implements OnInit {
     const appNum = a?.application_number || '';
     const schoolName = this.targetSchool(a!) === 'girls' ? 'مدرسة البنات' : 'مدرسة البنين';
 
-    const tmplObj = DEFAULT_ADM_TEMPLATES.find((t) => t.code === this.selectedTemplateCode);
+    const tmplObj = this.admTemplates().find((t) => t.code === this.selectedTemplateCode);
     if (!tmplObj || this.selectedTemplateCode === 'CUSTOM') {
       return this.waMessageText;
     }
@@ -638,6 +758,69 @@ export class ApplicationDetailsComponent implements OnInit {
     const url = `https://wa.me/${rawPhone}?text=${encodeURIComponent(this.waMessageText)}`;
     window.open(url, '_blank');
     this.showWaModal.set(false);
+  }
+
+  // ---- تصحيح رقم الواتساب المعتمد ----
+  selectedWaCountry(): { code: string; name: string; len: number[]; sample: string } {
+    return this.waCountries.find((c) => c.code === this.waCode) || this.waCountries[0];
+  }
+
+  isValidE164(v?: string): boolean {
+    return !!v && /^\+\d{10,15}$/.test(v.replace(/\s/g, ''));
+  }
+
+  startEditWa(g: Guardian): void {
+    // تعبئة الحقول من الرقم الحالي إن كان بصيغة دولية، وإلا محاولة تخمين من الرقم المحلي
+    const current = (g.whatsapp_phone || g.phone || '').replace(/\s/g, '');
+    this.waCode = '+249';
+    this.waBody = '';
+    const match = this.waCountries.slice().sort((a, b) => b.code.length - a.code.length).find((c) => current.startsWith(c.code));
+    if (match) {
+      this.waCode = match.code;
+      this.waBody = current.slice(match.code.length);
+    } else {
+      this.waBody = current.replace(/\D/g, '').replace(/^0+/, '');
+    }
+    this.editingWaId.set(g.id);
+    this.updateComposedWa();
+  }
+
+  updateComposedWa(): void {
+    const country = this.selectedWaCountry();
+    const [min, max] = country.len;
+    let cleaned = (this.waBody || '').replace(/\D/g, '');
+    const codeDigits = country.code.replace(/\D/g, '');
+    if (cleaned.startsWith(codeDigits)) cleaned = cleaned.slice(codeDigits.length);
+    cleaned = cleaned.replace(/^0+/, '');
+    if (cleaned.length > max) cleaned = cleaned.slice(0, max);
+    if (cleaned !== this.waBody) this.waBody = cleaned;
+
+    if (!cleaned) { this.composedWa.set(''); this.waErr.set(''); return; }
+    if (cleaned.length < min || cleaned.length > max) {
+      const lenText = min === max ? `${min}` : `${min}–${max}`;
+      this.waErr.set(`رقم ${country.name} يجب أن يكون ${lenText} خانة (مثال: ${country.sample}).`);
+      this.composedWa.set('');
+      return;
+    }
+    this.waErr.set('');
+    this.composedWa.set(`${this.waCode}${cleaned}`);
+  }
+
+  saveWaNumber(g: Guardian): void {
+    const composed = this.composedWa();
+    if (!composed || this.waErr()) return;
+    this.savingWa.set(true);
+    this.service.updateGuardian(g.id, { whatsapp_phone: composed }).subscribe({
+      next: () => {
+        this.savingWa.set(false);
+        this.guardians.update((list) => list.map((x) => x.id === g.id ? { ...x, whatsapp_phone: composed } : x));
+        this.editingWaId.set(null);
+      },
+      error: () => {
+        this.savingWa.set(false);
+        this.waErr.set('تعذّر حفظ الرقم. حاول مجدداً.');
+      },
+    });
   }
 
   openDirectWhatsapp(phone: string): void {
