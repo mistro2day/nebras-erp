@@ -21,6 +21,14 @@ class TenantMiddleware(MiddlewareMixin):
     أو عبر ترويسة الطلب X-Tenant-ID
     """
     def process_request(self, request):
+        # فحص الحياة (Health Check) لا يحتاج مستأجراً ويجب ألا يلمس قاعدة البيانات،
+        # حتى لا يتعطّل فحص Render عند بطء أو برودة قاعدة بيانات Neon.
+        if request.path in ('/api/v1/health/', '/api/v1/health'):
+            request.tenant = None
+            request.tenant_id = None
+            clear_current_tenant()
+            return None
+
         host = request.get_host().split(':')[0]
         parts = host.split('.')
         tenant = None
