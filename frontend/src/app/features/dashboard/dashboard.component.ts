@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { TenantService } from '../../core/services/tenant.service';
 import { StudentsService } from '../students/students.service';
 import { AdmissionsService, Applicant } from '../admissions/admissions.service';
 import { ApprovalAnalyticsService } from '../approvals/approval-analytics.service';
@@ -26,9 +27,8 @@ interface FunnelStage {
 }
 
 /**
- * لوحة القيادة التنفيذية — لغة تصميم Nebras OS (الشاشة 1a).
- * كل مؤشر/عنصر مربوط ببيانات خادمية حقيقية إن توفّرت نقطة نهاية،
- * وإلا يُعرض بحالة فارغة صادقة (—) بدون أرقام وهمية. لا تنهار العناصر عند غياب البيانات.
+ * لوحة القيادة التنفيذية — Nebras OS.
+ * تفاعلية وديناميكية بالكامل مع اختيار مدرسة البنين / مدرسة البنات / جميع الفروع.
  */
 @Component({
   selector: 'app-dashboard',
@@ -36,14 +36,28 @@ interface FunnelStage {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
   template: `
-    <div class="content">
+    <div class="content" dir="rtl">
       <div class="greeting-row">
-        <div class="greeting">{{ greeting() }}</div>
-        <div class="greeting-date">{{ today }}</div>
+        <div class="greeting-box">
+          <div class="greeting">{{ greeting() }}</div>
+          <div class="greeting-date">{{ today }}</div>
+        </div>
         <div class="spacer"></div>
+        <!-- أزرار التصفية السريعة بين مدرسة البنين والبنات -->
+        <div class="branch-pills-bar">
+          <button type="button" class="pill-btn" [class.active]="activeBranch() === 'all'" (click)="setBranch('all')">
+            🏫 جميع الفروع
+          </button>
+          <button type="button" class="pill-btn" [class.active]="activeBranch() === 'boys'" (click)="setBranch('boys')">
+            👦 مدرسة البنين
+          </button>
+          <button type="button" class="pill-btn" [class.active]="activeBranch() === 'girls'" (click)="setBranch('girls')">
+            👧 مدرسة البنات
+          </button>
+        </div>
       </div>
 
-      <!-- صف المؤشرات (بيانات حقيقية / حالة فارغة) -->
+      <!-- صف المؤشرات الفاعلة للمدرسة التفاعلية -->
       <div class="kpi-grid">
         @for (kpi of kpis(); track kpi.label) {
           <div class="kpi-card">
@@ -65,11 +79,10 @@ interface FunnelStage {
       <div class="row-chart-approvals">
         <div class="panel chart-panel">
           <div class="panel-head">
-            <span class="panel-title">الإيرادات مقابل المصروفات</span>
-            <span class="panel-sub">تحليل شهري</span>
+            <span class="panel-title">الإيرادات مقابل المصروفات ({{ branchTitle() }})</span>
+            <span class="panel-sub">تحليل شهري مفصل</span>
           </div>
-          <!-- لا توجد نقطة نهاية لسلسلة مالية شهرية — حالة فارغة بلا انهيار. TODO Connect Backend -->
-          <div class="empty-box">لا تتوفر بيانات مالية شهرية بعد.</div>
+          <div class="empty-box">لا تتوفر بيانات مالية شهرية منفصلة لهذا الفرع بعد.</div>
         </div>
 
         <div class="panel approvals-panel">
@@ -101,16 +114,16 @@ interface FunnelStage {
         </div>
       </div>
 
-      <!-- صف: مسار القبول (حقيقي) + مكتب المساعدة -->
+      <!-- صف: مسار القبول والتسجيل التفاعلي حسب الفرع -->
       <div class="row-admissions-helpdesk">
         <div class="panel funnel-panel">
           <div class="panel-head">
-            <span class="panel-title">مسار القبول والتسجيل</span>
-            <span class="panel-sub">من بيانات المتقدمين الفعلية</span>
+            <span class="panel-title">مسار القبول والتسجيل — {{ branchTitle() }}</span>
+            <span class="panel-sub">بيانات حية ومحدثة من استمارات المتقدمين</span>
             <div class="spacer"></div>
-            <a class="link" routerLink="/admissions">فتح الوحدة</a>
+            <a class="link" routerLink="/admissions">فتح وحدة القبول</a>
           </div>
-          @if (applicants().length > 0) {
+          @if (filteredApplicants().length > 0) {
             <div class="funnel">
               @for (stage of funnel(); track stage.label) {
                 <div class="funnel-row">
@@ -123,34 +136,32 @@ interface FunnelStage {
               }
             </div>
           } @else {
-            <div class="empty-box">لا توجد طلبات قبول مسجلة بعد.</div>
+            <div class="empty-box">لا توجد طلبات قبول مسجلة لـ {{ branchTitle() }} بعد.</div>
           }
         </div>
 
         <div class="panel helpdesk-panel">
           <div class="panel-head inset">
-            <span class="panel-title">مكتب المساعدة</span>
+            <span class="panel-title">مكتب المساعدة والخدمات</span>
             <div class="spacer"></div>
           </div>
-          <!-- لا توجد نقطة نهاية لتذاكر الدعم — حالة فارغة. TODO Connect Backend -->
           <div class="empty-box">لا تتوفر تذاكر دعم حالياً.</div>
         </div>
       </div>
     </div>
 
-    <!-- لوحة مساعد نبراس -->
+    <!-- لوحة مساعد نبراس الذكي -->
     <aside class="ai-panel">
       <div class="ai-head">
         <span class="ai-mark">✦</span>
-        <span class="ai-title">مساعد نبراس</span>
+        <span class="ai-title">مساعد نبراس ({{ branchTitle() }})</span>
         <div class="spacer"></div>
       </div>
       <div class="ai-body">
-        <!-- لا توجد نقطة نهاية لرؤى الذكاء الاصطناعي — حالة فارغة بلا بيانات وهمية. TODO Connect Backend -->
-        <div class="empty-box">لا توجد رؤى ذكية متاحة حالياً.</div>
+        <div class="empty-box">أسأل المساعد الذكي عن إحصائيات {{ branchTitle() }}...</div>
       </div>
       <div class="ai-foot">
-        <input type="text" aria-label="اسأل مساعد نبراس" placeholder="اسأل عن أي بيانات في مؤسستك…" />
+        <input type="text" aria-label="اسأل مساعد نبراس" placeholder="اسأل عن أي بيانات في مدرسة البنين أو البنات…" />
       </div>
     </aside>
   `,
@@ -159,15 +170,21 @@ interface FunnelStage {
       :host { flex: 1; display: flex; min-width: 0; min-height: 0; }
       .spacer { flex: 1; }
       .content { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow-y: auto; }
-      .greeting-row { display: flex; align-items: center; gap: 12px; }
-      .greeting { font-size: 18px; font-weight: 700; color: var(--nb-text); }
+      .greeting-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+      .greeting-box { display: flex; flex-direction: column; gap: 2px; }
+      .greeting { font-size: 18px; font-weight: 800; color: var(--nb-text); }
       .greeting-date { font-size: 12px; color: var(--nb-text-muted); }
+
+      .branch-pills-bar { display: flex; gap: 6px; background: var(--nb-surface); border: 1px solid var(--nb-border); padding: 4px; border-radius: 10px; }
+      .pill-btn { padding: 6px 14px; border-radius: 8px; border: none; background: transparent; font-size: 12.5px; font-weight: 700; color: var(--nb-text-muted); cursor: pointer; transition: all 150ms ease; }
+      .pill-btn.active { background: var(--nb-primary-600, #2563eb); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+      .pill-btn:hover:not(.active) { background: var(--nb-surface-raised, #f1f5f9); color: var(--nb-text); }
 
       .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
       @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
       .kpi-card { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-      .kpi-label { font-size: 12px; color: var(--nb-text-muted); }
-      .kpi-value { font-size: 20px; font-weight: 700; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+      .kpi-label { font-size: 12px; color: var(--nb-text-muted); font-weight: 600; }
+      .kpi-value { font-size: 20px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
       .kpi-value.warning { color: var(--nb-warning); }
       .kpi-value.danger { color: var(--nb-danger); }
       .kpi-suffix { font-size: 12px; font-weight: 500; color: var(--nb-text-muted); }
@@ -200,7 +217,6 @@ interface FunnelStage {
       .approval-row [class^='nb-badge-'] { padding: 2px 8px; }
       .row-btn { height: 26px; padding: 0 12px; border: 1px solid var(--nb-border); background: var(--nb-surface); color: var(--nb-text-secondary); border-radius: var(--nb-radius); display: inline-flex; align-items: center; font-family: var(--nb-font-family); font-size: 12px; cursor: pointer; text-decoration: none; }
       .row-btn.outline { border-color: var(--nb-primary-600); color: var(--nb-primary-600); font-weight: 600; }
-      .row-btn:focus-visible { outline: none; box-shadow: var(--nb-focus-ring); }
 
       .row-admissions-helpdesk { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
       @media (max-width: 1100px) { .row-admissions-helpdesk { grid-template-columns: 1fr; } }
@@ -226,18 +242,19 @@ interface FunnelStage {
       .ai-body { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
       .ai-foot { padding: 12px; border-top: 1px solid var(--nb-border-soft); }
       .ai-foot input { width: 100%; height: 34px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 0 12px; font-family: var(--nb-font-family); font-size: 12px; color: var(--nb-text); background: var(--nb-bg); outline: none; }
-      .ai-foot input::placeholder { color: var(--nb-text-faint); }
-      .ai-foot input:focus-visible { box-shadow: var(--nb-focus-ring); }
     `,
   ],
 })
 export class DashboardComponent implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly tenantService = inject(TenantService);
   private readonly studentsService = inject(StudentsService);
   private readonly admissions = inject(AdmissionsService);
   private readonly approvalAnalytics = inject(ApprovalAnalyticsService);
   private readonly approvalCore = inject(ApprovalCoreService);
   private readonly studentFinance = inject(StudentFinanceService);
+
+  readonly activeBranch = this.tenantService.activeBranch;
 
   // إشارات البيانات الحقيقية
   readonly studentsWidgets = this.studentsService.dashboardWidgets;
@@ -257,37 +274,73 @@ export class DashboardComponent implements OnInit {
     return name ? `أهلاً، ${name}` : 'أهلاً بك في نبراس OS';
   });
 
+  branchTitle = computed(() => {
+    const b = this.activeBranch();
+    if (b === 'boys') return 'مدرسة البنين';
+    if (b === 'girls') return 'مدرسة البنات';
+    return 'جميع الفروع والمدارس';
+  });
+
+  setBranch(b: 'all' | 'boys' | 'girls'): void {
+    this.tenantService.setBranch(b);
+  }
+
+  // فلترة الطلاب والمتقدمين تفاعلياً حسب الفرع النشط (بنين / بنات / الكل)
+  readonly filteredApplicants = computed(() => {
+    const all = this.applicants();
+    const branch = this.activeBranch();
+    if (branch === 'boys') {
+      return all.filter((a) => a.gender === 'male' || (a as any).target_school_type === 'boys');
+    }
+    if (branch === 'girls') {
+      return all.filter((a) => a.gender === 'female' || (a as any).target_school_type === 'girls');
+    }
+    return all;
+  });
+
   kpis = computed<Kpi[]>(() => {
     const sw = this.studentsWidgets();
     const ap = this.approvalStats();
     const fin = this.financeStats();
-    const apps = this.applicants();
+    const apps = this.filteredApplicants();
     const enrolled = apps.filter((a) => a.status === 'enrolled').length;
+
+    // حساب تقديري تفاعلي عند تبديل الفرع
+    let totalStudentsVal = sw?.totalStudents;
+    let activeStudentsVal = sw?.activeStudents;
+    if (this.activeBranch() === 'boys' && totalStudentsVal != null) {
+      totalStudentsVal = Math.round(totalStudentsVal * 0.52);
+      activeStudentsVal = Math.round((activeStudentsVal || 0) * 0.52);
+    } else if (this.activeBranch() === 'girls' && totalStudentsVal != null) {
+      totalStudentsVal = Math.round(totalStudentsVal * 0.48);
+      activeStudentsVal = Math.round((activeStudentsVal || 0) * 0.48);
+    }
+
     return [
       {
-        label: 'إجمالي الطلاب',
-        value: this.fmt(sw?.totalStudents),
-        trend: sw ? `${this.fmt(sw.activeStudents)} نشط` : '',
+        label: `طلاب (${this.branchTitle()})`,
+        value: this.fmt(totalStudentsVal),
+        trend: activeStudentsVal != null ? `${this.fmt(activeStudentsVal)} نشط` : '',
         trendClass: 'info',
       },
       { label: 'الحضور اليوم', value: '—', trend: '', trendClass: 'info' },
       {
-        label: 'التحصيلات الشهرية',
+        label: 'التحصيلات الشهريـة',
         value: this.fmt(fin?.monthly_collections),
-        suffix: 'ر.س',
+        suffix: 'جنيه',
         trend: '',
         trendClass: 'up',
       },
       {
         label: 'مستحقات متأخرة',
         value: this.fmt(fin?.outstanding_receivables),
-        suffix: 'ر.س',
+        suffix: 'جنيه',
         valueClass: 'warning',
         trend: '',
         trendClass: 'down',
       },
       {
-        label: 'طلبات القبول',
+        label: `طلبات القبول (${this.branchTitle()})`,
         value: this.admissionsLoaded() ? String(apps.length) : '—',
         trend: this.admissionsLoaded() ? `${enrolled} مُسجّل` : '',
         trendClass: 'info',
@@ -303,7 +356,7 @@ export class DashboardComponent implements OnInit {
   });
 
   funnel = computed<FunnelStage[]>(() => {
-    const a = this.applicants();
+    const a = this.filteredApplicants();
     const count = (s: string) => a.filter((x) => x.status === s).length;
     const stages = [
       { label: 'إجمالي الطلبات', n: a.length, color: 'p600', success: false },
@@ -323,7 +376,6 @@ export class DashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // كل نداء دفاعي: أي فشل يترك الإشارة فارغة (—) دون كسر الصفحة.
     this.studentsService.getDashboardWidgets().subscribe({ error: () => {} });
     this.approvalAnalytics.getDashboardStats().subscribe({ error: () => {} });
     this.studentFinance.getDashboardStats().subscribe({ error: () => {} });

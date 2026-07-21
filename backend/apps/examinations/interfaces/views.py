@@ -1,8 +1,10 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.utils import timezone
 
 from apps.shared.interfaces.views import BaseCRUDViewSet
+from apps.shared.application.numbering import generate_unique_number
 from apps.common.responses import StandardResponse
 
 from apps.examinations.domain.models import (
@@ -43,6 +45,15 @@ class ExamTypeViewSet(BaseCRUDViewSet):
 class ExamViewSet(BaseCRUDViewSet):
     model_class = Exam
     serializer_class = ExamSerializer
+
+    def get_create_defaults(self, request):
+        """رمز الامتحان يُولَّد في الخادم — يضمن التسلسل وعدم التكرار لكل مستأجر."""
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        return {
+            'code': generate_unique_number(
+                Exam, tenant_id,
+                f"EX-{timezone.now().year}-", field='code', width=4),
+        }
 
 
 class ExamSessionViewSet(BaseCRUDViewSet):
@@ -199,6 +210,16 @@ class ExamAppealViewSet(BaseCRUDViewSet):
 class ExamResultViewSet(BaseCRUDViewSet):
     model_class = ExamResult
     serializer_class = ExamResultSerializer
+
+    def get_queryset(self):
+        """يدعم ترشيح نتائج طالب/مادة/سنة عبر باراميترات الاستعلام (لصفحة الطالب)."""
+        qs = super().get_queryset()
+        params = self.request.query_params
+        for key in ('student_id', 'subject_id', 'academic_year', 'term'):
+            value = params.get(key)
+            if value:
+                qs = qs.filter(**{key: value})
+        return qs.order_by('subject_id', 'term')
 
 
 class TranscriptViewSet(BaseCRUDViewSet):

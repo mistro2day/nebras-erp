@@ -30,6 +30,8 @@ interface NavGroup {
   permission?: string;
 }
 
+import { FormsModule } from '@angular/forms';
+
 /**
  * هيكل التطبيق — اتجاه 1a من تصدير Nebras OS.html
  * (شريط جانبي ثابت 240px — كثافة متوازنة)
@@ -38,7 +40,7 @@ interface NavGroup {
   selector: 'app-dashboard-layout',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatMenuModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatMenuModule, FormsModule],
   template: `
     <div class="shell" dir="rtl">
       <!-- الشريط الجانبي (يمين في RTL) -->
@@ -207,6 +209,14 @@ interface NavGroup {
         <header class="topbar">
           <div class="breadcrumb">
             {{ tenantName() }} <span class="sep">/</span>
+            <div class="branch-selector-inline">
+              <select [value]="activeBranch()" (change)="onBranchChange($event)" title="اختر الفرع أو المدرسة">
+                <option value="all">🏫 جميع الفروع والمدارس</option>
+                <option value="boys">👦 مدرسة البنين</option>
+                <option value="girls">👧 مدرسة البنات</option>
+              </select>
+            </div>
+            <span class="sep">/</span>
             <span class="current">{{ pageTitle() }}</span>
           </div>
           <div class="spacer"></div>
@@ -789,9 +799,24 @@ interface NavGroup {
         font-size: 13px;
         color: var(--nb-text-muted);
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
 
         .sep { color: var(--nb-text-separator); }
         .current { color: var(--nb-text); font-weight: 600; }
+      }
+
+      .branch-selector-inline select {
+        background: var(--nb-surface-raised, #f8fafc);
+        border: 1px solid var(--nb-border, #cbd5e1);
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nb-primary-600, #2563eb);
+        outline: none;
+        cursor: pointer;
       }
 
       .spacer { flex: 1; }
@@ -914,6 +939,12 @@ export class DashboardLayoutComponent {
 
   readonly searchQuery = signal('');
   readonly navFilterQuery = signal('');
+  readonly activeBranch = this.tenantService.activeBranch;
+
+  onBranchChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement).value as 'all' | 'boys' | 'girls';
+    this.tenantService.setBranch(val);
+  }
 
   updateNavFilter(event: Event): void {
     const val = (event.target as HTMLInputElement).value || '';

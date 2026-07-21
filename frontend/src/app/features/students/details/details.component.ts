@@ -9,6 +9,8 @@ import { SfDocumentDrawerComponent, SfDoc } from '../../student-finance/shared/s
 import { HttpClient } from '@angular/common/http';
 import { ClinicService } from '../../clinic/clinic.service';
 import { LibraryService } from '../../library/library.service';
+import { ExaminationsService } from '../../examinations/examinations.service';
+import { forkJoin } from 'rxjs';
 import {
   ConfirmDialogComponent, ConfirmDialogData,
 } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -914,6 +916,7 @@ export class StudentDetailsComponent implements OnInit {
   private sfService = inject(StudentFinanceService);
   private clinicService = inject(ClinicService);
   private libraryService = inject(LibraryService);
+  private examService = inject(ExaminationsService);
   private dialog = inject(MatDialog);
   private http = inject(HttpClient);
 
@@ -934,21 +937,27 @@ export class StudentDetailsComponent implements OnInit {
 
   openDoc(type: 'invoice' | 'receipt' | 'receivable', data: any) { this.doc.set({ type, data }); }
 
-  studentGrades = signal<any[]>([
-    { subject: 'اللغة العربية', score: 96, classwork: 28, finalExam: 68 },
-    { subject: 'الرياضيات', score: 92, classwork: 26, finalExam: 66 },
-    { subject: 'العلوم العامة', score: 94, classwork: 27, finalExam: 67 },
-    { subject: 'التربية الإسلامية', score: 98, classwork: 29, finalExam: 69 },
-    { subject: 'اللغة الإنجليزية', score: 88, classwork: 24, finalExam: 64 },
-    { subject: 'الحاسب الآلي', score: 95, classwork: 28, finalExam: 67 }
-  ]);
+  // درجات المواد وجدول الامتحانات — تُملأ من نتائج الامتحانات الحقيقية للطالب.
+  studentGrades = signal<any[]>([]);
+  examSchedule = signal<any[]>([]);
 
-  examSchedule = signal<any[]>([
-    { subject: 'الرياضيات', type: 'امتحان نهائي تحريري', date: '2026-07-12', time: '09:00 - 11:30', room: 'قاعة ابن رشد (C1)', status: 'upcoming' },
-    { subject: 'اللغة العربية', type: 'امتحان نهائي تحريري', date: '2026-07-14', time: '09:00 - 11:00', room: 'قاعة ابن رشد (C1)', status: 'upcoming' },
-    { subject: 'العلوم العامة', type: 'امتحان نهائي تحريري', date: '2026-07-16', time: '09:00 - 11:00', room: 'مختبر الفيزياء', status: 'upcoming' },
-    { subject: 'التربية الإسلامية', type: 'امتحان شفهي وقرآن', date: '2026-07-08', time: '08:30 - 12:00', room: 'مصلى المدرسة', status: 'completed' }
-  ]);
+  /** المعدل العام (%) من متوسط نتائج الطالب. */
+  readonly avgScore = computed(() => {
+    const g = this.studentGrades();
+    if (!g.length) return 0;
+    return g.reduce((s, x) => s + (Number(x.score) || 0), 0) / g.length;
+  });
+  /** تسمية التقدير من المعدل. */
+  readonly avgGradeLabel = computed(() => {
+    const v = this.avgScore();
+    if (v >= 95) return 'ممتاز مرتفع (A+)';
+    if (v >= 90) return 'ممتاز (A)';
+    if (v >= 80) return 'جيد جداً (B)';
+    if (v >= 70) return 'جيد (C)';
+    if (v >= 60) return 'مقبول (D)';
+    return 'راسب (F)';
+  });
+  readonly passedCount = computed(() => this.studentGrades().filter((g) => g.passed).length);
 
   readonly documents = computed(() => this.timeline().filter((e) => e.type === 'document_upload'));
   schoolInfo = signal<any>(null);

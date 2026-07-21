@@ -7,12 +7,20 @@
 import requests
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 class EvolutionWhatsAppClient:
-    def __init__(self, base_url: str = "https://wa.nebras.edu.sd", api_key: str = "evo_key_998237465", instance_name: str = "nebras-khartoum-instance"):
-        self.base_url = base_url.rstrip('/')
+    def __init__(self, base_url: str = None, api_key: str = "evo_key_998237465", instance_name: str = "nebras-khartoum-instance"):
+        env_url = os.getenv("EVOLUTION_API_URL")
+        if env_url:
+            self.base_url = env_url.rstrip('/')
+        elif not base_url or "wa.nebras.edu.sd" in str(base_url):
+            self.base_url = "http://localhost:8080"
+        else:
+            self.base_url = base_url.rstrip('/')
+
         self.api_key = api_key
         self.instance_name = instance_name
         self.headers = {
@@ -34,6 +42,15 @@ class EvolutionWhatsAppClient:
             clean = '249' + clean
         return clean
 
+    def get_connection_state(self) -> dict:
+        """فحص حالة اقتران الجلسة في الإيفولوشن (open / close / connecting)."""
+        url = f"{self.base_url}/instance/connectionState/{self.instance_name}"
+        try:
+            res = requests.get(url, headers=self.headers, timeout=5)
+            return res.json()
+        except Exception as e:
+            return {"instance": {"state": "close", "error": str(e)}}
+
     def create_instance(self) -> dict:
         """
         1. إنشاء جلسة جديدة (Instance) على خادم Evolution API
@@ -53,12 +70,38 @@ class EvolutionWhatsAppClient:
 
     def get_qr_code(self) -> dict:
         """
-        2. جلب كود الـ QR Code لمسحه من شريحة الهاتف السوداني
+        2. جلب كود الـ QR Code الحقيقي المباشر لمسحه من شريحة الهاتف السوداني
         """
+        state_data = self.get_connection_state()
+        state = state_data.get("instance", {}).get("state", "close")
+        if state == "open":
+            return {
+                "status": "success",
+                "connected": True,
+                "state": "open",
+                "message": "الجلسة متصلة ومقترنة بالفعل بالواتساب."
+            }
+
         url = f"{self.base_url}/instance/connect/{self.instance_name}"
         try:
             response = requests.get(url, headers=self.headers, timeout=10)
-            return response.json()
+            data = response.json()
+
+            if response.status_code == 404 or "not found" in str(data).lower():
+                self.create_instance()
+                response = requests.get(url, headers=self.headers, timeout=10)
+                data = response.json()
+
+            qr_data = data.get("base64") or data.get("code") or data.get("qrcode", {}).get("base64")
+            if qr_data:
+                return {
+                    "status": "success",
+                    "connected": False,
+                    "state": state,
+                    "base64": qr_data,
+                    "code": data.get("code")
+                }
+            return data
         except Exception as e:
             logger.error(f"فشل جلب QR Code: {str(e)}")
             return {"status": "error", "message": str(e)}

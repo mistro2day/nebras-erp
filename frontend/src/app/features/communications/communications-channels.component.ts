@@ -171,7 +171,7 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
                       <p>يقترن الواتساب حصرياً عندما يكون خادم <code>Evolution API</code> مشغلاً على جهازك كـ WebSocket حي يتجدد كل 20 ثانية.</p>
                       <div class="docker-cmd-box">
                         <small>أمر تشغيل سيرفر الواتساب الحي الرسمي عبر Docker:</small>
-                        <code>docker run -d --name evolution-api -p 8080:8080 -e AUTHENTICATION_API_KEY=evo_key_998237465 evolutionapi/evolution-api:v2.1.1</code>
+                        <code>docker run -d --name evolution-api -p 8080:8080 -e AUTHENTICATION_API_KEY=evo_key_998237465 -e DATABASE_PROVIDER=postgresql evoapicloud/evolution-api:v2.1.1</code>
                       </div>
                     </div>
 
@@ -180,7 +180,7 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
                       <div class="check-actions">
                         <button class="btn-check-docker" (click)="checkLocalEvolutionServer()">⚡ فحص جاهزية السيرفر المحلي (Port 8080)</button>
                         <span class="docker-status-tag" [class.online]="dockerOnline()">
-                          {{ dockerOnline() ? '🟢 السيرفر الحي متصل وقاهز للاقتران!' : '🔴 سيرفر Evolution غير مشغل حالياً' }}
+                          {{ dockerOnline() ? '🟢 السيرفر الحي متصل وجاهز للاقتران!' : '🔴 سيرفر Evolution غير مشغل حالياً' }}
                         </span>
                       </div>
                     </div>
@@ -593,7 +593,8 @@ import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
     .qr-instructions h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
     .pairing-method-tabs { display: flex; flex-direction: column; gap: 10px; }
     .p-method { background: var(--nb-bg); border: 1px solid var(--nb-border-soft); padding: 10px; border-radius: var(--nb-radius-sm); font-size: 12.5px; }
-    .docker-cmd-box { background: #0f172a; color: #38bdf8; padding: 8px; border-radius: var(--nb-radius-sm); margin-top: 6px; font-family: monospace; font-size: 11px; display: flex; flex-direction: column; gap: 2px; overflow-x: auto; }
+    .docker-cmd-box { background: #0f172a; color: #38bdf8; padding: 10px; border-radius: var(--nb-radius-sm); margin-top: 6px; font-family: monospace; font-size: 11px; display: flex; flex-direction: column; gap: 4px; white-space: pre-wrap; word-break: break-all; overflow-x: hidden; }
+    .docker-cmd-box code { white-space: pre-wrap; word-break: break-all; color: #38bdf8; }
     .docker-cmd-box small { color: #94a3b8; font-family: sans-serif; font-size: 10.5px; }
     .check-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
     .btn-check-docker { font-size: 11.5px; font-weight: 700; background: var(--nb-primary-600); color: white; border: none; padding: 6px 12px; border-radius: var(--nb-radius-sm); cursor: pointer; }
@@ -765,9 +766,15 @@ export class CommunicationsChannelsComponent {
 
   checkLocalEvolutionServer(): void {
     const targetId = this.whatsappProviders()[0]?.id || 'p2';
-    this.commService.testProviderConnection(targetId).subscribe((res) => {
-      const isOk = res && (res.status === 'success' || res.health_status === 'healthy');
-      this.dockerOnline.set(isOk);
+    this.commService.testProviderConnection(targetId).subscribe({
+      next: (res: any) => {
+        const d = res?.data ?? res;
+        const isOk = !!d && (d.success === true || d.health_status === 'healthy' || res?.status === 'success');
+        this.dockerOnline.set(isOk);
+      },
+      error: () => {
+        this.dockerOnline.set(false);
+      },
     });
   }
 

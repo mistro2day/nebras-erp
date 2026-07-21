@@ -16,8 +16,9 @@ const TENANT_STORAGE_KEY = 'nb_tenant';
   providedIn: 'root'
 })
 export class TenantService {
-  // استخدام Signals لإدارة حالة المستأجر النشط بكفاءة ومرونة
+  // استخدام Signals لإدارة حالة المستأجر والفرع النشط (بنين / بنات / الكل)
   currentTenant = signal<TenantInfo | null>(null);
+  activeBranch = signal<'all' | 'boys' | 'girls'>('all');
 
   constructor() {
     this.bootstrap();
@@ -59,6 +60,13 @@ export class TenantService {
     } catch {
       // تجاهل أخطاء التخزين المحلي (وضع التصفح الخاص مثلاً)
     }
+  }
+
+  setBranch(branch: 'all' | 'boys' | 'girls') {
+    this.activeBranch.set(branch);
+    try {
+      localStorage.setItem('nb_active_branch', branch);
+    } catch {}
   }
 
   clearTenant() {

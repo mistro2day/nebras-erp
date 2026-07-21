@@ -1,8 +1,15 @@
 {
-  "//": "يضيف backend كجذر استيراد ليعرف المحرّر مجلد apps ويتوقف عن التحذير الزائف.",
-  "//2": "diagnosticMode=openFilesOnly يقلّل ضجيج الفحص عبر المشروع كله.",
-  "python.analysis.extraPaths": ["${workspaceFolder}/backend"],
-  "python.autoComplete.extraPaths": ["${workspaceFolder}/backend"],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend",
+    "./backend",
+    "backend"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/backend",
+    "./backend",
+    "backend"
+  ],
   "python.analysis.diagnosticMode": "openFilesOnly",
   "python.terminal.activateEnvironment": true
 }

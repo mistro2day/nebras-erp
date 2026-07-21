@@ -37,6 +37,7 @@ class Applicant(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_applicants'
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.arabic_full_name
@@ -68,6 +69,7 @@ class Guardian(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_guardians'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.full_name} ({self.get_relationship_display()})"
@@ -91,6 +93,7 @@ class RequiredDocument(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_documents'
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.document_name
@@ -109,6 +112,7 @@ class Interview(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_interviews'
+        ordering = ['-created_at']
 
 
 class AdmissionSettings(CombinedBaseModel):
@@ -135,6 +139,7 @@ class AdmissionSettings(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_settings'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"AdmissionSettings(tenant={self.tenant_id}, open={self.is_open})"
@@ -152,3 +157,4 @@ class PlacementTest(CombinedBaseModel):
 
     class Meta:
         db_table = 'admission_placement_tests'
+        ordering = ['-created_at']

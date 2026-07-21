@@ -5,12 +5,19 @@ import uuid
 
 class Branch(CombinedBaseModel):
     """
-    نموذج الفروع التابعة للمستأجر
+    نموذج الفروع المدرسية التابعة للمستأجر (مدرسة بنين / مدرسة بنات / مشتركة)
     """
+    SCHOOL_GENDER_CHOICES = [
+        ('boys', 'مدرسة بنين'),
+        ('girls', 'مدرسة بنات'),
+        ('coed', 'مشتركة (بنين وبنات)'),
+    ]
+
     name = models.CharField(max_length=255)
     name_ar = models.CharField(max_length=255, blank=True, null=True)
     name_en = models.CharField(max_length=255, blank=True, null=True)
     code = models.CharField(max_length=100, db_index=True)
+    school_gender_type = models.CharField(max_length=20, choices=SCHOOL_GENDER_CHOICES, default='coed', db_index=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     # Geographic & Address

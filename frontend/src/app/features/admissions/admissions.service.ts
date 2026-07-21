@@ -8,6 +8,7 @@ export interface Applicant {
   english_full_name?: string;
   gender: string;
   date_of_birth: string;
+  birth_place?: string;
   nationality: string;
   national_id: string;
   passport_number?: string;
@@ -16,9 +17,40 @@ export interface Applicant {
   special_needs?: string;
   previous_school?: string;
   previous_grade?: string;
+  previous_grade_score?: string;
   application_number: string;
   status: string;
   notes?: string;
+
+  // السنة والصف المتقدم له
+  academic_year_id?: string;
+  applying_grade_id?: string;
+
+  // المدرسة والفرع المستهدف (بنين / بنات)
+  branch_id?: string;
+  target_school_type?: string;
+
+  // الأشقاء بالمدرسة
+  has_siblings?: boolean;
+  siblings_section?: string;
+  siblings_count?: number;
+  siblings_details?: string;
+  sibling_student_ids?: string[];
+
+  // البيانات الصحية والاجتماعية والبيئة
+  has_health_issues?: boolean;
+  health_issues_details?: string;
+  has_social_issues?: boolean;
+  social_issues_details?: string;
+  resides_with?: string;
+  transport_mode?: string;
+  study_dependence?: string;
+
+  // اللوائح والتعهدات
+  agreed_to_admin_rules?: boolean;
+  agreed_to_academic_rules?: boolean;
+  agreed_to_org_rules?: boolean;
+  agreed_to_mobile_policy?: boolean;
 }
 
 export interface Guardian {
@@ -27,10 +59,22 @@ export interface Guardian {
   relationship: string;
   full_name: string;
   phone: string;
+  phone2?: string;
+  whatsapp_phone?: string;
   email: string;
   occupation?: string;
   national_id?: string;
   address?: string;
+  building_number?: string;
+  work_address?: string;
+
+  // هاتف الأم والبديل للطوارئ
+  mother_phone?: string;
+  mother_proxy_name?: string;
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_address?: string;
 }
 
 export interface RequiredDocument {
