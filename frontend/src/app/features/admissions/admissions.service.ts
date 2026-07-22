@@ -102,7 +102,18 @@ export interface PlacementTest {
   exam_type: string;
   marks_obtained?: number;
   passing_marks?: number;
+  max_marks?: number;
   result_status: string;
+}
+
+/** تقييم القبول المحسوب من الدرجات المرصودة والعتبات (aptitude-evaluation). */
+export interface AptitudeEvaluation {
+  subjects: Array<{ subject: string; marks: number | null; pass_mark: number; max_mark: number; result: string }>;
+  total: number;
+  total_pass: number | null;
+  all_subjects_passed: boolean;
+  meets_total: boolean;
+  recommended_decision: 'accepted' | 'rejected' | null;
 }
 
 /**
@@ -147,6 +158,22 @@ export class AdmissionsService {
     return this.apiClient.post(`admissions/applicants/${id}/schedule-interview/`, body);
   }
 
+  /** «قبول الطلب»: تأهيل المتقدم لامتحان القدرات (ينشئ صفوف المواد تلقائياً). */
+  qualifyForExam(id: string): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/qualify-exam/`, {});
+  }
+
+  /** رصد درجات القدرات: scores = [{ subject, marks }]. */
+  recordAptitude(id: string, scores: Array<{ subject: string; marks: number }>): Observable<any> {
+    return this.apiClient.post(`admissions/applicants/${id}/record-aptitude/`, { scores });
+  }
+
+  /** تقييم القبول المحسوب (قرار مقترح لا يغيّر الحالة). */
+  getAptitudeEvaluation(id: string): Observable<any> {
+    return this.apiClient.get<any>(`admissions/applicants/${id}/aptitude-evaluation/`);
+  }
+
+  /** القبول النهائي بعد رصد الدرجات. */
   acceptApplicant(id: string): Observable<any> {
     return this.apiClient.post(`admissions/applicants/${id}/accept/`, {});
   }

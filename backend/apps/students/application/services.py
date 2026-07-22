@@ -11,7 +11,8 @@ from apps.students.domain.services import StudentNumberGenerator, StudentDomainS
 from apps.students.domain.events import DomainEventPublisher
 from apps.workflow.models import WorkflowDefinition, WorkflowInstance
 from apps.workflow.services import WorkflowEngine
-from apps.admissions.domain.models import Applicant
+from apps.admissions.domain.models import Applicant, Guardian
+from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyContact
 from apps.common.exceptions import BusinessException
 # الحقائق الطبية مرجعها العيادة — لا تُكتب ولا تُقرأ إلا عبرها
 from apps.clinic.application import profile_service as clinic_profiles
@@ -78,6 +79,34 @@ class StudentApplicationService:
             created_by=user_id
         )
         
+        # 4b. نقل أولياء الأمور وجهات الطوارئ من طلب القبول إلى ملف الطالب
+        #     (بيانات الاستمارة يجب أن تنتقل مع الطالب المُسجّل).
+        for g in Guardian.objects.filter(applicant=applicant):
+            StudentFamilyRelation.objects.create(
+                student=student,
+                relationship=g.relationship or 'guardian',
+                full_name=g.full_name,
+                phone=g.phone,
+                email=g.email or None,
+                occupation=g.occupation,
+                employer=getattr(g, 'employer', None),
+                national_id=g.national_id,
+                emergency_contact=getattr(g, 'emergency_contact', False),
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
+            # جهة اتصال الطوارئ البديلة إن وُجدت في بيانات ولي الأمر
+            if getattr(g, 'emergency_contact_name', None):
+                StudentEmergencyContact.objects.create(
+                    student=student,
+                    name=g.emergency_contact_name,
+                    relationship=getattr(g, 'emergency_contact_relation', '') or '—',
+                    phone=getattr(g, 'emergency_contact_phone', '') or '',
+                    is_primary=False,
+                    tenant_id=tenant_id,
+                    created_by=user_id,
+                )
+
         # 5. إنشاء الملف الطبي للطالب — الحقائق الطبية مرجعها العيادة،
         # وهذا السجل يبقى للربط فقط (حقول JSON فيه لم تعد تُستخدم).
         StudentMedicalProfile.objects.create(

@@ -139,6 +139,20 @@ class AdmissionSettings(CombinedBaseModel):
     closed_message = models.TextField(blank=True, null=True)     # رسالة تُعرض عند إغلاق التسجيل
     contact_phone = models.CharField(max_length=50, blank=True, null=True)
     contact_email = models.EmailField(blank=True, null=True)
+    # ==== إعدادات امتحان القدرات (قابلة للتغيّر لكل مستأجر/عام) ====
+    # قائمة مواد القدرات وعتباتها، مثال:
+    # [{"name": "اللغة العربية", "max": 100, "pass": 75}, {"name": "الرياضيات", "max": 100, "pass": 75}]
+    aptitude_subjects = models.JSONField(default=list, blank=True)
+    # الحد الأدنى للمجموع الكلي للقبول (فارغ = يُكتفى بعتبة كل مادة)
+    aptitude_total_pass = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    # ==== الرسوم الدراسية المعروضة في استمارة التقديم (قابلة للتحكم لكل مستأجر/عام) ====
+    registration_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)     # رسوم التسجيل
+    annual_tuition = models.DecimalField(max_digits=12, decimal_places=2, default=0)       # الرسوم الدراسية السنوية
+    fee_currency = models.CharField(max_length=20, default='جنيه')                          # عملة العرض
+    # جدول الأقساط، مثال: [{"title": "القسط الأول", "amount": 500000, "note": "عند التسجيل"}]
+    fee_installments = models.JSONField(default=list, blank=True)
+    # ملاحظات/شروط الرسوم (قائمة نصوص تُعرض كنقاط)
+    fee_notes = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = 'admission_settings'
@@ -153,9 +167,10 @@ class PlacementTest(CombinedBaseModel):
     امتحانات تحديد المستوى للمتقدمين
     """
     applicant = models.ForeignKey(Applicant, on_delete=models.CASCADE, related_name='placement_tests')
-    exam_type = models.CharField(max_length=100)
+    exam_type = models.CharField(max_length=100)  # اسم المادة لامتحان القدرات (عربي/رياضيات/...)
     marks_obtained = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    passing_marks = models.DecimalField(max_digits=5, decimal_places=2, default=50.0)
+    passing_marks = models.DecimalField(max_digits=5, decimal_places=2, default=50.0)  # عتبة النجاح للمادة
+    max_marks = models.DecimalField(max_digits=5, decimal_places=2, default=100.0)  # الدرجة القصوى للمادة
     result_status = models.CharField(max_length=20, default='pending') # pending, passed, failed
 
     class Meta:

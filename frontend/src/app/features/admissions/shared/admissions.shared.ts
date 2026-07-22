@@ -11,11 +11,85 @@ export const APPLICANT_STATUS_TEXT: Record<string, string> = {
   submitted: 'مُقدّم',
   under_review: 'قيد المراجعة',
   interview_scheduled: 'مقابلة مجدولة',
+  qualified_exam: 'مؤهّل لامتحان القدرات',
+  exam_scored: 'رُصدت الدرجات',
   accepted: 'مقبول',
   rejected: 'مرفوض',
   enrolled: 'مُسجّل',
   waitlist: 'قائمة الانتظار',
 };
+
+/**
+ * مراحل القبول المرتّبة (stepper). كل مرحلة تُطابق حالة أو أكثر على الخادم.
+ * الترتيب يعكس التدفّق: مُقدّم → قبول الطلب → القدرات → القرار النهائي → التسجيل.
+ */
+export interface AdmissionStage {
+  key: string;
+  label: string;
+  /** الحالات التي تعتبر هذه المرحلة «مكتملة» أو «حالية» عندها. */
+  statuses: string[];
+}
+
+export const ADMISSION_STAGES: AdmissionStage[] = [
+  { key: 'submitted', label: 'مُقدّم', statuses: ['draft', 'submitted', 'under_review', 'interview_scheduled'] },
+  { key: 'qualified_exam', label: 'مؤهّل للقدرات', statuses: ['qualified_exam'] },
+  { key: 'exam_scored', label: 'رُصدت الدرجات', statuses: ['exam_scored'] },
+  { key: 'decision', label: 'القرار النهائي', statuses: ['accepted', 'rejected', 'waitlist'] },
+  { key: 'enrolled', label: 'مُسجّل', statuses: ['enrolled'] },
+];
+
+/**
+ * مواد امتحان القدرات الافتراضية (المواد الأساسية) — تُستخدم عندما لا يعرّف
+ * المستأجر مواده الخاصة في إعدادات القبول. تُطابق نظيرتها في الخلفية.
+ */
+export const DEFAULT_APTITUDE_SUBJECTS = [
+  { name: 'اللغة العربية', max: 100, pass: 75 },
+  { name: 'اللغة الإنجليزية', max: 100, pass: 75 },
+  { name: 'الرياضيات', max: 100, pass: 75 },
+  { name: 'الكيمياء', max: 100, pass: 75 },
+];
+
+/** بنية قسط واحد في جدول الرسوم. */
+export interface FeeInstallment { title: string; amount: number; note?: string; }
+
+/** بنية إعدادات الرسوم المعروضة (استمارة التقديم والطباعة). */
+export interface AdmissionFees {
+  registration_fee: number;
+  annual_tuition: number;
+  fee_currency: string;
+  fee_installments: FeeInstallment[];
+  fee_notes: string[];
+}
+
+/**
+ * الرسوم الافتراضية — منقولة من الاستمارة الورقية الرسمية (applicant-print-modal).
+ * تُستخدم كقيم مبدئية قابلة للتعديل في الإعدادات، وكـfallback في الطباعة.
+ */
+export const DEFAULT_ADMISSION_FEES: AdmissionFees = {
+  registration_fee: 200000,
+  annual_tuition: 500000,
+  fee_currency: 'جنيه',
+  fee_installments: [
+    { title: 'القسط الأول (عند التسجيل)', amount: 500000, note: 'رسوم التسجيل 200,000 + القسط الأول 300,000' },
+    { title: 'القسط الثاني', amount: 200000, note: 'بعد شهرين من بداية العام الدراسي' },
+  ],
+  fee_notes: [
+    'لا ترد رسوم التسجيل بعد سدادها.',
+    'تخصم المدرسة (300,000 جنيه) رسوم تسجيل + إجراءات في حالة ترك التلميذ المدرسة أو فصله خلال الأسبوع الأول.',
+    'لا ترد الرسوم الدراسية (القسط الأول) بعد إكمال الأسبوع الأول من الدراسة.',
+  ],
+};
+
+/** يُرجع فهرس المرحلة الحالية ضمن ADMISSION_STAGES بناءً على حالة الطلب. */
+export function admissionStageIndex(status: string): number {
+  const i = ADMISSION_STAGES.findIndex(s => s.statuses.includes(status));
+  return i === -1 ? 0 : i;
+}
+
+/** هل الحالة قرار رفض/انتظار (لتلوين المرحلة بالأحمر بدل الأخضر)؟ */
+export function isNegativeDecision(status: string): boolean {
+  return status === 'rejected' || status === 'waitlist';
+}
 
 export function applicantStatusText(status: string): string {
   return APPLICANT_STATUS_TEXT[status] || status;
@@ -30,6 +104,8 @@ export function applicantStatusKind(status: string): NbBadgeKind {
       return 'danger';
     case 'under_review':
     case 'interview_scheduled':
+    case 'qualified_exam':
+    case 'exam_scored':
       return 'info';
     case 'submitted':
       return 'warning';

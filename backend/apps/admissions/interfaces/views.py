@@ -26,6 +26,20 @@ def _get_admission_settings(tenant_id):
 # الحالات التي تشغل مقعدًا فعليًا في الصف (تُستثنى المسودة والمرفوض).
 _SEAT_TAKING_STATUSES = ('submitted', 'under_review', 'interview_scheduled', 'accepted', 'enrolled')
 
+# مواد امتحان القدرات الافتراضية حين لا يعرّف المستأجر مواده الخاصة.
+_DEFAULT_APTITUDE_SUBJECTS = [
+    {'name': 'اللغة العربية', 'max': 100, 'pass': 75},
+    {'name': 'اللغة الإنجليزية', 'max': 100, 'pass': 75},
+    {'name': 'الرياضيات', 'max': 100, 'pass': 75},
+    {'name': 'الكيمياء', 'max': 100, 'pass': 75},
+]
+
+
+def _aptitude_subjects(settings_obj):
+    """مواد القدرات المُعرّفة للمستأجر، أو الافتراضية إن لم تُعرّف."""
+    subjects = list(getattr(settings_obj, 'aptitude_subjects', []) or []) if settings_obj else []
+    return subjects if subjects else _DEFAULT_APTITUDE_SUBJECTS
+
 
 def _grade_taken_count(tenant_id, grade_id, academic_year_id=None):
     """عدد الطلبات التي تشغل مقاعد في صف معيّن (اختياريًا ضمن سنة دراسية)."""
@@ -94,7 +108,8 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
             return Response({'success': False, 'message': 'الحالة مطلوبة.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        allowed = {'under_review', 'interview_scheduled', 'accepted', 'rejected', 'waitlist', 'enrolled'}
+        allowed = {'under_review', 'interview_scheduled', 'qualified_exam', 'exam_scored',
+                   'accepted', 'rejected', 'waitlist', 'enrolled'}
         if new_status not in allowed:
             return Response({'success': False, 'message': f'الحالة "{new_status}" غير مسموحة.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -186,6 +201,116 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
         return StandardResponse(data=ApplicantSerializer(applicant).data,
                                 message='تم نقل الطالب إلى قائمة الانتظار.')
 
+    @action(detail=True, methods=['post'], url_path='qualify-exam')
+    def qualify_exam(self, request, pk=None):
+        """
+        «قبول الطلب» في التدفّق الجديد: تأهيل المتقدم لدخول امتحان القدرات.
+        ينشئ صفوف PlacementTest فارغة لكل مادة قدرات مُعرّفة في الإعدادات (إن لم توجد).
+        """
+        applicant = self.get_object()
+        settings_obj = _get_admission_settings(applicant.tenant_id)
+        subjects = _aptitude_subjects(settings_obj)
+
+        with transaction.atomic():
+            existing = set(
+                PlacementTest.objects.filter(applicant=applicant)
+                .values_list('exam_type', flat=True)
+            )
+            for subj in subjects:
+                name = (subj or {}).get('name')
+                if not name or name in existing:
+                    continue
+                PlacementTest.objects.create(
+                    tenant_id=applicant.tenant_id,
+                    applicant=applicant,
+                    exam_type=name,
+                    passing_marks=(subj or {}).get('pass', 50),
+                    max_marks=(subj or {}).get('max', 100),
+                    result_status='pending',
+                )
+            applicant.status = 'qualified_exam'
+            applicant.save(update_fields=['status', 'updated_at'])
+
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم قبول الطلب — المتقدم مؤهّل لامتحان القدرات.')
+
+    @action(detail=True, methods=['post'], url_path='record-aptitude')
+    def record_aptitude(self, request, pk=None):
+        """
+        رصد درجات امتحان القدرات.
+        البيانات: { scores: [{ subject, marks }] }
+        يحدّث/ينشئ PlacementTest لكل مادة، ويحسب نجاح كل مادة مقابل عتبتها،
+        ثم ينقل الحالة إلى exam_scored.
+        """
+        applicant = self.get_object()
+        scores = request.data.get('scores') or []
+        if not isinstance(scores, list) or not scores:
+            return Response({'success': False, 'message': 'قائمة الدرجات مطلوبة.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        settings_obj = _get_admission_settings(applicant.tenant_id)
+        subj_cfg = {(s or {}).get('name'): s for s in _aptitude_subjects(settings_obj)}
+
+        with transaction.atomic():
+            for row in scores:
+                subject = (row or {}).get('subject')
+                marks = (row or {}).get('marks')
+                if not subject or marks is None:
+                    continue
+                cfg = subj_cfg.get(subject, {})
+                pass_mark = cfg.get('pass', 50)
+                max_mark = cfg.get('max', 100)
+                pt, _ = PlacementTest.objects.get_or_create(
+                    applicant=applicant, exam_type=subject,
+                    defaults={'tenant_id': applicant.tenant_id},
+                )
+                pt.marks_obtained = marks
+                pt.passing_marks = pass_mark
+                pt.max_marks = max_mark
+                pt.result_status = 'passed' if float(marks) >= float(pass_mark) else 'failed'
+                pt.save()
+            applicant.status = 'exam_scored'
+            applicant.save(update_fields=['status', 'updated_at'])
+
+        return StandardResponse(data=ApplicantSerializer(applicant).data,
+                                message='تم رصد درجات القدرات.')
+
+    @action(detail=True, methods=['get'], url_path='aptitude-evaluation')
+    def aptitude_evaluation(self, request, pk=None):
+        """
+        يُرجع تقييم القبول المحسوب من الدرجات المرصودة والعتبات:
+        نجاح/رسوب كل مادة، المجموع، وهل يستوفي شرط القبول النهائي.
+        قرار مقترح للإدارة (لا يغيّر الحالة).
+        """
+        applicant = self.get_object()
+        settings_obj = _get_admission_settings(applicant.tenant_id)
+        total_pass = getattr(settings_obj, 'aptitude_total_pass', None) if settings_obj else None
+        tests = PlacementTest.objects.filter(applicant=applicant)
+
+        subjects, total, all_passed, any_scored = [], 0.0, True, False
+        for t in tests:
+            marks = float(t.marks_obtained) if t.marks_obtained is not None else None
+            if marks is not None:
+                any_scored = True
+                total += marks
+            passed = t.result_status == 'passed'
+            if not passed:
+                all_passed = False
+            subjects.append({
+                'subject': t.exam_type, 'marks': marks,
+                'pass_mark': float(t.passing_marks), 'max_mark': float(t.max_marks),
+                'result': t.result_status,
+            })
+
+        meets_total = (total_pass is None) or (total >= float(total_pass))
+        recommend = 'accepted' if (any_scored and all_passed and meets_total) else 'rejected'
+        return StandardResponse(data={
+            'subjects': subjects, 'total': total,
+            'total_pass': float(total_pass) if total_pass is not None else None,
+            'all_subjects_passed': all_passed, 'meets_total': meets_total,
+            'recommended_decision': recommend if any_scored else None,
+        }, message='تقييم القبول.')
+
     # ==========================================================
     # نقاط النهاية العامة (بوابة التسجيل الإلكتروني — بدون مصادقة)
     # المستأجر يُحل عبر النطاق الفرعي أو ترويسة X-Tenant-ID (TenantMiddleware).
@@ -241,6 +366,12 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
                 'required_documents': settings_obj.required_documents or [],
                 'closed_message': settings_obj.closed_message or '',
                 'application_fee': str(settings_obj.application_fee or 0),
+                # الرسوم الدراسية المعروضة في الاستمارة (قابلة للتحكم من الإعدادات)
+                'registration_fee': str(settings_obj.registration_fee or 0),
+                'annual_tuition': str(settings_obj.annual_tuition or 0),
+                'fee_currency': settings_obj.fee_currency or 'جنيه',
+                'fee_installments': settings_obj.fee_installments or [],
+                'fee_notes': settings_obj.fee_notes or [],
                 'registration_start': settings_obj.registration_start,
                 'registration_end': settings_obj.registration_end,
                 'contact_phone': settings_obj.contact_phone or '',

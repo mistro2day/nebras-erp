@@ -4,15 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
-  AdmissionsService, Applicant, Guardian, RequiredDocument, Interview, PlacementTest,
+  AdmissionsService, Applicant, Guardian, RequiredDocument, Interview, PlacementTest, AptitudeEvaluation,
 } from '../admissions.service';
 import { CommunicationsService, CommunicationTemplate } from '../../communications/communications.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDataTableComponent, NbColumn } from '../../../shared/nebras/nb-data-table.component';
 import {
-  ADM_PAGE_STYLES, DOC_STATUS_TEXT, INTERVIEW_STATUS_TEXT,
+  ADM_PAGE_STYLES, DOC_STATUS_TEXT, INTERVIEW_STATUS_TEXT, ADMISSION_STAGES,
   applicantStatusKind, applicantStatusText, docStatusKind, interviewStatusKind, pickList,
+  admissionStageIndex, isNegativeDecision, DEFAULT_APTITUDE_SUBJECTS,
+  AdmissionFees, DEFAULT_ADMISSION_FEES,
 } from '../shared/admissions.shared';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InterviewScheduleDialogComponent, InterviewScheduleResult } from '../../../shared/components/interview-schedule-dialog/interview-schedule-dialog.component';
@@ -97,12 +99,59 @@ const ADM_SUBMITTED_TEMPLATE = {
           <button type="button" class="nb-btn-whatsapp" (click)="openWhatsappModal(a.status)">
             💬 إرسال إشعار واتساب
           </button>
-
-          <button type="button" class="nb-btn-secondary" (click)="scheduleInterview()">📅 جدولة مقابلة</button>
-          <button type="button" class="nb-btn-primary" (click)="setStatus('accepted')">✓ قبول الطلب</button>
-          <button type="button" class="nb-btn-warning" (click)="setStatus('waitlist')">⏳ قائمة الانتظار</button>
-          <button type="button" class="nb-btn-danger" (click)="setStatus('rejected')">✕ رفض الطلب</button>
         </nb-page-header>
+
+        <!-- لوحة مراحل القبول: الخطوات + إجراء المرحلة الحالية (بديل الأزرار المبعثرة) -->
+        <div class="adm-flow">
+          <div class="adm-stepper" [class.negative]="isNegative()">
+            @for (st of stages; track st.key; let i = $index) {
+              <div class="adm-step"
+                   [class.done]="i < currentStageIndex()"
+                   [class.active]="i === currentStageIndex()">
+                <span class="adm-step-dot">{{ i < currentStageIndex() ? '✓' : (i + 1) }}</span>
+                <span class="adm-step-label">{{ i === 3 && isNegative() ? statusText(a.status) : st.label }}</span>
+              </div>
+              @if (i < stages.length - 1) { <span class="adm-step-line" [class.done]="i < currentStageIndex()"></span> }
+            }
+          </div>
+
+          <!-- إجراءات المرحلة الحالية فقط -->
+          <div class="adm-flow-actions">
+            @switch (currentStageIndex()) {
+              @case (0) {
+                <span class="adm-flow-hint">الخطوة التالية: مراجعة الطلب ثم قبوله لتأهيله لامتحان القدرات.</span>
+                <button type="button" class="nb-btn-ghost sm" (click)="scheduleInterview()">📅 جدولة مقابلة</button>
+                <button type="button" class="nb-btn-danger sm" (click)="setStatus('rejected')">✕ رفض</button>
+                <button type="button" class="nb-btn-warning sm" (click)="setStatus('waitlist')">⏳ انتظار</button>
+                <button type="button" class="nb-btn-primary" (click)="qualifyForExam()">✓ قبول الطلب</button>
+              }
+              @case (1) {
+                <span class="adm-flow-hint">المتقدم مؤهّل — ارصد درجات امتحان القدرات أدناه.</span>
+                <button type="button" class="nb-btn-danger sm" (click)="setStatus('rejected')">✕ رفض</button>
+                <button type="button" class="nb-btn-primary" (click)="scrollToAptitude()">📝 رصد الدرجات</button>
+              }
+              @case (2) {
+                <span class="adm-flow-hint">رُصدت الدرجات — اعتمد القرار النهائي.</span>
+                <button type="button" class="nb-btn-danger sm" (click)="setStatus('rejected')">✕ رفض</button>
+                <button type="button" class="nb-btn-warning sm" (click)="setStatus('waitlist')">⏳ انتظار</button>
+                <button type="button" class="nb-btn-primary" (click)="finalizeAccept()">✓ القبول النهائي</button>
+              }
+              @case (3) {
+                @if (a.status === 'accepted') {
+                  <span class="adm-flow-hint">تم القبول النهائي — حوّله إلى طالب مُسجّل.</span>
+                  <button type="button" class="nb-btn-ghost sm" (click)="setStatus('qualified_exam')">↩︎ إعادة للقدرات</button>
+                  <button type="button" class="nb-btn-primary" (click)="enrollAsStudent()">🎓 تسجيل كطالب</button>
+                } @else {
+                  <span class="adm-flow-hint">الطلب في حالة {{ statusText(a.status) }}.</span>
+                  <button type="button" class="nb-btn-ghost sm" (click)="setStatus('qualified_exam')">↩︎ إعادة للقدرات</button>
+                }
+              }
+              @case (4) {
+                <span class="adm-flow-hint">✓ اكتمل التسجيل — المتقدم الآن طالب مُسجّل.</span>
+              }
+            }
+          </div>
+        </div>
 
         <!-- شريط الوسوم والمعلومات السريعة -->
         <div class="meta-row-bar">
@@ -117,6 +166,55 @@ const ADM_SUBMITTED_TEMPLATE = {
           <span class="meta-item"><b>تاريخ الميلاد:</b> {{ a.date_of_birth }}</span>
           <span class="meta-item"><b>مكان الميلاد:</b> {{ a.birth_place || '—' }}</span>
         </div>
+
+        <!-- لوحة امتحان القدرات: تظهر من مرحلة التأهّل حتى القرار -->
+        @if (currentStageIndex() >= 1) {
+          <nb-panel title="🎯 امتحان القدرات ونتيجة القبول" style="margin-top:16px" id="aptitude-panel">
+            @if (aptitudeScores().length === 0) {
+              <div class="empty-box">لم تُعرّف مواد امتحان القدرات في إعدادات القبول بعد. عرّفها من إعدادات القبول ثم أعد «قبول الطلب».</div>
+            } @else {
+              <div class="apt-grid">
+                @for (row of aptitudeScores(); track row.subject; let i = $index) {
+                  <div class="apt-cell">
+                    <label>{{ row.subject }} <span class="apt-hint">(النجاح ≥ {{ row.pass }} من {{ row.max }})</span></label>
+                    <input type="number" min="0" [max]="row.max"
+                           [disabled]="a.status !== 'qualified_exam' && a.status !== 'exam_scored'"
+                           [(ngModel)]="row.marks"
+                           [class.pass]="row.marks !== null && row.marks >= row.pass"
+                           [class.fail]="row.marks !== null && row.marks < row.pass"
+                           placeholder="—" />
+                  </div>
+                }
+              </div>
+
+              @if (a.status === 'qualified_exam' || a.status === 'exam_scored') {
+                <div class="apt-actions">
+                  <button type="button" class="nb-btn-primary" [disabled]="savingAptitude()" (click)="saveAptitude()">
+                    {{ savingAptitude() ? '⏳ جارٍ الحفظ' : '💾 حفظ درجات القدرات' }}
+                  </button>
+                </div>
+              }
+
+              @if (evaluation(); as ev) {
+                <div class="apt-eval" [class.ok]="ev.recommended_decision === 'accepted'" [class.no]="ev.recommended_decision === 'rejected'">
+                  <div class="apt-eval-row">
+                    <span>المجموع الكلي:</span> <b>{{ ev.total }}</b>
+                    @if (ev.total_pass !== null) { <span class="apt-hint">(المطلوب ≥ {{ ev.total_pass }})</span> }
+                  </div>
+                  <div class="apt-eval-row">
+                    <span>اجتياز كل المواد:</span> <b>{{ ev.all_subjects_passed ? 'نعم ✓' : 'لا ✕' }}</b>
+                  </div>
+                  @if (ev.recommended_decision) {
+                    <div class="apt-eval-verdict">
+                      القرار المقترح:
+                      <b>{{ ev.recommended_decision === 'accepted' ? 'مستوفٍ لشروط القبول ✓' : 'غير مستوفٍ ✕' }}</b>
+                    </div>
+                  }
+                </div>
+              }
+            }
+          </nb-panel>
+        }
 
         <!-- 1) البيانات الشخصية للتلميذ والأكاديمية -->
         <nb-panel title="أ / البيانات الشخصية والأكاديمية للتلميذ">
@@ -359,8 +457,9 @@ const ADM_SUBMITTED_TEMPLATE = {
         <app-applicant-print-modal
           [applicant]="a"
           [guardian]="primaryGuardian() || defaultGuardianObj(a)"
-          [academicYear]="a.academic_year_id || '2026-2025'"
-          [gradeName]="a.applying_grade_id || 'المرجحة'"
+          [academicYear]="academicYearName(a.academic_year_id)"
+          [gradeName]="gradeName(a.applying_grade_id)"
+          [fees]="printFees()"
           (close)="showPrintModal.set(false)"
         ></app-applicant-print-modal>
       }
@@ -372,7 +471,55 @@ const ADM_SUBMITTED_TEMPLATE = {
     ADM_PAGE_STYLES,
     `
       .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; position: relative; }
-      
+
+      /* ==== لوحة مراحل القبول ==== */
+      .adm-flow {
+        margin: 14px 0 4px; padding: 14px 16px; border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius-card); background: var(--nb-surface);
+        display: flex; flex-direction: column; gap: 12px;
+      }
+      .adm-flow-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px dashed var(--nb-border); padding-top: 12px; }
+      .adm-flow-hint { flex: 1; min-width: 200px; font-size: 13px; color: var(--nb-text-faint); font-weight: 600; }
+
+      /* ==== شريط مراحل القبول (stepper) ==== */
+      .adm-stepper { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+      .adm-step { display: flex; align-items: center; gap: 7px; padding: 5px 4px; }
+      .adm-step-dot {
+        width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 700; background: var(--nb-surface); color: var(--nb-text-faint);
+        border: 2px solid var(--nb-border); flex-shrink: 0; transition: all 200ms ease;
+      }
+      .adm-step-label { font-size: 13px; font-weight: 700; color: var(--nb-text-faint); white-space: nowrap; }
+      .adm-step.done .adm-step-dot { background: var(--nb-success); color: #fff; border-color: var(--nb-success); }
+      .adm-step.done .adm-step-label { color: var(--nb-text); }
+      .adm-step.active .adm-step-dot { background: var(--nb-primary); color: #fff; border-color: var(--nb-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nb-primary) 20%, transparent); }
+      .adm-step.active .adm-step-label { color: var(--nb-primary); }
+      .adm-step-line { flex: 1; height: 2px; min-width: 16px; background: var(--nb-border); }
+      .adm-step-line.done { background: var(--nb-success); }
+      .adm-stepper.negative .adm-step.active .adm-step-dot { background: var(--nb-danger); border-color: var(--nb-danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nb-danger) 20%, transparent); }
+      .adm-stepper.negative .adm-step.active .adm-step-label { color: var(--nb-danger); }
+
+      /* ==== لوحة امتحان القدرات ==== */
+      .apt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+      .apt-cell { display: flex; flex-direction: column; gap: 6px; }
+      .apt-cell label { font-size: 13px; font-weight: 700; color: var(--nb-text); }
+      .apt-hint { font-size: 11px; font-weight: 400; color: var(--nb-text-faint); }
+      .apt-cell input {
+        height: 40px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 12px;
+        font-family: var(--nb-font-family); font-size: 15px; font-weight: 700; color: var(--nb-text);
+        background: var(--nb-surface); outline: none; text-align: center;
+      }
+      .apt-cell input:focus { border-color: var(--nb-primary); }
+      .apt-cell input.pass { border-color: var(--nb-success); background: color-mix(in srgb, var(--nb-success) 8%, var(--nb-surface)); }
+      .apt-cell input.fail { border-color: var(--nb-danger); background: color-mix(in srgb, var(--nb-danger) 8%, var(--nb-surface)); }
+      .apt-cell input:disabled { opacity: 0.7; cursor: not-allowed; }
+      .apt-actions { margin-top: 16px; display: flex; justify-content: flex-start; }
+      .apt-eval { margin-top: 16px; padding: 14px 16px; border-radius: var(--nb-radius-card); border: 1px solid var(--nb-border); background: var(--nb-surface); display: flex; flex-direction: column; gap: 8px; }
+      .apt-eval.ok { border-color: var(--nb-success); background: color-mix(in srgb, var(--nb-success) 6%, var(--nb-surface)); }
+      .apt-eval.no { border-color: var(--nb-danger); background: color-mix(in srgb, var(--nb-danger) 6%, var(--nb-surface)); }
+      .apt-eval-row { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+      .apt-eval-verdict { font-size: 14px; font-weight: 700; margin-top: 4px; }
+
       .auto-toast-banner {
         position: sticky; top: 0; z-index: 100; margin-bottom: 16px;
         padding: 12px 18px; border-radius: var(--nb-radius-card); font-size: 13px; font-weight: 700;
@@ -467,6 +614,21 @@ export class ApplicationDetailsComponent implements OnInit {
   readonly documents = signal<RequiredDocument[]>([]);
   readonly interviews = signal<Interview[]>([]);
   readonly placements = signal<PlacementTest[]>([]);
+
+  // ---- مراحل القبول (stepper) وامتحان القدرات ----
+  readonly stages = ADMISSION_STAGES;
+  readonly currentStageIndex = computed(() => admissionStageIndex(this.applicant()?.status || 'submitted'));
+  readonly isNegative = computed(() => isNegativeDecision(this.applicant()?.status || ''));
+  /** درجات القدرات القابلة للتحرير في نموذج الرصد: [{ subject, marks }]. */
+  readonly aptitudeScores = signal<Array<{ subject: string; marks: number | null; max: number; pass: number }>>([]);
+  readonly savingAptitude = signal(false);
+  readonly evaluation = signal<AptitudeEvaluation | null>(null);
+
+  // مراجع أكاديمية لتحويل UUID → اسم مقروء (العام/الصف) في العرض والطباعة
+  readonly grades = signal<any[]>([]);
+  readonly academicYears = signal<any[]>([]);
+  // الرسوم المعروضة في الاستمارة الورقية — من إعدادات القبول (أو الافتراضيات)
+  readonly printFees = signal<AdmissionFees>(DEFAULT_ADMISSION_FEES);
 
   readonly showPrintModal = signal(false);
   readonly showWaModal = signal(false);
@@ -610,12 +772,122 @@ export class ApplicationDetailsComponent implements OnInit {
     return icons[code] || '📝';
   }
 
+  /** أسماء الصف والعام من المعرّفات (fallback للنص كما هو إن لم يوجد). */
+  gradeName(id?: string): string {
+    if (!id) return '—';
+    const g = this.grades().find((x) => x.id === id);
+    return g?.name || g?.arabic_name || id;
+  }
+
+  academicYearName(id?: string): string {
+    if (!id) return '—';
+    const y = this.academicYears().find((x) => x.id === id);
+    return y?.name || y?.title || id;
+  }
+
   private loadAll(): void {
     this.service.getApplicant(this.id).subscribe((res) => this.applicant.set(res?.data ?? res ?? null));
+    this.service.getGrades().subscribe((res) => this.grades.set(pickList<any>(res)));
+    this.service.getAcademicYears().subscribe((res) => this.academicYears.set(pickList<any>(res)));
+    // رسوم الطباعة من إعدادات القبول (fallback للافتراضيات عند غياب الضبط)
+    this.service.getAdmissionSettings().subscribe((res) => {
+      const d = res?.data ?? res ?? {};
+      const hasFees = Number(d.registration_fee) > 0 || Number(d.annual_tuition) > 0
+        || (d.fee_installments?.length ?? 0) > 0 || (d.fee_notes?.length ?? 0) > 0;
+      if (hasFees) {
+        this.printFees.set({
+          registration_fee: Number(d.registration_fee ?? 0),
+          annual_tuition: Number(d.annual_tuition ?? 0),
+          fee_currency: d.fee_currency ?? 'جنيه',
+          fee_installments: d.fee_installments ?? [],
+          fee_notes: d.fee_notes ?? [],
+        });
+      }
+    });
     this.service.getGuardians().subscribe((res) => this.guardians.set(pickList<Guardian>(res).filter((g) => g.applicant === this.id)));
     this.service.getDocuments().subscribe((res) => this.documents.set(pickList<RequiredDocument>(res).filter((d) => d.applicant === this.id)));
     this.service.getInterviews().subscribe((res) => this.interviews.set(pickList<Interview>(res).filter((i) => i.applicant === this.id)));
-    this.service.getPlacementTests().subscribe((res) => this.placements.set(pickList<PlacementTest>(res).filter((t) => t.applicant === this.id)));
+    this.service.getPlacementTests().subscribe((res) => {
+      const tests = pickList<PlacementTest>(res).filter((t) => t.applicant === this.id);
+      this.placements.set(tests);
+      if (tests.length) {
+        this.aptitudeScores.set(tests.map((t) => ({
+          subject: t.exam_type,
+          marks: t.marks_obtained ?? null,
+          max: t.max_marks ?? 100,
+          pass: t.passing_marks ?? 50,
+        })));
+      } else {
+        // لا صفوف بعد (لم تُعرّف المواد وقت التأهيل) — اعرض المواد الافتراضية للإدخال؛ يُنشئها الحفظ.
+        this.aptitudeScores.set(DEFAULT_APTITUDE_SUBJECTS.map((s) => ({
+          subject: s.name, marks: null, max: s.max, pass: s.pass,
+        })));
+      }
+    });
+    // تقييم القبول المحسوب يظهر بعد رصد الدرجات
+    this.service.getAptitudeEvaluation(this.id).subscribe({
+      next: (res) => this.evaluation.set(res?.data ?? null),
+      error: () => this.evaluation.set(null),
+    });
+  }
+
+  // ==== إجراءات مراحل القبول ====
+
+  /** «قبول الطلب» → تأهيل لامتحان القدرات (ينشئ صفوف المواد من الإعدادات). */
+  qualifyForExam(): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'قبول الطلب',
+        message: 'قبول الطلب يؤهّل المتقدم لدخول <strong>امتحان القدرات</strong>. سيتم تجهيز مواد الامتحان. متابعة؟',
+        confirmText: 'قبول الطلب', color: 'primary',
+      },
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.service.qualifyForExam(this.id).subscribe((res) => {
+        this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status: 'qualified_exam' });
+        this.loadAll();
+      });
+    });
+  }
+
+  /** حفظ درجات القدرات المرصودة → الحالة exam_scored. */
+  saveAptitude(): void {
+    const rows = this.aptitudeScores().filter((r) => r.marks !== null && r.marks !== undefined);
+    if (!rows.length) return;
+    this.savingAptitude.set(true);
+    const scores = rows.map((r) => ({ subject: r.subject, marks: Number(r.marks) }));
+    this.service.recordAptitude(this.id, scores).subscribe({
+      next: (res) => {
+        this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status: 'exam_scored' });
+        this.savingAptitude.set(false);
+        this.loadAll();
+      },
+      error: () => this.savingAptitude.set(false),
+    });
+  }
+
+  /** القبول النهائي بعد رصد الدرجات (يعيد استخدام حالة accepted وقالب واتساب). */
+  finalizeAccept(): void {
+    const ev = this.evaluation();
+    const warn = ev && ev.recommended_decision === 'rejected'
+      ? '<br><span style="color:var(--nb-danger)">⚠️ التقييم المحسوب لا يستوفي شروط القبول.</span>' : '';
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        title: 'القبول النهائي',
+        message: `اعتماد <strong>القبول النهائي</strong> للمتقدم بناءً على درجات القدرات؟${warn}`,
+        confirmText: 'قبول نهائي', color: 'primary',
+      },
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.service.acceptApplicant(this.id).subscribe((res) => {
+        this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status: 'accepted' });
+        this.autoSendWhatsappNotification('accepted');
+      });
+    });
   }
 
   waPhone(): string {
@@ -857,6 +1129,31 @@ export class ApplicationDetailsComponent implements OnInit {
 
         // إرسال الإشعار تلقائياً في الخلفية فور تأكيد القرار
         this.autoSendWhatsappNotification(status);
+      });
+    });
+  }
+
+  scrollToAptitude(): void {
+    document.getElementById('aptitude-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /** تحويل المتقدم المقبول نهائياً إلى طالب مُسجّل (وحدة الطلاب). */
+  enrollAsStudent(): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'تسجيل كطالب',
+        message: 'تحويل المتقدم المقبول إلى <strong>طالب مُسجّل</strong> في وحدة الطلاب؟',
+        confirmText: 'تسجيل', color: 'primary',
+      },
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.service.enrollApplicantAsStudent(this.id).subscribe((res) => {
+        this.applicant.set({ ...(this.applicant() as Applicant), status: 'enrolled' });
+        const msg = res?.message || 'تم تسجيل الطالب بنجاح.';
+        this.autoNotificationToast.set({ status: 'success', message: msg });
+        setTimeout(() => this.autoNotificationToast.set(null), 8000);
       });
     });
   }

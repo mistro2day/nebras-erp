@@ -138,9 +138,32 @@ class StudentViewSet(viewsets.ModelViewSet):
             tenant_id=tenant_id,
             user_id=user_id
         )
-        
+
+        # توليد فاتورة رسوم التسجيل تلقائياً (best-effort — لا يُفشل التسجيل عند نقص الإعداد المالي)
+        fee_notice = None
+        try:
+            from apps.student_finance.application.services import BillingService
+            from apps.admissions.domain.models import Applicant as _Applicant
+            _app = _Applicant.objects.filter(id=uuid.UUID(applicant_id), tenant_id=tenant_id).first()
+            invoice = BillingService.bill_new_student_registration(
+                tenant_id=tenant_id,
+                student_id=student.id,
+                grade_id=getattr(_app, 'applying_grade_id', None) if _app else None,
+                user_id=user_id,
+            )
+            if invoice is not None:
+                fee_notice = f"تم توليد فاتورة رسوم التسجيل رقم {invoice.invoice_number} بمبلغ {invoice.total_amount}."
+        except Exception as exc:  # نقص إعداد مالي أو غيره — يُسجّل ولا يُفشل التسجيل
+            import logging
+            logging.getLogger('nebras.students').warning(
+                "تعذّر توليد فاتورة رسوم التسجيل للطالب %s: %s", student.id, exc)
+            fee_notice = "تم التسجيل، لكن تعذّر توليد فاتورة الرسوم تلقائياً — راجع إعدادات المالية."
+
         serializer = StudentSerializer(student)
-        return StandardResponse(serializer.data, message="تم تسجيل الطالب بنجاح وتوليد الرقم المدرسي.", status=status.HTTP_201_CREATED)
+        message = "تم تسجيل الطالب بنجاح وتوليد الرقم المدرسي."
+        if fee_notice:
+            message += " " + fee_notice
+        return StandardResponse(serializer.data, message=message, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='enroll')
     def enroll(self, request, pk=None):

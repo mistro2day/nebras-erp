@@ -5,7 +5,7 @@ import { TenantService } from '../../../core/services/tenant.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-import { pickList } from '../shared/admissions.shared';
+import { pickList, DEFAULT_ADMISSION_FEES } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
 
@@ -23,6 +23,11 @@ interface SettingsForm {
   min_age: number | null;
   max_age: number | null;
   application_fee: number;
+  registration_fee: number;
+  annual_tuition: number;
+  fee_currency: string;
+  fee_installments: Array<{ title: string; amount: number; note?: string }>;
+  fee_notes: string[];
   closed_message: string;
   contact_phone: string;
   contact_email: string;
@@ -116,6 +121,26 @@ const SUDAN_DEFAULT_TERMS = `شروط وأحكام القبول والتسجيل
             <div class="fld"><label>رسوم التقديم (جنيه)</label><input type="number" min="0" [(ngModel)]="s.application_fee" /></div>
             <div class="fld"><label>أدنى عمر (سنوات)</label><input type="number" min="0" [(ngModel)]="s.min_age" /></div>
             <div class="fld"><label>أقصى عمر (سنوات)</label><input type="number" min="0" [(ngModel)]="s.max_age" /></div>
+          </div>
+        </nb-panel>
+
+        <!-- الرسوم الدراسية المعروضة في استمارة التقديم -->
+        <nb-panel [title]="'الرسوم الدراسية المعروضة في استمارة التقديم — ' + tabTitle()"
+                  subtitle="هذه القيم تظهر للطالب في استمارة التقديم العامة. اتركها صفراً لإخفاء قسم الرسوم." style="margin-top:16px">
+          <div class="grid">
+            <div class="fld"><label>رسوم التسجيل</label><input type="number" min="0" [(ngModel)]="s.registration_fee" /></div>
+            <div class="fld"><label>الرسوم الدراسية السنوية</label><input type="number" min="0" [(ngModel)]="s.annual_tuition" /></div>
+            <div class="fld"><label>العملة</label><input [(ngModel)]="s.fee_currency" placeholder="جنيه" /></div>
+          </div>
+          <div class="fld" style="margin-top:12px">
+            <label>جدول الأقساط (سطر لكل قسط: العنوان | المبلغ | ملاحظة)</label>
+            <textarea rows="4" [(ngModel)]="feeInstallmentsText"
+                      placeholder="القسط الأول (عند التسجيل) | 500000 | رسوم التسجيل + القسط الأول&#10;القسط الثاني | 200000 | بعد شهرين من بداية العام"></textarea>
+          </div>
+          <div class="fld" style="margin-top:12px">
+            <label>ملاحظات وشروط الرسوم (سطر لكل ملاحظة)</label>
+            <textarea rows="4" [(ngModel)]="feeNotesText"
+                      placeholder="لا ترد رسوم التسجيل بعد سدادها إطلاقاً.&#10;لا ترد الرسوم الدراسية بعد إكمال الأسبوع الأول من الدراسة."></textarea>
           </div>
         </nb-panel>
 
@@ -262,27 +287,59 @@ export class AdmissionSettingsComponent implements OnInit {
       is_open: true, academic_year_id: null, registration_start: null, registration_end: null,
       allowed_grade_ids: [], grade_seats: {}, auto_close_when_full: true,
       terms: SUDAN_DEFAULT_TERMS, required_documents: SUDAN_DEFAULT_DOCS, min_age: null, max_age: null,
-      application_fee: 0, closed_message: 'تم إغلاق التقديم لمدرسة البنين لعام 2026-2025.',
+      application_fee: 0,
+      registration_fee: DEFAULT_ADMISSION_FEES.registration_fee,
+      annual_tuition: DEFAULT_ADMISSION_FEES.annual_tuition,
+      fee_currency: DEFAULT_ADMISSION_FEES.fee_currency,
+      fee_installments: DEFAULT_ADMISSION_FEES.fee_installments.map((i) => ({ ...i })),
+      fee_notes: [...DEFAULT_ADMISSION_FEES.fee_notes],
+      closed_message: 'تم إغلاق التقديم لمدرسة البنين لعام 2026-2025.',
       contact_phone: '', contact_email: '',
     },
     girls: {
       is_open: true, academic_year_id: null, registration_start: null, registration_end: null,
       allowed_grade_ids: [], grade_seats: {}, auto_close_when_full: true,
       terms: SUDAN_DEFAULT_TERMS, required_documents: SUDAN_DEFAULT_DOCS, min_age: null, max_age: null,
-      application_fee: 0, closed_message: 'تم إغلاق التقديم لمدرسة البنات لعام 2026-2025.',
+      application_fee: 0,
+      registration_fee: DEFAULT_ADMISSION_FEES.registration_fee,
+      annual_tuition: DEFAULT_ADMISSION_FEES.annual_tuition,
+      fee_currency: DEFAULT_ADMISSION_FEES.fee_currency,
+      fee_installments: DEFAULT_ADMISSION_FEES.fee_installments.map((i) => ({ ...i })),
+      fee_notes: [...DEFAULT_ADMISSION_FEES.fee_notes],
+      closed_message: 'تم إغلاق التقديم لمدرسة البنات لعام 2026-2025.',
       contact_phone: '', contact_email: '',
     },
     global: {
       is_open: true, academic_year_id: null, registration_start: null, registration_end: null,
       allowed_grade_ids: [], grade_seats: {}, auto_close_when_full: true,
       terms: SUDAN_DEFAULT_TERMS, required_documents: SUDAN_DEFAULT_DOCS, min_age: null, max_age: null,
-      application_fee: 0, closed_message: 'تم إغلاق باب التقديم العام بالمؤسسة.',
+      application_fee: 0,
+      registration_fee: DEFAULT_ADMISSION_FEES.registration_fee,
+      annual_tuition: DEFAULT_ADMISSION_FEES.annual_tuition,
+      fee_currency: DEFAULT_ADMISSION_FEES.fee_currency,
+      fee_installments: DEFAULT_ADMISSION_FEES.fee_installments.map((i) => ({ ...i })),
+      fee_notes: [...DEFAULT_ADMISSION_FEES.fee_notes],
+      closed_message: 'تم إغلاق باب التقديم العام بالمؤسسة.',
       contact_phone: '', contact_email: '',
     },
   };
 
   s: SettingsForm = this.branchSettingsStore['boys'];
   documentsText = SUDAN_DEFAULT_DOCS.join('\n');
+  feeNotesText = '';
+  feeInstallmentsText = '';
+
+  /** يحوّل نص الأقساط (سطر: العنوان | المبلغ | ملاحظة) إلى قائمة كائنات. */
+  private parseInstallments(text: string): Array<{ title: string; amount: number; note?: string }> {
+    return text.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+      const [title, amount, note] = line.split('|').map((p) => p.trim());
+      return { title: title || '', amount: Number(amount) || 0, ...(note ? { note } : {}) };
+    }).filter((x) => x.title);
+  }
+
+  private installmentsToText(list: Array<{ title: string; amount: number; note?: string }>): string {
+    return (list ?? []).map((i) => `${i.title} | ${i.amount}${i.note ? ' | ' + i.note : ''}`).join('\n');
+  }
 
   tabTitle(): string {
     const t = this.activeTab();
@@ -294,11 +351,15 @@ export class AdmissionSettingsComponent implements OnInit {
   selectBranchTab(tab: 'boys' | 'girls' | 'global'): void {
     // حفظ الحالة الحالية للفرع السابق في الذاكرة المحلية قبل التبديل
     this.s.required_documents = this.documentsText.split('\n').map((l) => l.trim()).filter(Boolean);
+    this.s.fee_notes = this.feeNotesText.split('\n').map((l) => l.trim()).filter(Boolean);
+    this.s.fee_installments = this.parseInstallments(this.feeInstallmentsText);
     this.branchSettingsStore[this.activeTab()] = { ...this.s };
 
     this.activeTab.set(tab);
     this.s = this.branchSettingsStore[tab];
     this.documentsText = (this.s.required_documents ?? []).join('\n');
+    this.feeNotesText = (this.s.fee_notes ?? []).join('\n');
+    this.feeInstallmentsText = this.installmentsToText(this.s.fee_installments ?? []);
   }
 
   ngOnInit(): void {
@@ -311,8 +372,18 @@ export class AdmissionSettingsComponent implements OnInit {
       next: (res) => {
         const d = res?.data ?? res;
         if (d) {
+          // إعدادات رسوم لم تُضبط بعد → استخدم الافتراضيات (المنقولة من الاستمارة الرسمية) قابلةً للتعديل
+          const hasSavedFees = Number(d.registration_fee) > 0 || Number(d.annual_tuition) > 0
+            || (d.fee_installments?.length ?? 0) > 0 || (d.fee_notes?.length ?? 0) > 0;
+          const feeDefaults = hasSavedFees ? {} : {
+            registration_fee: DEFAULT_ADMISSION_FEES.registration_fee,
+            annual_tuition: DEFAULT_ADMISSION_FEES.annual_tuition,
+            fee_currency: DEFAULT_ADMISSION_FEES.fee_currency,
+            fee_installments: DEFAULT_ADMISSION_FEES.fee_installments.map((i) => ({ ...i })),
+            fee_notes: [...DEFAULT_ADMISSION_FEES.fee_notes],
+          };
           this.s = {
-            ...this.s, ...d,
+            ...this.s, ...d, ...feeDefaults,
             allowed_grade_ids: d.allowed_grade_ids ?? [],
             grade_seats: d.grade_seats ?? {},
             auto_close_when_full: d.auto_close_when_full ?? true,
@@ -321,6 +392,8 @@ export class AdmissionSettingsComponent implements OnInit {
           this.branchSettingsStore['girls'] = { ...this.s };
           this.branchSettingsStore['global'] = { ...this.s };
           this.documentsText = (d.required_documents ?? []).join('\n');
+          this.feeNotesText = (this.s.fee_notes ?? []).join('\n');
+          this.feeInstallmentsText = this.installmentsToText(this.s.fee_installments ?? []);
         }
         this.loading.set(false);
       },
@@ -355,6 +428,8 @@ export class AdmissionSettingsComponent implements OnInit {
     this.error.set('');
     
     this.s.required_documents = this.documentsText.split('\n').map((l) => l.trim()).filter(Boolean);
+    this.s.fee_notes = this.feeNotesText.split('\n').map((l) => l.trim()).filter(Boolean);
+    this.s.fee_installments = this.parseInstallments(this.feeInstallmentsText);
     this.branchSettingsStore[this.activeTab()] = { ...this.s };
 
     const payload = {
@@ -362,6 +437,10 @@ export class AdmissionSettingsComponent implements OnInit {
       branch_type: this.activeTab(),
       required_documents: this.s.required_documents,
       application_fee: this.s['application_fee'] || 0,
+      registration_fee: this.s['registration_fee'] || 0,
+      annual_tuition: this.s['annual_tuition'] || 0,
+      fee_notes: this.s.fee_notes,
+      fee_installments: this.s.fee_installments,
     };
     
     this.svc.saveAdmissionSettings(payload).subscribe({

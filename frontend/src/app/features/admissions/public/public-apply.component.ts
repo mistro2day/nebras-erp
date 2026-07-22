@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AdmissionsService } from '../admissions.service';
@@ -6,6 +7,7 @@ import { CommunicationsService } from '../../communications/communications.servi
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { ApplicantPrintModalComponent } from '../shared/applicant-print-modal.component';
+import { AdmissionFees, DEFAULT_ADMISSION_FEES } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
 
@@ -83,6 +85,7 @@ interface ExtendedGuardianForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DecimalPipe,
     FormsModule,
     RouterLink,
     NbStepperComponent,
@@ -547,30 +550,35 @@ interface ExtendedGuardianForm {
               <div class="step-pane">
                 <div class="pane-title">د / الرسوم الدراسية ومراجعة الطلب النهائية</div>
 
-                <!-- الشروط والرسوم الدراسية -->
-                <div class="sub-card financial-card">
-                  <div class="sub-head">الرسوم الدراسية وجدول السداد المعتمد (2025 - 2026)</div>
-                  <div class="fin-details">
-                    <div class="fin-row"><span>رسوم التسجيل (إدارية وحكومية ولا تشمل الزي والكتب):</span><b>200,000 جنيه</b></div>
-                    <div class="fin-row"><span>الرسوم الدراسية الإجمالية للسنة:</span><b>500,000 جنيه</b></div>
-                    <div class="fin-schedule">
-                      <div class="sch-item">
-                        <span class="sch-num">1</span>
-                        <div class="sch-text"><b>القسط الأول (عند التسجيل):</b> رسوم التسجيل 200,000 جنيه + القسط الأول 300,000 جنيه = <b>500,000 جنيه</b>.</div>
-                      </div>
-                      <div class="sch-item">
-                        <span class="sch-num">2</span>
-                        <div class="sch-text"><b>القسط الثاني:</b> يدفع مبلغ <b>200,000 جنيه</b> بعد شهرين من بداية العام الدراسي.</div>
-                      </div>
+                <!-- الشروط والرسوم الدراسية (مصدرها إعدادات القبول) -->
+                @if (hasFeeInfo()) {
+                  <div class="sub-card financial-card">
+                    <div class="sub-head">الرسوم الدراسية وجدول السداد المعتمد</div>
+                    <div class="fin-details">
+                      @if (registrationFee() > 0) {
+                        <div class="fin-row"><span>رسوم التسجيل (إدارية وحكومية ولا تشمل الزي والكتب):</span><b>{{ registrationFee() | number }} {{ feeCurrency() }}</b></div>
+                      }
+                      @if (annualTuition() > 0) {
+                        <div class="fin-row"><span>الرسوم الدراسية الإجمالية للسنة:</span><b>{{ annualTuition() | number }} {{ feeCurrency() }}</b></div>
+                      }
+                      @if (feeInstallments().length) {
+                        <div class="fin-schedule">
+                          @for (inst of feeInstallments(); track $index) {
+                            <div class="sch-item">
+                              <span class="sch-num">{{ $index + 1 }}</span>
+                              <div class="sch-text"><b>{{ inst.title }}:</b> {{ inst.amount | number }} {{ feeCurrency() }}{{ inst.note ? ' — ' + inst.note : '' }}</div>
+                            </div>
+                          }
+                        </div>
+                      }
+                      @if (feeNotes().length) {
+                        <ul class="fin-notes">
+                          @for (note of feeNotes(); track $index) { <li>{{ note }}</li> }
+                        </ul>
+                      }
                     </div>
-                    <ul class="fin-notes">
-                      <li>لا ترد رسوم التسجيل بعد سدادها إطلاقاً.</li>
-                      <li>تخصم المدرسة (300,000 جنيه) رسوم تسجيل + إجراءات في حالة ترك التلميذ المدرسة أو فصله خلال الأسبوع الأول.</li>
-                      <li>لا ترد الرسوم الدراسية (القسط الأول) بعد إكمال الأسبوع الأول من الدراسة.</li>
-                      <li>تُنشأ القيود الحسابية والربط المباشر مع الشؤون المالية عند اعتماد التسجيل النهائي للطالب.</li>
-                    </ul>
                   </div>
-                </div>
+                }
 
                 <!-- مراجعة البيانات الشاملة -->
                 <div class="sub-card">
@@ -628,6 +636,7 @@ interface ExtendedGuardianForm {
           [guardian]="g"
           [academicYear]="yearName(a.academic_year_id)"
           [gradeName]="gradeName(a.applying_grade_id)"
+          [fees]="printFees()"
           (close)="showPrintModal.set(false)"
         ></app-applicant-print-modal>
       }
@@ -773,6 +782,24 @@ export class PublicApplyComponent implements OnInit {
   readonly years = signal<Option[]>([]);
   readonly grades = signal<any[]>([]);
 
+  // الرسوم الدراسية القابلة للتحكم من إعدادات القبول
+  readonly registrationFee = signal(0);
+  readonly annualTuition = signal(0);
+  readonly feeCurrency = signal('جنيه');
+  readonly feeInstallments = signal<Array<{ title: string; amount: number; note?: string }>>([]);
+  readonly feeNotes = signal<string[]>([]);
+  readonly hasFeeInfo = computed(() =>
+    this.registrationFee() > 0 || this.annualTuition() > 0 ||
+    this.feeInstallments().length > 0 || this.feeNotes().length > 0);
+  /** الرسوم المُجمّعة للطباعة — من الإعدادات أو الافتراضيات عند غيابها. */
+  readonly printFees = computed<AdmissionFees>(() => this.hasFeeInfo() ? {
+    registration_fee: this.registrationFee(),
+    annual_tuition: this.annualTuition(),
+    fee_currency: this.feeCurrency(),
+    fee_installments: this.feeInstallments(),
+    fee_notes: this.feeNotes(),
+  } : DEFAULT_ADMISSION_FEES);
+
   uploadedFiles: Record<string, File> = {};
 
   a: ExtendedPublicForm = {
@@ -842,6 +869,12 @@ export class PublicApplyComponent implements OnInit {
         this.contactEmail.set(d.contact_email ?? '');
         this.years.set((d.academic_years ?? []).map((y: any) => ({ id: y.id, name: y.name })));
         this.grades.set((d.grades ?? []).map((g: any) => ({ id: g.id, name: g.name, is_full: !!g.is_full, remaining: g.remaining ?? null })));
+        // الرسوم من الإعدادات
+        this.registrationFee.set(Number(d.registration_fee ?? 0));
+        this.annualTuition.set(Number(d.annual_tuition ?? 0));
+        this.feeCurrency.set(d.fee_currency ?? 'جنيه');
+        this.feeInstallments.set(Array.isArray(d.fee_installments) ? d.fee_installments : []);
+        this.feeNotes.set(Array.isArray(d.fee_notes) ? d.fee_notes : []);
         const current = (d.academic_years ?? []).find((y: any) => y.current);
         if (current) this.a.academic_year_id = current.id;
         else if ((d.academic_years ?? []).length === 1) this.a.academic_year_id = d.academic_years[0].id;

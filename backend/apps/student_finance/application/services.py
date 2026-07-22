@@ -230,6 +230,41 @@ class BillingService:
 
         return invoice
 
+    @classmethod
+    def bill_new_student_registration(cls, tenant_id, student_id, grade_id=None, academic_year=None, user_id=None):
+        """
+        يُنشئ حساب فوترة للطالب الجديد (إن لم يوجد) ويولّد فاتورة رسوم التسجيل
+        من هياكل الرسوم المطابقة (الصف + العام الدراسي + الهياكل العامة).
+
+        يُستدعى عند تسجيل متقدم مقبول كطالب. آمن للاستدعاء دون معاملة خارجية:
+        أي نقص في الإعداد المالي يُرفع كاستثناء ليعالجه المستدعي (best-effort).
+        يُرجع الفاتورة أو None إن لم توجد هياكل رسوم مطابقة.
+        """
+        account, _ = StudentBillingAccount.objects.get_or_create(
+            tenant_id=tenant_id,
+            student_id=student_id,
+            defaults={'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M%S')}-{str(student_id)[:8]}"},
+        )
+
+        # هياكل الرسوم النشطة المطابقة: العامة (بلا صف) + الخاصة بصف الطالب
+        structures = FeeStructure.objects.filter(tenant_id=tenant_id, is_active=True).filter(
+            Q(grade_id__isnull=True) | Q(grade_id=grade_id)
+        )
+        if academic_year:
+            structures = structures.filter(academic_year=str(academic_year))
+        structures = list(structures)
+        if not structures:
+            return None
+
+        due_date = date.today() + timezone.timedelta(days=14)
+        return cls.generate_student_invoice(
+            tenant_id=tenant_id,
+            billing_account_id=account.id,
+            fee_structures=structures,
+            due_date=due_date,
+            user_id=user_id,
+        )
+
 
 # ============================================================
 # 2. Payment Service — خدمة التحصيل وسداد الطلاب

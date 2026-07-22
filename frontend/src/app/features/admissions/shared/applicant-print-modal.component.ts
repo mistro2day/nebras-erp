@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { AdmissionFees, DEFAULT_ADMISSION_FEES } from './admissions.shared';
 
 @Component({
   selector: 'app-applicant-print-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DecimalPipe],
   template: `
     <div class="modal-backdrop" (click)="close.emit()" dir="rtl">
       <div class="modal-card print-card" (click)="$event.stopPropagation()">
@@ -136,17 +139,24 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
           <section class="paper-section">
             <div class="sec-title">د / الرسوم الدراسية والشروط المالية :</div>
             <div class="fees-box">
-              <p><b>رسوم التسجيل:</b> 200,000 جنيه (رسوم إدارية وحكومية ولا تشمل الزي والكتب).</p>
-              <p><b>الرسوم الدراسية:</b> 500,000 جنيه تسدد كالتالي:</p>
-              <ol>
-                <li>عند التسجيل يدفع: رسوم التسجيل 200,000 جنيه + القسط الأول 300,000 جنيه (الإجمالي 500,000 جنيه).</li>
-                <li>يدفع القسط الثاني 200,000 جنيه بعد شهرين من بداية العام الدراسي.</li>
-              </ol>
-              <ul class="financial-rules">
-                <li>لا ترد رسوم التسجيل بعد سدادها.</li>
-                <li>تخصم المدرسة (300,000 جنيه) رسوم تسجيل + إجراءات رسوم في حالة ترك التلميذ المدرسة أو فصله خلال الأسبوع الأول.</li>
-                <li>لا ترد الرسوم الدراسية (القسط الأول) بعد إكمال الأسبوع الأول من الدراسة.</li>
-              </ul>
+              @if (fees.registration_fee > 0) {
+                <p><b>رسوم التسجيل:</b> {{ fees.registration_fee | number }} {{ fees.fee_currency }} (رسوم إدارية وحكومية ولا تشمل الزي والكتب).</p>
+              }
+              @if (fees.annual_tuition > 0) {
+                <p><b>الرسوم الدراسية:</b> {{ fees.annual_tuition | number }} {{ fees.fee_currency }} تسدد كالتالي:</p>
+              }
+              @if (fees.fee_installments.length) {
+                <ol>
+                  @for (inst of fees.fee_installments; track $index) {
+                    <li>{{ inst.title }}: {{ inst.amount | number }} {{ fees.fee_currency }}{{ inst.note ? ' — ' + inst.note : '' }}</li>
+                  }
+                </ol>
+              }
+              @if (fees.fee_notes.length) {
+                <ul class="financial-rules">
+                  @for (note of fees.fee_notes; track $index) { <li>{{ note }}</li> }
+                </ul>
+              }
             </div>
           </section>
 
@@ -209,10 +219,24 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
     .paper-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ccc; display: flex; justify-content: space-between; font-size: 10px; color: #666; }
 
     @media print {
+      @page { size: A4; margin: 12mm; }
+      html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
       body * { visibility: hidden; }
+      /* تحييد قيود المودال حتى يتدفّق المحتوى كاملاً على صفحات متعددة */
+      .modal-backdrop {
+        position: static !important; background: none !important; backdrop-filter: none !important;
+        padding: 0 !important; display: block !important; z-index: auto !important;
+      }
+      .modal-card {
+        max-height: none !important; max-width: none !important; overflow: visible !important;
+        box-shadow: none !important; border-radius: 0 !important; width: 100% !important;
+      }
+      .print-paper { overflow: visible !important; max-height: none !important; padding: 0 !important; }
       #printable-form, #printable-form * { visibility: visible; }
       #printable-form { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
       .no-print { display: none !important; }
+      /* إظهار الحدود والتظليل عند الطباعة */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
   `],
 })
@@ -221,6 +245,8 @@ export class ApplicantPrintModalComponent {
   @Input() guardian: any = {};
   @Input() academicYear = '2026 - 2025';
   @Input() gradeName = '';
+  /** الرسوم المعروضة — تأتي من إعدادات القبول، وتعود للافتراضيات عند غيابها. */
+  @Input() fees: AdmissionFees = DEFAULT_ADMISSION_FEES;
   @Output() close = new EventEmitter<void>();
 
   readonly currentDate = new Date().toLocaleDateString('ar-SD');

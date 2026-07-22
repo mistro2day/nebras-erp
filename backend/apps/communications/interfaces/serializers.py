@@ -63,6 +63,8 @@ class CommunicationTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommunicationTemplate
         fields = '__all__'
+        # المستأجر يُحقن من الخادم في create()/perform_create — لا يُطلب من العميل.
+        read_only_fields = ['id', 'tenant_id', 'created_by', 'created_at', 'updated_at', 'deleted_at']
 
     def get_versions_count(self, obj):
         return obj.versions.count()
