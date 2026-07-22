@@ -1,64 +1,38 @@
-import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
-
-interface Folder {
-  id: string;
-  name: string;
-  icon: string;
-  count: number;
-  classification: 'public' | 'internal' | 'confidential';
-  access: string;
-}
-
-interface Doc {
-  id: string;
-  folder: string;
-  title: string;
-  ext: string;
-  version: string;
-  size: string;
-  owner: string;
-  updated: string;
-  locked?: boolean;
-}
+import { BackendDocument, BackendFolder, DocumentService, StorageStats, ActivityItem } from '../../../core/services/document.service';
 
 type DocTab = 'files' | 'permissions' | 'activity';
 
-/**
- * متصفح المستندات والأرشفة الرقمية (DMS) — لغة تصميم نبراس.
- *
- * التوقيع البصري: مستكشف بجزأين — شجرة المجلدات المؤسسية مع وسم التصنيف الأمني
- * لكل مجلد، ولوح المستندات مع شريط استهلاك المساحة. التصنيف يُعرض بنص + لون معاً
- * (لا اعتماد على اللون وحده). تبويبات محلية بدل mat-tabs تفادياً لأخطاء البناء.
- */
 @Component({
   selector: 'app-document-explorer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
         title="متصفح المستندات والأرشفة الرقمية"
         subtitle="إدارة المجلدات والوثائق المؤسسية، ضبط الإصدارات والأذونات، والأرشفة الآمنة.">
-        <button class="btn ghost">مجلد جديد</button>
-        <button class="btn primary">رفع مستند</button>
+        <button class="btn ghost" (click)="openNewFolderModal()">مجلد جديد</button>
+        <button class="btn primary" (click)="openUploadModal()">رفع مستند</button>
       </nb-page-header>
 
       <!-- شريط استهلاك المساحة -->
       <section class="storage">
         <div class="st-info">
           <span class="st-label">المساحة المستخدمة</span>
-          <span class="st-value">{{ usedGb }}<em>GB</em> <span class="st-of">من {{ quotaGb }}GB</span></span>
+          <span class="st-value">{{ stats().used_gb }}<em>GB</em> <span class="st-of">من {{ stats().quota_gb }}GB</span></span>
         </div>
         <div class="st-bar" role="img" [attr.aria-label]="'استُهلك ' + storagePct() + ' بالمئة من المساحة'">
           <span class="st-fill" [style.width.%]="storagePct()"></span>
         </div>
         <div class="st-legend">
-          <span><b>{{ totalDocs() }}</b> مستند</span>
-          <span><b>{{ folders.length }}</b> مجلد</span>
-          <span><b>{{ lockedCount() }}</b> مقفل للتحرير</span>
+          <span><b>{{ stats().total_docs }}</b> مستند</span>
+          <span><b>{{ folders().length }}</b> مجلد مؤسسي</span>
+          <span><b>{{ stats().locked_count }}</b> مقفل للتحرير</span>
         </div>
       </section>
 
@@ -66,13 +40,20 @@ type DocTab = 'files' | 'permissions' | 'activity';
       <section class="explorer">
         <aside class="tree" aria-label="شجرة المجلدات">
           <div class="tree-head">المجلدات المؤسسية</div>
-          @for (f of folders; track f.id) {
-            <button class="node" [class.on]="selected() === f.id" (click)="selected.set(f.id)"
-                    [attr.aria-current]="selected() === f.id ? 'true' : null">
-              <span class="node-ic" aria-hidden="true">{{ f.icon }}</span>
+          <button class="node" [class.on]="selectedFolderId() === null" (click)="selectFolder(null)">
+            <span class="node-ic">📂</span>
+            <span class="node-body">
+              <span class="node-name">جميع المستندات</span>
+              <span class="node-access">وصول شامل</span>
+            </span>
+            <span class="node-count">{{ stats().total_docs }}</span>
+          </button>
+          @for (f of folders(); track f.id) {
+            <button class="node" [class.on]="selectedFolderId() === f.id" (click)="selectFolder(f.id)">
+              <span class="node-ic">📁</span>
               <span class="node-body">
                 <span class="node-name">{{ f.name }}</span>
-                <span class="node-access">{{ f.access }}</span>
+                <span class="node-access">{{ f.folder_type }}</span>
               </span>
               <span class="node-count">{{ f.count }}</span>
             </button>
@@ -82,11 +63,11 @@ type DocTab = 'files' | 'permissions' | 'activity';
         <div class="pane">
           <header class="pane-head">
             <div class="ph-title">
-              <h2>{{ current().name }}</h2>
-              <span class="tag" [attr.data-c]="current().classification">{{ classText(current().classification) }}</span>
+              <h2>{{ currentFolderName() }}</h2>
+              <span class="tag data-internal">نشط</span>
             </div>
             <input class="search" type="search" [value]="query()"
-                   (input)="query.set($any($event.target).value)"
+                   (input)="onSearchInput($any($event.target).value)"
                    aria-label="بحث في المستندات" placeholder="بحث في المستندات…" />
           </header>
 
@@ -100,49 +81,68 @@ type DocTab = 'files' | 'permissions' | 'activity';
           @if (tab() === 'files') {
             <div class="list">
               <div class="row head">
-                <span>المستند</span><span>الإصدار</span><span>المالك</span><span>آخر تعديل</span><span class="ta-end">الحجم</span>
+                <span>المستند</span><span>الإصدار</span><span>حجم الملف</span><span>تاريخ الرفع</span><span class="ta-end">الإجراءات</span>
               </div>
-              @for (d of visibleDocs(); track d.id) {
-                <div class="row">
-                  <span class="doc">
-                    <span class="ext" [attr.data-e]="d.ext">{{ d.ext }}</span>
-                    <span class="doc-body">
-                      <span class="doc-title">{{ d.title }}</span>
-                      @if (d.locked) { <span class="lock">مقفل للتحرير</span> }
+              @if (loading()) {
+                <div class="empty">جاري تحميل المستندات…</div>
+              } @else {
+                @for (d of documents(); track d.id) {
+                  <div class="row">
+                    <span class="doc">
+                      <span class="ext" [attr.data-e]="d.file_extension">{{ d.file_extension || 'FILE' }}</span>
+                      <span class="doc-body">
+                        <a class="doc-title" [href]="d.latest_version_path || '#'" target="_blank" [title]="'تحميل أو معاينة ' + d.title">
+                          {{ d.title }}
+                        </a>
+                        @if (d.is_locked) { <span class="lock">🔒 مقفل للتحرير</span> }
+                      </span>
                     </span>
-                  </span>
-                  <span class="mono">v{{ d.version }}</span>
-                  <span class="muted">{{ d.owner }}</span>
-                  <span class="muted">{{ d.updated }}</span>
-                  <span class="ta-end mono">{{ d.size }}</span>
-                </div>
-              }
-              @if (visibleDocs().length === 0) {
-                <div class="empty">
-                  لا توجد مستندات مطابقة في هذا المجلد.
-                  @if (query()) { <button class="link-btn" (click)="query.set('')">مسح البحث</button> }
-                </div>
+                    <span class="mono">v{{ d.current_version_number }}</span>
+                    <span class="muted">{{ d.file_size_formatted }}</span>
+                    <span class="muted">{{ d.created_at | date:'mediumDate' }}</span>
+                    <div class="actions ta-end">
+                      @if (d.latest_version_path) {
+                        <a class="btn-icon" [href]="d.latest_version_path" target="_blank" title="تحميل الملف">📥</a>
+                      }
+                      <button class="btn-icon" (click)="openVersionModal(d)" title="إضافة إصدار جديد">⬆️</button>
+                      <button class="btn-icon" (click)="toggleLock(d)" [title]="d.is_locked ? 'فك قفل الملف' : 'قفل الملف'">
+                        {{ d.is_locked ? '🔓' : '🔒' }}
+                      </button>
+                    </div>
+                  </div>
+                }
+                @if (documents().length === 0) {
+                  <div class="empty">
+                    لا توجد مستندات في هذا المجلد بعد. يمكنك رفع ملف جديد الآن.
+                  </div>
+                }
               }
             </div>
           }
 
           @if (tab() === 'permissions') {
             <div class="perms">
-              @for (p of permissions; track p.role) {
-                <div class="perm">
-                  <span class="perm-role">{{ p.role }}</span>
-                  <span class="perm-level" [attr.data-l]="p.level">{{ p.label }}</span>
-                </div>
-              }
+              <div class="perm">
+                <span class="perm-role">إدارة النظام (Admin)</span>
+                <span class="perm-level data-write">قراءة وكتابة وحذف</span>
+              </div>
+              <div class="perm">
+                <span class="perm-role">مدير القسم</span>
+                <span class="perm-level data-write">قراءة وكتابة</span>
+              </div>
+              <div class="perm">
+                <span class="perm-role">موظفو القسم</span>
+                <span class="perm-level data-read">قراءة فقط</span>
+              </div>
               <p class="note">
-                الأذونات تُورَّث من المجلد الأب ما لم يُضبط لها استثناء صريح على مستوى المستند.
+                تُطبّق الأذونات بحسب أدوار ومستويات صلاحية المستخدمين في النظام.
               </p>
             </div>
           }
 
           @if (tab() === 'activity') {
             <ol class="timeline">
-              @for (a of activity; track a.at) {
+              @for (a of activity(); track a.at + a.action) {
                 <li class="tl-item">
                   <span class="tl-dot" aria-hidden="true"></span>
                   <span class="tl-body">
@@ -151,10 +151,114 @@ type DocTab = 'files' | 'permissions' | 'activity';
                   </span>
                 </li>
               }
+              @if (activity().length === 0) {
+                <li class="empty">لا توجد أنشطة مسجلة مؤخراً.</li>
+              }
             </ol>
           }
         </div>
       </section>
+
+      <!-- Nebras OS Custom Modal: Upload Document -->
+      @if (showUploadModal()) {
+        <div class="modal-backdrop" (click)="closeUploadModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>رفع مستند جديد</h3>
+              <button class="close-btn" (click)="closeUploadModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <label class="form-group">
+                <span>عنوان المستند *</span>
+                <input class="input" type="text" [(ngModel)]="uploadTitle" placeholder="أدخل عنوان الوثيقة..." />
+              </label>
+              <label class="form-group">
+                <span>المجلد المستهدف</span>
+                <select class="input" [(ngModel)]="uploadFolderId">
+                  <option [value]="''">بدون مجلد (عام)</option>
+                  @for (f of folders(); track f.id) {
+                    <option [value]="f.id">{{ f.name }}</option>
+                  }
+                </select>
+              </label>
+              <label class="form-group">
+                <span>اختر الملف من جهازك *</span>
+                <input class="input-file" type="file" (change)="onFileSelected($event)" />
+              </label>
+            </div>
+            <div class="modal-footer">
+              <button class="btn ghost" (click)="closeUploadModal()">إلغاء</button>
+              <button class="btn primary" [disabled]="submitting() || !uploadFileObj || !uploadTitle" (click)="submitUpload()">
+                {{ submitting() ? 'جاري الرفع…' : 'رفع المستند' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Nebras OS Custom Modal: New Folder -->
+      @if (showFolderModal()) {
+        <div class="modal-backdrop" (click)="closeFolderModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>إنشاء مجلد مؤسسي جديد</h3>
+              <button class="close-btn" (click)="closeFolderModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <label class="form-group">
+                <span>اسم المجلد *</span>
+                <input class="input" type="text" [(ngModel)]="newFolderName" placeholder="مثال: عقود المشتريات 2026" />
+              </label>
+              <label class="form-group">
+                <span>نوع المجلد</span>
+                <select class="input" [(ngModel)]="newFolderType">
+                  <option value="department">مجلد قسم (Department)</option>
+                  <option value="shared">مجلد مشترك (Shared)</option>
+                  <option value="confidential">مجلد سري (Confidential)</option>
+                </select>
+              </label>
+            </div>
+            <div class="modal-footer">
+              <button class="btn ghost" (click)="closeFolderModal()">إلغاء</button>
+              <button class="btn primary" [disabled]="submitting() || !newFolderName" (click)="submitNewFolder()">
+                {{ submitting() ? 'جاري الإنشاء…' : 'إنشاء المجلد' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Nebras OS Custom Modal: Add New Version -->
+      @if (showVersionModal()) {
+        <div class="modal-backdrop" (click)="closeVersionModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>إضافة إصدار جديد لـ «{{ activeDocForVersion?.title }}»</h3>
+              <button class="close-btn" (click)="closeVersionModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <label class="form-group">
+                <span>ملاحظات التغيير / سجل الإصدار</span>
+                <input class="input" type="text" [(ngModel)]="versionChangeLog" placeholder="مثال: تحديث البند الثالث من العقد" />
+              </label>
+              <label class="form-checkbox">
+                <input type="checkbox" [(ngModel)]="isMajorVersion" />
+                <span>إصدار رئيسي جديد (Major Version e.g. 2.0)</span>
+              </label>
+              <label class="form-group">
+                <span>اختر الملف الجديد *</span>
+                <input class="input-file" type="file" (change)="onFileSelected($event)" />
+              </label>
+            </div>
+            <div class="modal-footer">
+              <button class="btn ghost" (click)="closeVersionModal()">إلغاء</button>
+              <button class="btn primary" [disabled]="submitting() || !uploadFileObj" (click)="submitNewVersion()">
+                {{ submitting() ? 'جاري الحفظ…' : 'رفع الإصدار' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -167,8 +271,10 @@ type DocTab = 'files' | 'permissions' | 'activity';
     .btn.ghost:hover { border-color: var(--nb-primary-400); }
     .btn.primary { background: var(--nb-primary-600); color: #fff; }
     .btn.primary:hover { filter: brightness(1.08); }
-    .link-btn { background: none; border: none; font-family: inherit; font-size: 12px; font-weight: 600;
-      color: var(--nb-primary-600); cursor: pointer; }
+    .btn.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-icon { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px; }
+    .btn-icon:hover { background: var(--nb-border-soft); }
 
     /* شريط المساحة */
     .storage { background: var(--nb-surface); border: 1px solid var(--nb-border);
@@ -207,7 +313,6 @@ type DocTab = 'files' | 'permissions' | 'activity';
     .node-access { font-size: 11px; color: var(--nb-text-muted); }
     .node-count { font-size: 11px; font-weight: 700; color: var(--nb-text-muted);
       background: var(--nb-border-soft); border-radius: 999px; padding: 1px 7px; }
-    .node.on .node-count { background: var(--nb-surface); color: var(--nb-primary-600); }
 
     .pane { background: var(--nb-surface); border: 1px solid var(--nb-border);
       border-radius: var(--nb-radius-card); overflow: hidden; }
@@ -216,30 +321,25 @@ type DocTab = 'files' | 'permissions' | 'activity';
     .ph-title { display: flex; align-items: center; gap: 10px; }
     .ph-title h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nb-text); }
     .tag { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
-    .tag[data-c='public'] { background: #dcfce7; color: #15803d; }
-    .tag[data-c='internal'] { background: var(--nb-primary-50); color: var(--nb-primary-600); }
-    .tag[data-c='confidential'] { background: #fee2e2; color: #b91c1c; }
+    .tag.data-internal { background: var(--nb-primary-50); color: var(--nb-primary-600); }
+
     .search { height: 32px; min-width: 200px; padding: 0 12px; font-family: inherit; font-size: 12.5px;
       color: var(--nb-text); background: var(--nb-surface-raised);
       border: 1px solid var(--nb-border); border-radius: var(--nb-radius); outline: none; }
-    .search:focus { border-color: var(--nb-primary-400); box-shadow: 0 0 0 3px rgba(48,63,159,.10); }
+    .search:focus { border-color: var(--nb-primary-400); }
 
     .tabs { display: flex; gap: 2px; padding: 0 12px; background: var(--nb-surface-raised);
-      border-block: 1px solid var(--nb-border-soft); overflow-x: auto; }
+      border-block: 1px solid var(--nb-border-soft); }
     .tab { position: relative; height: 38px; padding: 0 12px; background: none; border: none; cursor: pointer;
-      font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--nb-text-muted); white-space: nowrap; }
-    .tab:hover { color: var(--nb-text); }
+      font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--nb-text-muted); }
     .tab.on { color: var(--nb-primary-600); }
     .tab.on::after { content: ''; position: absolute; inset-inline: 8px; bottom: -1px; height: 2px;
       background: var(--nb-primary-600); border-radius: 2px 2px 0 0; }
 
     .list { display: flex; flex-direction: column; }
-    .row { display: grid; grid-template-columns: 2.4fr .7fr 1.2fr 1fr .8fr; gap: 10px; align-items: center;
+    .row { display: grid; grid-template-columns: 2.2fr 0.8fr 1fr 1.2fr 0.8fr; gap: 10px; align-items: center;
       padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--nb-border-row); }
-    .row:last-child { border-bottom: none; }
-    .row.head { background: var(--nb-surface-raised); font-size: 11px; font-weight: 700;
-      color: var(--nb-text-muted); padding: 8px 16px; }
-    .row:not(.head):hover { background: var(--nb-surface-raised); }
+    .row.head { background: var(--nb-surface-raised); font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
     .doc { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .ext { flex-shrink: 0; width: 34px; height: 34px; border-radius: var(--nb-radius-sm);
       display: flex; align-items: center; justify-content: center; text-transform: uppercase;
@@ -248,102 +348,285 @@ type DocTab = 'files' | 'permissions' | 'activity';
     .ext[data-e='docx'] { background: #dbeafe; color: #1d4ed8; }
     .ext[data-e='xlsx'] { background: #dcfce7; color: #15803d; }
     .doc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .doc-title { font-weight: 600; color: var(--nb-text); }
+    .doc-title { font-weight: 600; color: var(--nb-text); text-decoration: none; }
+    .doc-title:hover { color: var(--nb-primary-600); text-decoration: underline; }
     .lock { font-size: 11px; font-weight: 600; color: var(--nb-warning, #b45309); }
-    .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--nb-text-secondary);
-      font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--nb-text-secondary); }
     .muted { font-size: 12px; color: var(--nb-text-muted); }
     .ta-end { text-align: end; }
-    .empty { padding: 34px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted);
-      display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+
+    .empty { padding: 34px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
 
     .perms { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-    .perm { display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 14px; background: var(--nb-surface-raised);
-      border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); }
+    .perm { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+      background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); }
     .perm-role { font-size: 13px; font-weight: 600; color: var(--nb-text); }
     .perm-level { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
-    .perm-level[data-l='write'] { background: #dcfce7; color: #15803d; }
-    .perm-level[data-l='read'] { background: var(--nb-primary-50); color: var(--nb-primary-600); }
-    .perm-level[data-l='none'] { background: #fee2e2; color: #b91c1c; }
-    .note { margin: 6px 0 0; font-size: 12px; line-height: 1.7; color: var(--nb-text-muted); }
+    .perm-level.data-write { background: #dcfce7; color: #15803d; }
+    .perm-level.data-read { background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .note { margin: 6px 0 0; font-size: 12px; color: var(--nb-text-muted); }
 
     .timeline { list-style: none; margin: 0; padding: 16px 20px; display: flex; flex-direction: column; }
     .tl-item { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
     .tl-item:not(:last-child)::before { content: ''; position: absolute; inset-inline-start: 4px; top: 14px;
       bottom: 0; width: 1px; background: var(--nb-border); }
-    .tl-dot { flex-shrink: 0; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%;
-      background: var(--nb-primary-500); }
+    .tl-dot { flex-shrink: 0; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: var(--nb-primary-500); }
     .tl-body { display: flex; flex-direction: column; gap: 2px; }
     .tl-body strong { font-size: 13px; font-weight: 600; color: var(--nb-text); }
     .tl-meta { font-size: 11.5px; color: var(--nb-text-muted); }
 
-    @media (max-width: 780px) {
-      .page { padding: 14px; }
-      .row, .row.head { grid-template-columns: 1fr 1fr; row-gap: 4px; }
-      .ta-end { text-align: start; }
-    }
+    /* Nebras Custom Modal UI */
+    .modal-backdrop { position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal-card { width: 100%; max-width: 480px; background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); display: flex; flex-direction: column; }
+    .modal-header { padding: 14px 18px; border-bottom: 1px solid var(--nb-border-soft); display: flex;
+      align-items: center; justify-content: space-between; }
+    .modal-header h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nb-text); }
+    .close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--nb-text-muted); }
+    .modal-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-footer { padding: 12px 18px; border-top: 1px solid var(--nb-border-soft); display: flex;
+      justify-content: flex-end; gap: 10px; background: var(--nb-surface-raised); }
+    .form-group { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--nb-text); }
+    .form-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; }
+    .input { height: 36px; padding: 0 12px; font-family: inherit; font-size: 13px; color: var(--nb-text);
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); outline: none; }
+    .input:focus { border-color: var(--nb-primary-400); }
+    .input-file { font-family: inherit; font-size: 12px; color: var(--nb-text); }
   `]
 })
-export class DocumentExplorerComponent {
-  readonly quotaGb = 20;
-  readonly usedGb = 4.2;
+export class DocumentExplorerComponent implements OnInit {
+  private docService = inject(DocumentService);
 
   readonly tabs: { key: DocTab; label: string }[] = [
     { key: 'files', label: 'المستندات' },
     { key: 'permissions', label: 'الأذونات' },
-    { key: 'activity', label: 'سجل النشاط' },
+    { key: 'activity', label: 'سجل النشاط والتدقيق' },
   ];
 
-  readonly folders: Folder[] = [
-    { id: 'hr', name: 'ملفات شؤون الموظفين', icon: '📁', count: 412, classification: 'confidential', access: 'الموارد البشرية — قراءة/كتابة' },
-    { id: 'students', name: 'ملفات الطلاب', icon: '📁', count: 638, classification: 'internal', access: 'شؤون الطلاب — قراءة/كتابة' },
-    { id: 'finance', name: 'المستندات المالية', icon: '📁', count: 254, classification: 'internal', access: 'الشؤون المالية — قراءة/كتابة' },
-    { id: 'medical', name: 'السجلات الصحية', icon: '🔒', count: 96, classification: 'confidential', access: 'العيادة المدرسية — قراءة فقط' },
-    { id: 'policies', name: 'اللوائح والسياسات', icon: '📁', count: 20, classification: 'public', access: 'الجميع — قراءة فقط' },
-  ];
-
-  private readonly docs: Doc[] = [
-    { id: 'd1', folder: 'finance', title: 'فاتورة المشتريات رقم 14', ext: 'pdf', version: '1.0', size: '1.2 MB', owner: 'الشؤون المالية', updated: 'اليوم 09:12' },
-    { id: 'd2', folder: 'finance', title: 'الميزانية التقديرية للعام الدراسي', ext: 'xlsx', version: '3.4', size: '640 KB', owner: 'الشؤون المالية', updated: 'أمس 14:30' },
-    { id: 'd3', folder: 'hr', title: 'عقد الموظف سالم العلي', ext: 'pdf', version: '2.1', size: '4.8 MB', owner: 'الموارد البشرية', updated: 'أمس 11:05', locked: true },
-    { id: 'd4', folder: 'hr', title: 'نموذج تقييم الأداء السنوي', ext: 'docx', version: '1.3', size: '210 KB', owner: 'الموارد البشرية', updated: '18 يوليو' },
-    { id: 'd5', folder: 'policies', title: 'لائحة تنظيم النقل المدرسي', ext: 'pdf', version: '1.2', size: '850 KB', owner: 'إدارة النقل', updated: '15 يوليو' },
-    { id: 'd6', folder: 'students', title: 'كشف درجات الفصل الأول', ext: 'xlsx', version: '2.0', size: '1.1 MB', owner: 'الشؤون الأكاديمية', updated: '12 يوليو' },
-    { id: 'd7', folder: 'medical', title: 'سجل التطعيمات — الصف الثالث', ext: 'pdf', version: '1.0', size: '380 KB', owner: 'العيادة المدرسية', updated: '10 يوليو', locked: true },
-  ];
-
-  readonly permissions = [
-    { role: 'مدير النظام', level: 'write', label: 'قراءة وكتابة وحذف' },
-    { role: 'مدير القسم', level: 'write', label: 'قراءة وكتابة' },
-    { role: 'موظف القسم', level: 'read', label: 'قراءة فقط' },
-    { role: 'أولياء الأمور', level: 'none', label: 'لا يوجد وصول' },
-  ];
-
-  readonly activity = [
-    { action: 'رُفع إصدار جديد من «عقد الموظف سالم العلي»', actor: 'نورة القحطاني', at: 'اليوم 11:05' },
-    { action: 'مُنح قسم الشؤون المالية صلاحية الكتابة', actor: 'مدير النظام', at: 'أمس 16:40' },
-    { action: 'أُرشف مجلد «مستندات العام السابق»', actor: 'خالد الدوسري', at: '18 يوليو' },
-  ];
+  folders = signal<BackendFolder[]>([]);
+  documents = signal<BackendDocument[]>([]);
+  activity = signal<ActivityItem[]>([]);
+  stats = signal<StorageStats>({ used_gb: 0.15, quota_gb: 20, total_docs: 0, locked_count: 0, folder_count: 0 });
 
   tab = signal<DocTab>('files');
-  selected = signal<string>('hr');
-  query = signal('');
+  selectedFolderId = signal<string | null>(null);
+  query = signal<string>('');
+  loading = signal<boolean>(false);
+  submitting = signal<boolean>(false);
 
-  current = computed(() => this.folders.find((f) => f.id === this.selected()) ?? this.folders[0]);
+  // Modals state
+  showUploadModal = signal<boolean>(false);
+  showFolderModal = signal<boolean>(false);
+  showVersionModal = signal<boolean>(false);
 
-  totalDocs = computed(() => this.folders.reduce((s, f) => s + f.count, 0));
-  lockedCount = computed(() => this.docs.filter((d) => d.locked).length);
-  storagePct = computed(() => Math.round((this.usedGb / this.quotaGb) * 100));
+  // Upload Form Inputs
+  uploadTitle = '';
+  uploadFolderId = '';
+  uploadFileObj: File | null = null;
 
-  visibleDocs = computed(() => {
-    const q = this.query().trim();
-    return this.docs
-      .filter((d) => d.folder === this.selected())
-      .filter((d) => !q || d.title.includes(q) || d.owner.includes(q));
+  // Folder Form Inputs
+  newFolderName = '';
+  newFolderType = 'department';
+
+  // Version Form Inputs
+  activeDocForVersion: BackendDocument | null = null;
+  versionChangeLog = '';
+  isMajorVersion = false;
+
+  currentFolderName = computed(() => {
+    const fid = this.selectedFolderId();
+    if (!fid) return 'جميع المستندات';
+    const found = this.folders().find(f => f.id === fid);
+    return found ? found.name : 'مجلد غير معروف';
   });
 
-  classText(c: Folder['classification']): string {
-    return c === 'confidential' ? 'سري' : c === 'internal' ? 'داخلي' : 'عام';
+  storagePct = computed(() => {
+    const st = this.stats();
+    if (!st.quota_gb) return 0;
+    return Math.min(100, Math.round((st.used_gb / st.quota_gb) * 100));
+  });
+
+  ngOnInit(): void {
+    this.refreshAllData();
+  }
+
+  refreshAllData(): void {
+    this.loadFolders();
+    this.loadStats();
+    this.loadActivity();
+    this.loadDocuments();
+  }
+
+  loadFolders(): void {
+    this.docService.getFolders().subscribe({
+      next: (data) => this.folders.set(data),
+      error: (err) => console.error('خطأ في جلب المجلدات:', err)
+    });
+  }
+
+  loadStats(): void {
+    this.docService.getStorageStats().subscribe({
+      next: (data) => this.stats.set(data),
+      error: (err) => console.error('خطأ في جلب الإحصائيات:', err)
+    });
+  }
+
+  loadActivity(): void {
+    this.docService.getActivityLog().subscribe({
+      next: (data) => this.activity.set(data),
+      error: (err) => console.error('خطأ في جلب سجل النشاط:', err)
+    });
+  }
+
+  loadDocuments(): void {
+    this.loading.set(true);
+    const fid = this.selectedFolderId() || undefined;
+    const q = this.query().trim() || undefined;
+
+    this.docService.getDocuments(fid, q).subscribe({
+      next: (docs) => {
+        this.documents.set(docs);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('خطأ في جلب المستندات:', err);
+        this.loading.set(false);
+      }
+    });
+  }
+
+  selectFolder(folderId: string | null): void {
+    this.selectedFolderId.set(folderId);
+    this.loadDocuments();
+  }
+
+  onSearchInput(val: string): void {
+    this.query.set(val);
+    this.loadDocuments();
+  }
+
+  // Upload Modal Handlers
+  openUploadModal(): void {
+    this.uploadTitle = '';
+    this.uploadFolderId = this.selectedFolderId() || '';
+    this.uploadFileObj = null;
+    this.showUploadModal.set(true);
+  }
+
+  closeUploadModal(): void {
+    this.showUploadModal.set(false);
+  }
+
+  onFileSelected(event: any): void {
+    const files = event.target?.files;
+    if (files && files.length > 0) {
+      this.uploadFileObj = files[0];
+      if (!this.uploadTitle) {
+        this.uploadTitle = files[0].name.replace(/\.[^/.]+$/, '');
+      }
+    }
+  }
+
+  submitUpload(): void {
+    if (!this.uploadFileObj || !this.uploadTitle) return;
+
+    const fd = new FormData();
+    fd.append('file', this.uploadFileObj);
+    fd.append('title', this.uploadTitle);
+    if (this.uploadFolderId) {
+      fd.append('folder', this.uploadFolderId);
+    }
+
+    this.submitting.set(true);
+    this.docService.uploadDocument(fd).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.closeUploadModal();
+        this.refreshAllData();
+      },
+      error: (err) => {
+        console.error('خطأ أثناء رفع المستند:', err);
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  // Folder Modal Handlers
+  openNewFolderModal(): void {
+    this.newFolderName = '';
+    this.newFolderType = 'department';
+    this.showFolderModal.set(true);
+  }
+
+  closeFolderModal(): void {
+    this.showFolderModal.set(false);
+  }
+
+  submitNewFolder(): void {
+    if (!this.newFolderName.trim()) return;
+
+    this.submitting.set(true);
+    this.docService.createFolder(this.newFolderName.trim(), this.newFolderType).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.closeFolderModal();
+        this.loadFolders();
+        this.loadStats();
+      },
+      error: (err) => {
+        console.error('خطأ في إنشاء المجلد:', err);
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  // Version Modal Handlers
+  openVersionModal(doc: BackendDocument): void {
+    this.activeDocForVersion = doc;
+    this.versionChangeLog = '';
+    this.isMajorVersion = false;
+    this.uploadFileObj = null;
+    this.showVersionModal.set(true);
+  }
+
+  closeVersionModal(): void {
+    this.showVersionModal.set(false);
+    this.activeDocForVersion = null;
+  }
+
+  submitNewVersion(): void {
+    if (!this.activeDocForVersion || !this.uploadFileObj) return;
+
+    const fd = new FormData();
+    fd.append('file', this.uploadFileObj);
+    fd.append('change_log', this.versionChangeLog);
+    fd.append('is_major', String(this.isMajorVersion));
+
+    this.submitting.set(true);
+    this.docService.addVersion(this.activeDocForVersion.id, fd).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.closeVersionModal();
+        this.refreshAllData();
+      },
+      error: (err) => {
+        console.error('خطأ في رفع الإصدار الجديد:', err);
+        this.submitting.set(false);
+      }
+    });
+  }
+
+  // Lock / Unlock Handler
+  toggleLock(doc: BackendDocument): void {
+    const action$ = doc.is_locked
+      ? this.docService.unlockDocument(doc.id)
+      : this.docService.lockDocument(doc.id);
+
+    action$.subscribe({
+      next: () => this.refreshAllData(),
+      error: (err) => console.error('خطأ في تغيير حالة قفل المستند:', err)
+    });
   }
 }

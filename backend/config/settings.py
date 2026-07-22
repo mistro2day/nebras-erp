@@ -15,8 +15,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-nebras-super-secret-k
 
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-_raw_hosts = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(',') if h.strip()]
+_raw_hosts = os.environ.get('ALLOWED_HOSTS', '*')
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(',') if h.strip()]
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -118,7 +122,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database: Neon PostgreSQL only. SQLite support has been removed.
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if not DATABASE_URL or not str(DATABASE_URL).strip():
+if not DATABASE_URL or not DATABASE_URL.strip():
     from django.core.exceptions import ImproperlyConfigured
 
     raise ImproperlyConfigured(
@@ -136,8 +140,13 @@ DATABASES = {
 
 # مهلة اتصال قصيرة بقاعدة بيانات Neon: عند برودة/تعليق المزوّد يفشل الطلب بسرعة
 # بدل تعليق العامل حتى مهلة gunicorn (120 ثانية) فيفشل فحص الحياة والديبلوي.
+if DATABASES.get('default') is None:
+    DATABASES['default'] = {}
+
 DATABASES['default'].setdefault('OPTIONS', {})
-DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
+if isinstance(DATABASES['default'].get('OPTIONS'), dict):
+    DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
