@@ -10,4 +10,8 @@ export const HR_ROUTES: Routes = [
     path: 'create',
     loadComponent: () => import('./create/create.component').then(m => m.EmployeeCreateComponent),
   },
+  {
+    path: 'employees/:id',
+    loadComponent: () => import('./details/employee-details.component').then(m => m.EmployeeDetailsComponent),
+  },
 ];

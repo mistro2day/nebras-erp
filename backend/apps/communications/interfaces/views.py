@@ -120,8 +120,9 @@ class ProviderViewSet(BaseCRUDViewSet):
             pass
 
         # توليد رمز بنسق WhatsApp Baileys في حالة التعذر
+        import urllib.parse
         baileys_noise_string = f"2@NebrasERP2026BaileysKhartoumInstanceSessionKey_{instance_name},WhatsAppNoiseTokenKeySD912345678"
-        scannable_qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={requests.utils.quote(baileys_noise_string)}"
+        scannable_qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(baileys_noise_string)}"
 
         return StandardResponse(data={
             'status': 'success',
@@ -398,7 +399,9 @@ class MessageViewSet(BaseCRUDViewSet):
 
         try:
             from apps.communications.infrastructure.celery_tasks import send_message_task
-            send_message_task.delay(str(message.id))
+            task_delay = getattr(send_message_task, 'delay', None)
+            if callable(task_delay):
+                task_delay(str(message.id))
         except Exception:
             pass
 
