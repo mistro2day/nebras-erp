@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { AutomationService } from './automation.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 
@@ -19,65 +20,103 @@ interface Lane {
   cards: EngineCard[];
 }
 
-/**
- * منصة الأتمتة المؤسسية (Automation Studio) — لغة تصميم نبراس.
- *
- * التوقيع البصري: «مسارات الأتمتة الثلاثة» — تُرتَّب المحركات في ثلاث مسارات
- * متتابعة (صمّم ← نفّذ ← شغّل) بدل شبكة مسطّحة، فيقرأ المستخدم دورة حياة
- * الأتمتة كاملة من الأعلى للأسفل ويعرف أين يبدأ. يعلوها صفّ عدّادات حيّة.
- */
 @Component({
   selector: 'app-automation-studio',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterLink, NbPageHeaderComponent],
+  imports: [CommonModule, RouterLink, FormsModule, NbPageHeaderComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
-        title="منصة الأتمتة المؤسسية"
-        subtitle="مصمّم مسارات العمل · جداول القرار · الاستوديو منخفض الشيفرة · مركز العمليات · DevOps والإضافات.">
-        <button class="btn ghost" (click)="load()">تحديث</button>
+        title="استوديو الأتمتة المؤسسية — Automation Studio"
+        subtitle="محرك مسارات العمل المباشرة · مصمم جداول القرار · منصة الكيانات منخفضة الشيفرة · مركز المراقبة الحية والذكاء الاصطناعي.">
+        <button class="btn ghost" (click)="loadCounts()">تحديث الإحصائيات</button>
+        <button class="btn ai-btn" (click)="openAiModal()">
+          <span class="ai-sparkle">✨</span> بناء أتمتة بالذكاء الاصطناعي
+        </button>
       </nb-page-header>
 
-      <!-- عدّادات المنصة -->
+      <!-- عدّادات المنصة المباشرة من الباك إند -->
       <section class="stats">
-        @for (s of stats; track s.key) {
-          <article class="stat">
-            <span class="stat-ic" [attr.data-t]="s.tone" aria-hidden="true">{{ s.glyph }}</span>
-            <span class="stat-body">
+        @for (s of statsConfig; track s.key) {
+          <article class="stat-card">
+            <span class="stat-ic" [attr.data-t]="s.tone">{{ s.glyph }}</span>
+            <div class="stat-body">
               <span class="stat-val">{{ counts()[s.key] ?? 0 }}</span>
               <span class="stat-lbl">{{ s.label }}</span>
-            </span>
+            </div>
           </article>
         }
       </section>
 
-      <!-- التوقيع البصري: مسارات الأتمتة الثلاثة -->
+      <!-- التوقيع البصري: مسارات الأتمتة التتابعـية (صمّم ← نفّذ ← شغّل) -->
       @for (lane of lanes; track lane.key) {
-        <section class="lane">
-          <header class="lane-head">
-            <span class="lane-step" aria-hidden="true">{{ $index + 1 }}</span>
-            <span class="lane-text">
+        <section class="lane-section">
+          <header class="lane-header">
+            <span class="lane-badge">{{ $index + 1 }}</span>
+            <div class="lane-titles">
               <h2>{{ lane.label }}</h2>
               <p>{{ lane.hint }}</p>
-            </span>
+            </div>
           </header>
-          <div class="cards">
+          <div class="cards-grid">
             @for (c of lane.cards; track c.route) {
-              <a class="card" [routerLink]="c.route">
-                <span class="card-ic" aria-hidden="true">{{ c.glyph }}</span>
-                <span class="card-title">
-                  {{ c.title }}
-                  @if (c.countKey && counts()[c.countKey]) {
-                    <span class="card-count">{{ counts()[c.countKey] }}</span>
+              <a class="engine-card" [routerLink]="c.route">
+                <div class="card-head">
+                  <span class="card-glyph">{{ c.glyph }}</span>
+                  @if (c.countKey && counts()[c.countKey] !== undefined) {
+                    <span class="card-badge">{{ counts()[c.countKey] }} عنصر</span>
                   }
-                </span>
-                <span class="card-desc">{{ c.desc }}</span>
-                <span class="card-go" aria-hidden="true">←</span>
+                </div>
+                <h3 class="card-title">{{ c.title }}</h3>
+                <p class="card-desc">{{ c.desc }}</p>
+                <span class="card-arrow">←</span>
               </a>
             }
           </div>
         </section>
+      }
+
+      <!-- Nebras OS Custom Modal: AI Automation Assist -->
+      @if (showAiModal()) {
+        <div class="modal-backdrop" (click)="closeAiModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>✨ مساعد الذكاء الاصطناعي لصياغة الأتمتة (AI Assist)</h3>
+              <button class="close-btn" (click)="closeAiModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <label class="form-group">
+                <span>نوع البناء المطلوب</span>
+                <select class="input" [(ngModel)]="aiKind">
+                  <option value="workflow">مسار عمل آلي (Workflow Diagram)</option>
+                  <option value="rule">جدول قرار وقاعدة عمل (Decision Table / Rule)</option>
+                  <option value="flow">تدفق أتمتة أحداث (Automation Flow)</option>
+                  <option value="form">نموذج تفاعلي منخفض الشيفرة (Low-Code Form)</option>
+                </select>
+              </label>
+
+              <label class="form-group">
+                <span>صف الأتمتة المطلوبة بأسلوبك الطبيعي *</span>
+                <textarea class="textarea" rows="4" [(ngModel)]="aiPrompt"
+                          placeholder="مثال: أنشئ مسار موافقة على طلبات الشراء التي تتجاوز 10,000 ريال، تبدأ بفحص الميزانية ثم توجيه الطلب للمدير المالي..."></textarea>
+              </label>
+
+              @if (aiResult()) {
+                <div class="ai-result-box">
+                  <h4>💡 المخرجات المباشرة من محرك الذكاء الاصطناعي:</h4>
+                  <pre class="json-code">{{ aiResult() | json }}</pre>
+                </div>
+              }
+            </div>
+            <div class="modal-footer">
+              <button class="btn ghost" (click)="closeAiModal()">إغلاق</button>
+              <button class="btn primary" [disabled]="aiLoading() || !aiPrompt.trim()" (click)="submitAiAssist()">
+                {{ aiLoading() ? 'جاري البناء بالذكاء الاصطناعي…' : 'توليد ومحاكاة الأتمتة' }}
+              </button>
+            </div>
+          </div>
+        </div>
       }
     </div>
   `,
@@ -86,141 +125,156 @@ interface Lane {
       background: var(--nb-bg); color: var(--nb-text); font-family: var(--nb-font-family); }
 
     .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600;
-      border-radius: var(--nb-radius); cursor: pointer; border: none; }
+      border-radius: var(--nb-radius); cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn.ghost:hover { border-color: var(--nb-primary-400); }
+    .btn.primary { background: var(--nb-primary-600); color: #fff; }
+    .btn.primary:hover { filter: brightness(1.08); }
+    .btn.ai-btn { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-weight: 700; }
+    .btn.ai-btn:hover { filter: brightness(1.1); box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35); }
 
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 22px; }
-    .stat { display: flex; align-items: center; gap: 12px; padding: 14px;
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-card { display: flex; align-items: center; gap: 14px; padding: 16px;
       background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); }
-    .stat-ic { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center; font-size: 17px; }
-    .stat-ic[data-t='indigo'] { background: var(--nb-primary-50); color: var(--nb-primary-600); }
-    .stat-ic[data-t='blue'] { background: #e0f2fe; color: #0284c7; }
-    .stat-ic[data-t='green'] { background: #dcfce7; color: #15803d; }
+    .stat-ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .stat-ic[data-t='indigo'] { background: #e0e7ff; color: #4338ca; }
+    .stat-ic[data-t='blue'] { background: #e0f2fe; color: #0369a1; }
+    .stat-ic[data-t='emerald'] { background: #d1fae5; color: #047857; }
     .stat-ic[data-t='amber'] { background: #fef3c7; color: #b45309; }
-    .stat-body { display: flex; flex-direction: column; min-width: 0; }
-    .stat-val { font-size: 22px; font-weight: 800; color: var(--nb-text); line-height: 1.2;
-      font-variant-numeric: tabular-nums; }
+    .stat-body { display: flex; flex-direction: column; }
+    .stat-val { font-size: 24px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; }
     .stat-lbl { font-size: 12px; font-weight: 600; color: var(--nb-text-muted); }
 
-    /* المسارات */
-    .lane { margin-bottom: 22px; }
-    .lane-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .lane-step { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--nb-primary-600); color: #fff; font-size: 13px; font-weight: 800; }
-    .lane-text h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nb-text); }
-    .lane-text p { margin: 2px 0 0; font-size: 12px; color: var(--nb-text-muted); }
+    /* المسارات البصرية الثلاثة */
+    .lane-section { margin-bottom: 28px; }
+    .lane-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .lane-badge { width: 30px; height: 30px; border-radius: 50%; background: var(--nb-primary-600);
+      color: #fff; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .lane-titles h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--nb-text); }
+    .lane-titles p { margin: 2px 0 0; font-size: 12px; color: var(--nb-text-muted); }
 
-    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px;
-      padding-inline-start: 40px; position: relative; }
-    .cards::before { content: ''; position: absolute; inset-inline-start: 13px; top: -14px; bottom: -14px;
-      width: 2px; background: var(--nb-border); border-radius: 2px; }
-    .lane:last-child .cards::before { bottom: 50%; }
-    @media (max-width: 700px) { .cards { padding-inline-start: 0; } .cards::before { display: none; } }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .engine-card { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
+      text-decoration: none; color: inherit; transition: all .2s ease; }
+    .engine-card:hover { transform: translateY(-3px); border-color: var(--nb-primary-400); box-shadow: 0 8px 24px rgba(48,63,159,.12); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; }
+    .card-glyph { width: 36px; height: 36px; border-radius: 10px; background: var(--nb-primary-50);
+      color: var(--nb-primary-600); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .card-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--nb-primary-50); color: var(--nb-primary-600); }
+    .card-title { margin: 4px 0 0; font-size: 14.5px; font-weight: 700; color: var(--nb-text); }
+    .card-desc { margin: 0; font-size: 12px; line-height: 1.6; color: var(--nb-text-muted); }
+    .card-arrow { position: absolute; top: 18px; inset-inline-end: 18px; font-size: 16px; color: var(--nb-text-muted); opacity: 0; transition: opacity .15s ease; }
+    .engine-card:hover .card-arrow { opacity: 1; color: var(--nb-primary-600); }
 
-    .card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 16px;
-      background: var(--nb-surface); border: 1px solid var(--nb-border);
-      border-radius: var(--nb-radius-card); text-decoration: none; color: inherit;
-      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
-    .card:hover { transform: translateY(-2px); border-color: var(--nb-primary-400);
-      box-shadow: 0 6px 18px rgba(48,63,159,.10); }
-    .card-ic { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center;
-      justify-content: center; font-size: 15px; background: var(--nb-primary-50); color: var(--nb-primary-600); }
-    .card-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: var(--nb-text); }
-    .card-count { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
-      background: var(--nb-primary-50); color: var(--nb-primary-600); }
-    .card-desc { font-size: 12px; line-height: 1.6; color: var(--nb-text-muted); }
-    .card-go { position: absolute; top: 16px; inset-inline-end: 16px; font-size: 14px;
-      color: var(--nb-text-muted); opacity: 0; transition: opacity .15s ease; }
-    .card:hover .card-go { opacity: 1; color: var(--nb-primary-600); }
-
-    @media (prefers-reduced-motion: reduce) { .card:hover { transform: none; } }
-    @media (max-width: 700px) { .page { padding: 14px; } }
-  `],
+    /* Nebras Custom Modal UI */
+    .modal-backdrop { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal-card { width: 100%; max-width: 540px; background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); box-shadow: 0 16px 40px rgba(0,0,0,0.22); display: flex; flex-direction: column; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--nb-border-soft); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--nb-text); }
+    .close-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--nb-text-muted); }
+    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--nb-border-soft); display: flex; justify-content: flex-end; gap: 10px; background: var(--nb-surface-raised); }
+    .form-group { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--nb-text); }
+    .input, .textarea { padding: 10px 12px; font-family: inherit; font-size: 13px; color: var(--nb-text);
+      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); outline: none; }
+    .input:focus, .textarea:focus { border-color: var(--nb-primary-400); }
+    .ai-result-box { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 14px; margin-top: 8px; }
+    .ai-result-box h4 { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--nb-primary-600); }
+    .json-code { margin: 0; font-family: monospace; font-size: 11.5px; max-height: 160px; overflow: auto; background: var(--nb-bg); padding: 10px; border-radius: 6px; }
+  `]
 })
 export class AutomationStudioComponent implements OnInit {
   private api = inject(AutomationService);
 
-  readonly stats = [
+  counts = signal<{ [key: string]: number }>({});
+  showAiModal = signal<boolean>(false);
+  aiKind = 'workflow';
+  aiPrompt = '';
+  aiLoading = signal<boolean>(false);
+  aiResult = signal<any>(null);
+
+  readonly statsConfig = [
     { key: 'workflow-diagrams', label: 'مخططات مسارات العمل', glyph: '▦', tone: 'indigo' },
-    { key: 'flows', label: 'تدفقات الأتمتة', glyph: '⚡', tone: 'blue' },
-    { key: 'decision-tables', label: 'جداول القرار', glyph: '▤', tone: 'green' },
+    { key: 'flows', label: 'تدفقات الأتمتة النشطة', glyph: '⚡', tone: 'blue' },
+    { key: 'decision-tables', label: 'جداول القرار المعتمدة', glyph: '▤', tone: 'emerald' },
     { key: 'plugin-installations', label: 'الإضافات المثبّتة', glyph: '◈', tone: 'amber' },
   ];
 
   readonly lanes: Lane[] = [
     {
       key: 'design',
-      label: 'صمّم',
-      hint: 'ابنِ المسار أو القاعدة أو الكيان بصرياً قبل نشره إلى المحرّك.',
+      label: '1. مسار التصميم والبناء (Design & Authoring)',
+      hint: 'بناء مخططات مسارات العمل المرئية، جداول القرار والقواعد، والكيانات منخفضة الشيفرة.',
       cards: [
-        {
-          route: 'workflow-designer', glyph: '▦', countKey: 'workflow-diagrams',
-          title: 'مصمّم مسارات العمل المرئي',
-          desc: 'كانفس لبناء العقد والوصلات والموافقات، مع تحقّق ومحاكاة ونشر إلى محرّك مسارات العمل.',
-        },
-        {
-          route: 'rule-designer', glyph: '▤', countKey: 'decision-tables',
-          title: 'مصمّم القواعد وجداول القرار',
-          desc: 'جداول وأشجار قرار ومجموعات قواعد فوق محرّك القواعد الحالي مع محاكاة واختبار.',
-        },
-        {
-          route: 'lowcode', glyph: '◇',
-          title: 'الاستوديو منخفض الشيفرة',
-          desc: 'باني الكيانات والنماذج والصفحات وواجهات الـ API — يولّد شيفرة متوافقة مع بنية DDD.',
-        },
-      ],
+        { route: '/automation/workflow-designer', glyph: '▦', title: 'مصمّم مسارات العمل البصري', desc: 'لوحة رسم مرئية (SVG Canvas) لسحب وإسقاط العُقد والموافقات والترجمة المباشرة المحركات.', countKey: 'workflow-diagrams' },
+        { route: '/automation/rule-designer', glyph: '▤', title: 'مصمّم القواعد وجداول القرار', desc: 'جداول وتفرعات القرار مع سياسات الإصابة المختلفة والترجمة التلقائية لمحرك القواعد.', countKey: 'decision-tables' },
+        { route: '/automation/lowcode', glyph: '❖', title: 'الاستوديو منخفض الشيفرة Low-Code', desc: 'بناء الكيانات والحقول واستخراج الشيفرة الهيكلية المعمارية (DDD Scaffolds).', countKey: 'entities' },
+      ]
     },
     {
-      key: 'run',
-      label: 'نفّذ',
-      hint: 'اربط المحفّزات بالإجراءات ودع المحرّك ينفّذ تلقائياً.',
+      key: 'execute',
+      label: '2. مسار التنفيذ والربط (Automation & Execution)',
+      hint: 'إدارة محفزات الأحداث والجدولة الزمنية وسجل تتبع الخطوات الزمني.',
       cards: [
-        {
-          route: 'automation', glyph: '⚡', countKey: 'flows',
-          title: 'محرّك أتمتة الأحداث',
-          desc: 'محفّزات الأحداث والجدولة والـ Webhooks وإجراءات تُنفَّذ عبر المحرّكات القائمة.',
-        },
-      ],
+        { route: '/automation/automation', glyph: '⚡', title: 'محرك التدفقات وسجل التشغيل', desc: 'ربط محفزات الأحداث والجدولة وتنفيذ الإجراءات المترتبة وتتبع التاريخ الزمني.', countKey: 'flows' },
+      ]
     },
     {
       key: 'operate',
-      label: 'شغّل وراقب',
-      hint: 'تابع صحة المنصة وأدر النشر والرايات والإضافات.',
+      label: '3. مسار التشغيل والمراقبة (Operations & DevOps)',
+      hint: 'مراقبة صحة السيرفرات وقاعدة البيانات والذاكرة المؤقتة، وإدارة البيئات والإضافات.',
       cards: [
-        {
-          route: 'operations', glyph: '◉',
-          title: 'مركز العمليات والمراقبة',
-          desc: 'صحة النظام والطوابير والعمّال والكاش وقواعد البيانات والتنبيهات التشغيلية.',
-        },
-        {
-          route: 'devops', glyph: '⚑',
-          title: 'مركز DevOps ورايات الميزات',
-          desc: 'البيئات والأسرار ورايات الميزات وسجل النشر والتراجع ووضع الصيانة.',
-        },
-        {
-          route: 'plugins', glyph: '◈', countKey: 'plugin-installations',
-          title: 'مدير الإضافات المخصّصة',
-          desc: 'سجل الإضافات والإصدارات والاعتماديات والفحص الأمني والتثبيت الآمن للمستأجرين.',
-        },
-      ],
-    },
+        { route: '/automation/operations', glyph: '📊', title: 'مركز العمليات والصحة الحية', desc: 'مراقبة فورية لصحة قاعدة البيانات والمؤشرات الحية وإصدار التنبيهات الفورية.' },
+        { route: '/automation/devops', glyph: '🚩', title: 'مركز DevOps ورايات الميزات', desc: 'إدارة البيئات ورايات الميزات (Feature Flags) وسجلات التراجع عن النشر.' },
+        { route: '/automation/plugins', glyph: '◈', title: 'إدارة الإضافات والملحقات', desc: 'سجل الإضافات وتثبيت الملحقات وفحص الأمان للمستأجرين.', countKey: 'plugin-installations' },
+      ]
+    }
   ];
 
-  counts = signal<Record<string, number | undefined>>({});
-
   ngOnInit(): void {
-    this.load();
+    this.loadCounts();
   }
 
-  load(): void {
-    for (const s of this.stats) {
-      this.api.list(s.key).subscribe({
-        next: (d: any) => this.counts.update((c) => ({ ...c, [s.key]: Array.isArray(d) ? d.length : 0 })),
-        error: () => this.counts.update((c) => ({ ...c, [s.key]: 0 })),
+  loadCounts(): void {
+    const resources = ['workflow-diagrams', 'flows', 'decision-tables', 'plugin-installations', 'entities'];
+    resources.forEach(r => {
+      this.api.list(r).subscribe({
+        next: (items: any) => {
+          const list = Array.isArray(items) ? items : (items?.data || []);
+          this.counts.update(c => ({ ...c, [r]: list.length }));
+        },
+        error: () => {}
       });
-    }
+    });
+  }
+
+  openAiModal(): void {
+    this.aiPrompt = '';
+    this.aiKind = 'workflow';
+    this.aiResult.set(null);
+    this.showAiModal.set(true);
+  }
+
+  closeAiModal(): void {
+    this.showAiModal.set(false);
+  }
+
+  submitAiAssist(): void {
+    if (!this.aiPrompt.trim()) return;
+
+    this.aiLoading.set(true);
+    this.api.aiAssist(this.aiKind, this.aiPrompt).subscribe({
+      next: (res) => {
+        this.aiResult.set(res);
+        this.aiLoading.set(false);
+      },
+      error: (err) => {
+        console.error('خطأ مساعد الذكاء الاصطناعي:', err);
+        this.aiLoading.set(false);
+      }
+    });
   }
 }

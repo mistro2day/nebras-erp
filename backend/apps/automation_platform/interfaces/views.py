@@ -302,8 +302,11 @@ class SystemHealthSnapshotViewSet(BaseCRUDViewSet):
     serializer_class = s.SystemHealthSnapshotSerializer
 
 
+from rest_framework.permissions import AllowAny
+
 class OperationsOverviewView(APIView):
     """ملخص لوحة العمليات: أحدث حالة لكل مكوّن + التنبيهات المفتوحة."""
+    permission_classes: list = [AllowAny]
 
     def get(self, request):
         data = OperationsService.overview(tenant_id=_tenant_id(request))
@@ -312,6 +315,7 @@ class OperationsOverviewView(APIView):
     def post(self, request):
         results = OperationsService.collect_health(tenant_id=_tenant_id(request))
         return StandardResponse(data=results, message='تم جمع لقطات صحة النظام.')
+
 
 
 # ----------------------- DevOps -----------------------
@@ -388,8 +392,10 @@ class AIAssistView(APIView):
     استهلاك منصة الذكاء الاصطناعي لتوليد المخططات/القواعد/النماذج.
     لا يوجد نموذج مضمّن — يُستخدم مزوّد قابل للاستبدال (AIAssistProvider).
     """
+    permission_classes: list = [AllowAny]
 
     def post(self, request):
+
         kind = request.data.get('kind')  # workflow|rules|form|automations
         prompt = request.data.get('prompt', '')
         context = request.data.get('context', {})
