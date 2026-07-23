@@ -51,12 +51,6 @@ class StudentsConfig(AppConfig):
     name = 'apps.students'
     label = 'students'
 
-class TeachersConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.teachers'
-    label = 'teachers'
-    verbose_name = 'إدارة المعلمين والتكليفات التدريسية'
-
 class HRConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.hr'

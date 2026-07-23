@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'apps.apps.MasterDataConfig',
     'apps.apps.EmployeesConfig',
     'apps.apps.FacultyConfig',
-    'apps.apps.TeachersConfig',
     'apps.apps.HRConfig',
     'apps.apps.FinanceConfig',
     'apps.apps.StudentFinanceConfig',

@@ -1,1 +1,0 @@
-from apps.teachers.domain.models import TeacherProfile, TeacherAssignment
