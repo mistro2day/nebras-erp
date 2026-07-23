@@ -111,6 +111,31 @@ class BillingService:
                 )
                 discount_amount += disc
 
+        # 4b. خصم أبناء وأقارب الموظفين (اللائحة التنظيمية للمعلمين — رابعاً وخامساً)
+        #     يُطبَّق فقط إذا كان الطالب مربوطاً ومؤكَّداً بملف موظف.
+        try:
+            from apps.employees.application.dependent_linking import get_discount_for_student
+            staff_disc = get_discount_for_student(tenant_id, account.student_id)
+        except Exception as exc:  # لا يجوز أن يُفشل خللٌ في الربط إصدارَ الفاتورة
+            logger.warning("تعذّر جلب خصم أبناء الموظفين للطالب %s: %s", account.student_id, exc)
+            staff_disc = None
+
+        if staff_disc and staff_disc['percentage'] > 0:
+            pct = Decimal(str(staff_disc['percentage']))
+            disc = total_amount * (pct / Decimal('100.0'))
+            disc = min(disc, total_amount - discount_amount)
+            if disc > 0:
+                label = 'إعفاء كلي' if staff_disc['is_fully_exempt'] else f"خصم {pct}%"
+                kinship = 'ابن موظف' if staff_disc['relation_type'] == 'child' else 'قريب موظف'
+                InvoiceDiscount.objects.create(
+                    tenant_id=tenant_id,
+                    invoice=invoice,
+                    discount_type='percentage',
+                    amount=disc,
+                    discount_reason=f"{kinship} ({staff_disc['employee_name']}) — {label} وفق اللائحة التنظيمية",
+                )
+                discount_amount += disc
+
         final_total = total_amount - discount_amount
         invoice.total_amount = final_total
         invoice.outstanding_amount = final_total

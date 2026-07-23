@@ -244,22 +244,63 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 
           <!-- 4. الأبناء والتخفيضات -->
           @if (activeTab() === 'dependents') {
-            <nb-panel title="سجل أبناء المعلم بالمدرسة وتخفيضات الرسوم التلقائية" [flush]="true">
+            <nb-panel title="سجل أبناء المعلم بالمدرسة وتخفيضات الرسوم" [flush]="true">
               <div class="table-responsive">
-                <div class="tbl-head-grid">
-                  <span>اسم التلميذ</span><span>المرحلة الدراسية</span><span>الصف الدراسي</span><span>نسبة التخفيض المستحقة</span><span>ملاحظات الاعتماد</span>
+                <div class="tbl-head-grid dep-grid">
+                  <span>اسم التلميذ</span><span>صلة القرابة</span><span>المرحلة / الصف</span><span>نسبة التخفيض</span><span>حالة الربط بالطالب</span>
                 </div>
                 @if (!employee()?.dependents?.length) {
                   <div class="empty-msg">لا يوجد أبناء مسجلون بالمدرسة لهذا المعلم.</div>
                 } @else {
                   @for (dep of employee()?.dependents; track dep.id) {
-                    <div class="tbl-row-grid">
+                    <div class="tbl-row-grid dep-grid">
                       <span><b>{{ dep.full_name }}</b></span>
-                      <span>{{ dep.academic_stage }}</span>
-                      <span>{{ dep.grade_level }}</span>
-                      <span><b style="color: #16a34a; font-size: 15px;">خصم {{ dep.discount_percentage }}%</b></span>
-                      <span><span class="badge approved">معتمد وفق اللائحة ✓</span></span>
+                      <span>{{ dep.relation_type === 'relative' ? 'قريب درجة أولى' : 'ابن / ابنة' }}</span>
+                      <span>{{ dep.academic_stage }} · {{ dep.grade_level || '—' }}</span>
+                      <span>
+                        <b class="disc-val">{{ dep.discount_percentage }}%</b>
+                        @if (dep.is_fully_exempt) { <span class="badge approved">إعفاء كلي</span> }
+                      </span>
+                      <span>
+                        @if (dep.student_id) {
+                          <span class="badge approved">مربوط بطالب ✓ — الخصم مُفعّل</span>
+                          <button type="button" class="nb-btn-ghost sm" (click)="unlinkDependent(dep)">فكّ الربط</button>
+                        } @else {
+                          <span class="badge pending">تصريح معلّق — بانتظار تسجيل الطالب</span>
+                        }
+                      </span>
                     </div>
+                  }
+                }
+              </div>
+
+              <!-- اقتراحات الربط: طلاب مسجّلون أولياء أمرهم يحملون رقم الموظف الوطني -->
+              <div class="link-box">
+                <div class="link-head">
+                  <b>اقتراحات ربط الطلاب</b>
+                  <button type="button" class="nb-btn-secondary" [disabled]="loadingSuggestions()"
+                          (click)="loadLinkSuggestions()">
+                    {{ loadingSuggestions() ? 'جارٍ البحث…' : '⟳ بحث عن طلاب مطابقين' }}
+                  </button>
+                </div>
+                <p class="link-hint">
+                  المطابقة تتم بالرقم الوطني لولي الأمر، فتعمل سواء سُجّل الطالب قبل العقد أو بعده.
+                  التأكيد يدوي لأن أثر الخطأ مالي.
+                </p>
+                @if (suggestionsLoaded()) {
+                  @if (!suggestions().length) {
+                    <div class="empty-msg">لا توجد طلاب مطابقون غير مربوطين حالياً.</div>
+                  } @else {
+                    @for (s of suggestions(); track s.student_id) {
+                      <div class="sug-row">
+                        <span><b>{{ s.student_name || 'طالب' }}</b></span>
+                        <span class="sug-meta">
+                          @if (s.declared_name) { مطابق للتصريح: {{ s.declared_name }} }
+                          @else { لا يوجد تصريح مسبق — سيُنشأ تلقائياً }
+                        </span>
+                        <button type="button" class="nb-btn-primary sm" (click)="confirmLink(s)">تأكيد الربط</button>
+                      </div>
+                    }
                   }
                 }
               </div>
@@ -444,6 +485,18 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 
     .badge { padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; }
     .badge.active, .badge.approved { background: #dcfce7; color: #15803d; }
+    .badge.pending { background: #fef3c7; color: #92400e; }
+
+    /* ربط الأبناء بالطلاب */
+    .dep-grid { grid-template-columns: 1.4fr 0.9fr 1.1fr 0.9fr 1.7fr; }
+    .disc-val { color: #16a34a; font-size: 15px; }
+    .link-box { margin: 16px 20px 20px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; background: #f8fafc; }
+    .link-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .link-hint { margin: 8px 0 12px; font-size: 12.5px; color: #64748b; line-height: 1.7; }
+    .sug-row { display: grid; grid-template-columns: 1.2fr 2fr auto; gap: 12px; align-items: center; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+    .sug-meta { color: #64748b; font-size: 12.5px; }
+    .nb-btn-primary.sm, .nb-btn-ghost.sm { padding: 6px 14px; font-size: 12px; }
+    .nb-btn-ghost { background: transparent; border: none; color: #2563eb; font-weight: 600; cursor: pointer; }
 
     .nb-btn-primary { background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; }
     .nb-btn-secondary { background: #e2e8f0; color: #1e293b; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; }
@@ -461,6 +514,11 @@ export class EmployeeDetailsComponent implements OnInit {
   readonly loading = signal(true);
   readonly employee = signal<any>(null);
   readonly activeTab = signal<'personal' | 'contact' | 'academic' | 'dependents' | 'experiences' | 'payroll'>('personal');
+
+  // ربط أبناء الموظف بالطلاب المسجّلين (المطابقة بالرقم الوطني لولي الأمر)
+  readonly suggestions = signal<any[]>([]);
+  readonly suggestionsLoaded = signal(false);
+  readonly loadingSuggestions = signal(false);
 
   showContractModal = false;
   showMsgModal = false;
@@ -498,6 +556,61 @@ export class EmployeeDetailsComponent implements OnInit {
         this.loading.set(false);
         this.notify.error('تعذر جلب تفاصيل بيانات الموظف.');
       }
+    });
+  }
+
+  // ==== ربط أبناء الموظف بالطلاب المسجّلين ====
+
+  /** يجلب الطلاب المطابقين بالرقم الوطني لولي الأمر والذين لم يُربطوا بعد. */
+  loadLinkSuggestions() {
+    const id = this.employee()?.id;
+    if (!id) return;
+    this.loadingSuggestions.set(true);
+    const url = this.cleanApiUrl(`v1/employees/employees/${id}/link-suggestions/`);
+    this.http.get<any>(url).subscribe({
+      next: (res) => {
+        this.loadingSuggestions.set(false);
+        this.suggestionsLoaded.set(true);
+        this.suggestions.set((res?.data ?? res)?.suggestions ?? []);
+      },
+      error: () => {
+        this.loadingSuggestions.set(false);
+        this.suggestionsLoaded.set(true);
+        this.notify.error('تعذّر جلب اقتراحات الربط.');
+      },
+    });
+  }
+
+  /** يؤكّد ربط طالب مقترح بملف الموظف — يفعّل الخصم على فواتيره القادمة. */
+  confirmLink(s: any) {
+    const id = this.employee()?.id;
+    if (!id) return;
+    const url = this.cleanApiUrl(`v1/employees/employees/${id}/confirm-link/`);
+    this.http.post<any>(url, {
+      student_id: s.student_id,
+      dependent_id: s.dependent_id || undefined,
+      student_name: s.student_name || '',
+    }).subscribe({
+      next: (res) => {
+        this.notify.success(res?.message || 'تم ربط الطالب بملف الموظف.');
+        this.suggestions.update(list => list.filter(x => x.student_id !== s.student_id));
+        this.fetchEmployeeDetails(id);
+      },
+      error: () => this.notify.error('تعذّر تأكيد الربط.'),
+    });
+  }
+
+  /** يفكّ ربط تصريح عن طالبه مع إبقاء التصريح قائماً. */
+  unlinkDependent(dep: any) {
+    const id = this.employee()?.id;
+    if (!id) return;
+    const url = this.cleanApiUrl(`v1/employees/employees/${id}/unlink-dependent/`);
+    this.http.post<any>(url, { dependent_id: dep.id }).subscribe({
+      next: () => {
+        this.notify.success('تم فكّ الربط.');
+        this.fetchEmployeeDetails(id);
+      },
+      error: () => this.notify.error('تعذّر فكّ الربط.'),
     });
   }
 

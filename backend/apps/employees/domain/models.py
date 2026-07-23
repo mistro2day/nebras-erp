@@ -181,6 +181,10 @@ class EmployeeDependent(CombinedSharedModel):
     full_name = models.CharField(max_length=255, verbose_name="اسم التلميذ")
     relation_type = models.CharField(max_length=20, choices=RELATION_CHOICES, default='child',
                                      db_index=True, verbose_name="صلة القرابة")
+    # الربط بالطالب الفعلي — اختياري لأن العقد يُكتب غالباً قبل تسجيل الابن.
+    # فارغ = تصريح بانتظار التسجيل · مملوء = مربوط ومؤكَّد ويُطبَّق عليه الخصم.
+    student_id = models.UUIDField(null=True, blank=True, db_index=True, verbose_name="الطالب المرتبط")
+    linked_at = models.DateTimeField(null=True, blank=True, verbose_name="تاريخ تأكيد الربط")
     academic_stage = models.CharField(max_length=100, default='المرحلة الابتدائية', verbose_name="المرحلة الدراسية")
     grade_level = models.CharField(max_length=100, blank=True, null=True, verbose_name="الصف الدراسي")
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.00, verbose_name="نسبة التخفيض %")

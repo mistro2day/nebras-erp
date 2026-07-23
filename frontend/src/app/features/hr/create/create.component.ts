@@ -312,7 +312,7 @@ interface PriorExpInput {
               </p>
               <div class="dep-actions">
                 <button type="button" class="btn-add-dep" (click)="addDependent()">+ إضافة ابن/ابنة أو قريب</button>
-                <button type="button" class="btn-reapply" (click)="reapplyBylawDiscounts()"
+                <button type="button" class="nb-btn-secondary" (click)="reapplyBylawDiscounts()"
                         title="إرجاع النسب إلى قيم اللائحة الافتراضية">↻ تطبيق نسب اللائحة</button>
               </div>
             </nb-panel>
@@ -464,14 +464,24 @@ interface PriorExpInput {
     .dynamic-rows { margin-bottom: 8px; }
     .row-inputs { display: flex; gap: 10px; }
     .btn-add, .btn-add-dep { background: #e2e8f0; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
-    /* تلميح خصومات اللائحة التنظيمية */
-    .bylaw-hint { margin: 12px 0 4px; padding: 10px 12px; background: #f1f5f9; border-inline-start: 3px solid #0f766e; border-radius: 6px; font-size: 12.5px; line-height: 1.9; color: #475569; }
-    .bylaw-hint b { color: #0f172a; font-weight: 700; }
-    .exempt-badge { display: inline-block; margin-inline-start: 8px; background: #dcfce7; color: #15803d; font-weight: 700; padding: 2px 10px; border-radius: 99px; font-size: 12px; }
-    .exempt-input { background: #dcfce7 !important; color: #15803d; font-weight: 700; }
-    .dep-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .btn-reapply { background: transparent; border: 1px solid #0f766e; color: #0f766e; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; font-size: 12.5px; }
-    .btn-reapply:hover { background: #0f766e; color: #fff; }
+    /* تلميح خصومات اللائحة التنظيمية — برموز تصميم نبراس */
+    .bylaw-hint {
+      margin: 12px 0 4px; padding: 10px 12px;
+      background: var(--nb-bg); border-inline-start: 3px solid var(--nb-primary-600);
+      border-radius: var(--nb-radius); font-size: 12.5px; line-height: 1.9; color: var(--nb-text-faint);
+    }
+    .bylaw-hint b { color: var(--nb-text); font-weight: 700; }
+    .exempt-badge {
+      display: inline-block; margin-inline-start: 8px; font-weight: 700;
+      padding: 2px 10px; border-radius: 99px; font-size: 12px;
+      background: color-mix(in srgb, var(--nb-success) 15%, transparent); color: var(--nb-success);
+    }
+    .exempt-input {
+      background: color-mix(in srgb, var(--nb-success) 10%, var(--nb-surface)) !important;
+      color: var(--nb-success); font-weight: 700;
+    }
+    .dep-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+    .dep-actions .btn-add-dep { margin-top: 0; }
     .btn-remove, .btn-del, .btn-del-exp { background: #fee2e2; color: #991b1b; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 
     .wizard-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
