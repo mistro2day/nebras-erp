@@ -7,7 +7,13 @@ class FacultyBusinessRulesService(BaseService):
     """
     @staticmethod
     def validate_national_id_unique(national_id: str, exclude_id=None) -> bool:
-        qs = FacultyMember.objects.filter(national_id=national_id, deleted_at__isnull=True)
+        """
+        الرقم الوطني مصدره ملف الموظف، فالاستعلام يمرّ عبر العلاقة
+        (لم يعد عموداً في FacultyMember بعد توحيد مصدر الحقيقة).
+        """
+        qs = FacultyMember.objects.filter(
+            employee__national_id=national_id, deleted_at__isnull=True
+        )
         if exclude_id:
             qs = qs.exclude(id=exclude_id)
         return not qs.exists()

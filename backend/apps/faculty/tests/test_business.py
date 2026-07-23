@@ -1,6 +1,7 @@
 from django.test import TestCase
 from apps.faculty.domain.models import FacultyMember, AcademicQualification
 from apps.faculty.application.services import FacultyBusinessRulesService
+from apps.employees.domain.models import Employee
 import uuid
 
 class FacultyBusinessRulesTest(TestCase):
@@ -9,15 +10,22 @@ class FacultyBusinessRulesTest(TestCase):
     """
     def setUp(self):
         self.tenant_id = uuid.uuid4()
-        self.member = FacultyMember.objects.create(
+        # البيانات الشخصية مصدرها ملف الموظف بعد توحيد مصدر الحقيقة
+        self.employee = Employee.objects.create(
             tenant_id=self.tenant_id,
             employee_number='EMP-999',
-            teacher_code='TCH-999',
             national_id='1112223334',
             full_name_ar='أحمد بن خالد المعلم',
             gender='male',
             nationality='Saudi',
             date_of_birth='1985-01-01',
+            department='Mathematics',
+            position='Senior Teacher',
+        )
+        self.member = FacultyMember.objects.create(
+            tenant_id=self.tenant_id,
+            employee=self.employee,
+            teacher_code='TCH-999',
             department='Mathematics',
             current_position='Senior Teacher'
         )

@@ -3,108 +3,101 @@ from django.utils import timezone
 from apps.shared.domain.models import CombinedSharedModel
 from apps.employees.domain.models import Employee
 
-# 1. Faculty Member Core Entity - Refactored to link to Employee for backwards-compatibility
+# 1. Faculty Member — الدور الأكاديمي للموظف
+#
+# مصدر الحقيقة للبيانات الشخصية هو `Employee` وحده. كان هذا الكيان يحمل نسخة
+# ثانية منها ويدفعها إلى Employee عند الحفظ، فكان التعديل المباشر على Employee
+# لا ينعكس هنا وتتباعد النسختان (رقم هاتف قديم، اسمان مختلفان في تقريرين).
+#
+# الآن: الحقول الشخصية خصائص للقراءة تُفوَّض إلى Employee — نسخة واحدة لا نسختان.
+# ويبقى هنا ما يخصّ الدور الأكاديمي وحده (رمز المعلم، القسم، حالة اعتماد الدور).
 class FacultyMember(CombinedSharedModel):
-    # Link to Employee Core
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='faculty_roles', null=True, blank=True)
-    
-    # Backwards-compatibility fields (mirrors/delegates or kept for existing code integrity)
-    employee_number = models.CharField(max_length=50, unique=True, db_index=True)
-    teacher_code = models.CharField(max_length=50, unique=True, db_index=True)
-    national_id = models.CharField(max_length=50, unique=True, db_index=True)
-    passport = models.CharField(max_length=50, blank=True, null=True)
-    
-    full_name_ar = models.CharField(max_length=255)
-    full_name_en = models.CharField(max_length=255, blank=True, null=True)
-    gender = models.CharField(max_length=10) # male, female
-    nationality = models.CharField(max_length=100)
-    religion = models.CharField(max_length=100, blank=True, null=True)
-    date_of_birth = models.DateField()
-    marital_status = models.CharField(max_length=50, blank=True, null=True)
-    photo_url = models.CharField(max_length=500, blank=True, null=True)
+    # الرابط بالموظف — إلزامي: لا وجود لعضو هيئة تدريس بلا ملف موظف
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='faculty_roles')
 
-    email = models.EmailField()
-    mobile = models.CharField(max_length=50)
-    address = models.TextField(blank=True, null=True)
-    
+    # خاص بالدور الأكاديمي
+    teacher_code = models.CharField(max_length=50, unique=True, db_index=True)
     branch_id = models.UUIDField(db_index=True, null=True, blank=True)
     department = models.CharField(max_length=100)
     current_position = models.CharField(max_length=100)
     joining_date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=30, default='draft', db_index=True) # draft, pending_review, approved, active, suspended, resigned
 
+    # ==== البيانات الشخصية: تُقرأ من الموظف (توافقية مع الكود والواجهة القائمة) ====
+    @property
+    def employee_number(self):
+        return self.employee.employee_number if self.employee_id else None
+
+    @property
+    def national_id(self):
+        return self.employee.national_id if self.employee_id else None
+
+    @property
+    def passport(self):
+        return self.employee.passport if self.employee_id else None
+
+    @property
+    def full_name_ar(self):
+        return self.employee.full_name_ar if self.employee_id else ''
+
+    @property
+    def full_name_en(self):
+        return self.employee.full_name_en if self.employee_id else None
+
+    @property
+    def gender(self):
+        return self.employee.gender if self.employee_id else None
+
+    @property
+    def nationality(self):
+        return self.employee.nationality if self.employee_id else None
+
+    @property
+    def religion(self):
+        return self.employee.religion if self.employee_id else None
+
+    @property
+    def date_of_birth(self):
+        return self.employee.date_of_birth if self.employee_id else None
+
+    @property
+    def marital_status(self):
+        return self.employee.marital_status if self.employee_id else None
+
+    @property
+    def photo_url(self):
+        return self.employee.photo_url if self.employee_id else None
+
+    @property
+    def email(self):
+        return self.employee.email if self.employee_id else None
+
+    @property
+    def mobile(self):
+        return self.employee.mobile if self.employee_id else None
+
+    @property
+    def address(self):
+        return self.employee.address if self.employee_id else None
+
     def save(self, *args, **kwargs):
-        from apps.employees.domain.models import Employee
-        
-        # تحضير حالة الموظف بناءً على حالة المعلم
-        emp_status = 'active' if self.status in ['approved', 'active'] else 'suspended'
-        if self.status == 'resigned':
-            emp_status = 'resigned'
-            
-        if not self.employee:
-            # البحث عن موظف بنفس الهوية الوطنية أو الرقم الوظيفي لتجنب التكرار
-            employee = Employee.objects.filter(
-                tenant_id=self.tenant_id,
-                national_id=self.national_id,
-                deleted_at__isnull=True
-            ).first()
-            if not employee:
-                employee = Employee.objects.filter(
-                    tenant_id=self.tenant_id,
-                    employee_number=self.employee_number,
-                    deleted_at__isnull=True
-                ).first()
-                
-            if not employee:
-                # إنشاء موظف جديد
-                employee = Employee.objects.create(
-                    tenant_id=self.tenant_id,
-                    employee_number=self.employee_number,
-                    national_id=self.national_id,
-                    passport=self.passport,
-                    full_name_ar=self.full_name_ar,
-                    full_name_en=self.full_name_en,
-                    gender=self.gender,
-                    nationality=self.nationality,
-                    religion=self.religion,
-                    date_of_birth=self.date_of_birth,
-                    marital_status=self.marital_status,
-                    photo_url=self.photo_url,
-                    email=self.email,
-                    mobile=self.mobile,
-                    address=self.address,
-                    branch_id=self.branch_id,
-                    department=self.department,
-                    position=self.current_position,
-                    employment_type='Full-time',
-                    joining_date=self.joining_date,
-                    status=emp_status
-                )
-            self.employee = employee
-        else:
-            # مزامنة البيانات الشخصية والوظيفية إذا كان الرابط موجوداً بالفعل
-            emp = self.employee
-            emp.employee_number = self.employee_number
-            emp.national_id = self.national_id
-            emp.passport = self.passport
-            emp.full_name_ar = self.full_name_ar
-            emp.full_name_en = self.full_name_en
-            emp.gender = self.gender
-            emp.nationality = self.nationality
-            emp.religion = self.religion
-            emp.date_of_birth = self.date_of_birth
-            emp.marital_status = self.marital_status
-            emp.photo_url = self.photo_url
-            emp.email = self.email
-            emp.mobile = self.mobile
-            emp.address = self.address
-            emp.branch_id = self.branch_id
-            emp.department = self.department
-            emp.position = self.current_position
-            emp.status = emp_status
-            emp.save()
-            
+        """
+        لم تعد هناك مزامنة للبيانات الشخصية — مصدرها Employee وحده.
+        يبقى انعكاس واحد مشروع: حالة الدور الأكاديمي تنعكس على الحالة الوظيفية
+        (اعتماد المعلم يُفعّل ملفه الوظيفي، واستقالته تُنهيه).
+        """
+        if self.employee_id:
+            emp_status = 'active' if self.status in ('approved', 'active') else 'suspended'
+            if self.status == 'resigned':
+                emp_status = 'resigned'
+            if self.employee.status != emp_status:
+                self.employee.status = emp_status
+                self.employee.save(update_fields=['status', 'updated_at'])
+
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.full_name_ar} ({self.teacher_code})"
 
     class Meta:
         db_table = 'nebras_faculty_members'

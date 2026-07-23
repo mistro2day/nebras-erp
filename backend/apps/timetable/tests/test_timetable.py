@@ -29,19 +29,11 @@ class AcademicTimetableTests(TestCase):
             employment_type='Full-time'
         )
 
-        # إنشاء المعلم مع الحقول المطلوبة لـ FacultyMember
+        # الدور الأكاديمي فقط — البيانات الشخصية مصدرها Employee أعلاه
         self.teacher = FacultyMember.objects.create(
             tenant_id=self.tenant_id,
             employee=self.employee,
-            employee_number='EMP-FAC-99',
             teacher_code='TCH-CODE-99',
-            national_id='1009988776',
-            full_name_ar='محمد المعلم',
-            gender='male',
-            nationality='Saudi',
-            date_of_birth='1985-05-12',
-            email='test@nebras.com',
-            mobile='0500000000',
             department='Academic',
             current_position='Teacher',
             status='active'

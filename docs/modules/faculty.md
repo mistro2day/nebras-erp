@@ -4,11 +4,42 @@
 
 ---
 
+## 0. مصدر الحقيقة للبيانات الشخصية (Single Source of Truth)
+
+> **مبدأ حاكم:** `Employee` هو المصدر **الوحيد** لبيانات الشخص. `FacultyMember`
+> يمثّل **الدور الأكاديمي** لذلك الموظف ولا يحمل نسخة ثانية من بياناته.
+
+```
+Employee (الشخص — الموارد البشرية)
+   ├── الحضور والانصراف · الرواتب · السلفيات
+   └── FacultyMember (الدور الأكاديمي) ← employee إلزامي
+          ├── teacher_code · department · current_position · joining_date · status
+          └── التكليفات · المؤهلات · الرخص · الإتاحة
+```
+
+**ما يملكه `FacultyMember` فعلاً:** `teacher_code` · `branch_id` · `department` ·
+`current_position` · `joining_date` · `status` (حالة اعتماد الدور).
+
+**ما يُقرأ من `Employee` عبر خصائص مفوِّضة:** `employee_number` · `national_id` ·
+`passport` · `full_name_ar` · `full_name_en` · `gender` · `nationality` ·
+`religion` · `date_of_birth` · `marital_status` · `photo_url` · `email` ·
+`mobile` · `address`.
+
+هذه الحقول ما زالت تظهر في استجابة API (للقراءة فقط) فلم ينكسر أي كود قائم،
+لكن **تعديلها يتم من موديول الموظفين حصراً**.
+
+**خلفية:** كان `FacultyMember` يحمل نسخة ثانية ويدفعها إلى `Employee` عند الحفظ،
+فكان التعديل المباشر على `Employee` لا ينعكس وتتباعد النسختان (رقم هاتف قديم،
+اسمان مختلفان في تقريرين). سُحبت الحقول في ترحيل
+`faculty.0005_facultymember_single_source_of_truth` بعد التحقق من صفر فروقات.
+
+---
+
 ## 1. الهيكل المعماري والطبقات (Faculty Architecture)
 
 يتكون الموديول من الكيانات والطبقات الأساسية التالية:
 
-- **FacultyMember:** الكيان الرئيسي لعضو هيئة التدريس، ويضم البيانات الشخصية والتفاصيل الوظيفية.
+- **FacultyMember:** الكيان الرئيسي لعضو هيئة التدريس — الدور الأكاديمي المرتبط إلزامياً بـ`Employee` (راجع القسم 0 أعلاه).
 - **TeacherProfile:** السيرة الذاتية والتخصص والترتبة الأكاديمية والاهتمامات.
 - **AcademicQualification & TeachingLicense:** المؤهلات العلمية والرخص المهنية والشهادات مع تواريخ الصلاحية والتحقق.
 - **TeacherAssignment:** التعيين الأكاديمي السنوي والفصلي للمواد والشعب الدراسية.

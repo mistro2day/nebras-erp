@@ -24,17 +24,11 @@ class EmployeeRefactoringTest(TestCase):
             employment_type='Full-time'
         )
 
-        # 2. إنشاء معلم يربط بالموظف
+        # 2. الدور الأكاديمي للموظف نفسه — لا نسخة ثانية من بياناته الشخصية
         self.faculty_member = FacultyMember.objects.create(
             tenant_id=self.tenant_id,
             employee=self.employee,
-            employee_number='EMP-2026-002',
             teacher_code='TCH-002',
-            national_id='3334445556',
-            full_name_ar='محمد بن علي المعلم',
-            gender='male',
-            nationality='Saudi',
-            date_of_birth='1988-01-01',
             department='Mathematics',
             current_position='Senior Teacher'
         )
@@ -47,3 +41,13 @@ class EmployeeRefactoringTest(TestCase):
         # التحقق من أن الكيان يربط بنجاح بالموظف
         self.assertEqual(self.faculty_member.employee, self.employee)
         self.assertEqual(self.faculty_member.teacher_code, 'TCH-002')
+
+    def test_personal_data_has_single_source(self):
+        """البيانات الشخصية تُقرأ من الموظف، وأي تعديل عليه ينعكس فوراً."""
+        self.assertEqual(self.faculty_member.full_name_ar, 'خالد بن محمد الإداري')
+        self.assertEqual(self.faculty_member.national_id, '2223334445')
+
+        self.employee.mobile = '0555000111'
+        self.employee.save(update_fields=['mobile', 'updated_at'])
+        self.faculty_member.refresh_from_db()
+        self.assertEqual(self.faculty_member.mobile, '0555000111')
