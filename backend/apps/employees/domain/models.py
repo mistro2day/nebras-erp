@@ -3,6 +3,24 @@ from django.utils import timezone
 from apps.shared.domain.models import CombinedSharedModel
 import uuid
 
+# ============================================================
+# قواعد خصومات اللائحة التنظيمية للمعلمين
+# المرجع: docs/modules/teacher-contract-bylaw.md (رابعاً: الأبناء · خامساً: الأقارب)
+# ============================================================
+# المفتاح = عدد الأبناء الملتحقين · exempt = عدد المُعفَين كلياً · percentage = نسبة خصم الباقين
+DEPENDENT_DISCOUNT_RULES = {
+    1: {'exempt': 0, 'percentage': 50},
+    2: {'exempt': 0, 'percentage': 30},
+    3: {'exempt': 0, 'percentage': 25},
+    4: {'exempt': 1, 'percentage': 20},
+    5: {'exempt': 2, 'percentage': 20},
+}
+# أي عدد أكبر من هذا يُعامَل بمعاملة الشريحة الأخيرة
+MAX_DEPENDENT_TIER = 5
+# خامساً: أقارب المعلمين من الدرجة الأولى — رسوم التسجيل + خصم ثابت
+RELATIVE_DISCOUNT_PERCENTAGE = 10
+
+
 # 1. Universal Employee Core Entity (معلمين وموظفين بحسب عقد 2026)
 class Employee(CombinedSharedModel):
     employee_number = models.CharField(max_length=50, blank=True, null=True, db_index=True)
@@ -26,6 +44,7 @@ class Employee(CombinedSharedModel):
     square_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="رقم المربع")
     house_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="رقم المنزل")
     address = models.TextField(blank=True, null=True, verbose_name="العنوان السكني الشامل")
+    gatekeeper_name = models.CharField(max_length=255, blank=True, null=True, verbose_name="اسم البواب")
     prominent_teacher_friend = models.CharField(max_length=255, blank=True, null=True, verbose_name="اسم أقرب معلم بارز")
 
     # وسائل التواصل والاتصال
@@ -94,6 +113,51 @@ class Employee(CombinedSharedModel):
         self.net_payable = (basic + transport + comm + rep) - ded
         super().save(*args, **kwargs)
 
+    def apply_dependent_discounts(self):
+        """
+        إعادة احتساب خصومات اللائحة يدوياً (**اختياري — لا يُستدعى تلقائياً عند الحفظ**).
+        نِسب الخصم المحفوظة هي ما أدخله المستخدم؛ هذه الدالة أداة مساعدة لمن أراد
+        إرجاع النسب إلى قيم اللائحة الافتراضية.
+
+        قواعد اللائحة التنظيمية (docs/modules/teacher-contract-bylaw.md):
+
+        رابعاً — الأبناء (خصم متدرّج حسب عدد الأبناء الملتحقين):
+            1 → 50%  ·  2 → 30%  ·  3 → 25%
+            4 → إعفاء تلميذ واحد + 20% للثلاثة الباقين
+            5 → إعفاء تلميذين
+
+        خامساً — أقارب الدرجة الأولى: خصم 10% ثابت.
+
+        يُعاد الحساب كلما أُضيف أو حُذف ملحق. يُرجع ملخّصاً بما طُبِّق.
+        """
+        children = list(self.dependents.filter(relation_type='child').order_by('created_at'))
+        rule = DEPENDENT_DISCOUNT_RULES.get(
+            min(len(children), MAX_DEPENDENT_TIER)
+        ) if children else None
+
+        if rule:
+            exempt_count = rule['exempt']
+            for idx, dep in enumerate(children):
+                if idx < exempt_count:
+                    dep.is_fully_exempt = True
+                    dep.discount_percentage = 100
+                else:
+                    dep.is_fully_exempt = False
+                    dep.discount_percentage = rule['percentage']
+                dep.save(update_fields=['is_fully_exempt', 'discount_percentage', 'updated_at'])
+
+        # أقارب الدرجة الأولى: نسبة ثابتة
+        for rel in self.dependents.filter(relation_type='relative'):
+            rel.is_fully_exempt = False
+            rel.discount_percentage = RELATIVE_DISCOUNT_PERCENTAGE
+            rel.save(update_fields=['is_fully_exempt', 'discount_percentage', 'updated_at'])
+
+        return {
+            'children_count': len(children),
+            'exempted': rule['exempt'] if rule else 0,
+            'percentage': rule['percentage'] if rule else 0,
+        }
+
     class Meta:
         db_table = 'nebras_employees'
         ordering = ['-created_at']
@@ -103,11 +167,24 @@ class Employee(CombinedSharedModel):
 
 # 2. أبناء الموظف/المعلم بالمدرسة (جدول الأبناء بالاستمارة + خصومات الرسوم)
 class EmployeeDependent(CombinedSharedModel):
+    """
+    ملحقو الموظف/المعلم بالمدرسة. تُطبَّق عليهم خصومات اللائحة التنظيمية:
+    - الأبناء (رابعاً): خصم متدرّج حسب عدد الأبناء الملتحقين.
+    - أقارب الدرجة الأولى (خامساً): رسوم التسجيل + خصم 10% ثابت.
+    راجع docs/modules/teacher-contract-bylaw.md
+    """
+    RELATION_CHOICES = (
+        ('child', 'ابن/ابنة'),
+        ('relative', 'قريب من الدرجة الأولى'),
+    )
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='dependents', verbose_name="الموظف/المعلم")
     full_name = models.CharField(max_length=255, verbose_name="اسم التلميذ")
+    relation_type = models.CharField(max_length=20, choices=RELATION_CHOICES, default='child',
+                                     db_index=True, verbose_name="صلة القرابة")
     academic_stage = models.CharField(max_length=100, default='المرحلة الابتدائية', verbose_name="المرحلة الدراسية")
     grade_level = models.CharField(max_length=100, blank=True, null=True, verbose_name="الصف الدراسي")
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.00, verbose_name="نسبة التخفيض %")
+    is_fully_exempt = models.BooleanField(default=False, verbose_name="معفى كلياً من الرسوم الدراسية")
     notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات الإعفاء")
 
     class Meta:
@@ -130,6 +207,8 @@ class EmployeeReference(CombinedSharedModel):
 class EmployeePriorExperience(CombinedSharedModel):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='prior_experiences', verbose_name="الموظف")
     school_name = models.CharField(max_length=255, verbose_name="اسم المدرسة/المؤسسة")
+    # الاستمارة تفصل الخبرات حسب البلد (السودان / القاهرة)
+    country = models.CharField(max_length=100, default='السودان', db_index=True, verbose_name="البلد")
     time_period = models.CharField(max_length=100, blank=True, null=True, verbose_name="الفترة الزمنية والتاريخ")
 
     class Meta:

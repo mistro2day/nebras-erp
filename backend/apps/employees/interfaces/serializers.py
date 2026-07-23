@@ -64,6 +64,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         for exp in prior_experiences_data:
             EmployeePriorExperience.objects.create(tenant_id=employee.tenant_id, employee=employee, **exp)
 
+        # ملاحظة: نسب الخصم تُحفظ كما أدخلها المستخدم (هو المرجع النهائي).
+        # اللائحة تُقترح في الواجهة فقط، ويمكن استدعاء
+        # employee.apply_dependent_discounts() يدوياً لإعادة الاحتساب عند الطلب.
         return employee
 
     def update(self, instance, validated_data):
@@ -88,6 +91,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             for exp in prior_experiences_data:
                 EmployeePriorExperience.objects.create(tenant_id=employee.tenant_id, employee=employee, **exp)
 
+        # نسب الخصم تُحفظ كما أدخلها المستخدم — لا يُعاد احتسابها تلقائياً.
         return employee
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):

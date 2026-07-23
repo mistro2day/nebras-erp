@@ -16,6 +16,8 @@ interface ReferenceInput {
 
 interface DependentInput {
   full_name: string;
+  /** child = ابن/ابنة (خصم متدرّج) · relative = قريب درجة أولى (خصم 10%) */
+  relation_type: 'child' | 'relative';
   academic_stage: string;
   grade_level: string;
   discount_percentage: number;
@@ -24,6 +26,8 @@ interface DependentInput {
 
 interface PriorExpInput {
   school_name: string;
+  /** الاستمارة تفصل الخبرات حسب البلد (السودان / القاهرة) */
+  country: string;
   time_period: string;
 }
 
@@ -121,6 +125,10 @@ interface PriorExpInput {
                 <div class="field">
                   <label>رقم المنزل</label>
                   <input type="text" [(ngModel)]="form.house_number" name="house_number" placeholder="منزل 12" />
+                </div>
+                <div class="field">
+                  <label>اسم البواب</label>
+                  <input type="text" [(ngModel)]="form.gatekeeper_name" name="gatekeeper_name" placeholder="اسم بواب السكن" />
                 </div>
                 <div class="field full-width">
                   <label>اسم أقرب معلم بارز صديق أو قريب بالمدرسة</label>
@@ -267,6 +275,13 @@ interface PriorExpInput {
                       <input type="text" [(ngModel)]="dep.full_name" [name]="'dep_name_' + idx" placeholder="الاسم كامل" />
                     </div>
                     <div class="field req">
+                      <label>صلة القرابة</label>
+                      <select [(ngModel)]="dep.relation_type" [name]="'dep_rel_' + idx" (ngModelChange)="onRelationChange(idx)">
+                        <option value="child">ابن / ابنة</option>
+                        <option value="relative">قريب من الدرجة الأولى</option>
+                      </select>
+                    </div>
+                    <div class="field req">
                       <label>المرحلة الدراسية</label>
                       <select [(ngModel)]="dep.academic_stage" [name]="'dep_stage_' + idx">
                         <option value="المرحلة الابتدائية">المرحلة الابتدائية</option>
@@ -279,13 +294,27 @@ interface PriorExpInput {
                       <input type="text" [(ngModel)]="dep.grade_level" [name]="'dep_grade_' + idx" placeholder="الصف الرابع، الثاني" />
                     </div>
                     <div class="field">
-                      <label>نسبة الخصم المستحقة %</label>
-                      <input type="number" [(ngModel)]="dep.discount_percentage" [name]="'dep_disc_' + idx" />
+                      <label>نسبة الخصم % <span class="lbl-sub">(مقترحة من اللائحة — قابلة للتعديل)</span></label>
+                      <input type="number" min="0" max="100" [(ngModel)]="dep.discount_percentage" [name]="'dep_disc_' + idx"
+                             [class.exempt-input]="dep.discount_percentage === 100" />
                     </div>
                   </div>
                 </div>
               </div>
-              <button type="button" class="btn-add-dep" (click)="addDependent()">+ إضافة ابن/ابنة بالمدرسة</button>
+              <p class="bylaw-hint">
+                نسب اللائحة التنظيمية (مقترحة — والمُدخَل يدوياً هو المعتمد):
+                <b>1 ابن → 50%</b> · <b>2 → 30%</b> · <b>3 → 25%</b> ·
+                <b>4 → إعفاء واحد + 20%</b> · <b>5 → إعفاء اثنين</b> ·
+                <b>قريب درجة أولى → 10%</b>.
+                @if (fullyExemptCount() > 0) {
+                  <span class="exempt-badge">مُعفى كلياً: {{ fullyExemptCount() }}</span>
+                }
+              </p>
+              <div class="dep-actions">
+                <button type="button" class="btn-add-dep" (click)="addDependent()">+ إضافة ابن/ابنة أو قريب</button>
+                <button type="button" class="btn-reapply" (click)="reapplyBylawDiscounts()"
+                        title="إرجاع النسب إلى قيم اللائحة الافتراضية">↻ تطبيق نسب اللائحة</button>
+              </div>
             </nb-panel>
           </div>
         }
@@ -300,6 +329,12 @@ interface PriorExpInput {
                     <div class="field req">
                       <label>اسم المدرسة / المؤسسة السابقة</label>
                       <input type="text" [(ngModel)]="exp.school_name" [name]="'exp_school_' + idx" placeholder="اسم المدرسة السابقة" />
+                    </div>
+                    <div class="field req">
+                      <label>البلد</label>
+                      <select [(ngModel)]="exp.country" [name]="'exp_country_' + idx">
+                        @for (c of experienceCountries; track c) { <option [value]="c">{{ c }}</option> }
+                      </select>
                     </div>
                     <div class="field req">
                       <label>الفترة الزمنية والتاريخ</label>
@@ -429,6 +464,14 @@ interface PriorExpInput {
     .dynamic-rows { margin-bottom: 8px; }
     .row-inputs { display: flex; gap: 10px; }
     .btn-add, .btn-add-dep { background: #e2e8f0; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+    /* تلميح خصومات اللائحة التنظيمية */
+    .bylaw-hint { margin: 12px 0 4px; padding: 10px 12px; background: #f1f5f9; border-inline-start: 3px solid #0f766e; border-radius: 6px; font-size: 12.5px; line-height: 1.9; color: #475569; }
+    .bylaw-hint b { color: #0f172a; font-weight: 700; }
+    .exempt-badge { display: inline-block; margin-inline-start: 8px; background: #dcfce7; color: #15803d; font-weight: 700; padding: 2px 10px; border-radius: 99px; font-size: 12px; }
+    .exempt-input { background: #dcfce7 !important; color: #15803d; font-weight: 700; }
+    .dep-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn-reapply { background: transparent; border: 1px solid #0f766e; color: #0f766e; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; font-size: 12.5px; }
+    .btn-reapply:hover { background: #0f766e; color: #fff; }
     .btn-remove, .btn-del, .btn-del-exp { background: #fee2e2; color: #991b1b; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
 
     .wizard-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
@@ -520,6 +563,7 @@ export class EmployeeCreateComponent {
     neighborhood: '',
     square_number: '',
     house_number: '',
+    gatekeeper_name: '',
     prominent_teacher_friend: '',
     phone_1: '',
     phone_2: '',
@@ -552,12 +596,15 @@ export class EmployeeCreateComponent {
   ]);
 
   dependents = signal<DependentInput[]>([
-    { full_name: '', academic_stage: 'المرحلة الابتدائية', grade_level: '', discount_percentage: 50, notes: '' }
+    { full_name: '', relation_type: 'child', academic_stage: 'المرحلة الابتدائية', grade_level: '', discount_percentage: 50, notes: '' }
   ]);
 
   priorExperiences = signal<PriorExpInput[]>([
-    { school_name: '', time_period: '' }
+    { school_name: '', country: 'السودان', time_period: '' }
   ]);
+
+  /** بلدان الخبرة السابقة كما تفصلها الاستمارة الرسمية. */
+  readonly experienceCountries = ['السودان', 'القاهرة'];
 
   recalculateSalary() {
     const basic = Number(this.form.basic_salary) || 0;
@@ -575,20 +622,72 @@ export class EmployeeCreateComponent {
     this.references.update(list => list.filter((_, i) => i !== idx));
   }
 
+  /**
+   * معاينة خصومات اللائحة التنظيمية (docs/modules/teacher-contract-bylaw.md).
+   * الخادم هو المرجع النهائي ويعيد الحساب عند الحفظ — هذه معاينة فورية للمستخدم.
+   * الأبناء: 1→50% · 2→30% · 3→25% · 4→إعفاء واحد+20% · 5→إعفاء اثنين+20%
+   * الأقارب من الدرجة الأولى: 10% ثابت.
+   */
+  private applyBylawDiscounts(list: DependentInput[]): DependentInput[] {
+    const tiers: Record<number, { exempt: number; percentage: number }> = {
+      1: { exempt: 0, percentage: 50 },
+      2: { exempt: 0, percentage: 30 },
+      3: { exempt: 0, percentage: 25 },
+      4: { exempt: 1, percentage: 20 },
+      5: { exempt: 2, percentage: 20 },
+    };
+    const children = list.filter(d => d.relation_type === 'child');
+    const rule = children.length ? tiers[Math.min(children.length, 5)] : null;
+    let childIdx = 0;
+    return list.map(d => {
+      if (d.relation_type === 'relative') return { ...d, discount_percentage: 10 };
+      if (!rule) return d;
+      const pct = childIdx < rule.exempt ? 100 : rule.percentage;
+      childIdx++;
+      return { ...d, discount_percentage: pct };
+    });
+  }
+
+  /** عدد المُعفَين كلياً — يُعرض للمستخدم كملخّص. */
+  fullyExemptCount(): number {
+    return this.dependents().filter(d => d.relation_type === 'child' && d.discount_percentage === 100).length;
+  }
+
+  /** إرجاع كل النسب إلى قيم اللائحة الافتراضية (يتجاوز تعديلات المستخدم). */
+  reapplyBylawDiscounts() {
+    this.dependents.update(list => this.applyBylawDiscounts(list));
+  }
+
+  /** نسبة اللائحة المقترحة لصف جديد — دون المساس بما عدّله المستخدم. */
+  private suggestedPercentage(childCount: number): number {
+    const tiers: Record<number, number> = { 1: 50, 2: 30, 3: 25, 4: 20, 5: 20 };
+    return tiers[Math.min(childCount, 5)] ?? 0;
+  }
+
   addDependent() {
-    const count = this.dependents().length + 1;
-    let disc = 50;
-    if (count === 2) disc = 30;
-    if (count === 3) disc = 25;
-    if (count >= 4) disc = 100;
-    this.dependents.update(list => [...list, { full_name: '', academic_stage: 'المرحلة الابتدائية', grade_level: '', discount_percentage: disc, notes: '' }]);
+    this.dependents.update(list => {
+      const childCount = list.filter(d => d.relation_type === 'child').length + 1;
+      return [...list, {
+        full_name: '', relation_type: 'child' as const, academic_stage: 'المرحلة الابتدائية',
+        grade_level: '', discount_percentage: this.suggestedPercentage(childCount), notes: '',
+      }];
+    });
   }
   removeDependent(idx: number) {
     this.dependents.update(list => list.filter((_, i) => i !== idx));
   }
+  /** عند تغيير صلة القرابة نضبط نسبة هذا الصف فقط (المستخدم يظل قادراً على تعديلها). */
+  onRelationChange(idx: number) {
+    this.dependents.update(list => list.map((d, i) => {
+      if (i !== idx) return d;
+      if (d.relation_type === 'relative') return { ...d, discount_percentage: 10 };
+      const childCount = list.filter((x, j) => x.relation_type === 'child' && j <= idx).length;
+      return { ...d, discount_percentage: this.suggestedPercentage(Math.max(childCount, 1)) };
+    }));
+  }
 
   addExperience() {
-    this.priorExperiences.update(list => [...list, { school_name: '', time_period: '' }]);
+    this.priorExperiences.update(list => [...list, { school_name: '', country: 'السودان', time_period: '' }]);
   }
   removeExperience(idx: number) {
     this.priorExperiences.update(list => list.filter((_, i) => i !== idx));
