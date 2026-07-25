@@ -21,9 +21,42 @@ class FacultyMemberSerializer(serializers.ModelSerializer):
     mobile = serializers.ReadOnlyField()
     address = serializers.ReadOnlyField()
 
+    # بيانات مالية حقيقية من ملف الموظف (تُغني الواجهة عن أي بيانات وهمية)
+    basic_salary = serializers.SerializerMethodField()
+    total_allowances = serializers.SerializerMethodField()
+    net_payable = serializers.SerializerMethodField()
+    employment_type = serializers.SerializerMethodField()
+    weekly_lesson_quota = serializers.SerializerMethodField()
+
     class Meta:
         model = FacultyMember
         fields = '__all__'
+
+    def _emp(self, obj):
+        return obj.employee if obj.employee_id else None
+
+    def get_basic_salary(self, obj):
+        emp = self._emp(obj)
+        return float(emp.basic_salary) if emp and emp.basic_salary is not None else 0
+
+    def get_total_allowances(self, obj):
+        emp = self._emp(obj)
+        if not emp:
+            return 0
+        return float((emp.transport_allowance or 0) + (emp.communication_allowance or 0)
+                     + (emp.representation_allowance or 0))
+
+    def get_net_payable(self, obj):
+        emp = self._emp(obj)
+        return float(emp.net_payable) if emp and emp.net_payable is not None else 0
+
+    def get_employment_type(self, obj):
+        emp = self._emp(obj)
+        return getattr(emp, 'employment_type', None) if emp else None
+
+    def get_weekly_lesson_quota(self, obj):
+        emp = self._emp(obj)
+        return getattr(emp, 'weekly_lesson_quota', None) if emp else None
 
 class TeacherProfileSerializer(serializers.ModelSerializer):
     class Meta:

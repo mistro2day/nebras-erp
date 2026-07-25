@@ -26,6 +26,13 @@ interface DetailedFaculty extends TeacherInfo {
   date_of_birth: string;
   department: string;
   joining_date: string;
+  // مالية حقيقية من ملف الموظف (تُغني عن أي بيانات وهمية)
+  basic_salary?: number;
+  total_allowances?: number;
+  net_payable?: number;
+  employment_type?: string;
+  weekly_lesson_quota?: number;
+  // للتوافق مع مودال التفاصيل القائم
   salary?: number;
   allowance?: number;
   contractType?: string;
@@ -120,20 +127,83 @@ interface DBTeacherAssignment {
 
       <!-- تبويب: دليل الكادر الأكاديمي -->
       @if (activeTab() === 'staff') {
-        <h2 class="section-title">أعضاء هيئة التدريس النشطين</h2>
-        <div class="cards-grid animate-fade">
-          @for (teacher of teachers(); track teacher.id) {
-            <div class="teacher-card-wrapper">
-              <app-teacher-card [teacher]="teacher"></app-teacher-card>
-              <button class="nb-btn-primary sm detail-btn" (click)="viewHRDetails(teacher)">
-                👤 عرض تفاصيل الموارد البشرية والتعاقد
-              </button>
+        <!-- شريط أدوات: بحث + تبديل العرض -->
+        <div class="staff-toolbar animate-fade">
+          <div class="staff-search">
+            <span class="search-ic">🔍</span>
+            <input type="search" [ngModel]="staffSearch()" (ngModelChange)="staffSearch.set($event)"
+                   placeholder="ابحث بالاسم أو الرمز أو القسم…" aria-label="بحث في الكادر" />
+            @if (staffSearch()) {
+              <button class="search-clear" (click)="staffSearch.set('')" aria-label="مسح البحث">✕</button>
+            }
+          </div>
+          <div class="staff-meta">
+            <span class="count-pill">{{ filteredTeachers().length }} من {{ teachers().length }}</span>
+            <div class="view-toggle" role="group" aria-label="طريقة العرض">
+              <button [class.on]="staffView() === 'table'" (click)="staffView.set('table')" title="جدول">☰ جدول</button>
+              <button [class.on]="staffView() === 'grid'" (click)="staffView.set('grid')" title="شبكة">▦ شبكة</button>
             </div>
-          }
-          @if (teachers().length === 0) {
-            <div class="no-data">لا يوجد كادر أكاديمي مسجل حالياً.</div>
-          }
+          </div>
         </div>
+
+        @if (loadingStaff()) {
+          <div class="no-data">جارٍ تحميل الكادر الأكاديمي…</div>
+        } @else if (teachers().length === 0) {
+          <div class="no-data">لا يوجد كادر أكاديمي مسجل حالياً.</div>
+        } @else if (filteredTeachers().length === 0) {
+          <div class="no-data">لا نتائج تطابق «{{ staffSearch() }}».</div>
+        } @else if (staffView() === 'table') {
+          <!-- العرض الافتراضي: جدول قابل للمسح مع إجراءات -->
+          <div class="staff-table-wrap animate-fade">
+            <table class="staff-table">
+              <thead>
+                <tr>
+                  <th>المعلم</th><th>القسم</th><th>المنصب</th>
+                  <th>نوع التوظيف</th><th>الحالة</th><th class="num">صافي المستحق</th><th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of filteredTeachers(); track t.id) {
+                  <tr class="staff-row" (click)="viewHRDetails(t)" tabindex="0"
+                      (keydown.enter)="viewHRDetails(t)">
+                    <td>
+                      <div class="who">
+                        <span class="avatar-sm">{{ initials(t.full_name_ar) }}</span>
+                        <div class="who-txt">
+                          <b>{{ t.full_name_ar }}</b>
+                          <span class="who-code">{{ t.teacher_code || '—' }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{{ t.department || '—' }}</td>
+                    <td>{{ t.current_position || '—' }}</td>
+                    <td>{{ employmentTypeLabel(t.employment_type) }}</td>
+                    <td><span class="s-pill" [class]="'s-' + statusKind(t.status)">{{ statusLabel(t.status) }}</span></td>
+                    <td class="num salary">{{ (t.net_payable || 0) | number }} ج.س</td>
+                    <td class="row-actions" (click)="$event.stopPropagation()">
+                      <button class="act view" (click)="viewHRDetails(t)" title="عرض التفاصيل">تفاصيل</button>
+                      <button class="act key" (click)="activateAccount(t)"
+                              [disabled]="!t.email || activatingId() === t.id"
+                              [title]="t.email ? 'تفعيل حساب الدخول' : 'يلزم بريد إلكتروني'">🔑</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <!-- عرض الشبكة: البطاقات -->
+          <div class="cards-grid animate-fade">
+            @for (teacher of filteredTeachers(); track teacher.id) {
+              <div class="teacher-card-wrapper" (click)="viewHRDetails(teacher)">
+                <app-teacher-card [teacher]="teacher"></app-teacher-card>
+                <button class="nb-btn-primary sm detail-btn" (click)="$event.stopPropagation(); viewHRDetails(teacher)">
+                  👤 عرض التفاصيل والتعاقد
+                </button>
+              </div>
+            }
+          </div>
+        }
       }
 
       <!-- تبويب: التكليفات التدريسية -->
@@ -306,8 +376,48 @@ interface DBTeacherAssignment {
     .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 0 0 12px; }
 
     .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    .teacher-card-wrapper { display: flex; flex-direction: column; gap: 8px; }
+    .teacher-card-wrapper { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
     .detail-btn { width: 100%; text-align: center; }
+
+    /* ==== شريط أدوات دليل الكادر ==== */
+    .staff-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .staff-search { position: relative; flex: 1; min-width: 240px; max-width: 420px; display: flex; align-items: center; }
+    .staff-search .search-ic { position: absolute; inset-inline-start: 12px; font-size: 13px; opacity: .55; pointer-events: none; }
+    .staff-search input { width: 100%; height: 40px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text); font-family: var(--nb-font-family); font-size: 13.5px; padding: 0 38px; outline: none; transition: border-color .15s; }
+    .staff-search input:focus { border-color: var(--nb-primary-600); }
+    .staff-search .search-clear { position: absolute; inset-inline-end: 10px; border: none; background: transparent; color: var(--nb-text-muted); cursor: pointer; font-size: 13px; padding: 4px; }
+    .staff-meta { display: flex; align-items: center; gap: 12px; }
+    .count-pill { font-size: 12.5px; font-weight: 700; color: var(--nb-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .view-toggle { display: inline-flex; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); overflow: hidden; }
+    .view-toggle button { border: none; background: var(--nb-surface); color: var(--nb-text-muted); padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: var(--nb-font-family); }
+    .view-toggle button.on { background: var(--nb-primary-600); color: #fff; }
+    .view-toggle button:not(.on):hover { background: var(--nb-bg); }
+
+    /* ==== جدول الكادر (العرض الافتراضي) ==== */
+    .staff-table-wrap { overflow-x: auto; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); background: var(--nb-surface); box-shadow: var(--nb-shadow-sm, 0 1px 2px rgba(0,0,0,.04)); }
+    .staff-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    .staff-table thead th { text-align: right; font-size: 12px; font-weight: 700; color: var(--nb-text-muted); background: var(--nb-bg); padding: 12px 16px; border-bottom: 1px solid var(--nb-border); white-space: nowrap; }
+    .staff-table th.num, .staff-table td.num { text-align: start; }
+    .staff-row { cursor: pointer; transition: background .12s; }
+    .staff-row:hover { background: color-mix(in srgb, var(--nb-primary-600) 5%, transparent); }
+    .staff-row:focus-visible { outline: 2px solid var(--nb-primary-600); outline-offset: -2px; }
+    .staff-table td { padding: 12px 16px; border-bottom: 1px solid var(--nb-border); font-size: 13px; color: var(--nb-text); vertical-align: middle; }
+    .staff-table tbody tr:last-child td { border-bottom: none; }
+    .who { display: flex; align-items: center; gap: 10px; }
+    .avatar-sm { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--nb-primary-600) 12%, transparent); color: var(--nb-primary-700); font-weight: 700; font-size: 12.5px; flex-shrink: 0; }
+    .who-txt { display: flex; flex-direction: column; gap: 1px; }
+    .who-txt b { font-weight: 700; }
+    .who-code { font-size: 11px; color: var(--nb-text-muted); font-variant-numeric: tabular-nums; }
+    .staff-table td.salary { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--nb-primary-700); }
+    .s-pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+    .s-good { background: color-mix(in srgb, var(--nb-success) 15%, transparent); color: var(--nb-success); }
+    .s-warn { background: color-mix(in srgb, #d97706 15%, transparent); color: #b45309; }
+    .s-muted { background: var(--nb-bg); color: var(--nb-text-muted); }
+    .row-actions { display: flex; gap: 6px; white-space: nowrap; }
+    .row-actions .act { border: 1px solid var(--nb-border); background: var(--nb-surface); border-radius: var(--nb-radius); padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--nb-text); font-family: var(--nb-font-family); }
+    .row-actions .act.view:hover { border-color: var(--nb-primary-600); color: var(--nb-primary-700); }
+    .row-actions .act.key { padding: 5px 8px; }
+    .row-actions .act:disabled { opacity: .45; cursor: not-allowed; }
 
     .dashboard-sections { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; margin-top: 24px; }
     @media (max-width: 900px) { .dashboard-sections { grid-template-columns: 1fr; } }
@@ -389,6 +499,21 @@ export class FacultyDashboardComponent implements OnInit {
   readonly teachers = signal<DetailedFaculty[]>([]);
   readonly assignments = signal<DBTeacherAssignment[]>([]);
   readonly loadingAssignments = signal(false);
+  readonly loadingStaff = signal(false);
+
+  // دليل الكادر: الجدول هو العرض الافتراضي + بحث
+  readonly staffView = signal<'table' | 'grid'>('table');
+  readonly staffSearch = signal('');
+  readonly filteredTeachers = computed(() => {
+    const q = this.staffSearch().trim().toLowerCase();
+    const list = this.teachers();
+    if (!q) return list;
+    return list.filter(t =>
+      (t.full_name_ar || '').toLowerCase().includes(q) ||
+      (t.teacher_code || '').toLowerCase().includes(q) ||
+      (t.department || '').toLowerCase().includes(q) ||
+      (t.current_position || '').toLowerCase().includes(q));
+  });
 
   // مصادر البيانات للأكاديميات
   readonly years = signal<any[]>([]);
@@ -397,29 +522,15 @@ export class FacultyDashboardComponent implements OnInit {
   readonly allSections = signal<any[]>([]);
   readonly allSubjects = signal<any[]>([]);
 
-  // الفلاتر للتكليف الجديد
+  // الفلاتر للتكليف الجديد — كلاهما بالمفتاح الأجنبي للصف (لا ترميز هشّ)
   selectedGradeId = '';
-  readonly filteredSections = computed(() => this.allSections().filter(sec => sec.grade === this.selectedGradeId));
+  readonly filteredSections = computed(() =>
+    this.allSections().filter(sec => sec.grade === this.selectedGradeId));
   readonly filteredSubjects = computed(() => {
-    // إرجاع المواد التي تبدأ بترميز الصف المختار تسهيلاً للتسكين
-    const grade = this.grades().find(g => g.id === this.selectedGradeId);
-    if (!grade) return [];
-    // ترميز الصف مثل "الصف الأول الابتدائي" يطابق "g1-" في كود المادة
-    const codePrefix = this.getGradeCodePrefix(grade.name);
-    return this.allSubjects().filter(sub => sub.code.toLowerCase().startsWith(codePrefix));
+    if (!this.selectedGradeId) return [];
+    // المادة مرتبطة بالصف عبر FK. بعض المواد عامة (بلا صف) فتظهر لكل الصفوف.
+    return this.allSubjects().filter(sub => !sub.grade || sub.grade === this.selectedGradeId);
   });
-
-  private getGradeCodePrefix(name: string): string {
-    if (name.includes('الأول')) return 'g1-';
-    if (name.includes('الثاني')) return 'g2-';
-    if (name.includes('الثالث')) return 'g3-';
-    if (name.includes('الرابع')) return 'g4-';
-    if (name.includes('الخامس')) return 'g5-';
-    if (name.includes('السادس')) return 'g6-';
-    if (name.includes('المتوسط')) return 'g7-'; // متوسط أول
-    if (name.includes('الثانوي')) return 'g8-'; // ثانوي أول
-    return 'g1-';
-  }
 
   // استمارة تكليف جديد
   newAsn = {
@@ -433,15 +544,6 @@ export class FacultyDashboardComponent implements OnInit {
   // المعلم المختار لعرض تفاصيل التعاقد المربوطة
   readonly selectedFaculty = signal<DetailedFaculty | null>(null);
 
-  // رواتب تجريبية يتم ربطها وربط المعلم بها
-  private readonly mockHRData: Record<string, { salary: number; allowance: number; type: string }> = {
-    'أحمد محمد علي': { salary: 380000, allowance: 76000, type: 'دوام كامل' },
-    'فاطمة عمر عثمان': { salary: 350000, allowance: 70000, type: 'دوام كامل' },
-    'ياسر عبد الله الطيب': { salary: 320000, allowance: 64000, type: 'دوام كامل' },
-    'حسن البشير الهادي': { salary: 300000, allowance: 60000, type: 'دوام كامل' },
-    'خديجة الطيب محمد': { salary: 360000, allowance: 72000, type: 'عقد مؤقت' }
-  };
-
   ngOnInit() {
     this.loadTeachers();
     this.loadAssignments();
@@ -449,23 +551,45 @@ export class FacultyDashboardComponent implements OnInit {
   }
 
   loadTeachers() {
+    this.loadingStaff.set(true);
     this.http.get<any>('/api/v1/faculty/members/').subscribe({
       next: (res) => {
-        if (res && res.success) {
-          const list = pickList<any>(res).map(t => {
-            // محاكاة سحب البيانات من الموارد البشرية بالاسم
-            const hr = this.mockHRData[t.full_name_ar] || { salary: 280000, allowance: 56000, type: 'دوام كامل' };
-            return {
-              ...t,
-              salary: hr.salary,
-              allowance: hr.allowance,
-              contractType: hr.type
-            };
-          });
-          this.teachers.set(list);
-        }
-      }
+        // بيانات مالية حقيقية من ملف الموظف — لا محاكاة
+        const list = pickList<any>(res).map(t => ({
+          ...t,
+          salary: t.basic_salary ?? 0,
+          allowance: t.total_allowances ?? 0,
+          contractType: this.employmentTypeLabel(t.employment_type),
+        }));
+        this.teachers.set(list);
+        this.loadingStaff.set(false);
+      },
+      error: () => this.loadingStaff.set(false),
     });
+  }
+
+  /** ترجمة نوع التوظيف للعربية للعرض. */
+  employmentTypeLabel(type?: string): string {
+    switch ((type || '').toLowerCase()) {
+      case 'full-time': return 'دوام كامل';
+      case 'part-time': return 'دوام جزئي';
+      case 'contract': return 'عقد مؤقت';
+      default: return type || '—';
+    }
+  }
+
+  /** نص وحالة عرض حالة الدور الأكاديمي. */
+  statusLabel(status?: string): string {
+    const map: Record<string, string> = {
+      draft: 'مسودة', pending_review: 'قيد المراجعة', approved: 'معتمد',
+      active: 'نشط', suspended: 'موقوف', resigned: 'مستقيل',
+    };
+    return map[status || ''] || status || '—';
+  }
+  statusKind(status?: string): 'good' | 'warn' | 'muted' {
+    if (status === 'active' || status === 'approved') return 'good';
+    if (status === 'suspended' || status === 'resigned') return 'muted';
+    return 'warn';
   }
 
   loadAssignments() {
