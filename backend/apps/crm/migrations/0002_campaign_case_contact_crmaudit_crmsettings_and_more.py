@@ -12,6 +12,33 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # إصلاح: حقل lead.status كان CharField(db_index=True) في 0001، فأنشأ
+        # فهرس varchar_pattern_ops (_like) باسم مبني على الجدول القديم crm_leads.
+        # لاحقاً يحوّل هذا الترحيل status إلى مفتاح أجنبي (uuid). أمر DROP INDEX
+        # المولَّد يستهدف الاسم الجديد فلا يجد الفهرس القديم، فيبقى عالقاً ويفشل
+        # تحويل العمود إلى uuid عند بناء قاعدة جديدة. نُسقطه هنا باسمه الحقيقي
+        # (بحث في الكتالوج، غير معتمد على الاسم) قبل أي تغيير للعمود.
+        # لا أثر على القواعد المطبَّقة سلفاً (الترحيل مُسجَّل مطبَّقاً فلا يُعاد).
+        migrations.RunSQL(
+            sql="""
+            DO $$
+            DECLARE idx_name text;
+            BEGIN
+                SELECT indexrelid::regclass::text INTO idx_name
+                FROM pg_index i
+                JOIN pg_class c ON c.oid = i.indrelid
+                JOIN pg_opclass op ON op.oid = ANY(i.indclass::oid[])
+                WHERE c.relname IN ('crm_leads', 'nebras_crm_leads')
+                  AND op.opcname = 'varchar_pattern_ops'
+                  AND pg_get_indexdef(i.indexrelid) LIKE '%status%'
+                LIMIT 1;
+                IF idx_name IS NOT NULL THEN
+                    EXECUTE 'DROP INDEX IF EXISTS ' || idx_name;
+                END IF;
+            END $$;
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.CreateModel(
             name='Campaign',
             fields=[
