@@ -79,47 +79,52 @@ interface DBTeacherAssignment {
         <div class="stats-grid animate-fade">
           <nb-stat-card label="إجمالي الكادر الأكاديمي" [value]="teachers().length"></nb-stat-card>
           <nb-stat-card label="التكليفات النشطة" [value]="assignments().length" valueKind="info"></nb-stat-card>
-          <nb-stat-card label="طلبات قيد المراجعة" [value]="getPendingCount()" [valueKind]="getPendingCount() ? 'warning' : 'default'"></nb-stat-card>
+          <nb-stat-card label="إجمالي الحصص الأسبوعية" [value]="totalWeeklyHours()" valueKind="info"></nb-stat-card>
+          <nb-stat-card label="تجاوزوا النصاب" [value]="overloadedCount()" [valueKind]="overloadedCount() ? 'warning' : 'default'"></nb-stat-card>
+          <nb-stat-card label="قيد المراجعة" [value]="getPendingCount()" [valueKind]="getPendingCount() ? 'warning' : 'default'"></nb-stat-card>
         </div>
 
         <div class="dashboard-sections animate-fade">
-          <nb-panel title="إجراءات التكليف السريع" [flush]="true">
+          <!-- توزيع النصاب التدريسي الحقيقي -->
+          <nb-panel title="توزيع النصاب التدريسي الأسبوعي">
+            @if (workload().length === 0) {
+              <div class="no-data">لا توجد تكليفات مُسندة بعد. ابدأ من «التكليفات التدريسية».</div>
+            } @else {
+              <div class="dist-chart">
+                @for (w of workload(); track w.id) {
+                  <div class="chart-item">
+                    <span class="label" [title]="w.name">{{ w.name }}</span>
+                    <div class="bar-container">
+                      <div class="fill" [class]="'load-' + w.state" [style.width.%]="w.pct"></div>
+                    </div>
+                    <span class="val" [class.over]="w.state === 'over'">{{ w.hours }} / {{ w.quota }}</span>
+                  </div>
+                }
+              </div>
+              <div class="load-legend">
+                <span><i class="dot load-ok"></i> ضمن النصاب</span>
+                <span><i class="dot load-full"></i> شبه مكتمل</span>
+                <span><i class="dot load-over"></i> تجاوز النصاب</span>
+              </div>
+            }
+          </nb-panel>
+
+          <nb-panel title="إجراءات سريعة" [flush]="true">
             <div class="quick-actions">
               <div class="action-card" (click)="activeTab.set('assignments')">
                 <span class="icon">📝</span>
                 <span class="title">إسناد تكليف جديد</span>
-                <span class="desc">تعيين معلم لمادة دراسية وشعبة</span>
+                <span class="desc">تعيين معلم لمادة وشعبة</span>
               </div>
               <div class="action-card" (click)="activeTab.set('staff')">
                 <span class="icon">👥</span>
-                <span class="title">ملفات المعلمين</span>
-                <span class="desc">عرض العقود وتفاصيل الموارد البشرية</span>
+                <span class="title">دليل الكادر</span>
+                <span class="desc">بحث وعرض ملفات المعلمين</span>
               </div>
             </div>
-          </nb-panel>
-
-          <nb-panel title="ساعات النصاب التدريسي الموزعة">
-            <div class="dist-chart">
-              <div class="chart-item">
-                <span class="label">أحمد محمد علي</span>
-                <div class="bar-container"><div class="fill" style="width: 80%"></div></div>
-                <span class="val">16 ساعة / 20</span>
-              </div>
-              <div class="chart-item">
-                <span class="label">فاطمة عمر عثمان</span>
-                <div class="bar-container"><div class="fill" style="width: 90%"></div></div>
-                <span class="val">18 ساعة / 20</span>
-              </div>
-              <div class="chart-item">
-                <span class="label">ياسر عبد الله الطيب</span>
-                <div class="bar-container"><div class="fill" style="width: 60%"></div></div>
-                <span class="val">12 ساعة / 20</span>
-              </div>
-              <div class="chart-item">
-                <span class="label">حسن البشير الهادي</span>
-                <div class="bar-container"><div class="fill" style="width: 70%"></div></div>
-                <span class="val">14 ساعة / 20</span>
-              </div>
+            <div class="dept-summary">
+              <div class="dept-row"><span>الأقسام الأكاديمية</span><b>{{ departmentCount() }}</b></div>
+              <div class="dept-row"><span>متوسط الحصص لكل معلم</span><b>{{ avgHoursPerTeacher() }}</b></div>
             </div>
           </nb-panel>
         </div>
@@ -432,12 +437,24 @@ interface DBTeacherAssignment {
     .action-card .desc { font-size: 11px; color: var(--nb-text-muted); }
 
     /* جدول التوزيع */
-    .dist-chart { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
-    .chart-item { display: grid; grid-template-columns: 1.2fr 2fr 1fr; align-items: center; gap: 12px; font-size: 12px; }
-    .chart-item .label { font-weight: 600; color: var(--nb-text); }
-    .bar-container { height: 6px; background: var(--nb-surface-raised); border-radius: 3px; overflow: hidden; }
-    .bar-container .fill { height: 100%; background: var(--nb-primary-500); border-radius: 3px; }
-    .chart-item .val { color: var(--nb-text-secondary); text-align: left; }
+    .dist-chart { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: 340px; overflow-y: auto; }
+    .chart-item { display: grid; grid-template-columns: 1.3fr 2fr 0.7fr; align-items: center; gap: 12px; font-size: 12px; }
+    .chart-item .label { font-weight: 600; color: var(--nb-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-container { height: 8px; background: var(--nb-bg); border-radius: 99px; overflow: hidden; }
+    .bar-container .fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+    .fill.load-ok { background: var(--nb-success); }
+    .fill.load-full { background: #d97706; }
+    .fill.load-over { background: var(--nb-danger); }
+    .chart-item .val { color: var(--nb-text-secondary); text-align: start; font-variant-numeric: tabular-nums; font-weight: 600; }
+    .chart-item .val.over { color: var(--nb-danger); }
+    .load-legend { display: flex; gap: 16px; padding: 4px 14px 12px; font-size: 11.5px; color: var(--nb-text-muted); flex-wrap: wrap; }
+    .load-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-inline-end: 5px; vertical-align: middle; }
+    .load-legend .dot.load-ok { background: var(--nb-success); }
+    .load-legend .dot.load-full { background: #d97706; }
+    .load-legend .dot.load-over { background: var(--nb-danger); }
+    .dept-summary { border-top: 1px solid var(--nb-border); margin-top: 4px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .dept-row { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--nb-text-muted); }
+    .dept-row b { color: var(--nb-text); font-size: 15px; font-variant-numeric: tabular-nums; }
 
     /* التكليفات التدريسية */
     .assignments-container { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
@@ -513,6 +530,49 @@ export class FacultyDashboardComponent implements OnInit {
       (t.teacher_code || '').toLowerCase().includes(q) ||
       (t.department || '').toLowerCase().includes(q) ||
       (t.current_position || '').toLowerCase().includes(q));
+  });
+
+  // ==== إحصاءات اللوحة الرئيسية من بيانات حقيقية ====
+
+  /** توزيع النصاب التدريسي الفعلي: مجموع ساعات تكليفات كل معلم مقابل نصابه. */
+  readonly workload = computed(() => {
+    const asns = this.assignments();
+    return this.teachers()
+      .map(t => {
+        const hours = asns
+          .filter(a => a.faculty_member === t.id)
+          .reduce((s, a) => s + (a.weekly_hours || 0), 0);
+        const quota = t.weekly_lesson_quota || 23;
+        return {
+          id: t.id,
+          name: t.full_name_ar,
+          hours,
+          quota,
+          pct: quota ? Math.min(100, Math.round((hours / quota) * 100)) : 0,
+          state: hours > quota ? 'over' : (hours >= quota * 0.85 ? 'full' : 'ok'),
+        };
+      })
+      .filter(w => w.hours > 0)
+      .sort((a, b) => b.hours - a.hours);
+  });
+
+  /** إجمالي ساعات النصاب المُسندة أسبوعياً عبر كل الكادر. */
+  readonly totalWeeklyHours = computed(() =>
+    this.assignments().reduce((s, a) => s + (a.weekly_hours || 0), 0));
+
+  /** عدد الأقسام الأكاديمية الفريدة. */
+  readonly departmentCount = computed(() =>
+    new Set(this.teachers().map(t => t.department).filter(Boolean)).size);
+
+  /** معلمون تجاوزوا نصابهم — يحتاجون إعادة توزيع. */
+  readonly overloadedCount = computed(() =>
+    this.workload().filter(w => w.state === 'over').length);
+
+  /** متوسط الحصص الأسبوعية لكل معلم مُسند إليه تكليف. */
+  readonly avgHoursPerTeacher = computed(() => {
+    const loaded = this.workload();
+    if (!loaded.length) return 0;
+    return Math.round(loaded.reduce((s, w) => s + w.hours, 0) / loaded.length);
   });
 
   // مصادر البيانات للأكاديميات
