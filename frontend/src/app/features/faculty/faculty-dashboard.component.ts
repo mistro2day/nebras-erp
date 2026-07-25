@@ -76,12 +76,27 @@ interface DBTeacherAssignment {
 
       <!-- تبويب: نظرة عامة -->
       @if (activeTab() === 'dashboard') {
-        <div class="stats-grid animate-fade">
-          <nb-stat-card label="إجمالي الكادر الأكاديمي" [value]="teachers().length"></nb-stat-card>
-          <nb-stat-card label="التكليفات النشطة" [value]="assignments().length" valueKind="info"></nb-stat-card>
-          <nb-stat-card label="إجمالي الحصص الأسبوعية" [value]="totalWeeklyHours()" valueKind="info"></nb-stat-card>
-          <nb-stat-card label="تجاوزوا النصاب" [value]="overloadedCount()" [valueKind]="overloadedCount() ? 'warning' : 'default'"></nb-stat-card>
-          <nb-stat-card label="قيد المراجعة" [value]="getPendingCount()" [valueKind]="getPendingCount() ? 'warning' : 'default'"></nb-stat-card>
+        <div class="stat-tiles animate-fade">
+          <div class="stat-tile t-primary">
+            <span class="st-ic">👥</span>
+            <div class="st-body"><span class="st-val">{{ teachers().length }}</span><span class="st-lbl">إجمالي الكادر الأكاديمي</span></div>
+          </div>
+          <div class="stat-tile t-info">
+            <span class="st-ic">📝</span>
+            <div class="st-body"><span class="st-val">{{ assignments().length }}</span><span class="st-lbl">التكليفات النشطة</span></div>
+          </div>
+          <div class="stat-tile t-info">
+            <span class="st-ic">⏱️</span>
+            <div class="st-body"><span class="st-val">{{ totalWeeklyHours() }}</span><span class="st-lbl">إجمالي الحصص الأسبوعية</span></div>
+          </div>
+          <div class="stat-tile" [class.t-danger]="overloadedCount()" [class.t-ok]="!overloadedCount()">
+            <span class="st-ic">{{ overloadedCount() ? '⚠️' : '✓' }}</span>
+            <div class="st-body"><span class="st-val">{{ overloadedCount() }}</span><span class="st-lbl">تجاوزوا النصاب</span></div>
+          </div>
+          <div class="stat-tile" [class.t-warn]="getPendingCount()" [class.t-muted]="!getPendingCount()">
+            <span class="st-ic">🕒</span>
+            <div class="st-body"><span class="st-val">{{ getPendingCount() }}</span><span class="st-lbl">قيد المراجعة</span></div>
+          </div>
         </div>
 
         <div class="dashboard-sections animate-fade">
@@ -375,10 +390,42 @@ interface DBTeacherAssignment {
     .tab-btn { background: none; border: none; padding: 10px 18px; font-family: var(--nb-font-family); font-size: 14px;
       font-weight: 600; color: var(--nb-text-secondary); cursor: pointer; border-radius: var(--nb-radius); transition: all 0.2s; }
     .tab-btn:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
-    .tab-btn.active { background: var(--nb-primary-50); color: var(--nb-primary-700); font-weight: 700; }
+    .tab-btn.active { background: var(--nb-primary-50); color: var(--nb-primary-700); font-weight: 700; box-shadow: inset 0 -2px 0 var(--nb-primary-600); }
 
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .section-title { font-size: 14px; font-weight: 700; color: var(--nb-text); margin: 0 0 12px; }
+
+    /* ==== بطاقات إحصاء بهوية بصرية (نمط نبراس) ==== */
+    .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-tile {
+      position: relative; display: flex; align-items: center; gap: 14px;
+      background: var(--nb-surface); border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card); padding: 16px 18px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: transform .15s, box-shadow .15s;
+    }
+    .stat-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(16,24,40,.08); }
+    .stat-tile::before { content:''; position:absolute; inset-block:0; inset-inline-start:0; width:4px; background: var(--nb-text-muted); }
+    .stat-tile .st-ic {
+      width: 46px; height: 46px; flex-shrink: 0; border-radius: 12px; display: flex;
+      align-items: center; justify-content: center; font-size: 20px; background: var(--nb-bg);
+    }
+    .st-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .st-val { font-size: 26px; font-weight: 800; line-height: 1; color: var(--nb-text); font-variant-numeric: tabular-nums; }
+    .st-lbl { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 600; }
+    /* تلوين حسب المعنى */
+    .stat-tile.t-primary::before { background: var(--nb-primary-600); }
+    .stat-tile.t-primary .st-ic { background: color-mix(in srgb, var(--nb-primary-600) 12%, transparent); }
+    .stat-tile.t-info::before { background: #2563eb; }
+    .stat-tile.t-info .st-ic { background: color-mix(in srgb, #2563eb 12%, transparent); }
+    .stat-tile.t-ok::before { background: var(--nb-success); }
+    .stat-tile.t-ok .st-ic { background: color-mix(in srgb, var(--nb-success) 14%, transparent); }
+    .stat-tile.t-danger::before { background: var(--nb-danger); }
+    .stat-tile.t-danger .st-ic { background: color-mix(in srgb, var(--nb-danger) 12%, transparent); }
+    .stat-tile.t-danger .st-val { color: var(--nb-danger); }
+    .stat-tile.t-warn::before { background: #d97706; }
+    .stat-tile.t-warn .st-ic { background: color-mix(in srgb, #d97706 14%, transparent); }
+    .stat-tile.t-warn .st-val { color: #b45309; }
+    .stat-tile.t-muted::before { background: var(--nb-border); }
 
     .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
     .teacher-card-wrapper { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
@@ -437,10 +484,10 @@ interface DBTeacherAssignment {
     .action-card .desc { font-size: 11px; color: var(--nb-text-muted); }
 
     /* جدول التوزيع */
-    .dist-chart { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: 340px; overflow-y: auto; }
-    .chart-item { display: grid; grid-template-columns: 1.3fr 2fr 0.7fr; align-items: center; gap: 12px; font-size: 12px; }
-    .chart-item .label { font-weight: 600; color: var(--nb-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .bar-container { height: 8px; background: var(--nb-bg); border-radius: 99px; overflow: hidden; }
+    .dist-chart { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; max-height: 340px; overflow-y: auto; }
+    .chart-item { display: grid; grid-template-columns: 1.4fr 2.2fr 0.6fr; align-items: center; gap: 14px; font-size: 13px; }
+    .chart-item .label { font-weight: 700; color: var(--nb-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-container { height: 10px; background: var(--nb-bg); border-radius: 99px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--nb-border); }
     .bar-container .fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
     .fill.load-ok { background: var(--nb-success); }
     .fill.load-full { background: #d97706; }
