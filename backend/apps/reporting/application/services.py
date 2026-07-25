@@ -76,28 +76,84 @@ class ReportEngineService:
             execution.save()
             raise e
 
+    # أنواع المصادر التي تُنفَّذ كـ SQL على قاعدة البيانات
+    _SQL_SOURCE_TYPES = ('db_view', 'materialized_view', 'stored_procedure')
+
     @classmethod
     def _fetch_data(cls, report, parameters, tenant_id):
-        """جلب البيانات الفعلية من مصدر البيانات."""
-        ds = report.dataset.data_source
-        
+        """
+        جلب البيانات الفعلية بتشغيل استعلام مصدر البيانات على قاعدة البيانات.
+
+        الأمان:
+        - عزل المستأجر: tenant_id يُمرَّر كمعامل مربوط %(tenant_id)s، والاستعلامات
+          يجب أن تُصفّي به. (كتّاب التقارير إداريون، والاستعلام شبه موثوق.)
+        - معاملات المستخدم تُربَط كـ %(key)s عبر cursor (لا إقحام نصّي — لا حقن SQL).
+        - للقراءة فقط: يُرفض أي استعلام ليس SELECT/WITH لمنع الكتابة عبر تقرير.
+        """
+        dataset = report.dataset
+        ds = dataset.data_source
+
+        # الاستعلام الفعّال: تجاوز مجموعة البيانات ثم قالب المصدر
+        sql = (dataset.query_override or ds.query_template or '').strip()
+        if not sql:
+            raise ValueError("مصدر البيانات لا يحتوي استعلاماً قابلاً للتشغيل.")
+
+        if ds.source_type not in cls._SQL_SOURCE_TYPES:
+            raise ValueError(
+                f"نوع المصدر '{ds.source_type}' غير مدعوم للتشغيل المباشر بعد "
+                f"(المدعوم: {', '.join(cls._SQL_SOURCE_TYPES)})."
+            )
+
+        # حارس القراءة فقط: يُسمح بـ SELECT أو WITH ... SELECT حصراً، وعبارة واحدة
+        cls._assert_read_only(sql)
+
         # كاش لتفادي الاستعلامات المتكررة
-        cache_key = f"nebras:rep:data:{tenant_id}:{report.id}:{hash(frozenset(parameters.items()))}"
+        cache_key = f"nebras:rep:data:{tenant_id}:{report.id}:{hash(frozenset((parameters or {}).items()))}"
         cached_data = cache.get(cache_key)
         if cached_data:
             return json.loads(cached_data)
 
-        # محاكاة توليد البيانات بناءً على مصدر الاستعلام لتأكيد التشغيل السليم
-        # في بيئة التشغيل الفعلية يتم تشغيل الاستعلام هنا
-        results = [
-            {'id': 1, 'name': 'أحمد علي', 'grade': 'الصف الأول', 'attendance_rate': 95.5, 'tenant_id': str(tenant_id)},
-            {'id': 2, 'name': 'محمد عثمان', 'grade': 'الصف الأول', 'attendance_rate': 88.2, 'tenant_id': str(tenant_id)},
-            {'id': 3, 'name': 'سارة عمر', 'grade': 'الصف الثاني', 'attendance_rate': 99.0, 'tenant_id': str(tenant_id)},
-        ]
-        
+        # معاملات مربوطة: المستأجر دائماً + معاملات التقرير (كلها آمنة عبر الـcursor)
+        bound = {'tenant_id': str(tenant_id)}
+        bound.update({k: v for k, v in (parameters or {}).items()})
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql, bound)
+            columns = [col[0] for col in cursor.description] if cursor.description else []
+            rows = cursor.fetchall()
+
+        results = [dict(zip(columns, cls._jsonify_row(row))) for row in rows]
+
         # حفظ في الكاش لمدة 5 دقائق
-        cache.set(cache_key, json.dumps(results), 300)
+        cache.set(cache_key, json.dumps(results, default=str), 300)
         return results
+
+    @staticmethod
+    def _assert_read_only(sql):
+        """يرفض أي استعلام غير قراءة أو متعدّد العبارات (حماية من الكتابة/الحقن)."""
+        lowered = sql.lstrip().lower()
+        if not (lowered.startswith('select') or lowered.startswith('with')):
+            raise ValueError("يُسمح باستعلامات القراءة (SELECT/WITH) فقط في التقارير.")
+        # منع تعدد العبارات (فاصلة منقوطة في غير آخر السطر)
+        stripped = sql.strip().rstrip(';')
+        if ';' in stripped:
+            raise ValueError("لا يُسمح بأكثر من عبارة SQL واحدة في التقرير.")
+
+    @staticmethod
+    def _jsonify_row(row):
+        """تحويل القيم غير القابلة للتسلسل (تواريخ، Decimal، UUID) إلى نصوص/أرقام."""
+        from decimal import Decimal
+        out = []
+        for v in row:
+            if isinstance(v, Decimal):
+                out.append(float(v))
+            elif hasattr(v, 'isoformat'):  # date/datetime
+                out.append(v.isoformat())
+            elif v is not None and not isinstance(v, (str, int, float, bool)):
+                out.append(str(v))
+            else:
+                out.append(v)
+        return out
 
 
 # ============================================================
