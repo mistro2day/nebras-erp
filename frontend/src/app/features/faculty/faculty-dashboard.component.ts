@@ -255,7 +255,7 @@ interface DBTeacherAssignment {
                 </div>
                 <div class="fld req">
                   <label>الصف الدراسي</label>
-                  <select [(ngModel)]="selectedGradeId" (change)="onGradeChange()">
+                  <select [ngModel]="selectedGradeId()" (ngModelChange)="onGradeChange($event)">
                     <option value="">اختر الصف…</option>
                     @for (g of grades(); track g.id) {
                       <option [value]="g.id">{{ g.name }}</option>
@@ -582,14 +582,18 @@ export class FacultyDashboardComponent implements OnInit {
   readonly allSections = signal<any[]>([]);
   readonly allSubjects = signal<any[]>([]);
 
-  // الفلاتر للتكليف الجديد — كلاهما بالمفتاح الأجنبي للصف (لا ترميز هشّ)
-  selectedGradeId = '';
-  readonly filteredSections = computed(() =>
-    this.allSections().filter(sec => sec.grade === this.selectedGradeId));
+  // الفلاتر للتكليف الجديد — signal ليتعقّبه computed (المتغيّر العادي لا يُعيد الحساب)
+  readonly selectedGradeId = signal('');
+  readonly filteredSections = computed(() => {
+    const g = this.selectedGradeId();
+    if (!g) return [];
+    return this.allSections().filter(sec => String(sec.grade) === g);
+  });
   readonly filteredSubjects = computed(() => {
-    if (!this.selectedGradeId) return [];
+    const g = this.selectedGradeId();
+    if (!g) return [];
     // المادة مرتبطة بالصف عبر FK. بعض المواد عامة (بلا صف) فتظهر لكل الصفوف.
-    return this.allSubjects().filter(sub => !sub.grade || sub.grade === this.selectedGradeId);
+    return this.allSubjects().filter(sub => !sub.grade || String(sub.grade) === g);
   });
 
   // استمارة تكليف جديد
@@ -680,8 +684,8 @@ export class FacultyDashboardComponent implements OnInit {
       years: this.academicsSvc.getAcademicYears(),
       terms: this.academicsSvc.getTerms(),
       grades: this.academicsSvc.getGrades(),
-      sections: this.academicsSvc.getSections(),
-      subjects: this.academicsSvc.getSubjects()
+      sections: this.academicsSvc.getSections({ page_size: 500 }),
+      subjects: this.academicsSvc.getSubjects({ page_size: 500 })
     }).subscribe({
       next: (res) => {
         this.years.set(pickList(res.years));
@@ -695,7 +699,8 @@ export class FacultyDashboardComponent implements OnInit {
     });
   }
 
-  onGradeChange() {
+  onGradeChange(gradeId: string) {
+    this.selectedGradeId.set(gradeId);
     this.newAsn.section_id = '';
     this.newAsn.subject_id = '';
   }
@@ -724,7 +729,7 @@ export class FacultyDashboardComponent implements OnInit {
         this.savingAsn.set(false);
         this.notify.success('تم تسجيل وإسناد التكليف التدريسي للمعلم بنجاح.');
         this.newAsn = { faculty_member: '', subject_id: '', section_id: '', weekly_hours: 4 };
-        this.selectedGradeId = '';
+        this.selectedGradeId.set('');
         this.loadAssignments();
       },
       error: (e) => {
