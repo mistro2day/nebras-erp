@@ -10,6 +10,7 @@ django.setup()
 
 from apps.tenants.domain.models import Tenant
 from apps.faculty.domain.models import FacultyMember, TeacherAssignment
+from apps.employees.domain.models import Employee
 from apps.academics.domain.subjects import Subject
 from apps.academics.domain.models import Section, Grade, AcademicYear, Term
 
@@ -62,11 +63,12 @@ def seed_faculty():
     ]
 
     for td in teachers_data:
-        faculty, created = FacultyMember.objects.get_or_create(
-            employee_number=td["emp_num"],
+        # 1) الموظف: المصدر الوحيد للبيانات الشخصية (بعد توحيد مصدر الحقيقة)
+        employee, _ = Employee.objects.get_or_create(
+            tenant_id=tenant_id,
+            national_id=td["national_id"],
             defaults={
-                "teacher_code": td["code"],
-                "national_id": td["national_id"],
+                "employee_number": td["emp_num"],
                 "full_name_ar": td["name"],
                 "gender": td["gender"],
                 "nationality": "سوداني",
@@ -74,10 +76,20 @@ def seed_faculty():
                 "email": td["email"],
                 "mobile": td["phone"],
                 "department": td["dept"],
+                "position": td["pos"],
+                "status": "active",
+            },
+        )
+        # 2) الدور الأكاديمي: يقرأ الشخصية من الموظف ولا يكرّرها
+        faculty, created = FacultyMember.objects.get_or_create(
+            tenant_id=tenant_id,
+            teacher_code=td["code"],
+            defaults={
+                "employee": employee,
+                "department": td["dept"],
                 "current_position": td["pos"],
                 "status": "approved",
-                "tenant_id": tenant_id
-            }
+            },
         )
         if created:
             print(f"  Created FacultyMember: {td['name']}")
@@ -197,31 +209,55 @@ def seed_faculty():
 
     assignments_created = 0
     assignments_by_teacher = {}
+    # ميزانية ساعات أسبوعية لكل معلم حتى لا تتجاوز التكليفات نصابه (نصاب العقد 23)
+    teacher_hours = {}
+    DEFAULT_QUOTA = 23
+    skipped_over_quota = 0
+
+    # فهرسة المواد حسب الصف: القسم يأخذ مواد صفّه فقط (لا كل المواد)
+    subjects_by_grade = {}
+    for sub in subjects:
+        subjects_by_grade.setdefault(sub.grade_id, []).append(sub)
 
     for sec in sections:
         grade = Grade.objects.filter(id=sec.grade_id).first()
         grade_order = grade.order if grade else 0
-        for sub in subjects:
+        # مواد هذا الصف فقط + المواد العامة (بلا صف)
+        grade_subjects = subjects_by_grade.get(sec.grade_id, []) + subjects_by_grade.get(None, [])
+        for sub in grade_subjects:
             teacher = get_teacher_for_subject(sub.code, grade_order)
             if not teacher:
                 continue
+            # ساعات المادة الأسبوعية الفعلية (لا رقم ثابت)
+            hours = int(getattr(sub, 'weekly_periods', 0) or 4)
+            quota = getattr(teacher.employee, 'weekly_lesson_quota', DEFAULT_QUOTA) or DEFAULT_QUOTA
+            used = teacher_hours.get(teacher.id, 0)
+            if used + hours > quota:
+                skipped_over_quota += 1
+                continue  # المعلم اكتمل نصابه — لا نُثقل عليه (واقعية)
             TeacherAssignment.objects.create(
                 faculty_member=teacher,
                 academic_year_id=year.id,
                 term_id=term.id,
                 subject_id=sub.id,
                 section_id=sec.id,
-                weekly_hours=4,
+                weekly_hours=hours,
                 tenant_id=tenant_id
             )
+            teacher_hours[teacher.id] = used + hours
             assignments_created += 1
             assignments_by_teacher.setdefault(teacher.full_name_ar, 0)
             assignments_by_teacher[teacher.full_name_ar] += 1
 
     print(f"\nSuccessfully created {assignments_created} teacher assignments!")
-    print("\nAssignments per teacher:")
+    if skipped_over_quota:
+        print(f"({skipped_over_quota} تكليفاً تُخطّي لعدم تجاوز نصاب المعلمين — واقعية)")
+    print("\nAssignments per teacher (hours / quota):")
     for name, count in sorted(assignments_by_teacher.items(), key=lambda x: -x[1]):
-        print(f"  {name}: {count} assignments")
+        # اعثر على ساعات هذا المعلم للعرض
+        hrs = next((teacher_hours.get(t.id, 0) for t in faculty_map.values()
+                    if t and t.full_name_ar == name), 0)
+        print(f"  {name}: {count} تكليف · {hrs} ساعة/أسبوع")
 
 if __name__ == "__main__":
     seed_faculty()
