@@ -225,7 +225,9 @@ class ExportService:
         try:
             from apps.tenants.domain.models import Tenant
             t = Tenant.objects.filter(id=tenant_id).first()
-            tenant_name = getattr(t, 'name', '') if t else ''
+            if t:
+                # الاسم العربي أولاً للترويسة الرسمية
+                tenant_name = getattr(t, 'name_ar', None) or getattr(t, 'name', '')
         except Exception:
             pass
         return report, res['data'], tenant_name

@@ -182,6 +182,145 @@ REPORTS = [
             ORDER BY p.arabic_name, sub.arabic_name
         """,
     },
+
+    # ==================== تقارير الطلاب ====================
+    {
+        "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
+        "code": "students_by_grade",
+        "name": "أعداد الطلاب حسب الصف",
+        "desc": "عدد الطلاب المسجّلين في كل صف دراسي.",
+        "sql": """
+            SELECT g.name AS "الصف", COUNT(DISTINCT e.student_id) AS "عدد الطلاب"
+            FROM student_enrollments e
+            JOIN academic_grades g ON g.id = e.grade_id
+            WHERE e.tenant_id = %(tenant_id)s AND e.deleted_at IS NULL
+            GROUP BY g.name, g."order"
+            ORDER BY g."order"
+        """,
+    },
+    {
+        "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
+        "code": "students_directory",
+        "name": "سجل الطلاب",
+        "desc": "قائمة الطلاب ببياناتهم الأساسية (الاسم، الجنس، الجنسية، الرقم الوطني).",
+        "sql": """
+            SELECT p.arabic_name AS "الاسم",
+                   CASE p.gender WHEN 'male' THEN 'ذكر' WHEN 'female' THEN 'أنثى' ELSE p.gender END AS "الجنس",
+                   p.nationality AS "الجنسية",
+                   p.national_id AS "الرقم الوطني"
+            FROM student_profiles p
+            WHERE p.tenant_id = %(tenant_id)s AND p.deleted_at IS NULL
+            ORDER BY p.arabic_name
+        """,
+    },
+
+    # ==================== تقارير الحضور والانصراف ====================
+    {
+        "cat_code": "rep_attendance", "cat_name": "تقارير الحضور والانصراف", "cat_type": "attendance", "icon": "🕐",
+        "code": "staff_attendance_summary",
+        "name": "ملخّص حضور الموظفين",
+        "desc": "أيام الحضور والغياب ومرّات التأخير لكل موظف.",
+        "sql": """
+            SELECT emp.full_name_ar AS "الموظف",
+                   COUNT(*) AS "أيام مسجّلة",
+                   SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS "حاضر",
+                   SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS "غائب",
+                   SUM(CASE WHEN COALESCE(a.late_minutes, 0) > 0 THEN 1 ELSE 0 END) AS "مرّات التأخير"
+            FROM nebras_attendance_records a
+            JOIN nebras_employees emp ON emp.id = a.employee_id
+            WHERE a.tenant_id = %(tenant_id)s AND a.deleted_at IS NULL
+            GROUP BY emp.full_name_ar
+            ORDER BY "غائب" DESC, "مرّات التأخير" DESC
+        """,
+    },
+
+    # ==================== تقارير المالية ====================
+    {
+        "cat_code": "rep_finance", "cat_name": "تقارير المالية", "cat_type": "finance", "icon": "💰",
+        "code": "student_invoices",
+        "name": "فواتير الطلاب وحالتها",
+        "desc": "فواتير الطلاب: الإجمالي والمدفوع والمتبقّي وحالة السداد.",
+        "sql": """
+            SELECT p.arabic_name AS "الطالب",
+                   i.invoice_number AS "رقم الفاتورة",
+                   i.total_amount AS "الإجمالي",
+                   i.paid_amount AS "المدفوع",
+                   i.outstanding_amount AS "المتبقّي",
+                   CASE i.status WHEN 'draft' THEN 'مسودة' WHEN 'posted' THEN 'مرحّلة'
+                        WHEN 'paid' THEN 'مسددة' WHEN 'partial' THEN 'سداد جزئي'
+                        WHEN 'cancelled' THEN 'ملغاة' ELSE i.status END AS "الحالة"
+            FROM nebras_student_invoices i
+            JOIN nebras_student_billing_accounts ba ON ba.id = i.student_billing_account_id
+            LEFT JOIN student_profiles p ON p.student_id = ba.student_id
+            WHERE i.tenant_id = %(tenant_id)s AND i.deleted_at IS NULL
+            ORDER BY i.outstanding_amount DESC
+        """,
+    },
+    {
+        "cat_code": "rep_finance", "cat_name": "تقارير المالية", "cat_type": "finance", "icon": "💰",
+        "code": "collection_summary",
+        "name": "ملخّص التحصيل المالي",
+        "desc": "إجمالي المستحق والمحصّل والمتبقّي عبر كل فواتير الطلاب.",
+        "sql": """
+            SELECT COUNT(*) AS "عدد الفواتير",
+                   SUM(total_amount) AS "إجمالي المستحق",
+                   SUM(paid_amount) AS "إجمالي المحصّل",
+                   SUM(outstanding_amount) AS "إجمالي المتبقّي"
+            FROM nebras_student_invoices
+            WHERE tenant_id = %(tenant_id)s AND deleted_at IS NULL
+        """,
+    },
+
+    # ==================== تقارير الرواتب ====================
+    {
+        "cat_code": "rep_payroll", "cat_name": "تقارير الرواتب", "cat_type": "payroll", "icon": "🧾",
+        "code": "payroll_runs",
+        "name": "مسيرات الرواتب",
+        "desc": "مسيرات الرواتب المنفّذة بتاريخها وحالتها وإجمالي تكلفتها.",
+        "sql": """
+            SELECT run_date AS "تاريخ المسير",
+                   CASE status WHEN 'draft' THEN 'مسودة' WHEN 'approved' THEN 'معتمد'
+                        WHEN 'paid' THEN 'مصروف' WHEN 'pending' THEN 'قيد الاعتماد'
+                        ELSE status END AS "الحالة",
+                   total_cost AS "إجمالي التكلفة"
+            FROM nebras_payroll_runs
+            WHERE tenant_id = %(tenant_id)s AND deleted_at IS NULL
+            ORDER BY run_date DESC
+        """,
+    },
+
+    # ==================== تقارير العيادة ====================
+    {
+        "cat_code": "rep_clinic", "cat_name": "تقارير العيادة", "cat_type": "clinic", "icon": "🩺",
+        "code": "clinic_visits",
+        "name": "زيارات العيادة المدرسية",
+        "desc": "سجل زيارات العيادة: التاريخ والنوع وفئة المريض والحالة.",
+        "sql": """
+            SELECT v.visit_date AS "تاريخ الزيارة",
+                   v.visit_type AS "نوع الزيارة",
+                   CASE v.patient_type WHEN 'student' THEN 'طالب' WHEN 'employee' THEN 'موظف'
+                        ELSE v.patient_type END AS "فئة المريض",
+                   v.status AS "الحالة"
+            FROM nebras_clinic_visits v
+            WHERE v.tenant_id = %(tenant_id)s AND v.deleted_at IS NULL
+            ORDER BY v.visit_date DESC
+        """,
+    },
+
+    # ==================== تقارير المكتبة ====================
+    {
+        "cat_code": "rep_library", "cat_name": "تقارير المكتبة", "cat_type": "library", "icon": "📖",
+        "code": "library_catalog",
+        "name": "فهرس المكتبة",
+        "desc": "قائمة الكتب المتوفّرة في المكتبة المدرسية.",
+        "sql": """
+            SELECT title_ar AS "العنوان",
+                   title_en AS "العنوان بالإنجليزية"
+            FROM nebras_library_books
+            WHERE tenant_id = %(tenant_id)s AND deleted_at IS NULL
+            ORDER BY title_ar
+        """,
+    },
 ]
 
 

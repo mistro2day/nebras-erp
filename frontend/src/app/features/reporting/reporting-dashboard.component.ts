@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReportingService } from './reporting.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
+import { TenantService } from '../../core/services/tenant.service';
 
 type TabKey = 'reports' | 'dashboards' | 'sources';
 
@@ -128,26 +129,102 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
         </nav>
 
         @if (tab() === 'reports') {
-          <div class="list">
-            <div class="row head">
-              <span>رمز التقرير</span><span>اسم التقرير</span><span>التصنيف</span><span class="ta-end">إجراءات</span>
-            </div>
-            @for (r of reports(); track r.id) {
-              <div class="row">
-                <span class="mono">{{ r.code || '—' }}</span>
-                <span class="strong">{{ r.name }}</span>
-                <span class="muted">{{ r.category_name || 'غير مصنّف' }}</span>
-                <span class="ta-end acts">
-                  <button class="btn sm primary" [disabled]="running() === r.id" (click)="runReport(r.id)">
-                    {{ running() === r.id ? 'جارٍ…' : 'تشغيل' }}
-                  </button>
-                  <button class="btn sm ghost" (click)="exportReport(r.id)">تصدير CSV</button>
-                </span>
+          <div class="rep-workspace">
+            <!-- القائمة الجانبية: فئات وتقارير -->
+            <aside class="rep-sidebar">
+              <div class="rep-search">
+                <span class="rs-ic">🔍</span>
+                <input type="search" [ngModel]="reportSearch()" (ngModelChange)="reportSearch.set($event)"
+                       placeholder="ابحث في التقارير…" aria-label="بحث التقارير" />
               </div>
-            }
-            @if (reports().length === 0) {
-              <div class="empty">لا توجد تقارير معرّفة في النظام بعد.</div>
-            }
+              <div class="rep-groups">
+                @for (g of groupedReports(); track g.category) {
+                  <div class="rep-group">
+                    <div class="rg-head">
+                      <span class="rg-ic">{{ catIcon(g.category) }}</span>
+                      <span class="rg-name">{{ g.category }}</span>
+                      <span class="rg-count">{{ g.reports.length }}</span>
+                    </div>
+                    @for (r of g.reports; track r.id) {
+                      <button class="rep-item" [class.active]="currentReport()?.id === r.id"
+                              (click)="runReport(r.id)">
+                        <span class="ri-name">{{ r.name }}</span>
+                        @if (running() === r.id) { <span class="ri-spin">⏳</span> }
+                      </button>
+                    }
+                  </div>
+                }
+                @if (groupedReports().length === 0) {
+                  <div class="empty">لا نتائج تطابق البحث.</div>
+                }
+              </div>
+            </aside>
+
+            <!-- المعاينة -->
+            <main class="rep-main">
+              @if (!currentReport()) {
+                <div class="rep-placeholder">
+                  <span class="rp-ic">📊</span>
+                  <h3>اختر تقريراً لعرضه</h3>
+                  <p>اختر تقريراً من القائمة على اليمين لتشغيله ومعاينته هنا، ثم صدّره PDF أو Excel أو اطبعه.</p>
+                </div>
+              } @else {
+                <div class="viewer-toolbar no-print">
+                  <span class="vt-title">{{ currentReport().name }}</span>
+                  <div class="vt-actions">
+                    <button class="btn ghost sm" (click)="printReport()">🖨️ طباعة</button>
+                    <button class="btn ghost sm" [disabled]="exporting()" (click)="exportPdf(currentReport().id)">
+                      {{ exporting() === 'pdf' ? '⏳' : '📄' }} PDF
+                    </button>
+                    <button class="btn ghost sm" [disabled]="exporting()" (click)="exportExcel(currentReport().id)">
+                      {{ exporting() === 'excel' ? '⏳' : '📊' }} Excel
+                    </button>
+                    <button class="btn ghost sm" [disabled]="exporting()" (click)="exportReport(currentReport().id)">
+                      {{ exporting() === 'csv' ? '⏳' : '⬇️' }} CSV
+                    </button>
+                  </div>
+                </div>
+                <div class="report-sheet" id="report-sheet">
+                  <header class="rs-head">
+                    <div class="rs-brand">
+                      <span class="rs-mark">🏫</span>
+                      <div class="rs-org-block">
+                        <span class="rs-org">{{ schoolName() }}</span>
+                        <span class="rs-org-sub">إدارة التعليم — نظام نبراس</span>
+                      </div>
+                    </div>
+                    <h2 class="rs-title">{{ currentReport().name }}</h2>
+                    @if (currentReport().description) {
+                      <p class="rs-desc">{{ currentReport().description }}</p>
+                    }
+                    <div class="rs-meta">
+                      <span>تاريخ التوليد: {{ executedAt() }}</span>
+                      <span>إجمالي السجلات: {{ executedData().length }}</span>
+                    </div>
+                  </header>
+
+                  @if (executedData().length === 0) {
+                    <div class="empty">لا توجد بيانات لعرضها في هذا التقرير.</div>
+                  } @else {
+                    <div class="scroll-x">
+                      <table class="data report-table">
+                        <thead>
+                          <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
+                        </thead>
+                        <tbody>
+                          @for (row of executedData(); track $index) {
+                            <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                  <footer class="rs-foot">
+                    <span>{{ schoolName() }} · Nebras ERP — نظام إدارة المؤسسات التعليمية</span>
+                  </footer>
+                </div>
+              }
+            </main>
           </div>
         }
 
@@ -185,68 +262,6 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
           </div>
         }
       </section>
-
-      <!-- عارض نتائج التقرير -->
-      @if (currentReport()) {
-        <section class="card viewer" id="report-viewer">
-          <!-- شريط الأدوات (لا يُطبع) -->
-          <div class="viewer-toolbar no-print">
-            <span class="vt-title">عارض التقرير</span>
-            <div class="vt-actions">
-              <button class="btn ghost sm" (click)="printReport()">🖨️ طباعة</button>
-              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportPdf(currentReport().id)">
-                {{ exporting() === 'pdf' ? '⏳' : '📄' }} PDF
-              </button>
-              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportExcel(currentReport().id)">
-                {{ exporting() === 'excel' ? '⏳' : '📊' }} Excel
-              </button>
-              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportReport(currentReport().id)">
-                {{ exporting() === 'csv' ? '⏳' : '⬇️' }} CSV
-              </button>
-              <button class="link-btn" (click)="currentReport.set(null); executedData.set([])">إغلاق</button>
-            </div>
-          </div>
-
-          <!-- الورقة (تُطبع) -->
-          <div class="report-sheet" id="report-sheet">
-            <header class="rs-head">
-              <div class="rs-brand">
-                <span class="rs-mark">📊</span>
-                <span class="rs-org">مجموعة مدارس النبراس الأهلية</span>
-              </div>
-              <h2 class="rs-title">{{ currentReport().name }}</h2>
-              @if (currentReport().description) {
-                <p class="rs-desc">{{ currentReport().description }}</p>
-              }
-              <div class="rs-meta">
-                <span>تاريخ التوليد: {{ executedAt() }}</span>
-                <span>إجمالي السجلات: {{ executedData().length }}</span>
-              </div>
-            </header>
-
-            @if (executedData().length === 0) {
-              <div class="empty">لا توجد بيانات لعرضها في هذا التقرير.</div>
-            } @else {
-              <div class="scroll-x">
-                <table class="data report-table">
-                  <thead>
-                    <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
-                  </thead>
-                  <tbody>
-                    @for (row of executedData(); track $index) {
-                      <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-
-            <footer class="rs-foot">
-              <span>Nebras ERP — نظام إدارة المؤسسات التعليمية</span>
-            </footer>
-          </div>
-        </section>
-      }
     </div>
   `,
   styles: [`
@@ -391,6 +406,45 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
       .ta-end, .acts { justify-content: flex-start; text-align: start; }
     }
 
+    /* ==== مساحة عمل التقارير: قائمة جانبية + معاينة ==== */
+    .rep-workspace { display: grid; grid-template-columns: 300px 1fr; min-height: 520px; }
+    .rep-sidebar { border-inline-start: 1px solid var(--nb-border); background: var(--nb-bg);
+      display: flex; flex-direction: column; max-height: 640px; }
+    .rep-search { position: relative; padding: 12px; border-bottom: 1px solid var(--nb-border); }
+    .rep-search .rs-ic { position: absolute; inset-inline-start: 22px; top: 50%; transform: translateY(-50%);
+      font-size: 12px; opacity: .5; pointer-events: none; }
+    .rep-search input { width: 100%; height: 36px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
+      background: var(--nb-surface); color: var(--nb-text); font-family: inherit; font-size: 13px; padding: 0 34px; outline: none; }
+    .rep-search input:focus { border-color: var(--nb-primary-500); }
+    .rep-groups { overflow-y: auto; padding: 8px; flex: 1; }
+    .rep-group { margin-bottom: 6px; }
+    .rg-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+    .rg-ic { font-size: 15px; }
+    .rg-name { font-size: 12.5px; font-weight: 700; color: var(--nb-text-muted); flex: 1; }
+    .rg-count { font-size: 11px; font-weight: 700; color: var(--nb-text-faint);
+      background: var(--nb-surface-raised); border-radius: 99px; padding: 1px 8px; }
+    .rep-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: start;
+      border: none; background: transparent; cursor: pointer; padding: 8px 12px 8px 24px; border-radius: var(--nb-radius);
+      font-family: inherit; font-size: 13px; color: var(--nb-text); transition: background .12s; }
+    .rep-item:hover { background: var(--nb-surface-raised); }
+    .rep-item.active { background: color-mix(in srgb, var(--nb-primary-600) 12%, transparent);
+      color: var(--nb-primary-700); font-weight: 700; }
+    .ri-name { flex: 1; }
+
+    .rep-main { padding: 0; min-width: 0; display: flex; flex-direction: column; }
+    .rep-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 60px 24px; color: var(--nb-text-muted); }
+    .rp-ic { font-size: 46px; opacity: .35; margin-bottom: 12px; }
+    .rep-placeholder h3 { margin: 0 0 8px; font-size: 16px; color: var(--nb-text); }
+    .rep-placeholder p { margin: 0; font-size: 13px; max-width: 380px; line-height: 1.7; }
+    .rs-org-block { display: flex; flex-direction: column; gap: 1px; }
+    .rs-org-sub { font-size: 11px; color: var(--nb-text-faint); }
+
+    @media (max-width: 820px) {
+      .rep-workspace { grid-template-columns: 1fr; }
+      .rep-sidebar { max-height: 280px; border-inline-start: none; border-bottom: 1px solid var(--nb-border); }
+    }
+
     /* ==== عارض التقرير والورقة ==== */
     .viewer { padding: 0; overflow: hidden; }
     .viewer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -435,6 +489,13 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
 })
 export class ReportingDashboardComponent implements OnInit {
   private repService = inject(ReportingService);
+  private tenantService = inject(TenantService);
+
+  /** اسم المدرسة من المستأجر — للترويسة الرسمية والطباعة. */
+  readonly schoolName = computed(() => {
+    const t = this.tenantService.currentTenant();
+    return t?.nameAr || t?.name || 'المؤسسة التعليمية';
+  });
 
   readonly tabs: { key: TabKey; label: string }[] = [
     { key: 'reports', label: 'التقارير المتوفرة' },
@@ -464,6 +525,39 @@ export class ReportingDashboardComponent implements OnInit {
   currentReport = signal<any | null>(null);
   executedAt = signal<string>('');
   exporting = signal<string | null>(null);   // 'pdf' | 'excel' | 'csv'
+
+  // مساحة عمل التقارير: بحث + تجميع حسب الفئة
+  reportSearch = signal('');
+  readonly groupedReports = computed(() => {
+    const q = this.reportSearch().trim().toLowerCase();
+    const filtered = this.reports().filter(r => !q
+      || (r.name || '').toLowerCase().includes(q)
+      || (r.category_name || '').toLowerCase().includes(q)
+      || (r.description || '').toLowerCase().includes(q));
+    const groups = new Map<string, any[]>();
+    for (const r of filtered) {
+      const key = r.category_name || 'أخرى';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
+    return Array.from(groups.entries()).map(([category, reports]) => ({ category, reports }));
+  });
+
+  /** أيقونة الفئة من اسمها (رموز موحّدة). */
+  catIcon(name: string): string {
+    const n = name || '';
+    if (n.includes('امتحان') || n.includes('درجات')) return '📝';
+    if (n.includes('هيئة') || n.includes('معلم')) return '👥';
+    if (n.includes('قبول')) return '📋';
+    if (n.includes('طلاب') || n.includes('طالب')) return '🎓';
+    if (n.includes('حضور')) return '🕐';
+    if (n.includes('مالي')) return '💰';
+    if (n.includes('رواتب')) return '🧾';
+    if (n.includes('عيادة')) return '🩺';
+    if (n.includes('مكتبة')) return '📖';
+    if (n.includes('أكاديم')) return '📚';
+    return '📊';
+  }
 
   ngOnInit(): void {
     this.loadData();
@@ -546,9 +640,6 @@ export class ReportingDashboardComponent implements OnInit {
         this.currentReport.set(report);
         this.executedAt.set(new Date().toLocaleString('ar'));
         this.running.set(null);
-        // إظهار العارض بالتمرير إليه
-        setTimeout(() => document.getElementById('report-viewer')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
       },
       error: () => this.running.set(null),
     });
