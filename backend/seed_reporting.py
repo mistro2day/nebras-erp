@@ -64,7 +64,14 @@ REPORTS = [
         "name": "المتقدمون حسب حالة الطلب",
         "desc": "توزيع طلبات الالتحاق على مراحل القبول (مُقدّم، مقبول، مُسجّل...).",
         "sql": """
-            SELECT status AS "الحالة", COUNT(*) AS "عدد المتقدمين"
+            SELECT CASE status
+                        WHEN 'draft' THEN 'مسودة' WHEN 'submitted' THEN 'مُقدّم'
+                        WHEN 'under_review' THEN 'قيد المراجعة' WHEN 'interview_scheduled' THEN 'مقابلة مجدولة'
+                        WHEN 'qualified_exam' THEN 'مؤهّل للقدرات' WHEN 'exam_scored' THEN 'رُصدت الدرجات'
+                        WHEN 'accepted' THEN 'مقبول' WHEN 'rejected' THEN 'مرفوض'
+                        WHEN 'enrolled' THEN 'مُسجّل' WHEN 'waitlist' THEN 'قائمة الانتظار'
+                        ELSE status END AS "الحالة",
+                   COUNT(*) AS "عدد المتقدمين"
             FROM admission_applicants
             WHERE tenant_id = %(tenant_id)s AND deleted_at IS NULL
             GROUP BY status
@@ -186,31 +193,62 @@ REPORTS = [
     # ==================== تقارير الطلاب ====================
     {
         "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
-        "code": "students_by_grade",
-        "name": "أعداد الطلاب حسب الصف",
-        "desc": "عدد الطلاب المسجّلين في كل صف دراسي.",
+        "code": "students_by_school_grade",
+        "name": "أعداد الطلاب حسب الفرع والصف",
+        "desc": "توزيع الطلاب على فروع المدرسة (بنين/بنات) وكل صف دراسي.",
         "sql": """
-            SELECT g.name AS "الصف", COUNT(DISTINCT e.student_id) AS "عدد الطلاب"
+            SELECT COALESCE(b.name_ar, b.name,
+                        CASE p.gender WHEN 'male' THEN 'فرع البنين'
+                             WHEN 'female' THEN 'فرع البنات' ELSE 'غير محدد' END) AS "الفرع",
+                   g.name AS "الصف",
+                   COUNT(DISTINCT e.student_id) AS "عدد الطلاب"
             FROM student_enrollments e
+            JOIN student_profiles p ON p.student_id = e.student_id
             JOIN academic_grades g ON g.id = e.grade_id
+            LEFT JOIN branches b ON b.id = e.branch_id
             WHERE e.tenant_id = %(tenant_id)s AND e.deleted_at IS NULL
-            GROUP BY g.name, g."order"
-            ORDER BY g."order"
+            GROUP BY COALESCE(b.name_ar, b.name,
+                        CASE p.gender WHEN 'male' THEN 'فرع البنين'
+                             WHEN 'female' THEN 'فرع البنات' ELSE 'غير محدد' END),
+                     g.name, g."order"
+            ORDER BY "الفرع", g."order"
+        """,
+    },
+    {
+        "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
+        "code": "students_by_school",
+        "name": "أعداد الطلاب حسب الفرع",
+        "desc": "إجمالي عدد الطلاب في كل فرع مدرسي (بنين/بنات).",
+        "sql": """
+            SELECT b.name_ar AS "الفرع",
+                   CASE b.school_gender_type WHEN 'boys' THEN 'بنين'
+                        WHEN 'girls' THEN 'بنات' ELSE 'مشتركة' END AS "النوع",
+                   COUNT(DISTINCT e.student_id) AS "عدد الطلاب"
+            FROM student_enrollments e
+            JOIN branches b ON b.id = e.branch_id
+            WHERE e.tenant_id = %(tenant_id)s AND e.deleted_at IS NULL
+            GROUP BY b.name_ar, b.school_gender_type
+            ORDER BY COUNT(DISTINCT e.student_id) DESC
         """,
     },
     {
         "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
         "code": "students_directory",
-        "name": "سجل الطلاب",
-        "desc": "قائمة الطلاب ببياناتهم الأساسية (الاسم، الجنس، الجنسية، الرقم الوطني).",
+        "name": "سجل الطلاب حسب الفرع",
+        "desc": "قائمة الطلاب ببياناتهم الأساسية مصنّفةً حسب الفرع المدرسي.",
         "sql": """
-            SELECT p.arabic_name AS "الاسم",
-                   CASE p.gender WHEN 'male' THEN 'ذكر' WHEN 'female' THEN 'أنثى' ELSE p.gender END AS "الجنس",
+            SELECT COALESCE(b.name_ar, b.name,
+                        CASE p.gender WHEN 'male' THEN 'فرع البنين'
+                             WHEN 'female' THEN 'فرع البنات' ELSE 'غير محدد' END) AS "الفرع",
+                   p.arabic_name AS "الاسم",
                    p.nationality AS "الجنسية",
                    p.national_id AS "الرقم الوطني"
             FROM student_profiles p
+            LEFT JOIN student_enrollments e
+                   ON e.student_id = p.student_id AND e.deleted_at IS NULL
+            LEFT JOIN branches b ON b.id = e.branch_id
             WHERE p.tenant_id = %(tenant_id)s AND p.deleted_at IS NULL
-            ORDER BY p.arabic_name
+            ORDER BY "الفرع", p.arabic_name
         """,
     },
 
@@ -297,10 +335,17 @@ REPORTS = [
         "desc": "سجل زيارات العيادة: التاريخ والنوع وفئة المريض والحالة.",
         "sql": """
             SELECT v.visit_date AS "تاريخ الزيارة",
-                   v.visit_type AS "نوع الزيارة",
+                   CASE v.visit_type
+                        WHEN 'emergency' THEN 'طارئة' WHEN 'walk_in' THEN 'بدون موعد'
+                        WHEN 'scheduled' THEN 'مجدولة' WHEN 'follow_up' THEN 'متابعة'
+                        WHEN 'routine' THEN 'روتينية' ELSE v.visit_type END AS "نوع الزيارة",
                    CASE v.patient_type WHEN 'student' THEN 'طالب' WHEN 'employee' THEN 'موظف'
                         ELSE v.patient_type END AS "فئة المريض",
-                   v.status AS "الحالة"
+                   CASE v.status
+                        WHEN 'diagnosed' THEN 'تم التشخيص' WHEN 'discharged' THEN 'انتهت'
+                        WHEN 'in_progress' THEN 'قيد الكشف' WHEN 'admitted' THEN 'إدخال'
+                        WHEN 'referred' THEN 'محوّل' WHEN 'waiting' THEN 'انتظار'
+                        ELSE v.status END AS "الحالة"
             FROM nebras_clinic_visits v
             WHERE v.tenant_id = %(tenant_id)s AND v.deleted_at IS NULL
             ORDER BY v.visit_date DESC
