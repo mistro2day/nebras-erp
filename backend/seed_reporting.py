@@ -85,6 +85,103 @@ REPORTS = [
             ORDER BY g."order"
         """,
     },
+
+    # ==================== تقارير الامتحانات والدرجات ====================
+    # ملاحظة: الاستعلامات تشمل كل أنواع الاختبارات مع عمود «نوع الاختبار»
+    # (شهري/نصفي/نهائي/قصير)، فتظهر الشهرية فور إدخالها والبيانات الحالية الآن.
+    {
+        "cat_code": "rep_exams", "cat_name": "تقارير الامتحانات والدرجات", "cat_type": "exam", "icon": "📝",
+        "code": "exam_marks_sheet",
+        "name": "كشف درجات الاختبارات",
+        "desc": "درجات الطلاب في الاختبارات (شهرية/نصفية/نهائية) لكل مادة مع بيان النجاح والرسوب.",
+        "sql": """
+            SELECT p.arabic_name AS "الطالب",
+                   sub.arabic_name AS "المادة",
+                   e.name AS "الاختبار",
+                   CASE et.type_class
+                        WHEN 'monthly' THEN 'شهري' WHEN 'weekly' THEN 'أسبوعي'
+                        WHEN 'midterm' THEN 'نصفي' WHEN 'final' THEN 'نهائي'
+                        WHEN 'quiz' THEN 'قصير' ELSE et.name END AS "نوع الاختبار",
+                   e.term AS "الفصل",
+                   m.marks_obtained AS "الدرجة",
+                   e.max_marks AS "العظمى",
+                   CASE WHEN m.is_present = false THEN 'غائب'
+                        WHEN m.marks_obtained >= e.pass_marks THEN 'ناجح'
+                        ELSE 'راسب' END AS "النتيجة"
+            FROM nebras_student_marks m
+            JOIN nebras_student_exams se ON se.id = m.student_exam_id
+            JOIN nebras_exam_schedules sch ON sch.id = se.schedule_id
+            JOIN nebras_exams e ON e.id = sch.exam_id
+            JOIN nebras_exam_types et ON et.id = e.exam_type_id
+            LEFT JOIN student_profiles p ON p.student_id = se.student_id
+            LEFT JOIN academic_subjects sub ON sub.id = e.subject_id
+            WHERE m.tenant_id = %(tenant_id)s AND m.deleted_at IS NULL
+            ORDER BY p.arabic_name, sub.arabic_name
+        """,
+    },
+    {
+        "cat_code": "rep_exams", "cat_name": "تقارير الامتحانات والدرجات", "cat_type": "exam", "icon": "📝",
+        "code": "subject_pass_rate",
+        "name": "معدل النجاح ومتوسط الدرجات حسب المادة",
+        "desc": "متوسط الدرجات ونسبة النجاح لكل مادة عبر كل الاختبارات.",
+        "sql": """
+            SELECT sub.arabic_name AS "المادة",
+                   COUNT(*) AS "عدد الطلاب",
+                   ROUND(AVG(m.marks_obtained), 1) AS "متوسط الدرجة",
+                   SUM(CASE WHEN m.is_present AND m.marks_obtained >= e.pass_marks THEN 1 ELSE 0 END) AS "الناجحون",
+                   ROUND(100.0 * SUM(CASE WHEN m.is_present AND m.marks_obtained >= e.pass_marks THEN 1 ELSE 0 END)
+                         / NULLIF(COUNT(*), 0), 1) AS "نسبة النجاح"
+            FROM nebras_student_marks m
+            JOIN nebras_student_exams se ON se.id = m.student_exam_id
+            JOIN nebras_exam_schedules sch ON sch.id = se.schedule_id
+            JOIN nebras_exams e ON e.id = sch.exam_id
+            LEFT JOIN academic_subjects sub ON sub.id = e.subject_id
+            WHERE m.tenant_id = %(tenant_id)s AND m.deleted_at IS NULL
+            GROUP BY sub.arabic_name
+            ORDER BY "نسبة النجاح" DESC
+        """,
+    },
+    {
+        "cat_code": "rep_exams", "cat_name": "تقارير الامتحانات والدرجات", "cat_type": "exam", "icon": "📝",
+        "code": "failing_students",
+        "name": "الطلاب المتعثّرون (رسوب في الاختبارات)",
+        "desc": "الطلاب الراسبون في اختبار واحد أو أكثر — لمتابعة الدعم الأكاديمي.",
+        "sql": """
+            SELECT p.arabic_name AS "الطالب",
+                   sub.arabic_name AS "المادة",
+                   e.name AS "الاختبار",
+                   m.marks_obtained AS "الدرجة",
+                   e.pass_marks AS "درجة النجاح"
+            FROM nebras_student_marks m
+            JOIN nebras_student_exams se ON se.id = m.student_exam_id
+            JOIN nebras_exam_schedules sch ON sch.id = se.schedule_id
+            JOIN nebras_exams e ON e.id = sch.exam_id
+            LEFT JOIN student_profiles p ON p.student_id = se.student_id
+            LEFT JOIN academic_subjects sub ON sub.id = e.subject_id
+            WHERE m.tenant_id = %(tenant_id)s AND m.deleted_at IS NULL
+              AND m.is_present = true AND m.marks_obtained < e.pass_marks
+            ORDER BY m.marks_obtained ASC
+        """,
+    },
+    {
+        "cat_code": "rep_exams", "cat_name": "تقارير الامتحانات والدرجات", "cat_type": "exam", "icon": "📝",
+        "code": "student_results_summary",
+        "name": "النتائج النهائية للطلاب وتقديراتهم",
+        "desc": "مجموع الدرجات وحرف التقدير وحالة النجاح لكل طالب حسب المادة والفصل.",
+        "sql": """
+            SELECT p.arabic_name AS "الطالب",
+                   sub.arabic_name AS "المادة",
+                   r.term AS "الفصل",
+                   r.total_marks AS "المجموع",
+                   r.grade_letter AS "التقدير",
+                   CASE WHEN r.is_passed THEN 'ناجح' ELSE 'راسب' END AS "الحالة"
+            FROM nebras_exam_results r
+            LEFT JOIN student_profiles p ON p.student_id = r.student_id
+            LEFT JOIN academic_subjects sub ON sub.id = r.subject_id
+            WHERE r.tenant_id = %(tenant_id)s AND r.deleted_at IS NULL
+            ORDER BY p.arabic_name, sub.arabic_name
+        """,
+    },
 ]
 
 
