@@ -32,6 +32,14 @@ export class ReportingService {
     return this.http.post<any>(`${this.baseUrl}/reports/${id}/export-csv/`, { parameters }, { responseType: 'blob' as 'json' });
   }
 
+  exportReportPdf(id: string, parameters: any): Observable<Blob> {
+    return this.http.post(`${this.baseUrl}/reports/${id}/export-pdf/`, { parameters }, { responseType: 'blob' });
+  }
+
+  exportReportExcel(id: string, parameters: any): Observable<Blob> {
+    return this.http.post(`${this.baseUrl}/reports/${id}/export-excel/`, { parameters }, { responseType: 'blob' });
+  }
+
   // 4. لوحات القيادة (Dashboards)
   getDashboards(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/dashboards/`);

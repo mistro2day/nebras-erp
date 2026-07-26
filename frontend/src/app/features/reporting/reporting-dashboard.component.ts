@@ -187,23 +187,63 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
       </section>
 
       <!-- عارض نتائج التقرير -->
-      @if (executedData().length > 0) {
-        <section class="card">
-          <div class="card-head">
-            <h3>نتائج التقرير — {{ executedData().length }} سجل</h3>
-            <button class="link-btn" (click)="executedData.set([])">إخفاء</button>
+      @if (currentReport()) {
+        <section class="card viewer" id="report-viewer">
+          <!-- شريط الأدوات (لا يُطبع) -->
+          <div class="viewer-toolbar no-print">
+            <span class="vt-title">عارض التقرير</span>
+            <div class="vt-actions">
+              <button class="btn ghost sm" (click)="printReport()">🖨️ طباعة</button>
+              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportPdf(currentReport().id)">
+                {{ exporting() === 'pdf' ? '⏳' : '📄' }} PDF
+              </button>
+              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportExcel(currentReport().id)">
+                {{ exporting() === 'excel' ? '⏳' : '📊' }} Excel
+              </button>
+              <button class="btn ghost sm" [disabled]="exporting()" (click)="exportReport(currentReport().id)">
+                {{ exporting() === 'csv' ? '⏳' : '⬇️' }} CSV
+              </button>
+              <button class="link-btn" (click)="currentReport.set(null); executedData.set([])">إغلاق</button>
+            </div>
           </div>
-          <div class="scroll-x">
-            <table class="data">
-              <thead>
-                <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
-              </thead>
-              <tbody>
-                @for (row of executedData(); track $index) {
-                  <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
-                }
-              </tbody>
-            </table>
+
+          <!-- الورقة (تُطبع) -->
+          <div class="report-sheet" id="report-sheet">
+            <header class="rs-head">
+              <div class="rs-brand">
+                <span class="rs-mark">📊</span>
+                <span class="rs-org">مجموعة مدارس النبراس الأهلية</span>
+              </div>
+              <h2 class="rs-title">{{ currentReport().name }}</h2>
+              @if (currentReport().description) {
+                <p class="rs-desc">{{ currentReport().description }}</p>
+              }
+              <div class="rs-meta">
+                <span>تاريخ التوليد: {{ executedAt() }}</span>
+                <span>إجمالي السجلات: {{ executedData().length }}</span>
+              </div>
+            </header>
+
+            @if (executedData().length === 0) {
+              <div class="empty">لا توجد بيانات لعرضها في هذا التقرير.</div>
+            } @else {
+              <div class="scroll-x">
+                <table class="data report-table">
+                  <thead>
+                    <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
+                  </thead>
+                  <tbody>
+                    @for (row of executedData(); track $index) {
+                      <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <footer class="rs-foot">
+              <span>Nebras ERP — نظام إدارة المؤسسات التعليمية</span>
+            </footer>
           </div>
         </section>
       }
@@ -350,6 +390,47 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
       .row, .row.src { grid-template-columns: 1fr 1fr; row-gap: 4px; }
       .ta-end, .acts { justify-content: flex-start; text-align: start; }
     }
+
+    /* ==== عارض التقرير والورقة ==== */
+    .viewer { padding: 0; overflow: hidden; }
+    .viewer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 16px; background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border); flex-wrap: wrap; }
+    .vt-title { font-size: 13px; font-weight: 700; color: var(--nb-text); }
+    .vt-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    .report-sheet { padding: 28px 30px; background: var(--nb-surface); }
+    .rs-head { border-bottom: 2px solid var(--nb-primary-600); padding-bottom: 16px; margin-bottom: 18px; }
+    .rs-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .rs-mark { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      background: color-mix(in srgb, var(--nb-primary-600) 12%, transparent); font-size: 17px; }
+    .rs-org { font-size: 13px; font-weight: 700; color: var(--nb-text-muted); }
+    .rs-title { margin: 0; font-size: 22px; font-weight: 800; color: var(--nb-primary-700); }
+    .rs-desc { margin: 6px 0 0; font-size: 13px; color: var(--nb-text-muted); line-height: 1.6; }
+    .rs-meta { display: flex; gap: 20px; margin-top: 12px; font-size: 12.5px; color: var(--nb-text-muted); font-weight: 600; flex-wrap: wrap; }
+    .rs-meta span { font-variant-numeric: tabular-nums; }
+
+    /* جدول التقرير المصمّم */
+    table.report-table { border: 1px solid var(--nb-border); border-radius: var(--nb-radius); overflow: hidden; }
+    table.report-table th { position: static; background: var(--nb-primary-600); color: #fff; text-align: center;
+      font-size: 12px; font-weight: 700; padding: 11px 12px; border-bottom: none; white-space: nowrap; }
+    table.report-table td { text-align: center; padding: 10px 12px; border-bottom: 1px solid var(--nb-border-soft); }
+    table.report-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--nb-primary-600) 4%, transparent); }
+    table.report-table tbody tr:last-child td { border-bottom: none; }
+
+    .rs-foot { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--nb-border-soft);
+      text-align: center; font-size: 11px; color: var(--nb-text-faint); }
+
+    /* ==== الطباعة: تُظهر الورقة فقط ==== */
+    @media print {
+      @page { size: A4; margin: 14mm; }
+      body * { visibility: hidden; }
+      #report-sheet, #report-sheet * { visibility: visible; }
+      #report-sheet { position: absolute; inset-inline: 0; top: 0; width: 100%; padding: 0; }
+      .no-print { display: none !important; }
+      table.report-table th { background: var(--nb-primary-600) !important; color: #fff !important;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      table.report-table tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   `]
 })
 export class ReportingDashboardComponent implements OnInit {
@@ -379,6 +460,10 @@ export class ReportingDashboardComponent implements OnInit {
   sources = signal<any[]>([]);
   executedData = signal<any[]>([]);
   dataColumns = signal<string[]>([]);
+  // التقرير المعروض حالياً في العارض
+  currentReport = signal<any | null>(null);
+  executedAt = signal<string>('');
+  exporting = signal<string | null>(null);   // 'pdf' | 'excel' | 'csv'
 
   ngOnInit(): void {
     this.loadData();
@@ -452,27 +537,61 @@ export class ReportingDashboardComponent implements OnInit {
 
   runReport(id: string): void {
     this.running.set(id);
+    const report = this.reports().find(r => r.id === id) || null;
     this.repService.executeReport(id, {}).subscribe({
       next: (res) => {
         const list = res?.data?.data ?? [];
         this.executedData.set(list);
         this.dataColumns.set(list.length ? Object.keys(list[0]) : []);
+        this.currentReport.set(report);
+        this.executedAt.set(new Date().toLocaleString('ar'));
         this.running.set(null);
+        // إظهار العارض بالتمرير إليه
+        setTimeout(() => document.getElementById('report-viewer')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
       },
       error: () => this.running.set(null),
     });
   }
 
-  exportReport(id: string): void {
-    this.repService.exportReportCsv(id, {}).subscribe({
-      next: (blob: any) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${id}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      },
+  private saveBlob(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  private safeName(): string {
+    return (this.currentReport()?.name || 'report').replace(/[\\/:*?"<>|]/g, '_');
+  }
+
+  exportPdf(id: string): void {
+    this.exporting.set('pdf');
+    this.repService.exportReportPdf(id, {}).subscribe({
+      next: (blob) => { this.saveBlob(blob, `${this.safeName()}.pdf`); this.exporting.set(null); },
+      error: () => this.exporting.set(null),
     });
+  }
+
+  exportExcel(id: string): void {
+    this.exporting.set('excel');
+    this.repService.exportReportExcel(id, {}).subscribe({
+      next: (blob) => { this.saveBlob(blob, `${this.safeName()}.xlsx`); this.exporting.set(null); },
+      error: () => this.exporting.set(null),
+    });
+  }
+
+  exportReport(id: string): void {
+    this.exporting.set('csv');
+    this.repService.exportReportCsv(id, {}).subscribe({
+      next: (blob: any) => { this.saveBlob(blob, `${this.safeName()}.csv`); this.exporting.set(null); },
+      error: () => this.exporting.set(null),
+    });
+  }
+
+  printReport(): void {
+    window.print();
   }
 }

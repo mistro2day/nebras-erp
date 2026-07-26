@@ -183,16 +183,62 @@ class ExportService:
 
         csv_data = output.getvalue()
         
-        # تسجيل عملية التصدير
+        cls._log_export(tenant_id, report_id, user_id, 'csv', 'csv')
+        return csv_data
+
+    @classmethod
+    def export_to_pdf(cls, tenant_id, report_id, parameters=None, user_id=None):
+        """تصدير تقرير إلى PDF عربي منسّق (RTL + تشكيل)."""
+        from apps.reporting.application.exporters import PdfExporter
+        report, data, tenant_name = cls._prepare(tenant_id, report_id, parameters, user_id)
+        pdf = PdfExporter.build(
+            report_name=report.name,
+            rows=data,
+            tenant_name=tenant_name,
+            subtitle=report.description or '',
+            generated_at=timezone.now().strftime('%Y-%m-%d %H:%M'),
+        )
+        cls._log_export(tenant_id, report_id, user_id, 'pdf', 'pdf')
+        return pdf
+
+    @classmethod
+    def export_to_excel(cls, tenant_id, report_id, parameters=None, user_id=None):
+        """تصدير تقرير إلى Excel بورقة RTL منسّقة."""
+        from apps.reporting.application.exporters import ExcelExporter
+        report, data, tenant_name = cls._prepare(tenant_id, report_id, parameters, user_id)
+        xlsx = ExcelExporter.build(
+            report_name=report.name,
+            rows=data,
+            tenant_name=tenant_name,
+            generated_at=timezone.now().strftime('%Y-%m-%d %H:%M'),
+        )
+        cls._log_export(tenant_id, report_id, user_id, 'excel', 'xlsx')
+        return xlsx
+
+    @staticmethod
+    def _prepare(tenant_id, report_id, parameters, user_id):
+        """يشغّل التقرير ويجلب اسم المستأجر — نواة مشتركة لكل المُصدِّرات."""
+        from apps.reporting.domain.models import Report
+        res = ReportEngineService.execute_report(tenant_id, report_id, parameters, user_id)
+        report = Report.objects.get(id=report_id, tenant_id=tenant_id)
+        tenant_name = ''
+        try:
+            from apps.tenants.domain.models import Tenant
+            t = Tenant.objects.filter(id=tenant_id).first()
+            tenant_name = getattr(t, 'name', '') if t else ''
+        except Exception:
+            pass
+        return report, res['data'], tenant_name
+
+    @staticmethod
+    def _log_export(tenant_id, report_id, user_id, fmt, ext):
         ReportExport.objects.create(
             tenant_id=tenant_id,
             report_id=report_id,
             exported_by=user_id,
-            format='csv',
-            file_name=f"report_{report_id}_{timezone.now().strftime('%Y%m%d%H%M')}.csv",
+            format=fmt,
+            file_name=f"report_{report_id}_{timezone.now().strftime('%Y%m%d%H%M')}.{ext}",
         )
-
-        return csv_data
 
 
 # ============================================================

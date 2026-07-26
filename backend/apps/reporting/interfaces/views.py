@@ -88,6 +88,43 @@ class ReportViewSet(BaseCRUDViewSet):
         response['Content-Disposition'] = f'attachment; filename="report_{pk}.csv"'
         return response
 
+    @action(detail=True, methods=['post'], url_path='export-pdf')
+    def export_pdf(self, request, pk=None):
+        """تصدير التقرير كـ PDF عربي منسّق."""
+        from django.http import HttpResponse
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        serializer = ExecuteReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        pdf = ExportService.export_to_pdf(
+            tenant_id=tenant_id, report_id=pk,
+            parameters=serializer.validated_data.get('parameters', {}),
+            user_id=request.user.id if request.user else None,
+        )
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="report_{pk}.pdf"'
+        return response
+
+    @action(detail=True, methods=['post'], url_path='export-excel')
+    def export_excel(self, request, pk=None):
+        """تصدير التقرير كـ Excel بورقة RTL."""
+        from django.http import HttpResponse
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        serializer = ExecuteReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        xlsx = ExportService.export_to_excel(
+            tenant_id=tenant_id, report_id=pk,
+            parameters=serializer.validated_data.get('parameters', {}),
+            user_id=request.user.id if request.user else None,
+        )
+        response = HttpResponse(
+            xlsx,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="report_{pk}.xlsx"'
+        return response
+
 
 class ReportTemplateViewSet(BaseCRUDViewSet):
     model_class = ReportTemplate
