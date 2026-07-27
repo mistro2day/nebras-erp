@@ -16,6 +16,32 @@ from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyC
 from apps.common.exceptions import BusinessException
 # الحقائق الطبية مرجعها العيادة — لا تُكتب ولا تُقرأ إلا عبرها
 from apps.clinic.application import profile_service as clinic_profiles
+
+
+def resolve_branch_for_gender(tenant_id, gender):
+    """
+    يُرجع فرع المدرسة المطابق لجنس الطالب (بنين/بنات)، وينشئه إن لم يوجد.
+    توحيد مفهوم «المدرسة» عبر فروع حقيقية بدل الاعتماد على الجنس كبديل.
+    """
+    from apps.organization.domain.models import Branch
+    gtype = 'girls' if gender == 'female' else 'boys'
+    defaults = {
+        'boys': {'code': 'BR-BOYS', 'name': 'فرع البنين', 'name_ar': 'فرع البنين'},
+        'girls': {'code': 'BR-GIRLS', 'name': 'فرع البنات', 'name_ar': 'فرع البنات'},
+    }[gtype]
+    branch = Branch.objects.filter(
+        tenant_id=tenant_id, school_gender_type=gtype, deleted_at__isnull=True
+    ).first()
+    if branch:
+        return branch
+    branch, _ = Branch.objects.get_or_create(
+        tenant_id=tenant_id, code=defaults['code'],
+        defaults={
+            'name': defaults['name'], 'name_ar': defaults['name_ar'],
+            'school_gender_type': gtype, 'is_active': True, 'country': 'السودان',
+        },
+    )
+    return branch
 import uuid
 import datetime
 
@@ -130,6 +156,24 @@ class StudentApplicationService:
                     created_by=user_id
                 )
                 
+        # 6b. إنشاء التسجيل الدراسي مع ربطه بالفرع المناسب (بنين/بنات) —
+        #     الفرع يُستنتج من جنس المتقدم ويُنشأ تلقائياً إن لم يوجد.
+        #     بهذا يُوحَّد مفهوم المدرسة/الفرع من لحظة القيد لا بمعالجة لاحقة.
+        if applicant.academic_year_id and applicant.applying_grade_id:
+            branch = resolve_branch_for_gender(tenant_id, applicant.gender)
+            StudentEnrollment.objects.create(
+                tenant_id=tenant_id,
+                student=student,
+                academic_year_id=applicant.academic_year_id,
+                grade_id=applicant.applying_grade_id,
+                section_id=applicant.applying_section_id,
+                branch_id=branch.id,
+                enrollment_date=datetime.date.today(),
+                enrollment_type='new',
+                status='active',
+                created_by=user_id,
+            )
+
         # 7. تحديث حالة طلب التقديم إلى "مُسجّل" (ذرّي ضمن نفس المعاملة)
         applicant.status = 'enrolled'
         applicant.save(update_fields=['status', 'updated_at'])
