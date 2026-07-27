@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
 import { StudentsService } from '../students.service';
+import { OrganizationService } from '../../organization/organization.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import {
@@ -102,6 +103,15 @@ import { SendMessageModalComponent } from '../../communications/components/send-
             <option value="withdrawn">منسحب</option>
           </select>
         </div>
+        <div class="field">
+          <label>الفرع / المدرسة</label>
+          <select [ngModel]="branchFilter()" (ngModelChange)="onBranchChange($event)">
+            <option value="">كل الفروع</option>
+            @for (b of branches(); track b.id) {
+              <option [value]="b.id">{{ b.name_ar || b.name }}</option>
+            }
+          </select>
+        </div>
         
         <!-- تبديل مظهر العرض -->
         <div class="view-toggle">
@@ -144,7 +154,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                   </span>
                 </div>
               }
-              @if (students().length === 0) {
+              @if (filteredStudents().length === 0) {
                 <div class="tbl-empty">لا يوجد طلاب يطابقون خيارات البحث.</div>
               }
             </div>
@@ -183,8 +193,8 @@ import { SendMessageModalComponent } from '../../communications/components/send-
               </div>
             </div>
           }
-          @if (students().length === 0) {
-            <div class="grid-empty-state">لا يوجد طلاب مطبقين للبحث.</div>
+          @if (filteredStudents().length === 0) {
+            <div class="grid-empty-state">لا يوجد طلاب يطابقون خيارات البحث.</div>
           }
         </div>
       }
@@ -192,7 +202,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
       @if (totalPages() > 1) {
         <div class="pager">
           <button class="nb-btn-ghost sm" [disabled]="page() === 1" (click)="prev()">السابق</button>
-          <span class="pager-info">صفحة {{ page() }} من {{ totalPages() }} · {{ students().length }} طالب</span>
+          <span class="pager-info">صفحة {{ page() }} من {{ totalPages() }} · {{ filteredStudents().length }} طالب</span>
           <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
         </div>
       }
@@ -429,6 +439,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 })
 export class StudentsListComponent implements OnInit {
   private readonly studentsService = inject(StudentsService);
+  private readonly orgService = inject(OrganizationService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
 
@@ -441,17 +452,39 @@ export class StudentsListComponent implements OnInit {
 
   searchQuery = '';
   statusFilter = '';
+  readonly branchFilter = signal('');
+  readonly branches = signal<any[]>([]);
+
+  /** الطلاب بعد تطبيق فلتر الفرع (حسب فرع أي تسجيل للطالب). */
+  readonly filteredStudents = computed(() => {
+    const bf = this.branchFilter();
+    if (!bf) return this.students();
+    return this.students().filter(s =>
+      (s.enrollments || []).some((e: any) => e.branch_id === bf));
+  });
 
   private readonly pageSize = 12;
   readonly page = signal(1);
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.students().length / this.pageSize)));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredStudents().length / this.pageSize)));
   readonly paged = computed(() => {
     const start = (this.page() - 1) * this.pageSize;
-    return this.students().slice(start, start + this.pageSize);
+    return this.filteredStudents().slice(start, start + this.pageSize);
   });
 
   ngOnInit(): void {
     this.loadStudents();
+    this.loadBranches();
+  }
+
+  private loadBranches(): void {
+    this.orgService.getBranches().subscribe({
+      next: (res) => this.branches.set((res?.data ?? res ?? []) as any[]),
+    });
+  }
+
+  onBranchChange(id: string): void {
+    this.branchFilter.set(id);
+    this.page.set(1);
   }
 
   loadStudents(): void {

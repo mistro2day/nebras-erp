@@ -114,10 +114,34 @@ class StudentAttachmentSerializer(serializers.ModelSerializer):
 
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):
+    # اسم الفرع ونوعه (بنين/بنات) للعرض والفلترة في الواجهة
+    branch_name = serializers.SerializerMethodField()
+    branch_gender_type = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentEnrollment
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id', 'student']
+
+    def _branch(self, obj):
+        if not getattr(obj, 'branch_id', None):
+            return None
+        cache = getattr(self, '_branch_cache', None)
+        if cache is None:
+            cache = {}
+            self._branch_cache = cache
+        if obj.branch_id not in cache:
+            from apps.organization.domain.models import Branch
+            cache[obj.branch_id] = Branch.objects.filter(id=obj.branch_id).first()
+        return cache[obj.branch_id]
+
+    def get_branch_name(self, obj):
+        b = self._branch(obj)
+        return (b.name_ar or b.name) if b else None
+
+    def get_branch_gender_type(self, obj):
+        b = self._branch(obj)
+        return b.school_gender_type if b else None
 
 
 class StudentPromotionHistorySerializer(serializers.ModelSerializer):
