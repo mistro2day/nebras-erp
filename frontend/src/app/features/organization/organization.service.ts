@@ -8,6 +8,7 @@ export interface Branch {
   name_ar?: string;
   name_en?: string;
   code: string;
+  school_gender_type: 'boys' | 'girls' | 'coed';
   is_active: boolean;
   address?: string;
   city?: string;
@@ -62,6 +63,14 @@ export class OrganizationService {
 
   createBranch(branch: Partial<Branch>): Observable<any> {
     return this.apiClient.post('organization/branches/', branch);
+  }
+
+  updateBranch(id: string, branch: Partial<Branch>): Observable<any> {
+    return this.apiClient.patch(`organization/branches/${id}/`, branch);
+  }
+
+  deleteBranch(id: string): Observable<any> {
+    return this.apiClient.delete(`organization/branches/${id}/`);
   }
 
   getCampuses(): Observable<any> {

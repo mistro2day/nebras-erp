@@ -12,6 +12,11 @@ export const ORGANIZATION_ROUTES: Routes = [
       import('./overview/overview.component').then((m) => m.OrganizationOverviewComponent),
   },
   {
+    path: 'branches',
+    loadComponent: () =>
+      import('./branches/branches.component').then((m) => m.OrgBranchesComponent),
+  },
+  {
     path: 'departments',
     loadComponent: () =>
       import('./departments/departments.component').then((m) => m.OrgDepartmentsComponent),

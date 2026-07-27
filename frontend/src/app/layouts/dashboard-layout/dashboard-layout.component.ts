@@ -1306,6 +1306,7 @@ export class DashboardLayoutComponent {
           link: '/organization/overview',
           children: [
             { label: 'نظرة عامة', link: '/organization/overview' },
+            { label: 'الفروع والمدارس', link: '/organization/branches' },
             { label: 'الأقسام', link: '/organization/departments' },
           ],
         },
