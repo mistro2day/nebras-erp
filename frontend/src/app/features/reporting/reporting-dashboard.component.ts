@@ -172,6 +172,12 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
                 <div class="viewer-toolbar no-print">
                   <span class="vt-title">{{ currentReport().name }}</span>
                   <div class="vt-actions">
+                    @if (chartSpec()) {
+                      <div class="mode-toggle">
+                        <button [class.on]="viewerMode() === 'table'" (click)="viewerMode.set('table')">☰ جدول</button>
+                        <button [class.on]="viewerMode() === 'chart'" (click)="viewerMode.set('chart')">📊 رسم</button>
+                      </div>
+                    }
                     <button class="btn ghost sm" (click)="printReport()">🖨️ طباعة</button>
                     <button class="btn ghost sm" [disabled]="exporting()" (click)="exportPdf(currentReport().id)">
                       {{ exporting() === 'pdf' ? '⏳' : '📄' }} PDF
@@ -205,6 +211,25 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
 
                   @if (executedData().length === 0) {
                     <div class="empty">لا توجد بيانات لعرضها في هذا التقرير.</div>
+                  } @else if (viewerMode() === 'chart' && chartSpec(); as spec) {
+                    <!-- رسم أعمدة أفقي متحرّك (لون واحد — سلسلة واحدة) -->
+                    <div class="bar-chart" role="img"
+                         [attr.aria-label]="'رسم بياني: ' + spec.valueCol + ' حسب ' + spec.labelCol">
+                      <div class="bc-axis"><span>{{ spec.valueCol }}</span></div>
+                      @for (it of spec.items; track $index; let i = $index) {
+                        <div class="bc-row" (mouseenter)="hoveredBar.set(i)" (mouseleave)="hoveredBar.set(null)">
+                          <span class="bc-label" [title]="it.label">{{ it.label }}</span>
+                          <div class="bc-track">
+                            <div class="bc-fill" [class.hot]="hoveredBar() === i"
+                                 [style.width.%]="barPct(it.value)"
+                                 [style.transition-delay.ms]="i * 45"></div>
+                            <span class="bc-value" [style.transition-delay.ms]="i * 45 + 250">
+                              {{ it.value | number }}
+                            </span>
+                          </div>
+                        </div>
+                      }
+                    </div>
                   } @else {
                     <div class="scroll-x">
                       <table class="data report-table">
@@ -474,6 +499,28 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
     .rs-foot { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--nb-border-soft);
       text-align: center; font-size: 11px; color: var(--nb-text-faint); }
 
+    /* ==== مبدّل جدول/رسم في شريط الأدوات ==== */
+    .mode-toggle { display: inline-flex; border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
+      overflow: hidden; margin-inline-end: 4px; }
+    .mode-toggle button { height: 28px; padding: 0 12px; border: none; background: var(--nb-surface);
+      color: var(--nb-text-muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .mode-toggle button.on { background: var(--nb-primary-600); color: #fff; }
+
+    /* ==== رسم أعمدة أفقي متحرّك (سلسلة واحدة — لون نبراس) ==== */
+    .bar-chart { display: flex; flex-direction: column; gap: 12px; padding: 8px 2px 4px; }
+    .bc-axis { font-size: 11.5px; font-weight: 700; color: var(--nb-text-muted); margin-bottom: 2px; }
+    .bc-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }
+    .bc-label { font-size: 12.5px; font-weight: 600; color: var(--nb-text); text-align: end;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bc-track { position: relative; display: flex; align-items: center; gap: 8px;
+      background: color-mix(in srgb, var(--nb-primary-600) 5%, transparent); border-radius: 4px; padding: 2px; }
+    .bc-fill { height: 16px; min-width: 4px; border-radius: 4px;
+      background: linear-gradient(90deg, var(--nb-primary-500), var(--nb-primary-600));
+      width: 0; transition: width .7s cubic-bezier(.22,.61,.36,1); }
+    .bc-fill.hot { background: linear-gradient(90deg, var(--nb-primary-600), var(--nb-primary-700, #0f766e)); }
+    .bc-value { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--nb-text);
+      white-space: nowrap; }
+
     /* ==== الطباعة: تُظهر الورقة فقط ==== */
     @media print {
       @page { size: A4; margin: 14mm; }
@@ -525,6 +572,36 @@ export class ReportingDashboardComponent implements OnInit {
   currentReport = signal<any | null>(null);
   executedAt = signal<string>('');
   exporting = signal<string | null>(null);   // 'pdf' | 'excel' | 'csv'
+
+  // عرض العارض: جدول أو رسم بياني
+  viewerMode = signal<'table' | 'chart'>('table');
+  hoveredBar = signal<number | null>(null);
+
+  /**
+   * كشف تلقائي: هل التقرير قابل للرسم؟ (عمود تصنيف نصّي + عمود قيمة رقمية،
+   * وعدد صفوف معقول). يُرجع تعريف الرسم أو null.
+   */
+  readonly chartSpec = computed(() => {
+    const rows = this.executedData();
+    const cols = this.dataColumns();
+    if (!rows.length || cols.length < 2 || rows.length > 24) return null;
+
+    const isNum = (v: any) => v !== null && v !== '' && !isNaN(Number(v));
+    // أول عمود قيمه كلها نصّية (غير رقمية) = التصنيف
+    const labelCol = cols.find(c => rows.every(r => !isNum(r[c])));
+    // أول عمود قيمه كلها رقمية = القيمة
+    const valueCol = cols.find(c => rows.every(r => isNum(r[c])));
+    if (!labelCol || !valueCol) return null;
+
+    const items = rows.map(r => ({ label: String(r[labelCol] ?? '—'), value: Number(r[valueCol]) }));
+    const max = Math.max(...items.map(i => i.value), 0) || 1;
+    return { labelCol, valueCol, max, items };
+  });
+
+  barPct(value: number): number {
+    const spec = this.chartSpec();
+    return spec ? Math.round((value / spec.max) * 100) : 0;
+  }
 
   // مساحة عمل التقارير: بحث + تجميع حسب الفئة
   reportSearch = signal('');
@@ -639,6 +716,7 @@ export class ReportingDashboardComponent implements OnInit {
         this.dataColumns.set(list.length ? Object.keys(list[0]) : []);
         this.currentReport.set(report);
         this.executedAt.set(new Date().toLocaleString('ar'));
+        this.viewerMode.set('table');
         this.running.set(null);
       },
       error: () => this.running.set(null),
