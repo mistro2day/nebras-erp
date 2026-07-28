@@ -163,6 +163,47 @@ class InvoiceLineItem(models.Model):
         return self.description
 
 
+class TenantSignupRequest(models.Model):
+    """طلب انضمام مدرسة عبر الموقع العام — يبقى معلّقاً حتى يعتمده مالك المنصّة.
+
+    لا يُنشأ المستأجر ولا النطاق الفرعي إلا عند الاعتماد، منعاً للإساءة وحجز النطاقات.
+    """
+    STATUS_CHOICES = (
+        ('pending', 'معلّق قيد المراجعة'),
+        ('approved', 'معتمد'),
+        ('rejected', 'مرفوض'),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school_name = models.CharField(max_length=255)
+    subdomain = models.CharField(max_length=100, db_index=True, help_text='النطاق الفرعي المطلوب')
+    contact_name = models.CharField(max_length=150, blank=True, null=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    city = models.CharField(max_length=120, blank=True, null=True)
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='signup_requests')
+    note = models.TextField(blank=True, null=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    reviewed_by = models.UUIDField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    created_tenant = models.ForeignKey('tenants.Tenant', on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='signup_request', help_text='المستأجر المُنشأ عند الاعتماد')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'saas_tenant_signup_requests'
+        ordering = ['-created_at']
+        verbose_name = 'طلب انضمام مدرسة'
+        verbose_name_plural = 'طلبات انضمام المدارس'
+
+    def __str__(self):
+        return f'{self.school_name} ({self.subdomain}) — {self.status}'
+
+
 class PaymentSubmission(models.Model):
     """طلب سداد ذاتي يقدّمه المستأجر لفاتورة اشتراكه عبر تحويل بنكي.
 

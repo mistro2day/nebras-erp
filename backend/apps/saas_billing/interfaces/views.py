@@ -9,10 +9,12 @@ from apps.common.responses import StandardResponse, StandardPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from apps.saas_billing.domain.models import (
     SubscriptionPlan, TenantSubscription, Invoice, Payment, PaymentSubmission,
+    TenantSignupRequest,
 )
 from apps.saas_billing.interfaces.serializers import (
     SubscriptionPlanSerializer, TenantSubscriptionSerializer,
     InvoiceSerializer, PaymentSerializer, PaymentSubmissionSerializer,
+    TenantSignupRequestSerializer,
 )
 from apps.saas_billing.application import services
 
@@ -195,6 +197,72 @@ class PaymentSubmissionViewSet(viewsets.ModelViewSet):
             return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
         submission.refresh_from_db()
         return StandardResponse(data=PaymentSubmissionSerializer(submission).data, message='تم رفض الطلب')
+
+
+class TenantSignupRequestViewSet(viewsets.ModelViewSet):
+    """طلبات انضمام المدارس — الإنشاء وفحص التوفّر عامّان، والمراجعة لمالك المنصّة."""
+    serializer_class = TenantSignupRequestSerializer
+    pagination_class = StandardPagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'status']
+
+    def get_permissions(self):
+        if self.action in ('create', 'check_subdomain'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = TenantSignupRequest.objects.select_related('plan', 'created_tenant').all()
+        status_f = self.request.query_params.get('status')
+        if status_f:
+            qs = qs.filter(status=status_f)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        plan = None
+        plan_id = data.get('plan') or data.get('plan_id')
+        if plan_id:
+            plan = SubscriptionPlan.objects.filter(id=plan_id).first()
+        try:
+            req = services.create_signup_request(
+                school_name=data.get('school_name'), subdomain=data.get('subdomain'),
+                email=data.get('email'), contact_name=data.get('contact_name'),
+                phone=data.get('phone'), city=data.get('city'), plan=plan, note=data.get('note'),
+            )
+        except ValueError as exc:
+            return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(data=TenantSignupRequestSerializer(req).data,
+                                message='تم استلام طلبك، سنراجعه ونوافيك.', status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'])
+    def check_subdomain(self, request):
+        sub = request.query_params.get('subdomain', '')
+        normalized = services.normalize_subdomain(sub)
+        return StandardResponse(data={'subdomain': normalized, 'available': services.subdomain_available(normalized)})
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        req = self.get_object()
+        try:
+            tenant = services.approve_signup_request(req, reviewed_by=getattr(request.user, 'id', None),
+                                                     trial_days=int(request.data.get('trial_days') or 14))
+        except ValueError as exc:
+            return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        req.refresh_from_db()
+        return StandardResponse(data=TenantSignupRequestSerializer(req).data,
+                                message=f'تم إنشاء المستأجر «{tenant.name}» ونطاقه {tenant.subdomain}.')
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        req = self.get_object()
+        try:
+            services.reject_signup_request(req, reviewed_by=getattr(request.user, 'id', None),
+                                           reason=request.data.get('reason'))
+        except ValueError as exc:
+            return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        req.refresh_from_db()
+        return StandardResponse(data=TenantSignupRequestSerializer(req).data, message='تم رفض الطلب')
 
 
 class BillingDashboardView(viewsets.ViewSet):

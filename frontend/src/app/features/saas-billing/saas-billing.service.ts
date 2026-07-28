@@ -100,6 +100,10 @@ export class SaasBillingService {
     return this.http.post(`${this.base}/invoices/${invoiceId}/submit_payment/`, form);
   }
 
+  getSignupRequests(params = ''): Observable<any> { return this.http.get(`${this.base}/signup-requests/?page_size=100${params}`); }
+  approveSignup(id: string, trialDays = 14): Observable<any> { return this.http.post(`${this.base}/signup-requests/${id}/approve/`, { trial_days: trialDays }); }
+  rejectSignup(id: string, reason?: string): Observable<any> { return this.http.post(`${this.base}/signup-requests/${id}/reject/`, { reason }); }
+
   getSubmissions(params = ''): Observable<any> { return this.http.get(`${this.base}/payment-submissions/?page_size=100${params}`); }
   approveSubmission(id: string): Observable<any> { return this.http.post(`${this.base}/payment-submissions/${id}/approve/`, {}); }
   rejectSubmission(id: string, reason?: string): Observable<any> { return this.http.post(`${this.base}/payment-submissions/${id}/reject/`, { reason }); }

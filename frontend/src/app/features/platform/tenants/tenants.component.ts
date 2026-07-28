@@ -21,6 +21,45 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
         <button class="btn primary" (click)="openNew()">+ مستأجر جديد</button>
       </nb-page-header>
 
+      <div class="tabs">
+        <button [class.on]="tab() === 'tenants'" (click)="tab.set('tenants')">المستأجرون</button>
+        <button [class.on]="tab() === 'requests'" (click)="tab.set('requests')">
+          طلبات الانضمام
+          @if (pendingRequests() > 0) { <span class="tab-badge">{{ pendingRequests() }}</span> }
+        </button>
+      </div>
+
+      @if (tab() === 'requests') {
+        <div class="scroll-x">
+          <table class="data">
+            <thead><tr>
+              <th>المدرسة</th><th>النطاق المطلوب</th><th>المسؤول</th><th>البريد</th>
+              <th>الباقة</th><th>الحالة</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody>
+              @for (r of requests(); track r.id) {
+                <tr>
+                  <td class="name">{{ r.school_name }}</td>
+                  <td class="mono">{{ r.subdomain }}.nebras.com</td>
+                  <td>{{ r.contact_name || '—' }}</td>
+                  <td>{{ r.email }}</td>
+                  <td>{{ r.plan_name || '—' }}</td>
+                  <td><span class="chip" [class]="'sg-' + r.status">{{ r.status_display }}</span></td>
+                  <td class="acts">
+                    @if (r.status === 'pending') {
+                      <button class="btn primary xs" (click)="approveReq(r)">اعتماد وإنشاء</button>
+                      <button class="btn ghost xs" (click)="rejectReq(r)">رفض</button>
+                    } @else if (r.created_tenant_subdomain) {
+                      <span class="mono done">{{ r.created_tenant_subdomain }}</span>
+                    }
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="7" class="muted">لا توجد طلبات انضمام.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+
       <div class="stat-row">
         <div class="stat"><span class="s-val">{{ tenants().length }}</span><span class="s-lbl">إجمالي المستأجرين</span></div>
         <div class="stat ok"><span class="s-val">{{ activeCount() }}</span><span class="s-lbl">نشط</span></div>
@@ -61,6 +100,7 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
             </tbody>
           </table>
         </div>
+      }
       }
 
       <!-- مودال المستأجر -->
@@ -145,6 +185,15 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
     .st-trial { background: color-mix(in srgb, #2563eb 16%, transparent); color: #2563eb; }
     .st-past_due { background: color-mix(in srgb, var(--nb-danger) 16%, transparent); color: var(--nb-danger); }
     .st-suspended, .st-canceled, .st-expired { background: color-mix(in srgb, var(--nb-text-muted) 16%, transparent); color: var(--nb-text-muted); }
+    .sg-approved { background: color-mix(in srgb, var(--nb-success) 16%, transparent); color: var(--nb-success); }
+    .sg-pending { background: color-mix(in srgb, #d97706 16%, transparent); color: #d97706; }
+    .sg-rejected { background: color-mix(in srgb, var(--nb-danger) 16%, transparent); color: var(--nb-danger); }
+    .done { color: var(--nb-success); font-weight: 700; }
+
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--nb-border); margin: 4px 0 20px; }
+    .tabs button { height: 38px; padding: 0 16px; border: none; background: transparent; color: var(--nb-text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tabs button.on { color: var(--nb-primary-600); border-bottom-color: var(--nb-primary-600); }
+    .tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-inline-start: 6px; border-radius: 99px; background: var(--nb-danger); color: #fff; font-size: 11px; font-weight: 800; }
 
     .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
     .modal { background: var(--nb-surface); border-radius: var(--nb-radius-card); padding: 22px; width: 100%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,.25); }
@@ -164,10 +213,13 @@ export class PlatformTenantsComponent implements OnInit {
   private notify = inject(NotificationService);
   private router = inject(Router);
 
+  readonly tab = signal<'tenants' | 'requests'>('tenants');
   readonly tenants = signal<any[]>([]);
+  readonly requests = signal<any[]>([]);
   readonly subsByTenant = signal<Record<string, any>>({});
   readonly plans = signal<any[]>([]);
   readonly loading = signal(true);
+  readonly pendingRequests = computed(() => this.requests().filter(r => r.status === 'pending').length);
   readonly saving = signal(false);
   readonly editing = signal<any | null>(null);
   readonly provisioning = signal<any | null>(null);
@@ -198,6 +250,22 @@ export class PlatformTenantsComponent implements OnInit {
       },
     });
     this.billing.getPlans().subscribe({ next: (r) => this.plans.set(r?.data ?? []) });
+    this.billing.getSignupRequests().subscribe({ next: (r) => this.requests.set(r?.data ?? []) });
+  }
+
+  approveReq(r: any): void {
+    if (!confirm(`اعتماد طلب «${r.school_name}» وإنشاء نطاق ${r.subdomain}.nebras.com؟`)) return;
+    this.billing.approveSignup(r.id).subscribe({
+      next: (res) => { this.notify.success(res?.message || 'تم الاعتماد وإنشاء المستأجر.'); this.load(); },
+      error: (e) => this.notify.error(e?.error?.message || 'تعذّر الاعتماد.'),
+    });
+  }
+  rejectReq(r: any): void {
+    const reason = prompt('سبب الرفض (اختياري):') ?? undefined;
+    this.billing.rejectSignup(r.id, reason).subscribe({
+      next: () => { this.notify.success('تم رفض الطلب.'); this.load(); },
+      error: () => this.notify.error('تعذّر الرفض.'),
+    });
   }
 
   openNew(): void { this.form = { name_ar: '', subdomain: '', email: '', phone_number: '', is_active: true }; this.editing.set({}); }

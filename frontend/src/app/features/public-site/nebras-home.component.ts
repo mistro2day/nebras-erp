@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -15,7 +16,7 @@ interface PublicPlan {
   selector: 'app-nebras-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="site" dir="rtl">
       <!-- شريط علوي -->
@@ -40,8 +41,8 @@ interface PublicPlan {
             <p>نبراس نظام ERP مدرسي عربيّ حديث: القبول، الطلاب، الأكاديميات، الامتحانات،
                المالية، شؤون الموظفين، والتقارير — بتصميم أنيق ودعم كامل للّغة العربية.</p>
             <div class="hero-cta">
-              <button class="btn primary" (click)="scrollTo('pricing')">اطّلع على الباقات</button>
-              <button class="btn ghost" (click)="scrollTo('contact')">اطلب عرضاً</button>
+              <button class="btn primary" (click)="openSignup()">اطلب المنصّة</button>
+              <button class="btn ghost" (click)="scrollTo('pricing')">اطّلع على الباقات</button>
             </div>
           </div>
           <div class="hero-art">
@@ -87,7 +88,7 @@ interface PublicPlan {
                     <li>{{ p.max_branches ? p.max_branches : '∞' }} فرع/فروع</li>
                     <li>{{ p.modules.length }} وحدة مفعّلة</li>
                   </ul>
-                  <button class="btn" [class.primary]="i === 1" [class.ghost]="i !== 1" (click)="scrollTo('contact')">اطلب هذه الباقة</button>
+                  <button class="btn" [class.primary]="i === 1" [class.ghost]="i !== 1" (click)="openSignup(p.id)">اطلب هذه الباقة</button>
                 </article>
               }
             </div>
@@ -99,10 +100,61 @@ interface PublicPlan {
       <section id="contact" class="contact">
         <div class="wrap contact-in">
           <h2>جاهز لتبدأ؟</h2>
-          <p>راسلنا لتفعيل نطاق مدرستك الخاص (مثال: <span class="mono">madrasati.nebras.com</span>) والحصول على فترة تجريبية.</p>
-          <a class="btn primary" href="mailto:sales@nebras.edu">sales&#64;nebras.edu</a>
+          <p>اطلب تفعيل نطاق مدرستك الخاص (مثال: <span class="mono">madrasati.nebras.com</span>) — نراجع طلبك ونفعّل فترة تجريبية.</p>
+          <button class="btn primary" (click)="openSignup()">اطلب المنصّة الآن</button>
+          <p class="or">أو راسلنا: <a href="mailto:sales@nebras.edu">sales&#64;nebras.edu</a></p>
         </div>
       </section>
+
+      <!-- نموذج طلب الانضمام -->
+      @if (showSignup()) {
+        <div class="overlay" (click)="showSignup.set(false)">
+          <div class="signup" (click)="$event.stopPropagation()">
+            @if (submitted()) {
+              <div class="done">
+                <span class="ok">✓</span>
+                <h3>تم استلام طلبك</h3>
+                <p>سنراجع طلب مدرسة «{{ form.school_name }}» ونوافيك على {{ form.email }} فور التفعيل.</p>
+                <button class="btn primary" (click)="showSignup.set(false)">تمام</button>
+              </div>
+            } @else {
+              <h3>اطلب منصّة نبراس لمدرستك</h3>
+              <div class="fields">
+                <label>اسم المدرسة<input [(ngModel)]="form.school_name" placeholder="مثال: مدارس النور" /></label>
+                <label>النطاق الفرعي المطلوب
+                  <div class="sub-in">
+                    <input [(ngModel)]="form.subdomain" (input)="onSubdomainChange()" placeholder="al-noor" />
+                    <span class="suffix">.nebras.com</span>
+                  </div>
+                  @if (form.subdomain) {
+                    @if (checking()) { <small class="hint">جارٍ التحقق…</small> }
+                    @else if (available() === true) { <small class="hint ok">✓ متاح</small> }
+                    @else if (available() === false) { <small class="hint bad">✕ غير متاح، جرّب اسماً آخر</small> }
+                  }
+                </label>
+                <div class="grid2">
+                  <label>اسم المسؤول<input [(ngModel)]="form.contact_name" /></label>
+                  <label>البريد<input type="email" [(ngModel)]="form.email" /></label>
+                  <label>الهاتف<input [(ngModel)]="form.phone" /></label>
+                  <label>المدينة<input [(ngModel)]="form.city" /></label>
+                </div>
+                <label>الباقة المطلوبة
+                  <select [(ngModel)]="form.plan">
+                    <option value="">— بلا تحديد —</option>
+                    @for (p of plans(); track p.id) { <option [value]="p.id">{{ p.name_ar }}</option> }
+                  </select>
+                </label>
+              </div>
+              <div class="signup-actions">
+                <button class="btn ghost" (click)="showSignup.set(false)">إلغاء</button>
+                <button class="btn primary" [disabled]="submitting() || !canSubmit()" (click)="submitSignup()">
+                  {{ submitting() ? 'جارٍ الإرسال…' : 'إرسال الطلب' }}
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       <footer class="foot">
         <div class="wrap">© {{ year }} نبراس — منصّة إدارة المدارس. جميع الحقوق محفوظة.</div>
@@ -166,7 +218,30 @@ interface PublicPlan {
     .contact p { color: #475569; font-size: 15px; margin: 10px 0 22px; }
     .mono { font-family: ui-monospace, monospace; direction: ltr; color: var(--teal); }
 
+    .contact .or { font-size: 13px; margin-top: 14px; }
+    .contact .or a { color: var(--teal); font-weight: 700; }
+
     .foot { padding: 26px 0; border-top: 1px solid var(--line); text-align: center; color: #94a3b8; font-size: 13px; }
+
+    .overlay { position: fixed; inset: 0; background: rgba(2,6,23,.55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+    .signup { background: #fff; border-radius: 18px; padding: 26px; width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(2,6,23,.3); }
+    .signup h3 { margin: 0 0 16px; font-size: 20px; font-weight: 800; }
+    .fields { display: flex; flex-direction: column; gap: 14px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fields label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: #334155; }
+    .fields input, .fields select { height: 40px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-family: inherit; font-size: 14px; outline: none; background: #fff; }
+    .fields input:focus, .fields select:focus { border-color: var(--teal); }
+    .sub-in { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .sub-in input { border: none; border-radius: 0; flex: 1; }
+    .sub-in .suffix { display: flex; align-items: center; padding: 0 12px; background: #f1f5f9; color: #64748b; font-size: 13px; direction: ltr; }
+    .hint { font-size: 12px; font-weight: 700; }
+    .hint.ok { color: var(--teal); }
+    .hint.bad { color: #dc2626; }
+    .signup-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .done { text-align: center; padding: 12px; }
+    .done .ok { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: color-mix(in srgb, var(--teal) 14%, #fff); color: var(--teal); font-size: 28px; font-weight: 800; }
+    .done h3 { margin: 14px 0 8px; }
+    .done p { color: #64748b; margin: 0 0 20px; }
 
     @media (max-width: 820px) {
       .hero-in { grid-template-columns: 1fr; }
@@ -183,6 +258,16 @@ export class NebrasHomeComponent implements OnInit {
   readonly loading = signal(true);
   readonly year = new Date().getFullYear();
 
+  // طلب الانضمام
+  readonly showSignup = signal(false);
+  readonly submitting = signal(false);
+  readonly submitted = signal(false);
+  readonly checking = signal(false);
+  readonly available = signal<boolean | null>(null);
+  form: any = {};
+  private subCheckTimer: any = null;
+  private base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
+
   readonly featureList = [
     { i: '🎓', t: 'القبول والتسجيل', d: 'سير قبول كامل من الطلب حتى تسجيل الطالب، مع رسوم قابلة للضبط.' },
     { i: '📊', t: 'الأكاديميات والامتحانات', d: 'الصفوف والفصول والمواد ورصد الدرجات والكشوف التفصيلية.' },
@@ -193,8 +278,7 @@ export class NebrasHomeComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
-    this.http.get<any>(`${base}saas-billing/plans/public/`).subscribe({
+    this.http.get<any>(`${this.base}saas-billing/plans/public/`).subscribe({
       next: (r) => { this.plans.set(r?.data ?? r ?? []); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
@@ -202,4 +286,44 @@ export class NebrasHomeComponent implements OnInit {
 
   scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
   login(): void { this.router.navigate(['/accounts/login']); }
+
+  openSignup(planId?: string): void {
+    this.form = { school_name: '', subdomain: '', contact_name: '', email: '', phone: '', city: '', plan: planId || '' };
+    this.available.set(null);
+    this.submitted.set(false);
+    this.showSignup.set(true);
+  }
+
+  onSubdomainChange(): void {
+    this.available.set(null);
+    if (this.subCheckTimer) clearTimeout(this.subCheckTimer);
+    const val = (this.form.subdomain || '').trim();
+    if (!val) return;
+    this.checking.set(true);
+    this.subCheckTimer = setTimeout(() => {
+      this.http.get<any>(`${this.base}saas-billing/signup-requests/check_subdomain/?subdomain=${encodeURIComponent(val)}`)
+        .subscribe({
+          next: (r) => {
+            const d = r?.data ?? r;
+            this.available.set(!!d?.available);
+            if (d?.subdomain) this.form.subdomain = d.subdomain;
+            this.checking.set(false);
+          },
+          error: () => { this.available.set(null); this.checking.set(false); },
+        });
+    }, 400);
+  }
+
+  canSubmit(): boolean {
+    return !!this.form.school_name && !!this.form.email && this.available() === true;
+  }
+
+  submitSignup(): void {
+    if (!this.canSubmit()) return;
+    this.submitting.set(true);
+    this.http.post<any>(`${this.base}saas-billing/signup-requests/`, this.form).subscribe({
+      next: () => { this.submitting.set(false); this.submitted.set(true); },
+      error: () => { this.submitting.set(false); },
+    });
+  }
 }

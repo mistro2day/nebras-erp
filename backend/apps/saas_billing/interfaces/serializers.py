@@ -1,8 +1,20 @@
 from rest_framework import serializers
 from apps.saas_billing.domain.models import (
     SubscriptionPlan, TenantSubscription, Invoice, InvoiceLineItem, Payment,
-    PaymentSubmission,
+    PaymentSubmission, TenantSignupRequest,
 )
+
+
+class TenantSignupRequestSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    plan_name = serializers.CharField(source='plan.name_ar', read_only=True)
+    created_tenant_subdomain = serializers.CharField(source='created_tenant.subdomain', read_only=True)
+
+    class Meta:
+        model = TenantSignupRequest
+        fields = '__all__'
+        read_only_fields = ['id', 'status', 'reviewed_by', 'reviewed_at', 'rejection_reason',
+                            'created_tenant', 'created_at', 'updated_at']
 
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):

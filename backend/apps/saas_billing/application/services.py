@@ -264,6 +264,82 @@ def reject_payment_submission(submission, *, reviewed_by=None, reason=None):
     return submission
 
 
+_RESERVED_SUBDOMAINS = {'www', 'app', 'admin', 'api', 'portal', 'mail', 'static', 'assets'}
+
+
+def normalize_subdomain(raw: str) -> str:
+    import re
+    s = (raw or '').strip().lower()
+    s = re.sub(r'[^a-z0-9-]+', '-', s).strip('-')
+    return s
+
+
+def subdomain_available(subdomain: str, *, exclude_request_id=None) -> bool:
+    """هل النطاق الفرعي متاح؟ (غير محجوز، وغير مستخدم من مستأجر أو طلب معلّق آخر)."""
+    from apps.tenants.domain.models import Tenant
+    from apps.saas_billing.domain.models import TenantSignupRequest
+    s = normalize_subdomain(subdomain)
+    if not s or len(s) < 3 or s in _RESERVED_SUBDOMAINS:
+        return False
+    if Tenant.objects.filter(subdomain=s).exists():
+        return False
+    pending = TenantSignupRequest.objects.filter(subdomain=s, status='pending')
+    if exclude_request_id is not None:
+        pending = pending.exclude(id=exclude_request_id)
+    if pending.exists():
+        return False
+    return True
+
+
+def create_signup_request(*, school_name, subdomain, email, contact_name=None,
+                          phone=None, city=None, plan=None, note=None):
+    """يسجّل طلب انضمام مدرسة (لا يُنشئ مستأجراً — يبقى معلّقاً للمراجعة)."""
+    from apps.saas_billing.domain.models import TenantSignupRequest
+    s = normalize_subdomain(subdomain)
+    if not subdomain_available(s):
+        raise ValueError('النطاق الفرعي غير متاح أو غير صالح.')
+    return TenantSignupRequest.objects.create(
+        school_name=school_name, subdomain=s, email=email, contact_name=contact_name,
+        phone=phone, city=city, plan=plan, note=note,
+    )
+
+
+@transaction.atomic
+def approve_signup_request(req, *, reviewed_by=None, trial_days: int = 14):
+    """يعتمد طلب الانضمام: يُنشئ المستأجر + اشتراكاً تجريبياً على الخطة المطلوبة."""
+    from apps.tenants.domain.models import Tenant
+    if req.status != 'pending':
+        raise ValueError('لا يمكن اعتماد طلب غير معلّق.')
+    if not subdomain_available(req.subdomain, exclude_request_id=req.id):
+        raise ValueError('النطاق الفرعي لم يعد متاحاً.')
+
+    tenant = Tenant.objects.create(
+        name=req.school_name, name_ar=req.school_name, subdomain=req.subdomain,
+        email=req.email, phone_number=req.phone, is_active=True,
+    )
+    if req.plan:
+        create_subscription(tenant_id=tenant.id, plan=req.plan, trial_days=trial_days)
+
+    req.status = 'approved'
+    req.created_tenant = tenant
+    req.reviewed_by = reviewed_by
+    req.reviewed_at = timezone.now()
+    req.save(update_fields=['status', 'created_tenant', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    return tenant
+
+
+@transaction.atomic
+def reject_signup_request(req, *, reviewed_by=None, reason=None):
+    if req.status != 'pending':
+        raise ValueError('لا يمكن رفض طلب غير معلّق.')
+    req.status = 'rejected'
+    req.rejection_reason = reason
+    req.reviewed_by = reviewed_by
+    req.reviewed_at = timezone.now()
+    req.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    return req
+
+
 @dataclass
 class BillingMetrics:
     active_subscriptions: int
