@@ -63,6 +63,29 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
           <div class="empty">جارٍ تحميل المؤشرات…</div>
         }
 
+        <!-- الاستخدام مقابل حدود الخطة (للمستأجر الحالي) -->
+        @if (usage(); as u) {
+          @if (u.has_plan) {
+            <div class="panel usage-panel">
+              <h3>الاستخدام مقابل حدود الخطة — {{ u.plan_name }}</h3>
+              <div class="usage-grid">
+                @for (r of usageRows(u); track r.key) {
+                  <div class="usage-item" [class.over]="r.exceeded">
+                    <div class="u-top">
+                      <span class="u-lbl">{{ r.label }}</span>
+                      <span class="u-num">{{ r.current | number }} / {{ r.unlimited ? '∞' : (r.limit | number) }}</span>
+                    </div>
+                    <div class="u-track">
+                      <div class="u-fill" [class.hot]="r.pct >= 90" [style.width.%]="r.unlimited ? 4 : r.pct"></div>
+                    </div>
+                    @if (r.exceeded) { <span class="u-warn">تجاوزت الحدّ — يلزم ترقية الخطة</span> }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+
         <!-- توزيع الاشتراكات على الخطط -->
         <div class="panel">
           <h3>توزيع الاشتراكات على الخطط</h3>
@@ -271,6 +294,18 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
       background: linear-gradient(90deg, var(--nb-primary-500), var(--nb-primary-600)); width: 0; transition: width .7s cubic-bezier(.22,.61,.36,1); }
     .bc-value { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+    .usage-panel { margin-bottom: 16px; }
+    .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .usage-item { display: flex; flex-direction: column; gap: 6px; }
+    .u-top { display: flex; justify-content: space-between; align-items: baseline; }
+    .u-lbl { font-size: 12.5px; font-weight: 700; }
+    .u-num { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--nb-text-muted); }
+    .u-track { height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--nb-primary-600) 8%, transparent); overflow: hidden; }
+    .u-fill { height: 100%; border-radius: 99px; background: var(--nb-primary-600); width: 0; transition: width .7s cubic-bezier(.22,.61,.36,1); }
+    .u-fill.hot { background: var(--nb-danger); }
+    .usage-item.over .u-fill { background: var(--nb-danger); }
+    .u-warn { font-size: 11px; font-weight: 700; color: var(--nb-danger); }
+
     .plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
     .plan-card { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
       padding: 18px; display: flex; flex-direction: column; gap: 12px; }
@@ -330,6 +365,7 @@ export class SaasBillingDashboardComponent implements OnInit {
   readonly tab = signal<Tab>('overview');
 
   readonly metrics = signal<BillingMetrics | null>(null);
+  readonly usage = signal<any | null>(null);
   readonly plans = signal<SubscriptionPlan[]>([]);
   readonly subscriptions = signal<TenantSubscription[]>([]);
   readonly invoices = signal<Invoice[]>([]);
@@ -357,9 +393,15 @@ export class SaasBillingDashboardComponent implements OnInit {
 
   private loadAll(): void {
     this.svc.getMetrics().subscribe({ next: r => this.metrics.set(r?.data ?? r) });
+    this.svc.getUsage().subscribe({ next: r => this.usage.set(r?.data ?? null), error: () => this.usage.set(null) });
     this.svc.getPlans().subscribe({ next: r => this.plans.set(r?.data ?? []) });
     this.svc.getSubscriptions().subscribe({ next: r => this.subscriptions.set(r?.data ?? []) });
     this.svc.getInvoices().subscribe({ next: r => this.invoices.set(r?.data ?? []) });
+  }
+
+  usageRows(u: any): any[] {
+    const res = u?.resources || {};
+    return Object.keys(res).map(key => ({ key, ...res[key] }));
   }
 
   runCycle(): void {

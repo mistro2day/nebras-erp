@@ -49,7 +49,16 @@ class StudentApplicationService:
     """
     خدمات التطبيق لمعالجة وتنسيق كافة حالات استخدام الطلاب
     """
-    
+
+    @staticmethod
+    def _enforce_student_limit(tenant_id):
+        """يمنع تجاوز حدّ الطلاب في خطة اشتراك المستأجر (يترجم الخطأ لاستثناء الأعمال)."""
+        from apps.saas_billing.application.limits import ensure_can_add, PlanLimitExceeded
+        try:
+            ensure_can_add(tenant_id, 'students')
+        except PlanLimitExceeded as exc:
+            raise BusinessException(str(exc), code="plan_limit_exceeded")
+
     @classmethod
     @transaction.atomic
     def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None) -> Student:
@@ -68,6 +77,9 @@ class StudentApplicationService:
         # التحقق من عدم تسجيل الطالب مسبقاً
         if Student.objects.filter(student_number=applicant.application_number).exists():
             raise BusinessException("هذا الطالب مسجل بالفعل في النظام.", code="student_already_registered")
+
+        # التحقق من حدّ الطلاب في خطة اشتراك المستأجر
+        cls._enforce_student_limit(tenant_id)
 
         # 2. توليد رقم الطالب الفريد
         student_number = StudentNumberGenerator.generate(
@@ -193,6 +205,9 @@ class StudentApplicationService:
         """
         إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية الأساسية
         """
+        # التحقق من حدّ الطلاب في خطة اشتراك المستأجر
+        cls._enforce_student_limit(tenant_id)
+
         # 1. توليد رقم الطالب الأكاديمي
         student_number = StudentNumberGenerator.generate(
             tenant_id=tenant_id,

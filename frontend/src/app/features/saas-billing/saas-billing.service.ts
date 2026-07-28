@@ -73,6 +73,10 @@ export class SaasBillingService {
 
   getMetrics(): Observable<any> { return this.http.get(`${this.base}/dashboard/`); }
   runCycle(): Observable<any> { return this.http.post(`${this.base}/dashboard/run_cycle/`, {}); }
+  getUsage(tenantId?: string): Observable<any> {
+    const q = tenantId ? `?tenant_id=${tenantId}` : '';
+    return this.http.get(`${this.base}/dashboard/usage/${q}`);
+  }
 
   getPlans(): Observable<any> { return this.http.get(`${this.base}/plans/?page_size=100`); }
   createPlan(body: Partial<SubscriptionPlan>): Observable<any> { return this.http.post(`${this.base}/plans/`, body); }

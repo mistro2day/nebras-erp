@@ -27,6 +27,17 @@ class EmployeeViewSet(BaseCRUDViewSet):
         qs = super().get_queryset()
         return qs.order_by('-created_at')
 
+    def create(self, request, *args, **kwargs):
+        # التحقق من حدّ الموظفين في خطة اشتراك المستأجر
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        from apps.saas_billing.application.limits import ensure_can_add, PlanLimitExceeded
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        try:
+            ensure_can_add(tenant_id, 'staff')
+        except PlanLimitExceeded as exc:
+            raise DRFValidationError({'detail': str(exc)})
+        return super().create(request, *args, **kwargs)
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'advances', 'create_advance', 'all_advances']:
             return []

@@ -147,3 +147,15 @@ class BillingDashboardView(viewsets.ViewSet):
         """تشغيل دورة الفوترة يدوياً الآن (تجديد + متأخرات + تصعيد)."""
         summary = services.run_billing_cycle()
         return StandardResponse(data=summary, message='تم تشغيل دورة الفوترة')
+
+    @action(detail=False, methods=['get'])
+    def usage(self, request):
+        """استخدام المستأجر مقابل حدود خطته (الطلاب/الموظفون/الفروع/الوحدات)."""
+        from apps.saas_billing.application import limits
+        tenant_id = request.query_params.get('tenant_id')
+        if not tenant_id and hasattr(request, 'tenant') and request.tenant:
+            tenant_id = request.tenant.id
+        if not tenant_id:
+            return StandardResponse(success=False, message='tenant_id مطلوب',
+                                    status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(data=limits.get_usage(tenant_id))

@@ -48,6 +48,17 @@ class BranchViewSet(OrganizationBaseViewSet):
     serializer_class = BranchSerializer
     search_fields = ['name', 'name_ar', 'code', 'city']
 
+    def perform_create(self, serializer):
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        # التحقق من حدّ الفروع في خطة اشتراك المستأجر
+        from apps.saas_billing.application.limits import ensure_can_add, PlanLimitExceeded
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        try:
+            ensure_can_add(tenant_id, 'branches')
+        except PlanLimitExceeded as exc:
+            raise DRFValidationError({'detail': str(exc)})
+        serializer.save(tenant_id=tenant_id)
+
 
 class CampusViewSet(OrganizationBaseViewSet):
     model_class = Campus
