@@ -1,11 +1,17 @@
 import { Routes } from '@angular/router';
 import { DashboardLayoutComponent } from './layouts/dashboard-layout/dashboard-layout.component';
 import { authGuard } from './core/guards/auth.guard';
+import { publicSurfaceGuard } from './core/guards/surface.guard';
 
 export const routes: Routes = [
   {
     path: 'accounts',
     loadChildren: () => import('./features/accounts/accounts.routes').then((m) => m.ACCOUNTS_ROUTES),
+  },
+  // الموقع العام لمنصّة نبراس — يظهر على النطاق الجذر (nebras.com). تسويقي بلا مصادقة.
+  {
+    path: 'nebras',
+    loadComponent: () => import('./features/public-site/nebras-home.component').then((m) => m.NebrasHomeComponent),
   },
   // بوابة الهبوط العامة — أول ما يراه الزائر (تقديم / تتبّع / دخول الإدارة).
   {
@@ -32,8 +38,8 @@ export const routes: Routes = [
   {
     path: '',
     component: DashboardLayoutComponent,
-    // بوابة الدخول: لا تُعرض لوحة التحكم قبل المصادقة — يُعاد التوجيه إلى /accounts/login.
-    canActivate: [authGuard],
+    // أولاً حارس السطح (نطاق نبراس الجذر ← الموقع العام)، ثم بوابة الدخول.
+    canActivate: [publicSurfaceGuard, authGuard],
     children: [
       {
         path: 'dashboard',

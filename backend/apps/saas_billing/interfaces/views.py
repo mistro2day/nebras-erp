@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from apps.common.responses import StandardResponse, StandardPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -26,6 +26,12 @@ class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['code', 'name_ar', 'name_en']
     ordering_fields = ['sort_order', 'price', 'created_at']
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def public(self, request):
+        """الباقات العامة المعروضة في موقع نبراس التسويقي (بلا مصادقة)."""
+        plans = SubscriptionPlan.objects.filter(is_active=True, is_public=True).order_by('sort_order', 'price')
+        return StandardResponse(data=SubscriptionPlanSerializer(plans, many=True).data)
 
 
 class TenantSubscriptionViewSet(viewsets.ModelViewSet):
