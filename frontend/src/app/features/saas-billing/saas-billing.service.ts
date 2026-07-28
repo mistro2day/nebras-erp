@@ -72,6 +72,7 @@ export class SaasBillingService {
   private base = '/api/v1/saas-billing';
 
   getMetrics(): Observable<any> { return this.http.get(`${this.base}/dashboard/`); }
+  runCycle(): Observable<any> { return this.http.post(`${this.base}/dashboard/run_cycle/`, {}); }
 
   getPlans(): Observable<any> { return this.http.get(`${this.base}/plans/?page_size=100`); }
   createPlan(body: Partial<SubscriptionPlan>): Observable<any> { return this.http.post(`${this.base}/plans/`, body); }

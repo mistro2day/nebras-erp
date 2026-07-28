@@ -141,3 +141,9 @@ class BillingDashboardView(viewsets.ViewSet):
             'collected_this_year': m.collected_this_year,
             'overdue_invoices': m.overdue_invoices,
         })
+
+    @action(detail=False, methods=['post'])
+    def run_cycle(self, request):
+        """تشغيل دورة الفوترة يدوياً الآن (تجديد + متأخرات + تصعيد)."""
+        summary = services.run_billing_cycle()
+        return StandardResponse(data=summary, message='تم تشغيل دورة الفوترة')

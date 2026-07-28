@@ -272,6 +272,16 @@ except Exception:  # noqa: BLE001
     CELERY_BEAT_SCHEDULER = 'celery.beat:PersistentScheduler'
     DJANGO_CELERY_BEAT_AVAILABLE = False
 
+# جدول المهام الدورية الثابت (يُستخدم مع PersistentScheduler، ويُبذَر أيضاً في
+# DatabaseScheduler عند توفّره). دورة فوترة المنصّة تعمل يومياً في الساعة 02:00.
+from celery.schedules import crontab  # noqa: E402
+CELERY_BEAT_SCHEDULE = {
+    'saas-billing-daily-cycle': {
+        'task': 'apps.saas_billing.tasks.run_billing_cycle',
+        'schedule': crontab(hour=2, minute=0),
+    },
+}
+
 # ==========================================================
 # إعدادات البريد الإلكتروني (SMTP) — يدعم SendGrid / Mailgun / Amazon SES
 # ==========================================================

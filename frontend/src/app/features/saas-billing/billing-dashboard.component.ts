@@ -31,6 +31,11 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
 
       <!-- ===== نظرة عامة ===== -->
       @if (tab() === 'overview') {
+        <div class="bar-actions no-print">
+          <button class="btn ghost" [disabled]="cycling()" (click)="runCycle()">
+            {{ cycling() ? '⏳ جارٍ التشغيل…' : '🔄 تشغيل دورة الفوترة الآن' }}
+          </button>
+        </div>
         @if (metrics(); as m) {
           <div class="kpi-row">
             <div class="kpi accent">
@@ -329,6 +334,7 @@ export class SaasBillingDashboardComponent implements OnInit {
   readonly subscriptions = signal<TenantSubscription[]>([]);
   readonly invoices = signal<Invoice[]>([]);
   readonly saving = signal(false);
+  readonly cycling = signal(false);
 
   readonly editingPlan = signal<SubscriptionPlan | null>(null);
   readonly payingInvoice = signal<Invoice | null>(null);
@@ -354,6 +360,19 @@ export class SaasBillingDashboardComponent implements OnInit {
     this.svc.getPlans().subscribe({ next: r => this.plans.set(r?.data ?? []) });
     this.svc.getSubscriptions().subscribe({ next: r => this.subscriptions.set(r?.data ?? []) });
     this.svc.getInvoices().subscribe({ next: r => this.invoices.set(r?.data ?? []) });
+  }
+
+  runCycle(): void {
+    this.cycling.set(true);
+    this.svc.runCycle().subscribe({
+      next: (r) => {
+        this.cycling.set(false);
+        const d = r?.data ?? {};
+        this.notify.success(`دورة الفوترة: ${d.renewed || 0} تجديد، ${d.invoiced || 0} فاتورة، ${d.suspended || 0} إيقاف.`);
+        this.loadAll();
+      },
+      error: () => { this.cycling.set(false); this.notify.error('تعذّر تشغيل دورة الفوترة.'); },
+    });
   }
 
   // ---- الخطط ----

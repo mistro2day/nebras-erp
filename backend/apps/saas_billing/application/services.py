@@ -135,6 +135,91 @@ def sync_overdue_invoices() -> int:
     return count
 
 
+@transaction.atomic
+def renew_due_subscriptions(today: date | None = None) -> dict:
+    """يجدّد الاشتراكات التي انتهت دورتها الحالية.
+
+    - الاشتراك النشط/المتأخر الذي وصل نهاية دورته: تُدفع الدورة إلى التالية وتُولّد
+      فاتورة تجديد جديدة.
+    - المطلوب إلغاؤه في نهاية الدورة (cancel_at_period_end): يُنهى بدل تجديده.
+    """
+    today = today or timezone.now().date()
+    renewed, invoiced, ended = 0, 0, 0
+
+    due = TenantSubscription.objects.select_related('plan').filter(
+        current_period_end__lte=today,
+    ).exclude(status__in=[SubscriptionStatus.CANCELED, SubscriptionStatus.EXPIRED])
+
+    for sub in due:
+        if sub.cancel_at_period_end:
+            sub.status = SubscriptionStatus.EXPIRED
+            sub.save(update_fields=['status', 'updated_at'])
+            ended += 1
+            continue
+
+        # دفع الدورة إلى التالية اعتباراً من نهاية الدورة الحالية
+        new_start = sub.current_period_end
+        sub.current_period_start = new_start
+        sub.current_period_end = _period_end(new_start, sub.plan.billing_cycle)
+        if sub.status == SubscriptionStatus.TRIAL:
+            sub.status = SubscriptionStatus.ACTIVE
+        sub.save(update_fields=['current_period_start', 'current_period_end', 'status', 'updated_at'])
+        renewed += 1
+
+        generate_invoice_for_subscription(sub, issue=today)
+        invoiced += 1
+
+    return {'renewed': renewed, 'invoiced': invoiced, 'ended': ended}
+
+
+@transaction.atomic
+def enforce_delinquency(today: date | None = None, *,
+                        past_due_after_days: int = 1,
+                        suspend_after_days: int = 30) -> dict:
+    """يصعّد حالة الاشتراكات ذات الفواتير المتأخرة.
+
+    - فاتورة متأخرة منذ ``past_due_after_days``: الاشتراك → متأخر السداد.
+    - متأخرة منذ ``suspend_after_days`` أو أكثر: الاشتراك → موقوف.
+    """
+    today = today or timezone.now().date()
+    marked_past_due, suspended = 0, 0
+    seen: set = set()  # كل اشتراك يُعالَج مرّة، فلا تتضخّم العدادات بفواتيره المتعدّدة
+
+    overdue = Invoice.objects.filter(status=InvoiceStatus.OVERDUE).select_related('subscription')
+    for inv in overdue:
+        sub = inv.subscription
+        if not sub or sub.id in seen or sub.status in (
+                SubscriptionStatus.CANCELED, SubscriptionStatus.EXPIRED, SubscriptionStatus.SUSPENDED):
+            continue
+        overdue_days = (today - inv.due_date).days if inv.due_date else 0
+        if overdue_days >= suspend_after_days:
+            sub.status = SubscriptionStatus.SUSPENDED
+            sub.save(update_fields=['status', 'updated_at'])
+            suspended += 1
+            seen.add(sub.id)
+        elif overdue_days >= past_due_after_days and sub.status == SubscriptionStatus.ACTIVE:
+            sub.status = SubscriptionStatus.PAST_DUE
+            sub.save(update_fields=['status', 'updated_at'])
+            marked_past_due += 1
+            seen.add(sub.id)
+
+    return {'past_due': marked_past_due, 'suspended': suspended}
+
+
+def run_billing_cycle(today: date | None = None) -> dict:
+    """المنسّق اليومي لدورة الفوترة: متأخرات → تجديد → تصعيد الحالة."""
+    today = today or timezone.now().date()
+    overdue = sync_overdue_invoices()
+    renew = renew_due_subscriptions(today)
+    delinquency = enforce_delinquency(today)
+    return {
+        'date': today.isoformat(),
+        'overdue_flagged': overdue,
+        **renew,
+        **delinquency,
+    }
+
+
 @dataclass
 class BillingMetrics:
     active_subscriptions: int
