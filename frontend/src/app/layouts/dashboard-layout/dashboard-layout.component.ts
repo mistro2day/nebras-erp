@@ -191,16 +191,20 @@ import { FormsModule } from '@angular/forms';
           </a>
         </div>
 
-        <div class="sidebar-user" [matMenuTriggerFor]="userMenu">
-          <div class="user-avatar">{{ userInitials() }}</div>
+        <div class="sidebar-user" [matMenuTriggerFor]="userMenu" title="إعدادات الحساب والملف الشخصي">
+          @if (userAvatarUrl()) {
+            <img [src]="userAvatarUrl()" class="user-avatar-img" alt="صورة الملف الشخصي" />
+          } @else {
+            <div class="user-avatar">{{ userInitials() }}</div>
+          }
           <div class="user-meta">
             <span class="user-name">{{ userName() }}</span>
             <span class="user-role">{{ userRole() }}</span>
           </div>
         </div>
         <mat-menu #userMenu="matMenu">
-          <button mat-menu-item routerLink="/profile">إعدادات الحساب</button>
-          <button mat-menu-item (click)="logout()">تسجيل الخروج</button>
+          <button mat-menu-item routerLink="/profile">👤 إعدادات الحساب والملف الشخصي</button>
+          <button mat-menu-item (click)="logout()">🚪 تسجيل الخروج</button>
         </mat-menu>
       </aside>
 
@@ -261,7 +265,11 @@ import { FormsModule } from '@angular/forms';
               }
             }
           </mat-menu>
-          <div class="topbar-avatar" [matMenuTriggerFor]="userMenu">{{ userInitials() }}</div>
+          @if (userAvatarUrl()) {
+            <img [src]="userAvatarUrl()" class="topbar-avatar-img" [matMenuTriggerFor]="userMenu" alt="صورة الملف الشخصي" />
+          } @else {
+            <div class="topbar-avatar" [matMenuTriggerFor]="userMenu">{{ userInitials() }}</div>
+          }
         </header>
 
         <div class="page">
@@ -889,6 +897,30 @@ import { FormsModule } from '@angular/forms';
         cursor: pointer;
       }
 
+      .user-avatar-img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--nb-primary-200, #c7d2fe);
+        flex-shrink: 0;
+      }
+
+      .topbar-avatar-img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--nb-primary-300, #a5b4fc);
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+        &:hover {
+          transform: scale(1.08);
+          box-shadow: 0 2px 10px rgba(79, 70, 229, 0.3);
+        }
+      }
+
       .notif-btn { position: relative; }
       .notif-badge {
         position: absolute; top: -6px; left: -6px; min-width: 16px; height: 16px;
@@ -1295,6 +1327,7 @@ export class DashboardLayoutComponent {
       permission: 'settings:read',
       items: [
         { label: 'منصة النظام', icon: '🖥️', link: '/platform' },
+        { label: 'فوترة المنصّة والاشتراكات', icon: '💳', link: '/saas-billing' },
         { label: 'الإعدادات والميزات', icon: '🛠️', link: '/config' },
         { label: 'التكامل', icon: '🔗', link: '/integration' },
         { label: 'التخصيص', icon: '🎨', link: '/personalization' },
@@ -1397,9 +1430,18 @@ export class DashboardLayoutComponent {
     () => this.tenantService.currentTenant()?.nameAr || 'مجموعة مدارس النبراس الأهلية'
   );
 
+  readonly userAvatarUrl = computed(() => {
+    const u = this.authService.currentUser();
+    return u?.avatar_url || u?.avatar || null;
+  });
+
   readonly userName = computed(() => {
     const u = this.authService.currentUser();
-    return u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'د. عبدالله المطيري' : 'د. عبدالله المطيري';
+    if (!u) return 'د. عبدالله المطيري';
+    const fn = u.first_name || u.firstName || '';
+    const ln = u.last_name || u.lastName || '';
+    const name = `${fn} ${ln}`.trim();
+    return name || 'د. عبدالله المطيري';
   });
 
   readonly userRole = computed(() => {
@@ -1415,8 +1457,10 @@ export class DashboardLayoutComponent {
 
   readonly userInitials = computed(() => {
     const u = this.authService.currentUser();
-    if (u?.firstName) {
-      return `${u.firstName.charAt(0)}.${(u.lastName ?? '').charAt(0)}`;
+    const fn = u?.first_name || u?.firstName;
+    const ln = u?.last_name || u?.lastName;
+    if (fn) {
+      return `${fn.charAt(0)}.${(ln || '').charAt(0)}`.toUpperCase();
     }
     return 'ع.م';
   });

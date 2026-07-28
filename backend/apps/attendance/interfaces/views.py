@@ -42,7 +42,7 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
         return qs
 
     def get_permissions(self):
-        if self.action in ['check_in', 'list', 'create']:
+        if self.action in ['check_in', 'clock_out', 'my_summary', 'live_status', 'list', 'create']:
             return []
         return super().get_permissions()
 
@@ -51,11 +51,16 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
         employee_id = request.data.get('employee')
         user_lat = float(request.data.get('latitude', 0))
         user_lng = float(request.data.get('longitude', 0))
+        device_id = request.data.get('device_id', '')
+        verification_method = request.data.get('verification_method', 'gps_biometric')
         
-        # محاكاة إحداثيات الفرع الرئيسي (الرياض)
-        branch_lat, branch_lng = 24.7136, 46.6753
+        # البحث عن سياسة الحضور النشطة أو استخدام قيم الفرع الافتراضية
+        policy = AttendancePolicy.objects.filter(is_active=True).first()
+        branch_lat = policy.latitude if policy else 24.7136
+        branch_lng = policy.longitude if policy else 46.6753
+        max_radius = policy.radius_meters if policy else 150
         
-        # حساب المسافة التقريبية
+        # حساب المسافة التقريبية (Haversine)
         from math import radians, cos, sin, asin, sqrt
         def haversine(lon1, lat1, lon2, lat2):
             lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
@@ -68,12 +73,12 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
 
         distance = haversine(user_lng, user_lat, branch_lng, branch_lat)
         
-        # إذا كان الموظف خارج النطاق (أكثر من 150 متر)
-        if distance > 150 and request.data.get('location_simulation') == 'outside':
+        # التثبت من المسافة (مع السماح بالوضع المحاكى للتطوير)
+        if distance > max_radius and request.data.get('location_simulation') == 'outside':
             return StandardResponse(
                 None, 
                 success=False, 
-                message="خطأ في تسجيل البصمة: أنت خارج النطاق الجغرافي المعتمد للفرع.",
+                message=f"خطأ في تسجيل البصمة: أنت تبعد {int(distance)} متراً خارج نطاق المدرسة المسموح ({max_radius}م).",
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -92,16 +97,84 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
             date=today,
             defaults={
                 'check_in': timezone.now().time(),
+                'check_in_lat': user_lat,
+                'check_in_lng': user_lng,
+                'device_id': device_id,
+                'verification_method': verification_method,
                 'status': 'present'
             }
         )
         
         if not created:
             record.check_out = timezone.now().time()
+            record.check_out_lat = user_lat
+            record.check_out_lng = user_lng
             record.save()
-            return StandardResponse(None, message="تم تسجيل انصراف الموظف بنجاح في قاعدة البيانات.")
+            return StandardResponse(
+                AttendanceRecordSerializer(record).data,
+                message="تم تسجيل انصراف الموظف بنجاح."
+            )
             
-        return StandardResponse(None, message="تم تسجيل حضور الموظف بنجاح في قاعدة البيانات.")
+        return StandardResponse(
+            AttendanceRecordSerializer(record).data,
+            message="تم تسجيل حضور الموظف بنجاح."
+        )
+
+    @action(detail=False, methods=['get'], url_path='my-summary')
+    def my_summary(self, request):
+        employee_id = request.query_params.get('employee')
+        if not employee_id:
+            return StandardResponse(None, success=False, message="مطلوب رقم الموظف.", status=status.HTTP_400_BAD_REQUEST)
+            
+        import datetime
+        today = datetime.date.today()
+        first_of_month = today.replace(day=1)
+        
+        records = AttendanceRecord.objects.filter(
+            employee_id=employee_id,
+            date__gte=first_of_month,
+            date__lte=today
+        )
+        
+        today_record = records.filter(date=today).first()
+        present_count = records.filter(status='present').count()
+        late_count = records.filter(status='late').count()
+        absent_count = records.filter(status='absent').count()
+        
+        return StandardResponse({
+            'today_record': AttendanceRecordSerializer(today_record).data if today_record else None,
+            'stats': {
+                'present_days': present_count,
+                'late_days': late_count,
+                'absent_days': absent_count,
+                'total_working_days': records.count()
+            }
+        })
+
+    @action(detail=False, methods=['get'], url_path='live-status')
+    def live_status(self, request):
+        import datetime
+        today = datetime.date.today()
+        records = AttendanceRecord.objects.filter(date=today).select_related('employee')
+        
+        present_list = []
+        for r in records:
+            present_list.append({
+                'id': str(r.id),
+                'employee_id': str(r.employee.id),
+                'employee_name': r.employee.full_name_ar,
+                'department': r.employee.department,
+                'check_in': r.check_in.strftime('%H:%M') if r.check_in else None,
+                'check_out': r.check_out.strftime('%H:%M') if r.check_out else None,
+                'status': r.status,
+                'verification_method': r.verification_method,
+            })
+            
+        return StandardResponse({
+            'date': today.isoformat(),
+            'total_present_today': len(present_list),
+            'records': present_list
+        })
 
 class CorrectionRequestViewSet(BaseCRUDViewSet):
     model_class = CorrectionRequest

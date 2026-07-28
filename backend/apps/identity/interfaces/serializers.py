@@ -5,15 +5,25 @@ from apps.identity.domain.sessions import UserSession
 from apps.identity.domain.user_assignment import UserAssignment
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             'id', 'email', 'username', 'first_name', 'last_name', 'phone', 
-            'national_id', 'avatar', 'language', 'user_timezone', 'emergency_contact', 
+            'national_id', 'avatar', 'avatar_url', 'language', 'user_timezone', 'emergency_contact', 
             'preferences', 'metadata', 'status', 'is_active', 'is_staff', 
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'avatar_url']
+
+    def get_avatar_url(self, obj):
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 
 class CreateUserSerializer(serializers.ModelSerializer):

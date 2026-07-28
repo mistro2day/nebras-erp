@@ -2,11 +2,13 @@ from rest_framework import viewsets, status, permissions, filters
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from django.db.models import Q
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 
 from apps.identity.domain.models import User, PasswordHistory
 from apps.identity.domain.rbac import Role, Permission, UserRole, RolePermission
@@ -198,6 +200,35 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return CreateUserSerializer
         return UserSerializer
+
+    @action(detail=False, methods=['get', 'patch', 'put'], url_path='me', parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def me(self, request):
+        user = request.user
+        if request.method == 'GET':
+            serializer = UserSerializer(user, context={'request': request})
+            return StandardResponse(serializer.data)
+
+        data = request.data.copy()
+        
+        if 'avatar' in request.FILES:
+            user.avatar = request.FILES['avatar']
+        elif data.get('remove_avatar') in [True, 'true', '1']:
+            if user.avatar:
+                user.avatar.delete(save=False)
+            user.avatar = None
+
+        import json
+        if 'preferences' in data and isinstance(data['preferences'], str):
+            try:
+                data['preferences'] = json.loads(data['preferences'])
+            except Exception:
+                pass
+
+        serializer = UserSerializer(user, data=data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return StandardResponse(serializer.data, message="تم تحديث بيانات الملف الشخصي بنجاح.")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

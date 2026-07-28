@@ -77,6 +77,13 @@ export class AuthService {
     );
   }
 
+  updateCurrentUser(userData: any) {
+    const current = this.currentUser() || {};
+    const merged = { ...current, ...userData };
+    this.currentUser.set(merged);
+    localStorage.setItem('current_user', JSON.stringify(merged));
+  }
+
   hasPermission(permCode: string): boolean {
     if (this.isSuperuser()) return true;
     return this.userPermissions().includes(permCode);

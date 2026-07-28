@@ -289,6 +289,12 @@ class AutomationPlatformConfig(AppConfig):
     label = 'automation_platform'
     verbose_name = 'منصة الأتمتة المؤسسية: مصمم مسارات العمل والمنصة منخفضة الشيفرة والعمليات وDevOps'
 
+class SaasBillingConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.saas_billing'
+    label = 'saas_billing'
+    verbose_name = 'فوترة المنصّة واشتراكات المستأجرين (SaaS)'
+
 
 
 

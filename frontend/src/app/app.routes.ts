@@ -99,6 +99,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/reporting/reporting.routes').then((m) => m.REPORTING_ROUTES),
       },
       {
+        path: 'saas-billing',
+        loadChildren: () => import('./features/saas-billing/saas-billing.routes').then((m) => m.SAAS_BILLING_ROUTES),
+      },
+      {
         path: 'examinations',
         loadChildren: () => import('./features/examinations/examinations.routes').then((m) => m.EXAMINATIONS_ROUTES),
       },

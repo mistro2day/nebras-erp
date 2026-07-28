@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/v1/examinations/', include('apps.examinations.interfaces.urls')),
     path('api/v1/finance/', include('apps.finance.interfaces.urls')),
     path('api/v1/student-finance/', include('apps.student_finance.interfaces.urls')),
+    path('api/v1/saas-billing/', include('apps.saas_billing.interfaces.urls')),
     path('api/v1/procurement/', include('apps.procurement.interfaces.urls')),
     path('api/v1/inventory/', include('apps.inventory.interfaces.urls')),
     path('api/v1/assets/', include('apps.assets.interfaces.urls')),

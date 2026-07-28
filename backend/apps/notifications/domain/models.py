@@ -33,3 +33,17 @@ class NotificationHistory(CombinedBaseModel):
         indexes = [
             models.Index(fields=['tenant_id', 'status', 'scheduled_at']),
         ]
+
+
+class DeviceToken(CombinedBaseModel):
+    user_id = models.UUIDField(db_index=True, verbose_name="المستخدم")
+    token = models.TextField(verbose_name="FCM Token")
+    platform = models.CharField(max_length=20, default='android', verbose_name="نظام التشغيل") # android, ios, web
+    device_name = models.CharField(max_length=150, blank=True, null=True, verbose_name="اسم الجهاز")
+    is_active = models.BooleanField(default=True, verbose_name="نشط")
+
+    class Meta:
+        db_table = 'nebras_device_tokens'
+        unique_together = ('tenant_id', 'user_id', 'token')
+        verbose_name = "رمز جهاز التنبيهات"
+        verbose_name_plural = "رموز أجهزة التنبيهات"

@@ -20,7 +20,9 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
         model = AttendanceRecord
         fields = [
             'id', 'employee', 'employee_name', 'department', 'position',
-            'date', 'check_in', 'check_out', 'status', 'late_minutes', 'overtime_minutes'
+            'date', 'check_in', 'check_out', 'check_in_lat', 'check_in_lng',
+            'check_out_lat', 'check_out_lng', 'device_id', 'verification_method',
+            'status', 'late_minutes', 'overtime_minutes', 'notes'
         ]
 
 class CorrectionRequestSerializer(serializers.ModelSerializer):

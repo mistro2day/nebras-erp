@@ -8,6 +8,9 @@ class AttendancePolicy(CombinedSharedModel):
     name = models.CharField(max_length=100)
     grace_period_minutes = models.IntegerField(default=15)
     half_day_late_minutes = models.IntegerField(default=120)
+    latitude = models.FloatField(default=24.7136, help_text="إحداثيات خط العرض للمدرسة")
+    longitude = models.FloatField(default=46.6753, help_text="إحداثيات خط الطول للمدرسة")
+    radius_meters = models.IntegerField(default=150, help_text="نصف قطر النطاق المسموح بالمتر")
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -33,9 +36,16 @@ class AttendanceRecord(CombinedSharedModel):
     date = models.DateField()
     check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
+    check_in_lat = models.FloatField(null=True, blank=True)
+    check_in_lng = models.FloatField(null=True, blank=True)
+    check_out_lat = models.FloatField(null=True, blank=True)
+    check_out_lng = models.FloatField(null=True, blank=True)
+    device_id = models.CharField(max_length=150, null=True, blank=True)
+    verification_method = models.CharField(max_length=50, default='gps_biometric') # gps_biometric, manual, qr_code
     status = models.CharField(max_length=30, default='absent', db_index=True) # present, absent, late, leave
     late_minutes = models.IntegerField(default=0)
     overtime_minutes = models.IntegerField(default=0)
+    notes = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'nebras_attendance_records'

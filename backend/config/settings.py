@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'apps.apps.ConfigurationConfig',
     'apps.apps.ApprovalCenterConfig',
     'apps.apps.AutomationPlatformConfig',
+    'apps.apps.SaasBillingConfig',
     'apps.common',
 ]
 
