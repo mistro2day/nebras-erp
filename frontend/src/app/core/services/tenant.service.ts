@@ -36,10 +36,15 @@ export class TenantService {
   // السطح ونطاق المستأجر الفرعي المُستخرَجان من عنوان المتصفّح
   surface = signal<AppSurface>('tenant');
   subdomain = signal<string | null>(null);
+  isDevHost = signal(false);
 
   isPublicSite = () => this.surface() === 'public';
   isAdminSite = () => this.surface() === 'admin';
   isTenantSite = () => this.surface() === 'tenant';
+
+  /** منطقة المالك (إدارة المستأجرين/الفوترة/المنصّة): تظهر على سطح admin فقط،
+   *  وتبقى ظاهرة في التطوير المحلّي (localhost) لتيسير الاختبار. */
+  showOwnerArea = () => this.isAdminSite() || this.isDevHost();
 
   constructor() {
     this.resolveSurface(window.location.hostname);
@@ -54,6 +59,7 @@ export class TenantService {
     const isDevHost = DEV_HOST_SUFFIXES.some(s => host === s || host.endsWith(s));
     const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
     if (isDevHost || isIp) {
+      this.isDevHost.set(true);
       this.surface.set('tenant');
       this.subdomain.set(null);
       return;

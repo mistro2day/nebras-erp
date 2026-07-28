@@ -14,3 +14,16 @@ export const publicSurfaceGuard: CanActivateFn = () => {
   }
   return true;
 };
+
+/**
+ * حارس منطقة المالك: يمنع الوصول لشاشات المنصّة (إدارة المستأجرين/الفوترة) من
+ * داخل لوحة مستأجر. متاح على سطح admin وفي التطوير المحلّي فقط.
+ */
+export const ownerSurfaceGuard: CanActivateFn = () => {
+  const tenant = inject(TenantService);
+  const router = inject(Router);
+  if (tenant.showOwnerArea()) {
+    return true;
+  }
+  return router.createUrlTree(['/dashboard']);
+};

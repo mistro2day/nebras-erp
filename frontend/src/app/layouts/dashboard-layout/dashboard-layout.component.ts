@@ -20,6 +20,8 @@ interface NavItem {
   children?: NavItem[];
   /** صلاحية مطلوبة لإظهار العنصر (اختياري) — يُخفى إن لم يمتلكها المستخدم */
   permission?: string;
+  /** عنصر خاص بمالك المنصّة — يظهر على سطح admin فقط (ويُخفى داخل لوحة المستأجر) */
+  ownerOnly?: boolean;
 }
 
 interface NavGroup {
@@ -1331,6 +1333,7 @@ export class DashboardLayoutComponent {
           icon: '🖥️',
           match: '/platform',
           link: '/platform/dashboard',
+          ownerOnly: true,
           children: [
             { label: 'لوحة النظام', link: '/platform/dashboard' },
             { label: 'إدارة المستأجرين', link: '/platform/tenants' },
@@ -1366,6 +1369,8 @@ export class DashboardLayoutComponent {
     this.authService.userPermissions();
 
     const canSee = (perm?: string) => !perm || this.authService.hasPermission(perm);
+    // عناصر المالك تُخفى داخل لوحة المستأجر (تظهر على سطح admin أو في التطوير المحلّي)
+    const showOwner = this.tenantService.showOwnerArea();
     const query = this.navFilterQuery().trim().toLowerCase();
 
     return this.navGroups
@@ -1375,6 +1380,7 @@ export class DashboardLayoutComponent {
 
         const matchingItems = group.items
           .filter((item) => canSee(item.permission))
+          .filter((item) => showOwner || !item.ownerOnly)
           .map((item) => {
             const matchesParent = !query || groupMatches || item.label.toLowerCase().includes(query);
             const matchingChildren = item.children?.filter(

@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { DashboardLayoutComponent } from './layouts/dashboard-layout/dashboard-layout.component';
 import { authGuard } from './core/guards/auth.guard';
-import { publicSurfaceGuard } from './core/guards/surface.guard';
+import { publicSurfaceGuard, ownerSurfaceGuard } from './core/guards/surface.guard';
 
 export const routes: Routes = [
   {
@@ -65,6 +65,7 @@ export const routes: Routes = [
       },
       {
         path: 'platform',
+        canActivate: [ownerSurfaceGuard],
         loadChildren: () => import('./features/platform/platform.routes').then((m) => m.PLATFORM_ROUTES),
       },
       {
@@ -106,6 +107,7 @@ export const routes: Routes = [
       },
       {
         path: 'saas-billing',
+        canActivate: [ownerSurfaceGuard],
         loadChildren: () => import('./features/saas-billing/saas-billing.routes').then((m) => m.SAAS_BILLING_ROUTES),
       },
       {
