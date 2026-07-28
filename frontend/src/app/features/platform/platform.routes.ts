@@ -11,6 +11,10 @@ export const PLATFORM_ROUTES: Routes = [
     loadComponent: () => import('./dashboard/dashboard.component').then(m => m.PlatformDashboardComponent)
   },
   {
+    path: 'tenants',
+    loadComponent: () => import('./tenants/tenants.component').then(m => m.PlatformTenantsComponent)
+  },
+  {
     path: 'settings',
     loadComponent: () => import('./settings/settings.component').then(m => m.PlatformSettingsComponent)
   },

@@ -97,4 +97,9 @@ export class PlatformService {
     formData.append('category', category);
     return this.apiClient.post('platform/storage/upload/', formData);
   }
+
+  // ==== إدارة المستأجرين (المدارس) — خاصّة بمالك المنصّة ====
+  getTenants(): Observable<any> { return this.apiClient.get<any>('tenants/branding/'); }
+  createTenant(body: any): Observable<any> { return this.apiClient.post('tenants/branding/', body); }
+  updateTenant(id: string, body: any): Observable<any> { return this.apiClient.patch(`tenants/branding/${id}/`, body); }
 }

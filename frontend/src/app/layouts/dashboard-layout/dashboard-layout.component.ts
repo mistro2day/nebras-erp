@@ -1326,8 +1326,18 @@ export class DashboardLayoutComponent {
       icon: '⚙️',
       permission: 'settings:read',
       items: [
-        { label: 'منصة النظام', icon: '🖥️', link: '/platform' },
-        { label: 'فوترة المنصّة والاشتراكات', icon: '💳', link: '/saas-billing' },
+        {
+          label: 'منصة النظام (المالك)',
+          icon: '🖥️',
+          match: '/platform',
+          link: '/platform/dashboard',
+          children: [
+            { label: 'لوحة النظام', link: '/platform/dashboard' },
+            { label: 'إدارة المستأجرين', link: '/platform/tenants' },
+            { label: 'فوترة المنصّة والاشتراكات', link: '/saas-billing' },
+            { label: 'السجلات', link: '/platform/logs' },
+          ],
+        },
         { label: 'الإعدادات والميزات', icon: '🛠️', link: '/config' },
         { label: 'التكامل', icon: '🔗', link: '/integration' },
         { label: 'التخصيص', icon: '🎨', link: '/personalization' },
