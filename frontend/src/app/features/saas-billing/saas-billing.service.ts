@@ -96,4 +96,11 @@ export class SaasBillingService {
   recordPayment(invoiceId: string, body: { amount: number; method: string; reference?: string }): Observable<any> {
     return this.http.post(`${this.base}/invoices/${invoiceId}/record_payment/`, body);
   }
+  submitPayment(invoiceId: string, form: FormData): Observable<any> {
+    return this.http.post(`${this.base}/invoices/${invoiceId}/submit_payment/`, form);
+  }
+
+  getSubmissions(params = ''): Observable<any> { return this.http.get(`${this.base}/payment-submissions/?page_size=100${params}`); }
+  approveSubmission(id: string): Observable<any> { return this.http.post(`${this.base}/payment-submissions/${id}/approve/`, {}); }
+  rejectSubmission(id: string, reason?: string): Observable<any> { return this.http.post(`${this.base}/payment-submissions/${id}/reject/`, { reason }); }
 }

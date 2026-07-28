@@ -7,7 +7,7 @@ import {
   SaasBillingService, SubscriptionPlan, TenantSubscription, Invoice, BillingMetrics,
 } from './saas-billing.service';
 
-type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
+type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices' | 'submissions';
 
 /** فوترة المنصّة (SaaS): مؤشرات الإيراد، خطط الاشتراك، اشتراكات المستأجرين، الفواتير والمدفوعات. */
 @Component({
@@ -25,7 +25,10 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
       <!-- التبويبات -->
       <div class="tabs no-print">
         @for (t of tabs; track t.id) {
-          <button [class.on]="tab() === t.id" (click)="tab.set(t.id)">{{ t.label }}</button>
+          <button [class.on]="tab() === t.id" (click)="tab.set(t.id)">
+            {{ t.label }}
+            @if (t.id === 'submissions' && pendingCount() > 0) { <span class="tab-badge">{{ pendingCount() }}</span> }
+          </button>
         }
       </div>
 
@@ -183,12 +186,72 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
                   <td class="acts">
                     @if (inv.status !== 'paid' && inv.status !== 'void') {
                       <button class="btn ghost xs" (click)="openPay(inv)">تسجيل دفعة</button>
+                      <button class="btn ghost xs" (click)="openSubmit(inv)">سداد ذاتي</button>
                     }
                   </td>
                 </tr>
               } @empty { <tr><td colspan="9" class="muted">لا توجد فواتير.</td></tr> }
             </tbody>
           </table>
+        </div>
+      }
+
+      <!-- ===== طلبات السداد الذاتي ===== -->
+      @if (tab() === 'submissions') {
+        <div class="scroll-x">
+          <table class="data">
+            <thead><tr>
+              <th>المستأجر</th><th>الفاتورة</th><th>المبلغ</th><th>البنك</th><th>المرجع</th>
+              <th>المرسِل</th><th>الإيصال</th><th>الحالة</th><th>إجراءات</th>
+            </tr></thead>
+            <tbody>
+              @for (s of submissions(); track s.id) {
+                <tr>
+                  <td>{{ s.tenant_name }}</td>
+                  <td class="mono">{{ s.invoice_number }}</td>
+                  <td>{{ s.amount | number:'1.0-0' }}</td>
+                  <td>{{ s.bank_name || '—' }}</td>
+                  <td class="mono">{{ s.transfer_reference || '—' }}</td>
+                  <td>{{ s.sender_name || '—' }}</td>
+                  <td>@if (s.receipt_attachment) { <a [href]="s.receipt_attachment" target="_blank">عرض</a> } @else { — }</td>
+                  <td><span class="chip" [class]="'sb-' + s.status">{{ s.status_display }}</span></td>
+                  <td class="acts">
+                    @if (s.status === 'pending') {
+                      <button class="btn primary xs" (click)="approve(s)">اعتماد</button>
+                      <button class="btn ghost xs" (click)="reject(s)">رفض</button>
+                    }
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="9" class="muted">لا توجد طلبات سداد.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <!-- مودال السداد الذاتي (تحويل بنكي) -->
+      @if (submittingInvoice(); as inv) {
+        <div class="overlay" (click)="submittingInvoice.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h3>سداد ذاتي — {{ inv.number }}</h3>
+            <p class="muted">المتبقّي: <b>{{ inv.balance_due | number:'1.0-0' }} {{ inv.currency }}</b></p>
+            <div class="fields">
+              <label>المبلغ المحوّل<input type="number" [(ngModel)]="submitForm.amount" /></label>
+              <div class="grid2">
+                <label>البنك<input [(ngModel)]="submitForm.bank_name" placeholder="بنك الخرطوم" /></label>
+                <label>تاريخ التحويل<input type="date" [(ngModel)]="submitForm.transfer_date" /></label>
+                <label>الرقم المرجعي<input [(ngModel)]="submitForm.transfer_reference" /></label>
+                <label>اسم المُحوِّل<input [(ngModel)]="submitForm.sender_name" /></label>
+              </div>
+              <label>إيصال التحويل<input type="file" (change)="onReceiptPick($event)" accept="image/*,application/pdf" /></label>
+              <label>ملاحظة<textarea rows="2" [(ngModel)]="submitForm.note"></textarea></label>
+            </div>
+            <div class="modal-actions">
+              <button class="btn ghost" (click)="submittingInvoice.set(null)">إلغاء</button>
+              <button class="btn primary" [disabled]="saving() || !submitForm.amount" (click)="submitSelfPayment()">
+                {{ saving() ? 'جارٍ الإرسال…' : 'إرسال للمراجعة' }}
+              </button>
+            </div>
+          </div>
         </div>
       }
 
@@ -338,6 +401,12 @@ type Tab = 'overview' | 'plans' | 'subscriptions' | 'invoices';
     .st-past_due, .iv-overdue { background: color-mix(in srgb, var(--nb-danger) 16%, transparent); color: var(--nb-danger); }
     .st-suspended, .st-canceled, .st-expired, .iv-void { background: color-mix(in srgb, var(--nb-text-muted) 16%, transparent); color: var(--nb-text-muted); }
     .iv-open { background: color-mix(in srgb, #d97706 16%, transparent); color: #d97706; }
+    .sb-approved { background: color-mix(in srgb, var(--nb-success) 16%, transparent); color: var(--nb-success); }
+    .sb-pending { background: color-mix(in srgb, #d97706 16%, transparent); color: #d97706; }
+    .sb-rejected { background: color-mix(in srgb, var(--nb-danger) 16%, transparent); color: var(--nb-danger); }
+    .tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px;
+      padding: 0 5px; margin-inline-start: 6px; border-radius: 99px; background: var(--nb-danger); color: #fff;
+      font-size: 11px; font-weight: 800; }
 
     .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
     .modal { background: var(--nb-surface); border-radius: var(--nb-radius-card); padding: 22px; width: 100%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,.25); max-height: 90vh; overflow-y: auto; }
@@ -361,6 +430,7 @@ export class SaasBillingDashboardComponent implements OnInit {
     { id: 'plans', label: 'الخطط' },
     { id: 'subscriptions', label: 'الاشتراكات' },
     { id: 'invoices', label: 'الفواتير' },
+    { id: 'submissions', label: 'طلبات السداد' },
   ];
   readonly tab = signal<Tab>('overview');
 
@@ -369,13 +439,19 @@ export class SaasBillingDashboardComponent implements OnInit {
   readonly plans = signal<SubscriptionPlan[]>([]);
   readonly subscriptions = signal<TenantSubscription[]>([]);
   readonly invoices = signal<Invoice[]>([]);
+  readonly submissions = signal<any[]>([]);
   readonly saving = signal(false);
   readonly cycling = signal(false);
 
   readonly editingPlan = signal<SubscriptionPlan | null>(null);
   readonly payingInvoice = signal<Invoice | null>(null);
+  readonly submittingInvoice = signal<Invoice | null>(null);
   planForm: Partial<SubscriptionPlan> = {};
   payForm: { amount: number | null; method: string; reference: string } = { amount: null, method: 'bank_transfer', reference: '' };
+  submitForm: any = {};
+  private receiptFile: File | null = null;
+
+  readonly pendingCount = computed(() => this.submissions().filter(s => s.status === 'pending').length);
 
   readonly planDistribution = computed(() => {
     const subs = this.subscriptions();
@@ -397,6 +473,47 @@ export class SaasBillingDashboardComponent implements OnInit {
     this.svc.getPlans().subscribe({ next: r => this.plans.set(r?.data ?? []) });
     this.svc.getSubscriptions().subscribe({ next: r => this.subscriptions.set(r?.data ?? []) });
     this.svc.getInvoices().subscribe({ next: r => this.invoices.set(r?.data ?? []) });
+    this.svc.getSubmissions().subscribe({ next: r => this.submissions.set(r?.data ?? []) });
+  }
+
+  // ---- طلبات السداد الذاتي ----
+  onReceiptPick(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    this.receiptFile = input.files?.[0] ?? null;
+  }
+  openSubmit(inv: Invoice): void {
+    this.submitForm = { amount: inv.balance_due, bank_name: 'بنك الخرطوم', transfer_reference: '', transfer_date: '', sender_name: '', note: '' };
+    this.receiptFile = null;
+    this.submittingInvoice.set(inv);
+  }
+  submitSelfPayment(): void {
+    const inv = this.submittingInvoice();
+    if (!inv || !this.submitForm.amount) return;
+    this.saving.set(true);
+    const fd = new FormData();
+    fd.append('amount', String(this.submitForm.amount));
+    fd.append('method', 'bank_transfer');
+    for (const k of ['bank_name', 'transfer_reference', 'transfer_date', 'sender_name', 'note']) {
+      if (this.submitForm[k]) fd.append(k, this.submitForm[k]);
+    }
+    if (this.receiptFile) fd.append('receipt_attachment', this.receiptFile);
+    this.svc.submitPayment(inv.id, fd).subscribe({
+      next: () => { this.saving.set(false); this.submittingInvoice.set(null); this.notify.success('أُرسل طلب السداد للمراجعة.'); this.loadAll(); this.tab.set('submissions'); },
+      error: () => { this.saving.set(false); this.notify.error('تعذّر إرسال طلب السداد.'); },
+    });
+  }
+  approve(s: any): void {
+    this.svc.approveSubmission(s.id).subscribe({
+      next: () => { this.notify.success('تم اعتماد السداد.'); this.loadAll(); },
+      error: () => this.notify.error('تعذّر الاعتماد.'),
+    });
+  }
+  reject(s: any): void {
+    const reason = prompt('سبب الرفض (اختياري):') ?? undefined;
+    this.svc.rejectSubmission(s.id, reason).subscribe({
+      next: () => { this.notify.success('تم رفض الطلب.'); this.loadAll(); },
+      error: () => this.notify.error('تعذّر الرفض.'),
+    });
   }
 
   usageRows(u: any): any[] {

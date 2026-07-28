@@ -6,12 +6,13 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from apps.common.responses import StandardResponse, StandardPagination
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from apps.saas_billing.domain.models import (
-    SubscriptionPlan, TenantSubscription, Invoice, Payment,
+    SubscriptionPlan, TenantSubscription, Invoice, Payment, PaymentSubmission,
 )
 from apps.saas_billing.interfaces.serializers import (
     SubscriptionPlanSerializer, TenantSubscriptionSerializer,
-    InvoiceSerializer, PaymentSerializer,
+    InvoiceSerializer, PaymentSerializer, PaymentSubmissionSerializer,
 )
 from apps.saas_billing.application import services
 
@@ -124,6 +125,70 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             data={'payment': PaymentSerializer(payment).data,
                   'invoice': InvoiceSerializer(invoice).data},
             message='تم تسجيل الدفعة', status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def submit_payment(self, request, pk=None):
+        """سداد ذاتي من المستأجر: يرفع إثبات تحويل بنكي يبقى معلّقاً للمراجعة."""
+        invoice = self.get_object()
+        try:
+            amount = Decimal(str(request.data.get('amount')))
+        except (InvalidOperation, TypeError):
+            return StandardResponse(success=False, message='مبلغ غير صالح',
+                                    status=status.HTTP_400_BAD_REQUEST)
+        submission = services.submit_payment_request(
+            invoice=invoice, amount=amount,
+            method=request.data.get('method', 'bank_transfer'),
+            bank_name=request.data.get('bank_name'),
+            transfer_reference=request.data.get('transfer_reference'),
+            transfer_date=request.data.get('transfer_date') or None,
+            sender_name=request.data.get('sender_name'),
+            note=request.data.get('note'),
+            receipt_attachment=request.FILES.get('receipt_attachment'),
+            submitted_by=getattr(request.user, 'id', None),
+        )
+        return StandardResponse(data=PaymentSubmissionSerializer(submission).data,
+                                message='تم إرسال طلب السداد للمراجعة', status=status.HTTP_201_CREATED)
+
+
+class PaymentSubmissionViewSet(viewsets.ModelViewSet):
+    """طلبات السداد الذاتي — يراجعها مشغّل المنصّة (اعتماد/رفض)."""
+    serializer_class = PaymentSubmissionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'status', 'amount']
+
+    def get_queryset(self):
+        qs = PaymentSubmission.objects.select_related('tenant', 'invoice').all()
+        tenant_id = self.request.query_params.get('tenant_id')
+        status_f = self.request.query_params.get('status')
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        if status_f:
+            qs = qs.filter(status=status_f)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        submission = self.get_object()
+        try:
+            services.approve_payment_submission(submission, reviewed_by=getattr(request.user, 'id', None))
+        except ValueError as exc:
+            return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        submission.refresh_from_db()
+        return StandardResponse(data=PaymentSubmissionSerializer(submission).data, message='تم اعتماد السداد')
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        submission = self.get_object()
+        try:
+            services.reject_payment_submission(
+                submission, reviewed_by=getattr(request.user, 'id', None),
+                reason=request.data.get('reason'))
+        except ValueError as exc:
+            return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
+        submission.refresh_from_db()
+        return StandardResponse(data=PaymentSubmissionSerializer(submission).data, message='تم رفض الطلب')
 
 
 class BillingDashboardView(viewsets.ViewSet):

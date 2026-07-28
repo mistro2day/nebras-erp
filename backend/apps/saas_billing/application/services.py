@@ -220,6 +220,50 @@ def run_billing_cycle(today: date | None = None) -> dict:
     }
 
 
+@transaction.atomic
+def submit_payment_request(*, invoice: Invoice, amount: Decimal, method: str = 'bank_transfer',
+                          bank_name=None, transfer_reference=None, transfer_date=None,
+                          sender_name=None, note=None, receipt_attachment=None,
+                          submitted_by=None):
+    """يسجّل طلب سداد ذاتي من المستأجر لفاتورته (يبقى معلّقاً للمراجعة)."""
+    from apps.saas_billing.domain.models import PaymentSubmission
+    return PaymentSubmission.objects.create(
+        tenant_id=invoice.tenant_id, invoice=invoice, amount=amount, method=method,
+        bank_name=bank_name, transfer_reference=transfer_reference, transfer_date=transfer_date,
+        sender_name=sender_name, note=note, receipt_attachment=receipt_attachment,
+        submitted_by=submitted_by,
+    )
+
+
+@transaction.atomic
+def approve_payment_submission(submission, *, reviewed_by=None):
+    """يعتمد طلب السداد: يولّد دفعة مرحّلة ويحدّث الفاتورة والاشتراك."""
+    if submission.status != 'pending':
+        raise ValueError('لا يمكن اعتماد طلب غير معلّق.')
+    payment = record_payment(
+        invoice=submission.invoice, amount=submission.amount, method=submission.method,
+        reference=submission.transfer_reference, recorded_by=reviewed_by,
+    )
+    submission.status = 'approved'
+    submission.payment = payment
+    submission.reviewed_by = reviewed_by
+    submission.reviewed_at = timezone.now()
+    submission.save(update_fields=['status', 'payment', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    return payment
+
+
+@transaction.atomic
+def reject_payment_submission(submission, *, reviewed_by=None, reason=None):
+    if submission.status != 'pending':
+        raise ValueError('لا يمكن رفض طلب غير معلّق.')
+    submission.status = 'rejected'
+    submission.rejection_reason = reason
+    submission.reviewed_by = reviewed_by
+    submission.reviewed_at = timezone.now()
+    submission.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    return submission
+
+
 @dataclass
 class BillingMetrics:
     active_subscriptions: int

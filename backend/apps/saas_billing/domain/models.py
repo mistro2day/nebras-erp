@@ -163,6 +163,51 @@ class InvoiceLineItem(models.Model):
         return self.description
 
 
+class PaymentSubmission(models.Model):
+    """طلب سداد ذاتي يقدّمه المستأجر لفاتورة اشتراكه عبر تحويل بنكي.
+
+    يرفق المستأجر إيصال التحويل ويبقى الطلب «معلّقاً» حتى يراجعه مشغّل المنصّة
+    فيعتمده (يولّد دفعة مرحّلة ويحدّث حالة الفاتورة) أو يرفضه بسبب.
+    """
+    STATUS_CHOICES = (
+        ('pending', 'معلّق قيد المراجعة'),
+        ('approved', 'معتمد'),
+        ('rejected', 'مرفوض'),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='saas_payment_submissions')
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='submissions')
+
+    amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.BANK_TRANSFER)
+    bank_name = models.CharField(max_length=120, blank=True, null=True)
+    transfer_reference = models.CharField(max_length=120, blank=True, null=True)
+    transfer_date = models.DateField(null=True, blank=True)
+    sender_name = models.CharField(max_length=150, blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    receipt_attachment = models.FileField(upload_to='saas_billing/payment_submissions/%Y/%m/', null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    submitted_by = models.UUIDField(null=True, blank=True)
+    reviewed_by = models.UUIDField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    payment = models.ForeignKey('Payment', on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='submission', help_text='الدفعة المُنشأة عند الاعتماد')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'saas_payment_submissions'
+        ordering = ['-created_at']
+        verbose_name = 'طلب سداد اشتراك'
+        verbose_name_plural = 'طلبات سداد الاشتراك'
+
+    def __str__(self):
+        return f'{self.transfer_reference or self.id} — {self.amount} ({self.status})'
+
+
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, related_name='saas_payments')

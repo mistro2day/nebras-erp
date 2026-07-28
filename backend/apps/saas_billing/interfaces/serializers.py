@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from apps.saas_billing.domain.models import (
     SubscriptionPlan, TenantSubscription, Invoice, InvoiceLineItem, Payment,
+    PaymentSubmission,
 )
 
 
@@ -47,6 +48,23 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'tenant']
+
+
+class PaymentSubmissionSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    method_display = serializers.CharField(source='get_method_display', read_only=True)
+    tenant_name = serializers.SerializerMethodField()
+    invoice_number = serializers.CharField(source='invoice.number', read_only=True)
+
+    class Meta:
+        model = PaymentSubmission
+        fields = '__all__'
+        read_only_fields = ['id', 'tenant', 'status', 'submitted_by', 'reviewed_by',
+                            'reviewed_at', 'payment', 'created_at', 'updated_at']
+
+    def get_tenant_name(self, obj):
+        t = obj.tenant
+        return (t.name_ar or t.name) if t else None
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
