@@ -202,6 +202,13 @@ _cors_origins_raw = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_raw.split(',') if o.strip()] if _cors_origins_raw else ["http://localhost:4200"]
 CORS_ALLOW_ALL_ORIGINS = len(CORS_ALLOWED_ORIGINS) == 0
 
+# التطوير: السماح لأي منفذ محلّي (Flutter Web / Angular يعملان على منافذ متغيّرة).
+# localhost/127.0.0.1 ليسا مصدر تهديد بعيد، فيبقى هذا آمناً في الإنتاج أيضاً.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+]
+
 # السماح برأس المستأجر المخصص في طلبات الواجهة عبر المصادر (CORS preflight)
 from corsheaders.defaults import default_headers  # noqa: E402
 CORS_ALLOW_HEADERS = list(default_headers) + ['x-tenant-id']
