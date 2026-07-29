@@ -355,6 +355,128 @@ class StudentPortalService:
             return empty
 
 
+class TeacherPortalService:
+    """خدمة بوابة المعلّم: يُعرَّف المعلّم من بريد حسابه، ويرى فصوله الحقيقية وطلابها."""
+
+    @staticmethod
+    def resolve_faculty_member(tenant_id, user):
+        """يربط حساب المستخدم بعضو هيئة التدريس عبر بريد الموظّف."""
+        email = getattr(user, 'email', None)
+        if not email:
+            return None
+        try:
+            from apps.employees.domain.models import Employee
+            from apps.faculty.domain.models import FacultyMember
+            emp = Employee.objects.filter(tenant_id=tenant_id, email__iexact=email,
+                                          deleted_at__isnull=True).first()
+            if not emp:
+                return None
+            return FacultyMember.objects.filter(tenant_id=tenant_id, employee_id=emp.id,
+                                                deleted_at__isnull=True).first()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _subject_name(tenant_id, subject_id, cache):
+        if subject_id in cache:
+            return cache[subject_id]
+        name = None
+        try:
+            from apps.academics.domain.subjects import Subject
+            s = Subject.objects.filter(id=subject_id).first()
+            name = s.arabic_name if s else None
+        except Exception:
+            pass
+        cache[subject_id] = name
+        return name
+
+    @staticmethod
+    def _section_info(tenant_id, section_id, cache):
+        if section_id in cache:
+            return cache[section_id]
+        info = {'name': None, 'grade': None, 'students': 0}
+        try:
+            from apps.academics.domain.models import Section
+            sec = Section.objects.filter(id=section_id).select_related('grade').first()
+            if sec:
+                info = {
+                    'name': sec.name,
+                    'grade': sec.grade.name if sec.grade_id else None,
+                    'students': sec.occupied_seats,
+                }
+        except Exception:
+            pass
+        cache[section_id] = info
+        return info
+
+    @classmethod
+    def get_dashboard(cls, tenant_id, user):
+        fm = cls.resolve_faculty_member(tenant_id, user)
+        if not fm:
+            return None
+        from apps.faculty.domain.models import TeacherAssignment
+        subj_cache, sec_cache = {}, {}
+        assignments = TeacherAssignment.objects.filter(
+            tenant_id=tenant_id, faculty_member_id=fm.id, deleted_at__isnull=True)
+        classes = []
+        total_students = 0
+        for a in assignments:
+            sec = cls._section_info(tenant_id, a.section_id, sec_cache)
+            total_students += sec['students'] or 0
+            classes.append({
+                'assignment_id': str(a.id),
+                'subject': cls._subject_name(tenant_id, a.subject_id, subj_cache) or 'مادة',
+                'section_id': str(a.section_id),
+                'section': sec['name'],
+                'grade': sec['grade'],
+                'students': sec['students'],
+                'weekly_hours': a.weekly_hours,
+            })
+        return {
+            'teacher_info': {
+                'name': fm.full_name_ar,
+                'employee_number': fm.employee_number,
+                'email': fm.email,
+            },
+            'summary': {
+                'classes': len(classes),
+                'total_students': total_students,
+                'weekly_hours': sum(c['weekly_hours'] for c in classes),
+            },
+            'classes': classes,
+        }
+
+    @classmethod
+    def get_section_students(cls, tenant_id, user, section_id):
+        """قائمة طلاب شعبة يدرّسها المعلّم (بعد التحقّق من إسناده لها)."""
+        fm = cls.resolve_faculty_member(tenant_id, user)
+        if not fm:
+            return None
+        from apps.faculty.domain.models import TeacherAssignment
+        allowed = TeacherAssignment.objects.filter(
+            tenant_id=tenant_id, faculty_member_id=fm.id,
+            section_id=section_id, deleted_at__isnull=True).exists()
+        if not allowed:
+            raise PermissionDenied('هذه الشعبة ليست ضمن إسناداتك.')
+
+        from apps.students.domain.models import StudentEnrollment, Student
+        ids = list(StudentEnrollment.objects.filter(
+            tenant_id=tenant_id, section_id=section_id, status='active',
+            deleted_at__isnull=True).values_list('student_id', flat=True).distinct())
+        students = Student.objects.filter(id__in=ids, deleted_at__isnull=True).select_related('profile')
+        out = []
+        for s in students:
+            profile = getattr(s, 'profile', None)
+            out.append({
+                'student_id': str(s.id),
+                'student_number': s.student_number,
+                'name': getattr(profile, 'arabic_name', '') or '—',
+                'gender': getattr(profile, 'gender', '') or '',
+            })
+        out.sort(key=lambda x: x['name'])
+        return {'students': out, 'count': len(out)}
+
+
 class PortalReportService:
     """
     توليد تقارير مؤشرات الأداء وجلسات استخدام البوابات

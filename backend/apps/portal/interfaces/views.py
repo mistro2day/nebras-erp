@@ -13,9 +13,38 @@ from apps.portal.interfaces.serializers import (
     PortalMessageSerializer, PortalTaskSerializer, PortalSettingsSerializer
 )
 from apps.portal.application.services import (
-    PortalDashboardService, PortalReportService, ParentPortalService
+    PortalDashboardService, PortalReportService, ParentPortalService, TeacherPortalService
 )
 from django.core.exceptions import PermissionDenied
+
+
+class TeacherDashboardView(APIView):
+    """لوحة المعلّم: فصوله الحقيقية وأعداد طلابها (يُعرَّف من بريد حسابه)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID') or getattr(request, 'tenant_id', None)
+        data = TeacherPortalService.get_dashboard(tenant_id, request.user)
+        if data is None:
+            return Response({"detail": "حسابك غير مرتبط بعضو هيئة تدريس."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response(data)
+
+
+class TeacherSectionStudentsView(APIView):
+    """قائمة طلاب شعبة يدرّسها المعلّم."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, section_id):
+        tenant_id = request.headers.get('X-Tenant-ID') or getattr(request, 'tenant_id', None)
+        try:
+            data = TeacherPortalService.get_section_students(tenant_id, request.user, section_id)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        if data is None:
+            return Response({"detail": "حسابك غير مرتبط بعضو هيئة تدريس."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response(data)
 
 
 class ParentDashboardView(APIView):
