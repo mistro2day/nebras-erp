@@ -9,6 +9,7 @@ import '../features/parent/presentation/parent_shell.dart';
 import '../features/parent/presentation/child_detail_page.dart';
 import '../features/parent/presentation/pay_page.dart';
 import '../features/student/presentation/student_shell.dart';
+import '../features/teacher/presentation/teacher_shell.dart';
 import '../features/common/role_placeholder_page.dart';
 
 String _homePathFor(UserRole role) {
@@ -17,6 +18,9 @@ String _homePathFor(UserRole role) {
       return '/parent';
     case UserRole.student:
       return '/student';
+    case UserRole.teacher:
+    case UserRole.admin:
+      return '/teacher';
     default:
       return '/placeholder';
   }
@@ -43,6 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
       GoRoute(path: '/parent', builder: (c, s) => const ParentShell()),
       GoRoute(path: '/student', builder: (c, s) => const StudentShell()),
+      GoRoute(path: '/teacher', builder: (c, s) => const TeacherShell()),
       GoRoute(
         path: '/parent/child/:id',
         builder: (c, s) => ChildDetailPage(studentId: s.pathParameters['id']!),

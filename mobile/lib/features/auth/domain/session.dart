@@ -8,7 +8,8 @@ UserRole roleFromPortalType(String? portalType, {bool isStaff = false}) {
     case 'student':
       return UserRole.student;
   }
-  return isStaff ? UserRole.admin : UserRole.unknown;
+  // مستخدمو المنصّة (موظفون) يُوجَّهون لبوابة المعلّم؛ تتحقّق هي من الإسناد.
+  return isStaff ? UserRole.teacher : UserRole.unknown;
 }
 
 /// جلسة مستخدم مصادَق.
