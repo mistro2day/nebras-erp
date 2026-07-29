@@ -119,6 +119,6 @@ class Announcement {
   factory Announcement.fromJson(Map<String, dynamic> j) => Announcement(
         title: j['title']?.toString() ?? '',
         body: (j['body'] ?? j['content'] ?? '').toString(),
-        date: (j['published_at'] ?? j['created_at'])?.toString(),
+        date: (j['publish_date'] ?? j['published_at'] ?? j['created_at'])?.toString(),
       );
 }
