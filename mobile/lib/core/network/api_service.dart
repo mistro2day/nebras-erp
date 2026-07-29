@@ -45,6 +45,20 @@ class ApiService {
     }
   }
 
+  /// تنزيل محتوى ثنائي (مثل PDF) مع حقن التوكن والمستأجر.
+  Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return res.data ?? <int>[];
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<dynamic> postMultipart(String path, FormData form) async {
     try {
       final res = await _dio.post(path, data: form);

@@ -31,6 +31,36 @@ class TeacherDashboardView(APIView):
         return Response(data)
 
 
+class PortalInvoicePdfView(APIView):
+    """يُنزّل فاتورة رسوم الطالب كملف PDF عربي (لولي الأمر أو الطالب المالك)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, invoice_id):
+        from django.http import HttpResponse
+        from apps.portal.application.invoice_pdf import build_invoice_pdf
+        tenant_id = request.headers.get('X-Tenant-ID') or getattr(request, 'tenant_id', None)
+        # اسم الطالب للترويسة
+        student_name = None
+        try:
+            from apps.student_finance.domain.models import StudentInvoice
+            from apps.students.domain.models import Student
+            inv = StudentInvoice.objects.filter(id=invoice_id, tenant_id=tenant_id).select_related('student_billing_account').first()
+            if inv:
+                st = Student.objects.filter(id=inv.student_billing_account.student_id).select_related('profile').first()
+                student_name = getattr(getattr(st, 'profile', None), 'arabic_name', None)
+        except Exception:
+            pass
+        try:
+            filename, pdf = build_invoice_pdf(tenant_id, request.user, invoice_id, student_name=student_name)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        resp = HttpResponse(pdf, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="{filename}"'
+        return resp
+
+
 class TeacherSectionStudentsView(APIView):
     """قائمة طلاب شعبة يدرّسها المعلّم."""
     permission_classes = [IsAuthenticated]

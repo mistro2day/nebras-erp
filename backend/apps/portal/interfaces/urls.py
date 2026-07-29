@@ -5,7 +5,7 @@ from apps.portal.interfaces.views import (
     PortalNotificationViewSet, PortalAnnouncementViewSet, PortalMessageViewSet, PortalTaskViewSet,
     PortalSettingsViewSet, PortalAnalyticsView,
     ParentChildrenView, ParentChildDetailView, ParentContactView,
-    TeacherDashboardView, TeacherSectionStudentsView
+    TeacherDashboardView, TeacherSectionStudentsView, PortalInvoicePdfView
 )
 
 router = DefaultRouter()
@@ -22,6 +22,7 @@ urlpatterns = [
     path('parent/children/<uuid:student_id>/', ParentChildDetailView.as_view(), name='parent-child-detail'),
     path('parent/contact/', ParentContactView.as_view(), name='parent-contact'),
     path('student/dashboard/', StudentDashboardView.as_view(), name='student-dashboard'),
+    path('invoices/<uuid:invoice_id>/pdf/', PortalInvoicePdfView.as_view(), name='portal-invoice-pdf'),
     path('teacher/dashboard/', TeacherDashboardView.as_view(), name='teacher-dashboard'),
     path('teacher/sections/<uuid:section_id>/students/', TeacherSectionStudentsView.as_view(), name='teacher-section-students'),
     path('applicant/dashboard/', ApplicantDashboardView.as_view(), name='applicant-dashboard'),

@@ -18,16 +18,7 @@ class HomeTab extends ConsumerWidget {
     final session = ref.watch(authControllerProvider);
     final async = ref.watch(childrenProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('أبنائي'),
-            Text('أهلاً ${session?.displayName ?? ''}',
-                style: GoogleFonts.tajawal(fontSize: 12, color: Colors.white70)),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('أبنائي')),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -57,15 +48,81 @@ class HomeTab extends ConsumerWidget {
                   style: GoogleFonts.tajawal(color: NebrasTheme.textMuted)),
             );
           }
+          final totalOutstanding =
+              children.fold<double>(0, (s, c) => s + c.outstandingBalance);
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(childrenProvider),
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.all(14),
-              itemCount: children.length,
-              itemBuilder: (c, i) => _ChildCard(child: children[i]),
+              children: [
+                _welcomeHeader(session?.displayName, children.length, totalOutstanding),
+                const SizedBox(height: 14),
+                ...children.map((c) => _ChildCard(child: c)),
+              ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _welcomeHeader(String? parentName, int childrenCount, double totalOutstanding) {
+    final hasDebt = totalOutstanding > 0;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [NebrasTheme.primary, NebrasTheme.accent]),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 22,
+                backgroundColor: Colors.white24,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('أهلاً بك',
+                        style: GoogleFonts.tajawal(color: Colors.white70, fontSize: 12)),
+                    Text(parentName ?? 'ولي الأمر',
+                        style: GoogleFonts.tajawal(
+                            color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _headerStat('الأبناء', '$childrenCount'),
+              Container(width: 1, height: 34, color: Colors.white24),
+              _headerStat('إجمالي المتبقّي',
+                  hasDebt ? money(totalOutstanding) : 'لا مستحقّات'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value,
+              style: GoogleFonts.tajawal(
+                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label, style: GoogleFonts.tajawal(color: Colors.white70, fontSize: 12)),
+        ],
       ),
     );
   }

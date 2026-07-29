@@ -86,7 +86,10 @@ class ChildDetail {
   final List<Map<String, dynamic>> familyRelations;
 
   String get name {
-    final fn = profile['first_name'] ?? profile['full_name'] ?? '';
+    // الخادم يُرجع الاسم العربي في profile['name']؛ نُبقي بدائل احتياطية.
+    final direct = (profile['name'] ?? profile['full_name'] ?? '').toString().trim();
+    if (direct.isNotEmpty && direct != '—') return direct;
+    final fn = profile['first_name'] ?? '';
     final ln = profile['last_name'] ?? '';
     final joined = [fn, ln].where((e) => '$e'.isNotEmpty).join(' ').trim();
     return joined.isNotEmpty ? joined : 'طالب $studentNumber';

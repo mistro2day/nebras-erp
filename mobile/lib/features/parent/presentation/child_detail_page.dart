@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/format.dart';
@@ -38,7 +41,7 @@ class ChildDetailPage extends ConsumerWidget {
                 _financeCard(context, child),
                 const SizedBox(height: 16),
                 _sectionTitle('الفواتير'),
-                ..._invoices(child.finance.invoices),
+                ..._invoices(context, ref, child.name, child.finance.invoices),
                 const SizedBox(height: 12),
                 _sectionTitle('سندات القبض'),
                 ..._receipts(child.finance.receipts),
@@ -134,23 +137,111 @@ class ChildDetailPage extends ConsumerWidget {
         child: Text(t, style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.w700)),
       );
 
-  List<Widget> _invoices(List<Map<String, dynamic>> items) {
+  List<Widget> _invoices(
+      BuildContext context, WidgetRef ref, String childName, List<Map<String, dynamic>> items) {
     if (items.isEmpty) return [_empty('لا توجد فواتير.')];
     return items.map((i) {
       final total = i['total'] ?? i['total_amount'] ?? i['amount'];
       return Card(
         child: ListTile(
           leading: const Icon(Icons.receipt_long, color: NebrasTheme.accent),
-          title: Text(i['number']?.toString() ?? i['invoice_number']?.toString() ?? 'فاتورة',
+          title: Text(i['invoice_number']?.toString() ?? i['number']?.toString() ?? 'فاتورة',
               style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 14)),
           subtitle: Text(prettyDate(i['issue_date']?.toString() ?? i['created_at']?.toString()),
               style: GoogleFonts.tajawal(fontSize: 12)),
-          trailing: Text(money(num.tryParse('$total') ?? 0),
-              style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(money(num.tryParse('$total') ?? 0),
+                  style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_left, color: NebrasTheme.textMuted, size: 20),
+            ],
+          ),
+          onTap: () => _showInvoiceSheet(context, ref, childName, i),
         ),
       );
     }).toList();
   }
+
+  void _showInvoiceSheet(
+      BuildContext context, WidgetRef ref, String childName, Map<String, dynamic> inv) {
+    final id = inv['id']?.toString();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(inv['invoice_number']?.toString() ?? 'فاتورة',
+                  style: GoogleFonts.tajawal(fontSize: 17, fontWeight: FontWeight.w800)),
+              Text(childName,
+                  style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
+              const SizedBox(height: 14),
+              _row('تاريخ الإصدار', prettyDate(inv['issue_date']?.toString())),
+              _row('تاريخ الاستحقاق', prettyDate(inv['due_date']?.toString())),
+              _row('الإجمالي', money(num.tryParse('${inv['total_amount'] ?? inv['total']}') ?? 0)),
+              _row('المدفوع', money(num.tryParse('${inv['paid_amount'] ?? 0}') ?? 0)),
+              _row('المتبقّي',
+                  money(num.tryParse('${inv['outstanding_amount'] ?? 0}') ?? 0), strong: true),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: id == null
+                    ? null
+                    : () async {
+                        Navigator.pop(ctx);
+                        await _openInvoicePdf(context, ref, id);
+                      },
+                icon: const Icon(Icons.picture_as_pdf),
+                label: Text('عرض / طباعة PDF',
+                    style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInvoicePdf(BuildContext context, WidgetRef ref, String invoiceId) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final bytes = await ref.read(parentRepositoryProvider).invoicePdf(invoiceId);
+      if (context.mounted) Navigator.of(context).pop(); // إغلاق مؤشّر التحميل
+      await Printing.layoutPdf(onLayout: (_) async => Uint8List.fromList(bytes));
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: NebrasTheme.danger),
+        );
+      }
+    }
+  }
+
+  Widget _row(String label, String value, {bool strong = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
+            Text(value,
+                style: GoogleFonts.tajawal(
+                    fontSize: strong ? 15 : 13,
+                    fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                    color: strong ? NebrasTheme.danger : NebrasTheme.textDark)),
+          ],
+        ),
+      );
 
   List<Widget> _receipts(List<Map<String, dynamic>> items) {
     if (items.isEmpty) return [_empty('لا توجد سندات قبض.')];

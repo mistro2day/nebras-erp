@@ -53,6 +53,11 @@ class ParentRepository {
     await _api.postMultipart('/student-finance/online-payments/', form);
   }
 
+  /// bytes فاتورة الطالب كملف PDF عربي.
+  Future<List<int>> invoicePdf(String invoiceId) async {
+    return _api.getBytes('/portal/invoices/$invoiceId/pdf/');
+  }
+
   Future<List<Announcement>> getAnnouncements() async {
     final res = await _api.get('/portal/announcements/');
     final list = (res is Map ? (res['data'] ?? res['results'] ?? res['announcements'] ?? []) : res) as List? ?? [];
