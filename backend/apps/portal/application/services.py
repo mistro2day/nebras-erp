@@ -82,34 +82,26 @@ class PortalDashboardService:
 
     @staticmethod
     def get_student_dashboard_data(tenant_id, portal_user):
-        student_profile = portal_user.profile.student_profile
-        
-        # محاكاة البيانات الأكاديمية والمكتبة والحضور والجدول المدرسي
+        """لوحة الطالب ببيانات حقيقية: معلوماته، وضعه المالي، درجاته، وحضوره.
+
+        يستبدل المحاكاة السابقة بمصادر فعلية (student_finance / examinations /
+        attendance). الأقسام التي لا بيانات لها تُرجَع فارغة لا وهمية.
+        """
+        sp = getattr(getattr(portal_user, 'profile', None), 'student_profile', None)
+        student_id = str(sp.student_id) if sp and getattr(sp, 'student_id', None) else None
+
+        info = {
+            "student_number": getattr(sp, 'student_number', None),
+            "grade_level": getattr(sp, 'grade_level', None),
+            "academic_year": getattr(sp, 'academic_year', None),
+            "name": StudentPortalService.student_name(student_id),
+        }
         return {
-            "student_info": {
-                "student_number": student_profile.student_number,
-                "grade_level": student_profile.grade_level,
-                "academic_year": student_profile.academic_year
-            },
-            "today_classes": [
-                {"subject": "لغة عربية", "time": "08:00 - 08:45", "room": "A3"},
-                {"subject": "رياضيات", "time": "08:45 - 09:30", "room": "Lab 1"},
-                {"subject": "علوم", "time": "09:45 - 10:30", "room": "A3"},
-                {"subject": "تربية إسلامية", "time": "10:30 - 11:15", "room": "A3"}
-            ],
-            "attendance_rate": 98.2,
-            "upcoming_exams": [
-                {"subject": "فيزياء", "date": "2026-07-15", "type": "نهائي"},
-                {"subject": "كيمياء", "date": "2026-07-18", "type": "نهائي"}
-            ],
-            "borrowed_books": [
-                {"title": "مقدمة في الفيزياء الحديثة", "due_date": "2026-07-10"}
-            ],
-            "transport_info": {
-                "route_name": "مسار الرياض الرئيسي",
-                "pickup_time": "06:45 AM",
-                "dropoff_time": "02:15 PM"
-            }
+            "student_info": info,
+            "finance": ParentPortalService._finance_summary(tenant_id, student_id)
+            if student_id else {},
+            "grades": StudentPortalService.grades(tenant_id, student_id),
+            "attendance": StudentPortalService.attendance_summary(tenant_id, student_id),
         }
 
     @staticmethod
@@ -281,6 +273,86 @@ class ParentPortalService:
             },
             'family_relations': family,
         }
+
+
+class StudentPortalService:
+    """خدمة بيانات بوابة الطالب: الاسم، الدرجات الحقيقية، وملخّص الحضور."""
+
+    @staticmethod
+    def student_name(student_id):
+        if not student_id:
+            return None
+        try:
+            from apps.students.domain.models import Student
+            s = Student.objects.filter(id=student_id, deleted_at__isnull=True).select_related('profile').first()
+            if s:
+                return getattr(getattr(s, 'profile', None), 'arabic_name', None) or None
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def grades(tenant_id, student_id):
+        """درجات الطالب الفعلية من سجلّات الامتحانات (StudentMark)."""
+        if not student_id:
+            return []
+        try:
+            from apps.examinations.domain.models import StudentMark
+            marks = StudentMark.objects.filter(
+                tenant_id=tenant_id,
+                student_exam__student_id=student_id,
+                deleted_at__isnull=True,
+            ).select_related('student_exam__schedule__exam').order_by('-created_at')[:30]
+            out = []
+            for m in marks:
+                try:
+                    exam = m.student_exam.schedule.exam
+                except Exception:
+                    continue
+                obtained = float(m.marks_obtained)
+                pass_marks = float(exam.pass_marks)
+                out.append({
+                    'exam_name': exam.name,
+                    'term': exam.term,
+                    'academic_year': exam.academic_year,
+                    'marks_obtained': obtained,
+                    'max_marks': float(exam.max_marks),
+                    'pass_marks': pass_marks,
+                    'is_present': m.is_present,
+                    'passed': m.is_present and obtained >= pass_marks,
+                })
+            return out
+        except Exception:
+            return []
+
+    @staticmethod
+    def attendance_summary(tenant_id, student_id):
+        """ملخّص حضور الطالب الفعلي من السجلّ اليومي."""
+        empty = {'total': 0, 'present': 0, 'absent': 0, 'rate': 0.0, 'recent': []}
+        if not student_id:
+            return empty
+        try:
+            from apps.attendance.domain.models import StudentDailyAttendance
+            recs = StudentDailyAttendance.objects.filter(
+                tenant_id=tenant_id, student_id=student_id, deleted_at__isnull=True)
+            total = recs.count()
+            if total == 0:
+                return empty
+            present = recs.filter(status='present').count()
+            absent = recs.filter(status='absent').count()
+            recent = [
+                {'date': str(r.date), 'status': r.status}
+                for r in recs.order_by('-date')[:12]
+            ]
+            return {
+                'total': total,
+                'present': present,
+                'absent': absent,
+                'rate': round(present / total * 100, 1),
+                'recent': recent,
+            }
+        except Exception:
+            return empty
 
 
 class PortalReportService:
