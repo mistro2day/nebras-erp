@@ -53,10 +53,40 @@ class ChildDetailPage extends ConsumerWidget {
                   _kv('تاريخ الميلاد', prettyDate(child.profile['date_of_birth']?.toString())),
                   _kv('الجنسية', child.profile['nationality']?.toString()),
                   _kv('الرقم الوطني', child.profile['national_id']?.toString()),
-                  _kv('فصيلة الدم', child.profile['blood_group']?.toString()),
+                  _kv('رقم الجواز', child.profile['passport']?.toString()),
                   _kv('الديانة', child.profile['religion']?.toString()),
+                  _kv('اللغات', _joinList(child.profile['languages'])),
                   _kv('الحالة', child.status),
                 ]),
+                if (_hasAny(child.profile,
+                    const ['special_needs', 'learning_difficulty', 'talented_program', 'notes'])) ...[
+                  const SizedBox(height: 16),
+                  _sectionTitle('احتياجات ومواهب'),
+                  _infoCard([
+                    _kv('احتياجات خاصة', child.profile['special_needs']?.toString()),
+                    _kv('صعوبات تعلّم', child.profile['learning_difficulty']?.toString()),
+                    _kv('برنامج الموهوبين', child.profile['talented_program']?.toString()),
+                    _kv('ملاحظات', child.profile['notes']?.toString()),
+                  ]),
+                ],
+                const SizedBox(height: 16),
+                _sectionTitle('الحالة الصحية'),
+                _infoCard([
+                  _kv('فصيلة الدم', child.medical['blood_group']?.toString()),
+                  _kv('الحساسية', _joinList(child.medical['allergies'])),
+                  _kv('أمراض مزمنة', _joinList(child.medical['chronic_diseases'])),
+                  _kv('أدوية', _joinList(child.medical['medication'])),
+                  _kv('إعاقات', _joinList(child.medical['disabilities'])),
+                  _kv('ملاحظات طبية', child.medical['medical_notes']?.toString()),
+                ]),
+                if (child.addresses.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _sectionTitle('العنوان'),
+                  ..._addresses(child.addresses),
+                ],
+                const SizedBox(height: 16),
+                _sectionTitle('جهات الطوارئ'),
+                ..._emergency(child.emergencyContacts),
                 const SizedBox(height: 16),
                 _sectionTitle('صلات القرابة'),
                 ..._family(child.familyRelations),
@@ -149,6 +179,68 @@ class ChildDetailPage extends ConsumerWidget {
   }
 
   Widget _kv(String label, String? value) => _KV(label: label, value: value);
+
+  /// يحوّل قائمة (لغات/حساسية…) إلى نصّ مفصول بفواصل، أو null إن فارغة.
+  String? _joinList(dynamic v) {
+    if (v is List) {
+      final items = v.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList();
+      return items.isEmpty ? null : items.join('، ');
+    }
+    final s = v?.toString().trim();
+    return (s == null || s.isEmpty) ? null : s;
+  }
+
+  bool _hasAny(Map<String, dynamic> m, List<String> keys) =>
+      keys.any((k) => (m[k]?.toString().trim() ?? '').isNotEmpty);
+
+  List<Widget> _addresses(List<Map<String, dynamic>> items) {
+    return items.map((a) {
+      final parts = [a['line1'], a['line2'], a['city'], a['state'], a['country']]
+          .where((e) => e != null && '$e'.trim().isNotEmpty)
+          .join('، ');
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.location_on, color: NebrasTheme.accent),
+          title: Text(parts.isEmpty ? '—' : parts,
+              style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 13.5)),
+          subtitle: (a['address_type']?.toString().isNotEmpty ?? false)
+              ? Text(a['address_type'].toString(), style: GoogleFonts.tajawal(fontSize: 12))
+              : null,
+        ),
+      );
+    }).toList();
+  }
+
+  List<Widget> _emergency(List<Map<String, dynamic>> items) {
+    if (items.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text('لا توجد جهات طوارئ مسجّلة.',
+              style: GoogleFonts.tajawal(color: NebrasTheme.textMuted, fontSize: 13)),
+        ),
+      ];
+    }
+    return items.map((c) {
+      return Card(
+        child: ListTile(
+          leading: Icon(Icons.emergency,
+              color: c['is_primary'] == true ? NebrasTheme.danger : NebrasTheme.accent),
+          title: Text(c['name']?.toString() ?? '—',
+              style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 14)),
+          subtitle: Text(
+            [c['relationship'], c['phone']].where((e) => '$e'.isNotEmpty && e != null).join(' · '),
+            style: GoogleFonts.tajawal(fontSize: 12),
+          ),
+          trailing: c['is_primary'] == true
+              ? Text('أساسي',
+                  style: GoogleFonts.tajawal(
+                      fontSize: 11, fontWeight: FontWeight.w700, color: NebrasTheme.danger))
+              : null,
+        ),
+      );
+    }).toList();
+  }
 
   List<Widget> _family(List<Map<String, dynamic>> rels) {
     if (rels.isEmpty) {

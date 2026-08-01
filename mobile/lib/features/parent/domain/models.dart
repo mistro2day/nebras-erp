@@ -75,6 +75,9 @@ class ChildDetail {
     required this.profile,
     required this.finance,
     required this.familyRelations,
+    required this.addresses,
+    required this.emergencyContacts,
+    required this.medical,
   });
 
   final String studentId;
@@ -84,6 +87,9 @@ class ChildDetail {
   final Map<String, dynamic> profile;
   final ChildFinance finance;
   final List<Map<String, dynamic>> familyRelations;
+  final List<Map<String, dynamic>> addresses;
+  final List<Map<String, dynamic>> emergencyContacts;
+  final Map<String, dynamic> medical;
 
   String get name {
     // الخادم يُرجع الاسم العربي في profile['name']؛ نُبقي بدائل احتياطية.
@@ -103,10 +109,14 @@ class ChildDetail {
         profile: (j['profile'] as Map?)?.cast<String, dynamic>() ?? {},
         finance: ChildFinance.fromJson(
             (j['finance'] as Map?)?.cast<String, dynamic>() ?? {}),
-        familyRelations: (j['family_relations'] as List? ?? [])
-            .map((e) => (e as Map).cast<String, dynamic>())
-            .toList(),
+        familyRelations: _mapList(j['family_relations']),
+        addresses: _mapList(j['addresses']),
+        emergencyContacts: _mapList(j['emergency_contacts']),
+        medical: (j['medical'] as Map?)?.cast<String, dynamic>() ?? {},
       );
+
+  static List<Map<String, dynamic>> _mapList(dynamic v) =>
+      (v as List? ?? []).map((e) => (e as Map).cast<String, dynamic>()).toList();
 }
 
 class Announcement {

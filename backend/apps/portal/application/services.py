@@ -250,6 +250,36 @@ class ParentPortalService:
             'phone': rel.phone, 'email': rel.email,
         } for rel in s.family_relations.all()]
 
+        # العناوين
+        addresses = [{
+            'id': str(a.id), 'address_type': a.address_type,
+            'line1': a.address_line1, 'line2': a.address_line2 or '',
+            'city': a.city, 'state': a.state or '', 'country': a.country,
+            'postal_code': a.postal_code or '',
+        } for a in s.addresses.all()]
+
+        # جهات الطوارئ
+        emergency = [{
+            'id': str(c.id), 'name': c.name, 'relationship': c.relationship,
+            'phone': c.phone, 'email': c.email or '', 'is_primary': c.is_primary,
+        } for c in s.emergency_contacts.all()]
+
+        # الحالة الصحية (مرجعها العيادة)
+        medical = {}
+        try:
+            from apps.clinic.application.profile_service import read_intake
+            intake = read_intake(tenant_id, 'student', s.id)
+            medical = {
+                'blood_group': intake.get('blood_group') or getattr(profile, 'blood_group', '') or '',
+                'allergies': intake.get('allergies') or [],
+                'chronic_diseases': intake.get('chronic_diseases') or [],
+                'medication': intake.get('medication') or [],
+                'disabilities': intake.get('disabilities') or [],
+                'medical_notes': intake.get('medical_notes') or '',
+            }
+        except Exception:
+            medical = {'blood_group': getattr(profile, 'blood_group', '') or ''}
+
         return {
             'student_id': str(s.id),
             'student_number': s.student_number,
@@ -261,8 +291,14 @@ class ParentPortalService:
                 'date_of_birth': getattr(profile, 'date_of_birth', None),
                 'nationality': getattr(profile, 'nationality', '') or '',
                 'national_id': getattr(profile, 'national_id', '') or '',
+                'passport': getattr(profile, 'passport', '') or '',
                 'blood_group': getattr(profile, 'blood_group', '') or '',
                 'religion': getattr(profile, 'religion', '') or '',
+                'languages': getattr(profile, 'languages', []) or [],
+                'special_needs': getattr(profile, 'special_needs', '') or '',
+                'learning_difficulty': getattr(profile, 'learning_difficulty', '') or '',
+                'talented_program': getattr(profile, 'talented_program', '') or '',
+                'notes': getattr(profile, 'notes', '') or '',
             },
             'grade_level': cls._grade_label(portal_user, s),
             'finance': {
@@ -272,6 +308,9 @@ class ParentPortalService:
                 'online_payments': payments,
             },
             'family_relations': family,
+            'addresses': addresses,
+            'emergency_contacts': emergency,
+            'medical': medical,
         }
 
 
