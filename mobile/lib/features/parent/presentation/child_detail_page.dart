@@ -1,22 +1,25 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:printing/printing.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/format.dart';
 import '../application/parent_providers.dart';
 import '../domain/models.dart';
-import 'pay_page.dart';
+import 'child_finance_page.dart';
 
-/// تفاصيل ابن: البيانات الأساسية + الوضع المالي (فواتير/إيصالات) + زر السداد.
+/// الملف التعريفي الكامل للطالب (كصفحة تفاصيل الطالب في لوحة الإدارة):
+/// البيانات الشخصية، الأكاديمية، صلات القرابة، ورابط الوضع المالي.
 class ChildDetailPage extends ConsumerWidget {
   const ChildDetailPage({super.key, required this.studentId});
 
   final String studentId;
+
+  String _gender(String? g) => g == 'male'
+      ? 'ذكر'
+      : g == 'female'
+          ? 'أنثى'
+          : (g ?? '—');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,13 +41,25 @@ class ChildDetailPage extends ConsumerWidget {
               children: [
                 _header(child),
                 const SizedBox(height: 16),
-                _financeCard(context, child),
+                _financeButton(context, child),
                 const SizedBox(height: 16),
-                _sectionTitle('الفواتير'),
-                ..._invoices(context, ref, child.name, child.finance.invoices),
-                const SizedBox(height: 12),
-                _sectionTitle('سندات القبض'),
-                ..._receipts(child.finance.receipts),
+                _sectionTitle('البيانات الشخصية'),
+                _infoCard([
+                  _kv('الاسم', child.name),
+                  _kv('الاسم بالإنجليزية', child.profile['english_name']?.toString()),
+                  _kv('رقم القيد', child.studentNumber),
+                  _kv('الصف', child.gradeLevel),
+                  _kv('الجنس', _gender(child.profile['gender']?.toString())),
+                  _kv('تاريخ الميلاد', prettyDate(child.profile['date_of_birth']?.toString())),
+                  _kv('الجنسية', child.profile['nationality']?.toString()),
+                  _kv('الرقم الوطني', child.profile['national_id']?.toString()),
+                  _kv('فصيلة الدم', child.profile['blood_group']?.toString()),
+                  _kv('الديانة', child.profile['religion']?.toString()),
+                  _kv('الحالة', child.status),
+                ]),
+                const SizedBox(height: 16),
+                _sectionTitle('صلات القرابة'),
+                ..._family(child.familyRelations),
               ],
             ),
           ),
@@ -57,9 +72,9 @@ class ChildDetailPage extends ConsumerWidget {
     return Row(
       children: [
         CircleAvatar(
-          radius: 30,
+          radius: 32,
           backgroundColor: NebrasTheme.accent.withAlpha(30),
-          child: const Icon(Icons.person, color: NebrasTheme.accent, size: 32),
+          child: const Icon(Icons.person, color: NebrasTheme.accent, size: 34),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -67,12 +82,10 @@ class ChildDetailPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(c.name,
-                  style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.w800)),
-              Text('رقم القيد: ${c.studentNumber}',
+                  style: GoogleFonts.tajawal(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Text('${c.gradeLevel ?? '—'} · ${c.studentNumber}',
                   style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
-              if (c.gradeLevel != null)
-                Text('الصف: ${c.gradeLevel}',
-                    style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
             ],
           ),
         ),
@@ -80,54 +93,42 @@ class ChildDetailPage extends ConsumerWidget {
     );
   }
 
-  Widget _financeCard(BuildContext context, ChildDetail c) {
-    final f = c.finance;
-    final hasDebt = f.outstandingBalance > 0;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: hasDebt
-              ? [NebrasTheme.danger, const Color(0xFFB91C1C)]
-              : [NebrasTheme.success, const Color(0xFF047857)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(hasDebt ? 'المتبقّي على الطالب' : 'لا توجد مستحقّات',
-              style: GoogleFonts.tajawal(color: Colors.white70, fontSize: 13)),
-          const SizedBox(height: 6),
-          Text(money(f.outstandingBalance),
-              style: GoogleFonts.tajawal(
-                  color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
-          if (f.creditBalance > 0)
-            Text('رصيد دائن: ${money(f.creditBalance)}',
-                style: GoogleFonts.tajawal(color: Colors.white70, fontSize: 12)),
-          if (hasDebt && f.billingAccountId != null) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: NebrasTheme.danger,
+  Widget _financeButton(BuildContext context, ChildDetail c) {
+    final hasDebt = c.finance.outstandingBalance > 0;
+    return Material(
+      color: (hasDebt ? NebrasTheme.danger : NebrasTheme.success).withAlpha(20),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ChildFinancePage(studentId: c.studentId),
+        )),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(hasDebt ? Icons.account_balance_wallet : Icons.check_circle,
+                  color: hasDebt ? NebrasTheme.danger : NebrasTheme.success),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('الوضع المالي',
+                        style: GoogleFonts.tajawal(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(
+                      hasDebt ? 'متبقٍّ: ${money(c.finance.outstandingBalance)}' : 'لا مستحقّات',
+                      style: GoogleFonts.tajawal(
+                          fontSize: 12,
+                          color: hasDebt ? NebrasTheme.danger : NebrasTheme.success),
+                    ),
+                  ],
                 ),
-                onPressed: () => context.push('/parent/pay',
-                    extra: PayArgs(
-                      billingAccountId: f.billingAccountId!,
-                      studentId: c.studentId,
-                      childName: c.name,
-                      outstanding: f.outstandingBalance,
-                    )),
-                icon: const Icon(Icons.payment),
-                label: Text('سداد الرسوم',
-                    style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
               ),
-            ),
-          ],
-        ],
+              const Icon(Icons.chevron_left, color: NebrasTheme.textMuted),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -137,134 +138,71 @@ class ChildDetailPage extends ConsumerWidget {
         child: Text(t, style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.w700)),
       );
 
-  List<Widget> _invoices(
-      BuildContext context, WidgetRef ref, String childName, List<Map<String, dynamic>> items) {
-    if (items.isEmpty) return [_empty('لا توجد فواتير.')];
-    return items.map((i) {
-      final total = i['total'] ?? i['total_amount'] ?? i['amount'];
-      return Card(
-        child: ListTile(
-          leading: const Icon(Icons.receipt_long, color: NebrasTheme.accent),
-          title: Text(i['invoice_number']?.toString() ?? i['number']?.toString() ?? 'فاتورة',
-              style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 14)),
-          subtitle: Text(prettyDate(i['issue_date']?.toString() ?? i['created_at']?.toString()),
-              style: GoogleFonts.tajawal(fontSize: 12)),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(money(num.tryParse('$total') ?? 0),
-                  style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_left, color: NebrasTheme.textMuted, size: 20),
-            ],
-          ),
-          onTap: () => _showInvoiceSheet(context, ref, childName, i),
-        ),
-      );
-    }).toList();
-  }
-
-  void _showInvoiceSheet(
-      BuildContext context, WidgetRef ref, String childName, Map<String, dynamic> inv) {
-    final id = inv['id']?.toString();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(inv['invoice_number']?.toString() ?? 'فاتورة',
-                  style: GoogleFonts.tajawal(fontSize: 17, fontWeight: FontWeight.w800)),
-              Text(childName,
-                  style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
-              const SizedBox(height: 14),
-              _row('تاريخ الإصدار', prettyDate(inv['issue_date']?.toString())),
-              _row('تاريخ الاستحقاق', prettyDate(inv['due_date']?.toString())),
-              _row('الإجمالي', money(num.tryParse('${inv['total_amount'] ?? inv['total']}') ?? 0)),
-              _row('المدفوع', money(num.tryParse('${inv['paid_amount'] ?? 0}') ?? 0)),
-              _row('المتبقّي',
-                  money(num.tryParse('${inv['outstanding_amount'] ?? 0}') ?? 0), strong: true),
-              const SizedBox(height: 18),
-              ElevatedButton.icon(
-                onPressed: id == null
-                    ? null
-                    : () async {
-                        Navigator.pop(ctx);
-                        await _openInvoicePdf(context, ref, id);
-                      },
-                icon: const Icon(Icons.picture_as_pdf),
-                label: Text('عرض / طباعة PDF',
-                    style: GoogleFonts.tajawal(fontWeight: FontWeight.w700)),
-              ),
-            ],
-          ),
-        ),
+  Widget _infoCard(List<Widget> rows) {
+    final visible = rows.whereType<_KV>().where((r) => r.hasValue).toList();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        child: Column(children: visible),
       ),
     );
   }
 
-  Future<void> _openInvoicePdf(BuildContext context, WidgetRef ref, String invoiceId) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-    try {
-      final bytes = await ref.read(parentRepositoryProvider).invoicePdf(invoiceId);
-      if (context.mounted) Navigator.of(context).pop(); // إغلاق مؤشّر التحميل
-      await Printing.layoutPdf(onLayout: (_) async => Uint8List.fromList(bytes));
-    } catch (e) {
-      if (context.mounted) Navigator.of(context).pop();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: NebrasTheme.danger),
-        );
-      }
-    }
-  }
+  Widget _kv(String label, String? value) => _KV(label: label, value: value);
 
-  Widget _row(String label, String value, {bool strong = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
-            Text(value,
-                style: GoogleFonts.tajawal(
-                    fontSize: strong ? 15 : 13,
-                    fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-                    color: strong ? NebrasTheme.danger : NebrasTheme.textDark)),
-          ],
+  List<Widget> _family(List<Map<String, dynamic>> rels) {
+    if (rels.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text('لا توجد بيانات صلة قرابة.',
+              style: GoogleFonts.tajawal(color: NebrasTheme.textMuted, fontSize: 13)),
         ),
-      );
-
-  List<Widget> _receipts(List<Map<String, dynamic>> items) {
-    if (items.isEmpty) return [_empty('لا توجد سندات قبض.')];
-    return items.map((r) {
-      final amt = r['amount'] ?? r['total'];
+      ];
+    }
+    return rels.map((r) {
       return Card(
         child: ListTile(
-          leading: const Icon(Icons.check_circle, color: NebrasTheme.success),
-          title: Text(r['number']?.toString() ?? r['receipt_number']?.toString() ?? 'سند قبض',
+          leading: const Icon(Icons.people_alt, color: NebrasTheme.accent),
+          title: Text(r['full_name']?.toString() ?? '—',
               style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 14)),
-          subtitle: Text(prettyDate(r['date']?.toString() ?? r['created_at']?.toString()),
-              style: GoogleFonts.tajawal(fontSize: 12)),
-          trailing: Text(money(num.tryParse('$amt') ?? 0),
-              style: GoogleFonts.tajawal(fontWeight: FontWeight.w700, color: NebrasTheme.success)),
+          subtitle: Text(
+            [r['relationship'], r['phone']].where((e) => '$e'.isNotEmpty && e != null).join(' · '),
+            style: GoogleFonts.tajawal(fontSize: 12),
+          ),
         ),
       );
     }).toList();
   }
+}
 
-  Widget _empty(String t) => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(t, style: GoogleFonts.tajawal(color: NebrasTheme.textMuted, fontSize: 13)),
-      );
+class _KV extends StatelessWidget {
+  const _KV({required this.label, required this.value});
+  final String label;
+  final String? value;
+
+  bool get hasValue => value != null && value!.trim().isNotEmpty && value != '—';
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label,
+                style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
+          ),
+          Expanded(
+            child: Text(value ?? '—',
+                style: GoogleFonts.tajawal(fontSize: 13.5, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ErrorView extends StatelessWidget {
