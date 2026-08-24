@@ -53,7 +53,7 @@ interface DBTeacherAssignment {
   selector: 'app-faculty-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Default,
-  imports: [CommonModule, FormsModule, MatDialogModule, TeacherCardComponent, NbPageHeaderComponent, NbStatCardComponent, NbPanelComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, TeacherCardComponent, NbPageHeaderComponent, NbPanelComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header

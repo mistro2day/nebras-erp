@@ -233,7 +233,7 @@ const ADM_SUBMITTED_TEMPLATE = {
             @if (stageConfig().hasTrackSelection) {
               <div class="info-item">
                 <strong>المسار الأكاديمي المفضل بالثانوية:</strong> 
-                {{ (a as any).academic_track === 'scientific' ? 'علمي (رياضيات وفيزياء وكيمياء)' : ((a as any).academic_track === 'literary' ? 'أدبي ولغوي' : 'عام / غير محدد') }}
+                {{ a.academic_track === 'scientific' ? 'علمي (رياضيات وفيزياء وكيمياء)' : (a.academic_track === 'literary' ? 'أدبي ولغوي' : 'عام / غير محدد') }}
               </div>
             }
             <div class="info-item"><strong>احتياجات خاصة:</strong> {{ a.special_needs || 'لا يوجد' }}</div>
