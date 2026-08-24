@@ -9,8 +9,9 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { ApplicantPrintModalComponent } from '../shared/applicant-print-modal.component';
-import { pickList } from '../shared/admissions.shared';
+import { pickList, resolveStageConfig, EducationalStageConfig } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
 
@@ -33,6 +34,7 @@ interface StaffApplicantForm {
   academic_year_id: string;
   applying_grade_id: string;
   applying_section_id: string;
+  academic_track?: string;
 
   has_siblings: boolean;
   siblings_section: string;
@@ -90,6 +92,7 @@ interface StaffGuardianForm {
     NbPanelComponent,
     NbStepperComponent,
     NbDatepickerComponent,
+    NbLoadingComponent,
     ApplicantPrintModalComponent
   ],
   template: `
@@ -104,12 +107,15 @@ interface StaffGuardianForm {
         </button>
       </nb-page-header>
 
-      <nb-panel>
-        <nb-stepper [steps]="stepLabels()" [current]="step()"></nb-stepper>
+      @if (loading()) {
+        <nb-panel><nb-loading message="جارٍ تحميل بيانات طلب الالتحاق…"></nb-loading></nb-panel>
+      } @else {
+        <nb-panel>
+          <nb-stepper [steps]="stepLabels()" [current]="step()"></nb-stepper>
 
-        @if (error()) { <div class="alert err" role="alert">{{ error() }}</div> }
+          @if (error()) { <div class="alert err" role="alert">{{ error() }}</div> }
 
-        <!-- 1) البيانات الشخصية للتلميذ + الأشقاء -->
+          <!-- 1) البيانات الشخصية للتلميذ + الأشقاء -->
         @if (step() === 1) {
           <div class="step-pane">
             <div class="sec-hdr">أ / البيانات الشخصية للتلميذ والأشقاء</div>
@@ -156,6 +162,16 @@ interface StaffGuardianForm {
                   @for (g of grades(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
                 </select>
               </div>
+
+              @if (stageConfig().hasTrackSelection) {
+                <div class="fld req"><label>المسار الأكاديمي المفضل (المرحلة الثانوية)</label>
+                  <select [(ngModel)]="a.academic_track">
+                    <option value="scientific">المسار العلمي (رياضيات، فيزياء، كيمياء)</option>
+                    <option value="literary">المسار الأدبي واللغوي</option>
+                    <option value="general">المسار العام الموحد</option>
+                  </select>
+                </div>
+              }
 
               <div class="fld"><label>الشعبة (اختياري)</label>
                 <select [(ngModel)]="a.applying_section_id">
@@ -323,21 +339,20 @@ interface StaffGuardianForm {
         <!-- 4) الدراسة السابقة والمستندات -->
         @if (step() === 4) {
           <div class="step-pane">
-            <div class="sec-hdr">ب / المؤهل الأكاديمي السابقة والمستندات</div>
+            <div class="sec-hdr">ب / المؤهل الأكاديمي السابقة والمستندات ({{ stageConfig().stageTitle }})</div>
             <div class="form-grid">
-              <div class="fld wide-2"><label>المدرسة الابتدائية / الروضة السابقة</label><input [(ngModel)]="a.previous_school" /></div>
-              <div class="fld"><label>الصف السابق</label><input [(ngModel)]="a.previous_grade" /></div>
+              <div class="fld wide-2"><label>{{ stageConfig().previousSchoolLabel }}</label><input [(ngModel)]="a.previous_school" /></div>
+              <div class="fld"><label>{{ stageConfig().previousGradeLabel }}</label><input [(ngModel)]="a.previous_grade" /></div>
               <div class="fld"><label>النسبة / التقدير</label><input [(ngModel)]="a.previous_grade_score" /></div>
               <div class="fld wide"><label>احتياجات خاصة / ملاحظات</label><textarea rows="2" [(ngModel)]="a.special_needs"></textarea></div>
             </div>
 
             <div class="box-card">
-              <div class="box-head">ج / المستندات المطلوبة للتسليم والتحقق</div>
+              <div class="box-head">ج / المستندات المطلوبة للتسليم والتحقق ({{ stageConfig().stageTitle }})</div>
               <ul class="docs-lst">
-                <li>[✓] أ/ صورتين فوتوغرافيتين للتلميذ.</li>
-                <li>[✓] ب/ الشهادة الأكاديمية السابقة.</li>
-                <li>[✓] ج/ صورة من الرقم الوطني / القيد.</li>
-                <li>[✓] د/ صورة إثبات شخصية ولي الأمر.</li>
+                @for (doc of stageConfig().requiredDocs; track doc.code) {
+                  <li>[✓] {{ doc.label }}</li>
+                }
               </ul>
             </div>
           </div>
@@ -405,6 +420,7 @@ interface StaffGuardianForm {
           }
         </div>
       </nb-panel>
+      }
 
       @if (showPrintModal()) {
         <app-applicant-print-modal
@@ -475,6 +491,7 @@ export class ApplicantFormComponent implements OnInit {
 
   readonly id = signal<string | null>(null);
   readonly isEdit = computed(() => !!this.id());
+  readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
   readonly step = signal(1);
@@ -511,6 +528,7 @@ export class ApplicantFormComponent implements OnInit {
     previous_grade_score: '',
     academic_year_id: '',
     applying_grade_id: '',
+    academic_track: 'scientific',
     applying_section_id: '',
     has_siblings: false,
     siblings_section: 'إبتدائي',
@@ -659,14 +677,19 @@ export class ApplicantFormComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.id.set(id);
-      this.svc.getApplicant(id).subscribe((res) => {
-        const d = res?.data ?? res;
-        if (d) {
-          for (const k of Object.keys(this.a)) {
-            if (d[k] !== undefined && d[k] !== null) this.a[k] = d[k];
+      this.loading.set(true);
+      this.svc.getApplicant(id).subscribe({
+        next: (res) => {
+          const d = res?.data ?? res;
+          if (d) {
+            for (const k of Object.keys(this.a)) {
+              if (d[k] !== undefined && d[k] !== null) this.a[k] = d[k];
+            }
+            if (this.a.applying_grade_id) this.onGradeChange();
           }
-          if (this.a.applying_grade_id) this.onGradeChange();
-        }
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
       });
     }
   }
@@ -680,6 +703,11 @@ export class ApplicantFormComponent implements OnInit {
 
   yearName(id: string): string { return this.years().find((y) => y.id === id)?.name || '—'; }
   gradeName(id: string): string { return this.grades().find((g) => g.id === id)?.name || '—'; }
+
+  readonly stageConfig = computed(() => {
+    const gName = this.gradeName(this.a.applying_grade_id);
+    return resolveStageConfig(gName);
+  });
 
   save(): void {
     if (!this.valid() || this.saving()) return;

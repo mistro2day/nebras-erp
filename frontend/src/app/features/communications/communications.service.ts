@@ -104,7 +104,7 @@ const FALLBACK_PROVIDERS: CommunicationProvider[] = [
     health_status: 'healthy',
     daily_quota: 1000,
     sent_today: 0,
-    config: { instance_name: 'nebras-khartoum-instance', webhook_url: 'http://localhost:8080', api_key: 'evo_key_998237465' },
+    config: { instance_name: 'nebras-khartoum-instance', webhook_url: 'http://localhost:8050', api_key: 'evo_key_998237465' },
   },
   {
     id: 'p3',
@@ -203,7 +203,7 @@ export class CommunicationsService {
   private http = inject(HttpClient);
   private baseUrl = '/api/v1/communications';
 
-  // إعدادات Evolution API (تُمرَّر عبر بروكسي /whatsapp-api → http://localhost:8080)
+  // إعدادات Evolution API (تُمرَّر عبر بروكسي /whatsapp-api → http://localhost:8050)
   private evoInstance = 'nebras-khartoum-instance';
   private evoApiKey = 'evo_key_998237465';
   private get evoHeaders() {
@@ -288,7 +288,7 @@ export class CommunicationsService {
         health_status: 'down',
         ping_ms: 0,
         connected: false,
-        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيله على المنفذ 8080 وصحة مفتاح apikey.',
+        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيله على المنفذ 8050 وصحة مفتاح apikey.',
       }))
     );
   }
@@ -316,7 +316,7 @@ export class CommunicationsService {
         instance_name: this.evoInstance,
         connected: false,
         qr_code_base64: null,
-        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيل الخادم على المنفذ 8080 وصحة مفتاح apikey.'
+        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيل الخادم على المنفذ 8050 وصحة مفتاح apikey.'
       }))
     );
   }
@@ -486,7 +486,7 @@ export class CommunicationsService {
       return `تعذّر الإرسال: الرقم (${rawNumber}) غير مسجّل على واتساب أو ينقصه رمز الدولة (مثال: 249 للسودان). الصيغة المُجرّبة: ${normalized}. رجاءً صحّح رقم الواتساب المعتمد لولي الأمر.`;
     }
     if (err?.status === 0 || err?.status === 502 || err?.status === 503 || err?.status === 404) {
-      return 'تعذر الإرسال: تأكد من تشغيل خادم Evolution API على المنفذ 8080 واقتران الواتساب (الحالة open).';
+      return 'تعذر الإرسال: تأكد من تشغيل خادم Evolution API على المنفذ 8050 واقتران الواتساب (الحالة open).';
     }
     return err?.error?.message || 'تعذر الإرسال حالياً. يرجى التأكد من الرقم والمحاولة لاحقاً.';
   }

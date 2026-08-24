@@ -11,5 +11,8 @@
     "backend"
   ],
   "python.analysis.diagnosticMode": "openFilesOnly",
-  "python.terminal.activateEnvironment": true
+  "python.terminal.activateEnvironment": true,
+  "git.repositoryScanIgnoredFolders": [
+    ".claude"
+  ]
 }

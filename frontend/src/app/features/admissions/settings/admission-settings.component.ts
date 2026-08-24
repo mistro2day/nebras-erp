@@ -5,6 +5,7 @@ import { TenantService } from '../../../core/services/tenant.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { pickList, DEFAULT_ADMISSION_FEES } from '../shared/admissions.shared';
 
 interface Option { id: string; name: string; }
@@ -61,7 +62,7 @@ const SUDAN_DEFAULT_TERMS = `شروط وأحكام القبول والتسجيل
   selector: 'app-admission-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -90,7 +91,7 @@ const SUDAN_DEFAULT_TERMS = `شروط وأحكام القبول والتسجيل
       @if (error()) { <div class="alert err" role="alert">{{ error() }}</div> }
 
       @if (loading()) {
-        <nb-panel><div class="loading">جارٍ تحميل إعدادات القبول…</div></nb-panel>
+        <nb-panel><nb-loading message="جارٍ تحميل إعدادات القبول…"></nb-loading></nb-panel>
       } @else {
         <!-- مفتاح فتح/إغلاق خاص بالفرع -->
         <nb-panel>

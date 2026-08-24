@@ -18,3 +18,7 @@ backend/baileys_auth_info/
 
 # ملف إعداد MCP المحلّي (يحوي مفاتيح) — لا يُتعقّب
 .mcp.json
+
+# مجلدات العمل المؤقتة
+.claude/
+

@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/v1/rules/', include('apps.rules.interfaces.urls')),
     path('api/v1/timetable/', include('apps.timetable.interfaces.urls')),
     path('api/v1/communications/', include('apps.communications.interfaces.urls')),
+    path('api/v1/notifications/', include('apps.notifications.interfaces.urls')),
     path('api/v1/reporting/', include('apps.reporting.interfaces.urls')),
     path('api/v1/examinations/', include('apps.examinations.interfaces.urls')),
     path('api/v1/finance/', include('apps.finance.interfaces.urls')),

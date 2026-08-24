@@ -80,6 +80,125 @@ export const DEFAULT_ADMISSION_FEES: AdmissionFees = {
   ],
 };
 
+export type EducationalStageKey = 'kindergarten' | 'primary' | 'middle' | 'secondary';
+
+export interface EducationalStageConfig {
+  key: EducationalStageKey;
+  stageTitle: string;
+  formTitle: string;
+  badgeLabel: string;
+  previousSchoolLabel: string;
+  previousGradeLabel: string;
+  requiredDocs: Array<{ code: string; label: string; mandatory: boolean }>;
+  aptitudeSubjects: Array<{ name: string; max: number; pass: number }>;
+  hasTrackSelection: boolean;
+}
+
+export const STAGE_CONFIGS: Record<EducationalStageKey, EducationalStageConfig> = {
+  kindergarten: {
+    key: 'kindergarten',
+    stageTitle: 'مرحـلة رياض الأطفـال والروضـة',
+    formTitle: 'إسـتمـارة تسجـيـل طـفـل (الروضة والتمهيدي)',
+    badgeLabel: '🧸 رياض الأطفال والروضة',
+    previousSchoolLabel: 'الحضانة / الروضة السابقة التي درس بها الطفل:',
+    previousGradeLabel: 'المستوى الدراسي السابق (حضانة / تمهيدي):',
+    requiredDocs: [
+      { code: 'VACC_CARD', label: 'كارت التطعيمات والبطاقة الصحية للطفل', mandatory: true },
+      { code: 'BIRTH_CERT', label: 'شهادة الميلاد الأصلية + صورة', mandatory: true },
+      { code: 'NATIONAL_ID', label: 'صورة الرقم الوطني للطفل وولي الأمر', mandatory: true },
+      { code: 'PHOTOS', label: 'عدد (4) صور شخصية حديثة بخلفية بيضاء', mandatory: true },
+    ],
+    aptitudeSubjects: [
+      { name: 'التطور اللغوي والنطق', max: 100, pass: 70 },
+      { name: 'المهارات الحركية والنمو', max: 100, pass: 70 },
+      { name: 'التفاعل والسلوك الاجتماعي', max: 100, pass: 70 },
+    ],
+    hasTrackSelection: false,
+  },
+  primary: {
+    key: 'primary',
+    stageTitle: 'المرحـلة الإبتدائيـة',
+    formTitle: 'إسـتمـارة التسجـيـل والقـبـول – المرحلة الابتدائية',
+    badgeLabel: '🏫 المرحلة الابتدائية',
+    previousSchoolLabel: 'المدرسة الابتدائية / الروضة التي درس بها التلميذ:',
+    previousGradeLabel: 'الصف الدراسي السابق للتقديم:',
+    requiredDocs: [
+      { code: 'TRANSFER_CERT', label: 'شهادة إخلاء طرف / نقل معتمدة من المدرسة السابقة', mandatory: true },
+      { code: 'REPORT_CARD', label: 'كشف درجات الصف السابق المعتمد', mandatory: true },
+      { code: 'BIRTH_CERT', label: 'شهادة الميلاد الأصلية + صورة', mandatory: true },
+      { code: 'NATIONAL_ID', label: 'صورة الرقم الوطني للتلميذ وولي الأمر', mandatory: true },
+      { code: 'PHOTOS', label: 'عدد (4) صور شخصية حديثة بخلفية بيضاء', mandatory: true },
+    ],
+    aptitudeSubjects: [
+      { name: 'اللغة العربية والقراءة', max: 100, pass: 75 },
+      { name: 'الرياضيات والعمليات', max: 100, pass: 75 },
+      { name: 'اللغة الإنجليزية', max: 100, pass: 75 },
+    ],
+    hasTrackSelection: false,
+  },
+  middle: {
+    key: 'middle',
+    stageTitle: 'المرحـلة المتوسـطة',
+    formTitle: 'إسـتمـارة التسجـيـل والقـبـول – المرحلة المتوسطة',
+    badgeLabel: '🎓 المرحلة المتوسطة',
+    previousSchoolLabel: 'المدرسة الابتدائية وتفاصيل النتيجة النهائية:',
+    previousGradeLabel: 'شهادة إتمام المرحلة الابتدائية / كشف درجات الصف السادس:',
+    requiredDocs: [
+      { code: 'PRIMARY_CERT', label: 'شهادة إتمام المرحلة الابتدائية / الأساس المعتمدة الأصلية', mandatory: true },
+      { code: 'REPORT_CARD', label: 'كشف درجات الصف السادس الابتدائي كاملًا', mandatory: true },
+      { code: 'BEHAVIOR_CERT', label: 'شهادة حسن سير وسلوك من المدرسة السابقة', mandatory: true },
+      { code: 'NATIONAL_ID', label: 'صورة الرقم الوطني والتأكيد الأمني', mandatory: true },
+      { code: 'PHOTOS', label: 'عدد (4) صور شخصية حديثة بخلفية بيضاء', mandatory: true },
+    ],
+    aptitudeSubjects: [
+      { name: 'اللغة العربية والقواعد', max: 100, pass: 75 },
+      { name: 'الرياضيات والمنطق', max: 100, pass: 75 },
+      { name: 'اللغة الإنجليزية', max: 100, pass: 75 },
+      { name: 'العلوم العامة', max: 100, pass: 75 },
+    ],
+    hasTrackSelection: false,
+  },
+  secondary: {
+    key: 'secondary',
+    stageTitle: 'المرحـلة الثانـويـة',
+    formTitle: 'إسـتمـارة التسجـيـل والقـبـول – المرحلة الثانوية',
+    badgeLabel: '⚖️ المرحلة الثانوية',
+    previousSchoolLabel: 'المدرسة المتوسطة ورقم الجلوس والنتيجة الرسمية:',
+    previousGradeLabel: 'شهادة إتمام المرحلة المتوسطة ورقم الاعتماد:',
+    requiredDocs: [
+      { code: 'MIDDLE_CERT', label: 'الشهادة المتوسطة المعتمدة الأصلية (أصل + 3 صور)', mandatory: true },
+      { code: 'RESULT_NOTICE', label: 'إشعار النتيجة الرسمية لشهادة إتمام المرحلة المتوسطة', mandatory: true },
+      { code: 'BEHAVIOR_CERT', label: 'شهادة حسن سير وسلوك معتمدة من إدارة المدرسة المتوسطة', mandatory: true },
+      { code: 'RESIDENCE_PROOF', label: 'إثبات سكن ولي الأمر وصورة الرقم الوطني', mandatory: true },
+      { code: 'PHOTOS', label: 'عدد (6) صور شخصية بخلفية بيضاء', mandatory: true },
+    ],
+    aptitudeSubjects: [
+      { name: 'الرياضيات المتقدمة', max: 100, pass: 75 },
+      { name: 'العلوم الطبيعية (فيزياء / كيمياء)', max: 100, pass: 75 },
+      { name: 'اللغة العربية والآداب', max: 100, pass: 75 },
+      { name: 'اللغة الإنجليزية والمطالعة', max: 100, pass: 75 },
+    ],
+    hasTrackSelection: true,
+  },
+};
+
+export function resolveStageConfig(gradeName: string | null | undefined): EducationalStageConfig {
+  if (!gradeName) return STAGE_CONFIGS.primary;
+  const name = gradeName.trim().toLowerCase();
+
+  if (name.includes('روضة') || name.includes('تمهيدي') || name.includes('حضانة') || name.includes('kg') || name.includes('preschool')) {
+    return STAGE_CONFIGS.kindergarten;
+  }
+  if (name.includes('متوسط') || name.includes('متوسطة') || name.includes('سابع') || name.includes('ثامن') || name.includes('تاسع') || name.includes('middle') || name.includes('intermediate')) {
+    return STAGE_CONFIGS.middle;
+  }
+  if (name.includes('ثانوي') || name.includes('ثانوية') || name.includes('عاشر') || name.includes('حادي عشر') || name.includes('ثاني عشر') || name.includes('علمي') || name.includes('أدبي') || name.includes('secondary') || name.includes('high')) {
+    return STAGE_CONFIGS.secondary;
+  }
+
+  return STAGE_CONFIGS.primary;
+}
+
 /** يُرجع فهرس المرحلة الحالية ضمن ADMISSION_STAGES بناءً على حالة الطلب. */
 export function admissionStageIndex(status: string): number {
   const i = ADMISSION_STAGES.findIndex(s => s.statuses.includes(status));

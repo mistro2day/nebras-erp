@@ -10,11 +10,12 @@ import { CommunicationsService, CommunicationTemplate } from '../../communicatio
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDataTableComponent, NbColumn } from '../../../shared/nebras/nb-data-table.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import {
   ADM_PAGE_STYLES, DOC_STATUS_TEXT, INTERVIEW_STATUS_TEXT, ADMISSION_STAGES,
   applicantStatusKind, applicantStatusText, docStatusKind, interviewStatusKind, pickList,
   admissionStageIndex, isNegativeDecision, DEFAULT_APTITUDE_SUBJECTS,
-  AdmissionFees, DEFAULT_ADMISSION_FEES,
+  AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalStageConfig,
 } from '../shared/admissions.shared';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { InterviewScheduleDialogComponent, InterviewScheduleResult } from '../../../shared/components/interview-schedule-dialog/interview-schedule-dialog.component';
@@ -72,7 +73,7 @@ const ADM_SUBMITTED_TEMPLATE = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe, FormsModule, MatDialogModule,
-    NbPageHeaderComponent, NbPanelComponent, NbDataTableComponent,
+    NbPageHeaderComponent, NbPanelComponent, NbDataTableComponent, NbLoadingComponent,
     ApplicantPrintModalComponent
   ],
   template: `
@@ -161,6 +162,8 @@ const ADM_SUBMITTED_TEMPLATE = {
             {{ targetSchool(a) === 'girls' ? '👧 مدرسة البنات' : '👦 مدرسة البنين' }}
           </span>
 
+          <span class="school-branch-chip stage">{{ stageConfig().badgeLabel }}</span>
+
           <span class="meta-item"><b>الجنسية:</b> {{ a.nationality || 'سوداني' }}</span>
           <span class="meta-item"><b>الجنس:</b> {{ a.gender === 'female' ? 'أنثى' : 'ذكر' }}</span>
           <span class="meta-item"><b>تاريخ الميلاد:</b> {{ a.date_of_birth }}</span>
@@ -217,15 +220,22 @@ const ADM_SUBMITTED_TEMPLATE = {
         }
 
         <!-- 1) البيانات الشخصية للتلميذ والأكاديمية -->
-        <nb-panel title="أ / البيانات الشخصية والأكاديمية للتلميذ">
+        <nb-panel [title]="'أ / البيانات الشخصية والأكاديمية للمتقدم (' + stageConfig().stageTitle + ')'">
           <div class="info-grid">
             <div class="info-item"><strong>اسم التلميذ رباعياً:</strong> {{ a.arabic_full_name }}</div>
             <div class="info-item"><strong>الاسم بالإنجليزي:</strong> {{ a.english_full_name || '—' }}</div>
             <div class="info-item"><strong>الرقم الوطني للتلميذ:</strong> {{ a.national_id || '—' }}</div>
             <div class="info-item"><strong>رقم الجواز:</strong> {{ a.passport_number || '—' }}</div>
             <div class="info-item"><strong>الديانة / فصيلة الدم:</strong> {{ a.religion || 'مسلم' }} · {{ a.blood_group || '—' }}</div>
-            <div class="info-item"><strong>المدرسة والصف السابقتين:</strong> {{ a.previous_school || '—' }} ({{ a.previous_grade || '—' }})</div>
+            <div class="info-item"><strong>{{ stageConfig().previousSchoolLabel }}</strong> {{ a.previous_school || '—' }}</div>
+            <div class="info-item"><strong>{{ stageConfig().previousGradeLabel }}</strong> {{ a.previous_grade || '—' }}</div>
             <div class="info-item"><strong>المعدل / النسبة السابقة:</strong> {{ a.previous_grade_score || '—' }}</div>
+            @if (stageConfig().hasTrackSelection) {
+              <div class="info-item">
+                <strong>المسار الأكاديمي المفضل بالثانوية:</strong> 
+                {{ a.academic_track === 'scientific' ? 'علمي (رياضيات وفيزياء وكيمياء)' : (a.academic_track === 'literary' ? 'أدبي ولغوي' : 'عام / غير محدد') }}
+              </div>
+            }
             <div class="info-item"><strong>احتياجات خاصة:</strong> {{ a.special_needs || 'لا يوجد' }}</div>
           </div>
         </nb-panel>
@@ -356,7 +366,7 @@ const ADM_SUBMITTED_TEMPLATE = {
           </nb-panel>
         </div>
 
-        <!-- 4) المستندات والمقابلات واختبارات المستوى -->
+        <!-- 4) المستندات والمقابلات وااختبارات المستوى -->
         <div class="two-col" style="margin-top:16px">
           <nb-panel title="و / المستندات المطلوبة والتحقق" [flush]="true">
             <nb-data-table [columns]="docCols" [rows]="documents()" emptyText="لا توجد مستندات مرفوعة.">
@@ -369,7 +379,7 @@ const ADM_SUBMITTED_TEMPLATE = {
             </nb-data-table>
           </nb-panel>
 
-          <nb-panel title="ز / المقابلات واختبارات تحديد المستوى" [flush]="true">
+          <nb-panel title="ز / المقابلات وااختبارات تحديد المستوى" [flush]="true">
             <nb-data-table [columns]="interviewCols" [rows]="interviews()" emptyText="لا توجد مقابلات مجدولة بعد.">
               <ng-template #cell let-row let-col="col" let-value="value">
                 @switch (col.key) {
@@ -464,7 +474,7 @@ const ADM_SUBMITTED_TEMPLATE = {
         ></app-applicant-print-modal>
       }
     } @else {
-      <div class="page" dir="rtl"><div class="loading">جارٍ تحميل تفاصيل طلب التسجيل…</div></div>
+      <div class="page" dir="rtl"><nb-loading message="جارٍ تحميل تفاصيل طلب الالتحاق…"></nb-loading></div>
     }
   `,
   styles: [
@@ -619,6 +629,12 @@ export class ApplicationDetailsComponent implements OnInit {
   readonly stages = ADMISSION_STAGES;
   readonly currentStageIndex = computed(() => admissionStageIndex(this.applicant()?.status || 'submitted'));
   readonly isNegative = computed(() => isNegativeDecision(this.applicant()?.status || ''));
+
+  readonly stageConfig = computed(() => {
+    const app = this.applicant();
+    const gName = this.gradeName(app?.applying_grade_id) || (app as any)?.applying_grade_name || (app as any)?.grade_name || '';
+    return resolveStageConfig(gName);
+  });
   /** درجات القدرات القابلة للتحرير في نموذج الرصد: [{ subject, marks }]. */
   readonly aptitudeScores = signal<Array<{ subject: string; marks: number | null; max: number; pass: number }>>([]);
   readonly savingAptitude = signal(false);

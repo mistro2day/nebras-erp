@@ -58,7 +58,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
       </div>
 
       <nb-panel [flush]="true">
-        <nb-data-table [columns]="columns" [rows]="filtered()" [emptyText]="emptyText" (rowClick)="open($event)">
+        <nb-data-table [columns]="columns" [rows]="filtered()" [emptyText]="emptyText" [loading]="loading()" [loadingText]="loadingText" (rowClick)="open($event)">
           <ng-template #cell let-row let-col="col" let-value="value">
             @switch (col.key) {
               @case ('status') {
@@ -105,12 +105,14 @@ export class ApplicantQueueComponent implements OnInit {
   /** أزرار انتقال الحالة المتاحة في كل صف */
   @Input() actions: QueueAction[] = [];
   @Input() emptyText = 'لا توجد طلبات مطابقة.';
+  @Input() loadingText = 'جارٍ تحميل طلبات التحاق المتقدمين…';
   @Input() showStats = true;
   /** عند تمريره يظهر زر «تسجيل طلب جديد» ويوجّه إلى هذا المسار (تسجيل يدوي من المشرف) */
   @Input() createLink?: string;
   @Output() actioned = new EventEmitter<{ row: Record<string, any>; action: QueueAction }>();
 
   readonly applicants = signal<Applicant[]>([]);
+  readonly loading = signal(true);
   search = '';
   statusFilter = '';
   private readonly filterTick = signal(0);
@@ -158,7 +160,14 @@ export class ApplicantQueueComponent implements OnInit {
   }
 
   load(): void {
-    this.service.getApplicants().subscribe((res) => this.applicants.set(pickList<Applicant>(res)));
+    this.loading.set(true);
+    this.service.getApplicants().subscribe({
+      next: (res) => {
+        this.applicants.set(pickList<Applicant>(res));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   onFilter(): void {

@@ -90,7 +90,7 @@ class ProviderViewSet(BaseCRUDViewSet):
         if env_url:
             webhook_url = env_url
         elif not config.get('webhook_url') or 'wa.nebras.edu.sd' in str(config.get('webhook_url')):
-            webhook_url = 'http://localhost:8080'
+            webhook_url = 'http://localhost:8050'
         else:
             webhook_url = config.get('webhook_url')
 

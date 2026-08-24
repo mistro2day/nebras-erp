@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { AdmissionFees, DEFAULT_ADMISSION_FEES } from './admissions.shared';
+import { AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalStageConfig } from './admissions.shared';
 
 @Component({
   selector: 'app-applicant-print-modal',
@@ -12,7 +12,7 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES } from './admissions.shared';
       <div class="modal-card print-card" (click)="$event.stopPropagation()">
         <header class="modal-header no-print">
           <div class="header-titles">
-            <h2>معاينة استمارة التسجيل والقبول الرسمية</h2>
+            <h2>معاينة استمارة التسجيل والقبول الرسمية ({{ stageConfig.badgeLabel }})</h2>
             <p>نسخة مطابقة للاستمارة الورقية الخاصة بالمدرسة (المورد الجديدة للتعليم الخاص)</p>
           </div>
           <div class="header-actions">
@@ -29,20 +29,20 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES } from './admissions.shared';
         </header>
 
         <div class="print-paper" id="printable-form">
-          <!-- ترويسة الاستمارة الرسمية -->
+          <!-- ترويسة الاستمارة الرسمية المخصصة للمرحلة -->
           <div class="paper-header">
             <div class="bismillah">بسم الله الرحمن الرحيم</div>
             <div class="school-brand">
               <h1>المــورد الجديــدة للتعليم الخـاص</h1>
-              <h2>المرحـلة الإبتدائيـة – (بنين – بنات)</h2>
+              <h2>{{ stageConfig.stageTitle }} – (بنين – بنات)</h2>
             </div>
             <div class="form-title-box">
-              <h3>إسـتمـارة التسجـيـل والقـبـول</h3>
+              <h3>{{ stageConfig.formTitle }}</h3>
             </div>
             <div class="meta-row">
               <div><b>التاريخ:</b> {{ currentDate }}</div>
               <div><b>العام الدراسي:</b> {{ academicYear || '2026 - 2025' }}</div>
-              <div><b>الصف:</b> {{ gradeName || '—' }}</div>
+              <div><b>الصف المطلوب:</b> {{ gradeName || '—' }}</div>
             </div>
             <div class="pledge-head">الإلتزام بالضوابط واللوائح في الاستمارة</div>
           </div>
@@ -112,26 +112,33 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES } from './admissions.shared';
             </table>
           </section>
 
-          <!-- ب/ المؤهل الأكاديمي -->
+          <!-- ب/ المؤهل الأكاديمي الخاص بالمرحلة -->
           <section class="paper-section">
-            <div class="sec-title">ب / المؤهل الأكاديمي :</div>
+            <div class="sec-title">ب / المؤهل الأكاديمي والسجل السابق للمرحلة :</div>
             <table class="paper-table">
               <tr>
-                <td><b>المدرسة الابتدائية / الروضة التي درس بها التلميذ:</b> {{ applicant.previous_school || '—' }}</td>
-                <td><b>الصف السابق:</b> {{ applicant.previous_grade || '—' }}</td>
+                <td><b>{{ stageConfig.previousSchoolLabel }}</b> {{ applicant.previous_school || '—' }}</td>
+                <td><b>{{ stageConfig.previousGradeLabel }}</b> {{ applicant.previous_grade || '—' }}</td>
                 <td><b>النسبة / التقدير:</b> {{ applicant.previous_grade_score || '—' }}</td>
               </tr>
+              @if (stageConfig.hasTrackSelection) {
+                <tr>
+                  <td colspan="3">
+                    <b>المسار الأكاديمي المفضل بالمرحلة الثانوية:</b> 
+                    {{ applicant.academic_track === 'scientific' ? 'المسار العلمي (رياضيات وفيزياء وكيمياء الأحياء)' : (applicant.academic_track === 'literary' ? 'المسار الأدبي واللغوي' : 'المسار العام الموحد') }}
+                  </td>
+                </tr>
+              }
             </table>
           </section>
 
-          <!-- ج/ المستندات المطلوبة -->
+          <!-- ج/ المستندات المطلوبة للمرحلة -->
           <section class="paper-section">
-            <div class="sec-title">ج / المستندات المطلوبة :</div>
+            <div class="sec-title">ج / المستندات والوثائق المطلوبة للمرحلة ({{ stageConfig.stageTitle }}) :</div>
             <div class="docs-checklist">
-              <span class="chk">[✓] أ/ صورتين فوتوغرافيتين</span>
-              <span class="chk">[✓] ب/ الشهادة الأكاديمية السابقة</span>
-              <span class="chk">[✓] ج/ صورة من الرقم الوطني</span>
-              <span class="chk">[✓] د/ صورة إثبات شخصية ولي الأمر</span>
+              @for (doc of stageConfig.requiredDocs; track doc.code) {
+                <span class="chk">[✓] {{ doc.label }}</span>
+              }
             </div>
           </section>
 
@@ -250,6 +257,11 @@ export class ApplicantPrintModalComponent {
   @Output() close = new EventEmitter<void>();
 
   readonly currentDate = new Date().toLocaleDateString('ar-SD');
+
+  get stageConfig(): EducationalStageConfig {
+    const name = this.gradeName || this.applicant?.applying_grade_name || this.applicant?.grade_name || '';
+    return resolveStageConfig(name);
+  }
 
   triggerPrint(): void {
     window.print();

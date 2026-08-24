@@ -17,7 +17,7 @@ class EvolutionWhatsAppClient:
         if env_url:
             self.base_url = env_url.rstrip('/')
         elif not base_url or "wa.nebras.edu.sd" in str(base_url):
-            self.base_url = "http://localhost:8080"
+            self.base_url = "http://localhost:8050"
         else:
             self.base_url = base_url.rstrip('/')
 

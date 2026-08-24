@@ -705,6 +705,69 @@ class StudentViewSet(viewsets.ModelViewSet):
             'portal_user_id': str(portal_user.id)
         }, message=message)
 
+    @action(detail=True, methods=['post'], url_path='activate-student-account')
+    def activate_student_account(self, request, pk=None):
+        """تفعيل حساب الطالب وإصدار بيانات الدخول لبوابته المخصصة"""
+        student = self.get_object()
+        profile = getattr(student, 'profile', None)
+        email = request.data.get('email') or (f"student_{student.student_number.lower()}@nebras.edu")
+        full_name = profile.arabic_name if profile else f"طالب {student.student_number}"
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else student.tenant_id
+        user_id = request.user.id if request.user else None
+
+        user, created = User.objects.get_or_create(
+            username=student.student_number,
+            defaults={
+                'email': email,
+                'first_name': full_name,
+                'last_name': 'طالب',
+                'phone': getattr(profile, 'mobile_phone', '') if profile else '',
+                'status': 'active',
+                'is_active': True,
+            }
+        )
+
+        from apps.common.security import generate_temp_password
+        temp_password = generate_temp_password()
+        if created:
+            user.set_password(temp_password)
+            user.save()
+
+        from apps.identity.domain.rbac import UserRole, ensure_system_roles
+        from apps.identity.application.services import PermissionCacheService
+        roles = ensure_system_roles(tenant_id, created_by=user_id)
+        UserRole.objects.get_or_create(tenant_id=tenant_id, user=user, role=roles['student'])
+        PermissionCacheService.clear_user_permissions_cache(user.id, tenant_id)
+
+        from apps.portal.domain.models import PortalUser, PortalProfile
+        portal_user, _ = PortalUser.objects.get_or_create(
+            user=user,
+            defaults={'user_type': 'student', 'tenant_id': tenant_id, 'created_by': user_id}
+        )
+
+        PortalProfile.objects.get_or_create(
+            portal_user=portal_user,
+            defaults={
+                'display_name_ar': full_name,
+                'email': email,
+                'tenant_id': tenant_id,
+                'created_by': user_id
+            }
+        )
+
+        return StandardResponse({
+            'user_id': str(user.id),
+            'student_number': student.student_number,
+            'email': user.email,
+            'temp_password': temp_password if created else None,
+            'created': created,
+            'is_active': True
+        }, message="تم تفعيل حساب الطالب بنجاح في المنصة وتجهيز بوابته المخصصة.")
+
     @action(detail=True, methods=['post'], url_path='reset-guardian-password')
     def reset_guardian_password(self, request, pk=None):
         """إعادة تعيين كلمة مرور حساب ولي الأمر وإرسال بيانات الدخول الجديدة.

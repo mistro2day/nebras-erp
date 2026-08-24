@@ -45,7 +45,7 @@ import { ADM_PAGE_STYLES, INTERVIEW_STATUS_TEXT, interviewStatusKind, pickList }
       </div>
 
       <nb-panel [flush]="true">
-        <nb-data-table [columns]="columns" [rows]="filtered()" emptyText="لا توجد مقابلات مطابقة.">
+        <nb-data-table [columns]="columns" [rows]="filtered()" [loading]="loading()" loadingText="جارٍ تحميل المقابلات الشخصية…" emptyText="لا توجد مقابلات مطابقة.">
           <ng-template #cell let-row let-col="col" let-value="value">
             @switch (col.key) {
               @case ('applicant') { <span class="strong">{{ applicantName(row.applicant) }}</span> }
@@ -90,6 +90,7 @@ export class AdmissionsInterviewsComponent implements OnInit {
   private readonly service = inject(AdmissionsService);
 
   readonly interviews = signal<Interview[]>([]);
+  readonly loading = signal(true);
   private readonly applicantMap = signal<Record<string, string>>({});
   statusFilter = '';
   private readonly filterTick = signal(0);
@@ -116,7 +117,14 @@ export class AdmissionsInterviewsComponent implements OnInit {
   }
 
   load(): void {
-    this.service.getInterviews().subscribe((res) => this.interviews.set(pickList<Interview>(res)));
+    this.loading.set(true);
+    this.service.getInterviews().subscribe({
+      next: (res) => {
+        this.interviews.set(pickList<Interview>(res));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
     // أسماء المتقدمين من نقطة النهاية الحقيقية (المقابلة تحمل معرّف المتقدم فقط)
     this.service.getApplicants().subscribe((res) => {
       const map: Record<string, string> = {};

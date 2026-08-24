@@ -8,6 +8,7 @@ import {
   contentChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NbLoadingComponent } from './nb-loading.component';
 
 export interface NbColumn {
   key: string;
@@ -25,7 +26,7 @@ export interface NbColumn {
   selector: 'nb-data-table',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, NbLoadingComponent],
   template: `
     <div class="nb-dt">
       <div class="nb-dt-head" [style.grid-template-columns]="gridCols">
@@ -33,24 +34,28 @@ export interface NbColumn {
           <span [style.text-align]="col.align ?? 'start'">{{ col.label }}</span>
         }
       </div>
-      @for (row of rows; track $index) {
-        <div class="nb-dt-row" [style.grid-template-columns]="gridCols" (click)="rowClick.emit(row)">
-          @for (col of columns; track col.key) {
-            <span [style.text-align]="col.align ?? 'start'">
-              @if (cellTpl()) {
-                <ng-container
-                  [ngTemplateOutlet]="cellTpl()!"
-                  [ngTemplateOutletContext]="{ $implicit: row, col: col, value: row[col.key] }"
-                ></ng-container>
-              } @else {
-                {{ row[col.key] }}
-              }
-            </span>
-          }
-        </div>
-      }
-      @if (rows.length === 0) {
-        <div class="nb-dt-empty">{{ emptyText }}</div>
+      @if (loading) {
+        <nb-loading [message]="loadingText"></nb-loading>
+      } @else {
+        @for (row of rows; track $index) {
+          <div class="nb-dt-row" [style.grid-template-columns]="gridCols" (click)="rowClick.emit(row)">
+            @for (col of columns; track col.key) {
+              <span [style.text-align]="col.align ?? 'start'">
+                @if (cellTpl()) {
+                  <ng-container
+                    [ngTemplateOutlet]="cellTpl()!"
+                    [ngTemplateOutletContext]="{ $implicit: row, col: col, value: row[col.key] }"
+                  ></ng-container>
+                } @else {
+                  {{ row[col.key] }}
+                }
+              </span>
+            }
+          </div>
+        }
+        @if (rows.length === 0) {
+          <div class="nb-dt-empty">{{ emptyText }}</div>
+        }
       }
     </div>
   `,
@@ -98,6 +103,8 @@ export class NbDataTableComponent {
   @Input({ required: true }) columns: NbColumn[] = [];
   @Input({ required: true }) rows: Record<string, any>[] = [];
   @Input() emptyText = 'لا توجد بيانات';
+  @Input() loading = false;
+  @Input() loadingText = 'جارٍ تحميل البيانات…';
 
   @Output() rowClick = new EventEmitter<Record<string, any>>();
 

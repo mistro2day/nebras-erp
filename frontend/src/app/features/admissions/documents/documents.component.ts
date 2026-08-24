@@ -66,6 +66,8 @@ import { ADM_PAGE_STYLES, DOC_STATUS_TEXT, docStatusKind, pickList } from '../sh
             <nb-data-table 
               [columns]="columns" 
               [rows]="filtered()" 
+              [loading]="loading()"
+              loadingText="جارٍ تحميل المستندات والوثائق…"
               emptyText="لا توجد مستندات مطابقة."
               (rowClick)="selectDocument($event)"
             >
@@ -490,6 +492,7 @@ export class AdmissionsDocumentsComponent implements OnInit {
   private readonly service = inject(AdmissionsService);
 
   readonly documents = signal<any[]>([]);
+  readonly loading = signal(true);
   readonly selectedDoc = signal<any | null>(null);
   rejectionReason = '';
   search = '';
@@ -534,17 +537,22 @@ export class AdmissionsDocumentsComponent implements OnInit {
   }
 
   load(): void {
-    this.service.getDocuments().subscribe((res) => {
-      const list = pickList<any>(res);
-      this.documents.set(list);
-      
-      // تحديث المستند المحدد في حال كان مفتوحاً لتحديث حالته
-      if (this.selectedDoc()) {
-        const updated = list.find(d => d.id === this.selectedDoc().id);
-        if (updated) {
-          this.selectedDoc.set(updated);
+    this.loading.set(true);
+    this.service.getDocuments().subscribe({
+      next: (res) => {
+        const list = pickList<any>(res);
+        this.documents.set(list);
+        
+        // تحديث المستند المحدد في حال كان مفتوحاً لتحديث حالته
+        if (this.selectedDoc()) {
+          const updated = list.find(d => d.id === this.selectedDoc().id);
+          if (updated) {
+            this.selectedDoc.set(updated);
+          }
         }
-      }
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
     });
   }
 

@@ -65,6 +65,8 @@ import { ADM_PAGE_STYLES, pickList } from '../shared/admissions.shared';
             <nb-data-table 
               [columns]="columns" 
               [rows]="filteredScholarships()" 
+              [loading]="loading()"
+              loadingText="جارٍ تحميل المنح والإعفاءات الدراسية…"
               emptyText="لا توجد منح دراسية مسجلة حالياً."
             >
               <ng-template #cell let-row let-col="col" let-value="value">
@@ -398,6 +400,7 @@ export class AdmissionsScholarshipsComponent implements OnInit {
   private readonly financeService = inject(StudentFinanceService);
 
   readonly scholarships = signal<any[]>([]);
+  readonly loading = signal(true);
   readonly billingAccounts = signal<any[]>([]);
   readonly showCreateForm = signal(false);
   selectedType = 'partial';
@@ -422,9 +425,14 @@ export class AdmissionsScholarshipsComponent implements OnInit {
   }
 
   load(): void {
+    this.loading.set(true);
     // جلب قائمة المنح من خادم المالية
-    this.financeService.listScholarships({ page_size: 100 }).subscribe((res) => {
-      this.scholarships.set(pickList<any>(res));
+    this.financeService.listScholarships({ page_size: 100 }).subscribe({
+      next: (res) => {
+        this.scholarships.set(pickList<any>(res));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
     });
 
     // جلب حسابات فوترة الطلاب لربط المنح بها
