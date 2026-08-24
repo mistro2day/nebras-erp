@@ -26,9 +26,10 @@ export interface Applicant {
   academic_year_id?: string;
   applying_grade_id?: string;
 
-  // المدرسة والفرع المستهدف (بنين / بنات)
+  // المدرسة والفرع المستهدف (بنين / بنات) والمسار الأكاديمي للثانوية
   branch_id?: string;
   target_school_type?: string;
+  academic_track?: string;
 
   // الأشقاء بالمدرسة
   has_siblings?: boolean;
