@@ -192,8 +192,9 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                 <span class="student-id">{{ student.student_number }}</span>
                 
                 <div class="meta-row">
-                  <span class="meta-item">📍 {{ student.profile.nationality || 'سوداني' }}</span>
                   <span class="meta-item">🚻 {{ student.profile.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
+                  <span class="meta-item" *ngIf="student.grade_name || student.enrollments?.[0]?.grade_name">📚 {{ student.grade_name || student.enrollments?.[0]?.grade_name }}</span>
+                  <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations?.[0]?.phone">📞 {{ student.guardian_phone || student.family_relations?.[0]?.phone }}</span>
                 </div>
               </div>
               

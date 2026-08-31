@@ -30,11 +30,37 @@ class GuardianSerializer(serializers.ModelSerializer):
 class ApplicantSerializer(serializers.ModelSerializer):
     guardians = GuardianSerializer(many=True, read_only=True)
     documents = RequiredDocumentSerializer(many=True, read_only=True)
+    grade_name = serializers.SerializerMethodField()
+    academic_year_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Applicant
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id', 'application_number']
+
+    def get_grade_name(self, obj):
+        if not getattr(obj, 'applying_grade_id', None):
+            return None
+        from apps.academics.domain.models import Grade
+        g = Grade.objects.filter(id=obj.applying_grade_id).first()
+        return g.name if g else None
+
+    def get_academic_year_name(self, obj):
+        if not getattr(obj, 'academic_year_id', None):
+            return None
+        from apps.academics.domain.models import AcademicYear
+        ay = AcademicYear.objects.filter(id=obj.academic_year_id).first()
+        return ay.name if ay else None
+
+    def get_guardian_phone(self, obj):
+        g = obj.guardians.first()
+        return g.phone if g else None
+
+    def get_guardian_name(self, obj):
+        g = obj.guardians.first()
+        return g.full_name if g else None
 
 
 class InterviewSerializer(serializers.ModelSerializer):

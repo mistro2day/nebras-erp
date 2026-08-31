@@ -86,7 +86,8 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   <h4 class="app-name">{{ app.arabic_full_name }}</h4>
                   <div class="app-meta">
                     <span>🚻 {{ app.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
-                    <span>📍 {{ app.nationality }}</span>
+                    <span class="grade-tag" *ngIf="app.grade_name || app.applying_grade?.name">📚 {{ app.grade_name || app.applying_grade?.name || 'الصف' }}</span>
+                    <span class="phone-tag" *ngIf="app.guardian_phone || app.guardians?.[0]?.phone">📞 {{ app.guardian_phone || app.guardians?.[0]?.phone }}</span>
                   </div>
                 </div>
               }
