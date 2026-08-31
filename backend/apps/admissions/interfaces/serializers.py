@@ -55,12 +55,16 @@ class ApplicantSerializer(serializers.ModelSerializer):
         return ay.name if ay else None
 
     def get_guardian_phone(self, obj):
-        g = obj.guardians.first()
-        return g.phone if g else None
+        g = obj.guardians.filter(legal_guardian=True).first() or obj.guardians.first()
+        if g:
+            return g.whatsapp_phone or g.phone
+        return None
 
     def get_guardian_name(self, obj):
-        g = obj.guardians.first()
-        return g.full_name if g else None
+        g = obj.guardians.filter(legal_guardian=True).first() or obj.guardians.first()
+        if g:
+            return g.full_name
+        return None
 
 
 class InterviewSerializer(serializers.ModelSerializer):

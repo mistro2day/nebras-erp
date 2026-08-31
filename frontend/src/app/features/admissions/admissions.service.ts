@@ -25,6 +25,11 @@ export interface Applicant {
   // السنة والصف المتقدم له
   academic_year_id?: string;
   applying_grade_id?: string;
+  grade_name?: string;
+  academic_year_name?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
+  guardians?: Guardian[];
 
   // المدرسة والفرع المستهدف (بنين / بنات) والمسار الأكاديمي للثانوية
   branch_id?: string;

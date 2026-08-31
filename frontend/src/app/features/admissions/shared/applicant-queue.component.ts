@@ -64,6 +64,19 @@ import { SendMessageModalComponent } from '../../communications/components/send-
               @case ('status') {
                 <span [class]="'nb-badge-' + statusKind(row.status)">{{ statusText(row.status) }}</span>
               }
+              @case ('grade_name') {
+                <span class="nb-grade-tag">{{ row.grade_name || '—' }}</span>
+              }
+              @case ('guardian_name') {
+                <span class="guardian-txt">{{ row.guardian_name || row.guardians?.[0]?.full_name || '—' }}</span>
+              }
+              @case ('guardian_phone') {
+                @if (row.guardian_phone || row.guardians?.[0]?.whatsapp_phone || row.guardians?.[0]?.phone) {
+                  <span class="phone-chip" dir="ltr">📞 {{ row.guardian_phone || row.guardians?.[0]?.whatsapp_phone || row.guardians?.[0]?.phone }}</span>
+                } @else {
+                  <span style="color:var(--nb-text-muted)">—</span>
+                }
+              }
               @case ('gender') {
                 {{ row.gender === 'male' ? 'ذكر' : 'أنثى' }}
               }
@@ -92,7 +105,39 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 
     </div>
   `,
-  styles: [ADM_PAGE_STYLES],
+  styles: [
+    ADM_PAGE_STYLES,
+    `
+      .nb-grade-tag {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nb-primary);
+        background: color-mix(in srgb, var(--nb-primary) 10%, transparent);
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .guardian-txt {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--nb-text);
+      }
+      .phone-chip {
+        font-size: 12px;
+        font-weight: 700;
+        color: #16a34a;
+        background: #f0fdf4;
+        padding: 2px 7px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid #bbf7d0;
+        white-space: nowrap;
+      }
+    `,
+  ],
 })
 export class ApplicantQueueComponent implements OnInit {
   private readonly service = inject(AdmissionsService);
@@ -118,12 +163,14 @@ export class ApplicantQueueComponent implements OnInit {
   private readonly filterTick = signal(0);
 
   readonly columns: NbColumn[] = [
-    { key: 'application_number', label: 'رقم الطلب', fr: 1.1 },
-    { key: 'arabic_full_name', label: 'اسم المتقدم', fr: 1.6 },
-    { key: 'gender', label: 'الجنس', fr: 0.7 },
-    { key: 'nationality', label: 'الجنسية', fr: 1 },
-    { key: 'status', label: 'الحالة', fr: 1 },
-    { key: 'actions', label: 'إجراءات', fr: 1.6 },
+    { key: 'application_number', label: 'رقم الطلب', fr: 0.9 },
+    { key: 'arabic_full_name', label: 'اسم المتقدم', fr: 1.4 },
+    { key: 'grade_name', label: 'الصف المتقدم له', fr: 1.2 },
+    { key: 'guardian_name', label: 'ولي الأمر', fr: 1.3 },
+    { key: 'guardian_phone', label: 'رقم الجوال', fr: 1.1 },
+    { key: 'gender', label: 'الجنس', fr: 0.6 },
+    { key: 'status', label: 'الحالة', fr: 0.9 },
+    { key: 'actions', label: 'إجراءات', fr: 1.4 },
   ];
 
   readonly filtered = computed(() => {
@@ -133,7 +180,10 @@ export class ApplicantQueueComponent implements OnInit {
       if (this.statuses.length && !this.statuses.includes(a.status)) return false;
       if (this.statusFilter && a.status !== this.statusFilter) return false;
       if (q) {
-        const hay = `${a.arabic_full_name} ${a.english_full_name ?? ''} ${a.application_number} ${a.national_id}`.toLowerCase();
+        const gName = a.guardian_name || a.guardians?.[0]?.full_name || '';
+        const gPhone = a.guardian_phone || a.guardians?.[0]?.whatsapp_phone || a.guardians?.[0]?.phone || '';
+        const grade = a.grade_name || '';
+        const hay = `${a.arabic_full_name} ${a.english_full_name ?? ''} ${a.application_number} ${a.national_id} ${grade} ${gName} ${gPhone}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
