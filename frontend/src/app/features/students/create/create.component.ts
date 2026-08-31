@@ -141,6 +141,38 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                 </div>
               </div>
 
+              <!-- بطاقة التوزيع الأكاديمي واختيار الشعبة / الفصل الدراسي -->
+              <div class="academic-distribution-card">
+                <div class="distribution-header">
+                  <span class="dist-icon">🏫</span>
+                  <div>
+                    <h4 class="dist-title">التسكين الأكاديمي وتوزيع الفصل / الشعبة</h4>
+                    <p class="dist-sub">حدد الشعبة أو الفصل الدراسي لتسكين الطالب فور إكمال تسجيله.</p>
+                  </div>
+                </div>
+
+                <div class="distribution-controls">
+                  <div class="field">
+                    <label>الصف الدراسي المسجل</label>
+                    <div class="field-badge-value">
+                      📚 {{ a.grade_name || 'الصف المسجل بالطلب' }}
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label>الشعبة / الفصل الدراسي (توزيع فوري)</label>
+                    <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)" class="section-select-control">
+                      <option value="">-- اختر الشعبة أو الفصل لتسكين الطالب --</option>
+                      @for (sec of availableSections(); track sec.id) {
+                        <option [value]="sec.id">
+                          {{ sec.name }} (السعة: {{ sec.capacity }} · المقاعد الشاغرة: {{ sec.available_seats !== undefined ? sec.available_seats : (sec.capacity - (sec.occupied_seats || 0)) }})
+                        </option>
+                      }
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <!-- قسم الرسوم والأقساط والإيصال الفوري عند التسجيل -->
               <div class="finance-step-wrapper">
                 <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
@@ -540,6 +572,82 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
         border: 1px solid var(--nb-border);
         color: var(--nb-text);
       }
+      .academic-distribution-card {
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border-soft);
+        border-radius: var(--nb-radius-card);
+        padding: 16px;
+        margin: 16px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .distribution-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .dist-icon {
+        font-size: 22px;
+        background: var(--nb-surface);
+        border: 1px solid var(--nb-border-soft);
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .dist-title {
+        margin: 0 0 2px;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+      .dist-sub {
+        margin: 0;
+        font-size: 12px;
+        color: var(--nb-text-muted);
+      }
+      .distribution-controls {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 14px;
+        background: var(--nb-surface);
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        padding: 12px 16px;
+      }
+      .field-badge-value {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border-soft);
+        border-radius: var(--nb-radius);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--nb-primary-600);
+      }
+      .section-select-control {
+        height: 36px;
+        width: 100%;
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        padding: 0 12px;
+        font-family: var(--nb-font-family);
+        font-size: 13px;
+        color: var(--nb-text);
+        background: var(--nb-surface);
+        outline: none;
+        cursor: pointer;
+      }
+      .section-select-control:focus {
+        border-color: var(--nb-primary-500);
+        box-shadow: 0 0 0 3px var(--nb-primary-100);
+      }
+
       .nb-btn-secondary:hover {
         background: var(--nb-border-soft);
       }
@@ -557,6 +665,8 @@ export class StudentCreateComponent implements OnInit {
   applicants = signal<any[]>([]);
   loadingApplicants = signal<boolean>(false);
   selectedApplicant = signal<any | null>(null);
+  availableSections = signal<any[]>([]);
+  selectedSectionId = signal<string>('');
   submitting = signal(false);
   errorMessage = signal('');
   financialConfig = signal<FinancialConfig | null>(null);
@@ -603,6 +713,8 @@ export class StudentCreateComponent implements OnInit {
   setMode(mode: 'admission' | 'manual') {
     this.regMode.set(mode);
     this.selectedApplicant.set(null);
+    this.selectedSectionId.set('');
+    this.availableSections.set([]);
   }
 
   getInitials(name?: string): string {
@@ -617,6 +729,18 @@ export class StudentCreateComponent implements OnInit {
   onApplicantSelected(id: string) {
     const applicant = this.applicants().find(a => a.id === id);
     this.selectedApplicant.set(applicant || null);
+    if (applicant) {
+      this.selectedSectionId.set(applicant.applying_section_id || '');
+      this.admissionsService.getSections(applicant.applying_grade_id).subscribe({
+        next: (res) => {
+          const secs = res?.data?.results || res?.data || res || [];
+          this.availableSections.set(secs as any[]);
+        }
+      });
+    } else {
+      this.availableSections.set([]);
+      this.selectedSectionId.set('');
+    }
   }
 
   registerStudent() {
@@ -624,12 +748,17 @@ export class StudentCreateComponent implements OnInit {
     if (!applicant) return;
 
     this.submitting.set(true);
-    this.studentsService.createStudentFromApplicant(applicant.id, this.financialConfig()).subscribe({
+    const config = {
+      ...(this.financialConfig() || {}),
+      section_id: this.selectedSectionId() || null
+    };
+
+    this.studentsService.createStudentFromApplicant(applicant.id, config as any).subscribe({
       next: (res) => {
         this.submitting.set(false);
         const studentId = res?.data?.id || res?.id;
         if (studentId) {
-          this.snack.open('تم تسجيل الطالب وتوليد الرقم الأكاديمي بنجاح!', 'إغلاق', { duration: 5000 });
+          this.snack.open('تم تسجيل الطالب وتسكينه في الفصل وإصدار السندات بنجاح!', 'إغلاق', { duration: 5000 });
           this.router.navigate(['/students/details', studentId]);
         } else {
           this.snack.open('تم تسجيل الطالب بنجاح.', 'إغلاق', { duration: 4000 });

@@ -165,15 +165,22 @@ class StudentApplicationService:
                     created_by=user_id
                 )
                 
-        # 6b. إنشاء التسجيل الدراسي
+        # 6b. إنشاء التسجيل الدراسي وتعيين الفصل / الشعبة
         if applicant.academic_year_id and applicant.applying_grade_id:
             branch = resolve_branch_for_gender(tenant_id, applicant.gender)
+            chosen_section_id = (financial_config.get('section_id') if financial_config else None) or applicant.applying_section_id
+            if chosen_section_id:
+                try:
+                    chosen_section_id = uuid.UUID(str(chosen_section_id))
+                except (ValueError, TypeError):
+                    chosen_section_id = None
+
             StudentEnrollment.objects.create(
                 tenant_id=tenant_id,
                 student=student,
                 academic_year_id=applicant.academic_year_id,
                 grade_id=applicant.applying_grade_id,
-                section_id=applicant.applying_section_id,
+                section_id=chosen_section_id,
                 branch_id=branch.id,
                 enrollment_date=datetime.date.today(),
                 enrollment_type='new',
