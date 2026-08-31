@@ -114,9 +114,12 @@ class StudentAttachmentSerializer(serializers.ModelSerializer):
 
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):
-    # اسم الفرع ونوعه (بنين/بنات) للعرض والفلترة في الواجهة
+    # اسم الفرع ونوعه (بنين/بنات) والصف والسنة والشعبة للعرض والفلترة في الواجهة
     branch_name = serializers.SerializerMethodField()
     branch_gender_type = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    academic_year_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentEnrollment
@@ -142,6 +145,27 @@ class StudentEnrollmentSerializer(serializers.ModelSerializer):
     def get_branch_gender_type(self, obj):
         b = self._branch(obj)
         return b.school_gender_type if b else None
+
+    def get_grade_name(self, obj):
+        if not getattr(obj, 'grade_id', None):
+            return None
+        from apps.academics.domain.models import Grade
+        g = Grade.objects.filter(id=obj.grade_id).first()
+        return g.name if g else None
+
+    def get_academic_year_name(self, obj):
+        if not getattr(obj, 'academic_year_id', None):
+            return None
+        from apps.academics.domain.models import AcademicYear
+        ay = AcademicYear.objects.filter(id=obj.academic_year_id).first()
+        return ay.name if ay else None
+
+    def get_section_name(self, obj):
+        if not getattr(obj, 'section_id', None):
+            return None
+        from apps.academics.domain.models import Section
+        s = Section.objects.filter(id=obj.section_id).first()
+        return s.name if s else None
 
 
 class StudentPromotionHistorySerializer(serializers.ModelSerializer):
@@ -230,7 +254,7 @@ class StudentAlumniSerializer(serializers.ModelSerializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     """
-    الـ Serializer الرئيسي للطالب مع الحقول المتداخلة
+    الـ Serializer الرئيسي للطالب مع الحقول المتداخلة وتسهيل عرض الصف والفرع وولي الأمر
     """
     profile = StudentProfileSerializer(read_only=True)
     medical_profile = StudentMedicalProfileSerializer(read_only=True)
@@ -240,11 +264,55 @@ class StudentSerializer(serializers.ModelSerializer):
     tags = StudentTagSerializer(many=True, read_only=True)
     identifiers = StudentIdentifierSerializer(many=True, read_only=True)
     
+    grade_name = serializers.SerializerMethodField()
+    academic_year_name = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+    
     class Meta:
         model = Student
         fields = [
             'id', 'student_number', 'status', 'created_at', 'updated_at',
             'profile', 'medical_profile', 'addresses', 'family_relations',
-            'enrollments', 'tags', 'identifiers'
+            'enrollments', 'tags', 'identifiers',
+            'grade_name', 'academic_year_name', 'branch_name',
+            'guardian_name', 'guardian_phone'
         ]
         read_only_fields = ['id', 'student_number', 'status']
+
+    def _latest_enrollment(self, obj):
+        enrs = obj.enrollments.all()
+        return enrs.filter(status='active').first() or enrs.first()
+
+    def get_grade_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.grade_id:
+            from apps.academics.domain.models import Grade
+            g = Grade.objects.filter(id=enr.grade_id).first()
+            return g.name if g else None
+        return None
+
+    def get_academic_year_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.academic_year_id:
+            from apps.academics.domain.models import AcademicYear
+            ay = AcademicYear.objects.filter(id=enr.academic_year_id).first()
+            return ay.name if ay else None
+        return None
+
+    def get_branch_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.branch_id:
+            from apps.organization.domain.models import Branch
+            b = Branch.objects.filter(id=enr.branch_id).first()
+            return (b.name_ar or b.name) if b else None
+        return None
+
+    def get_guardian_name(self, obj):
+        rel = obj.family_relations.first()
+        return rel.full_name if rel else None
+
+    def get_guardian_phone(self, obj):
+        rel = obj.family_relations.first()
+        return rel.phone if rel else None

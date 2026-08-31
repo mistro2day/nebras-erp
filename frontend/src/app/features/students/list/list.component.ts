@@ -127,30 +127,44 @@ import { SendMessageModalComponent } from '../../communications/components/send-
       @if (loading()) {
         <nb-loading message="جاري تحميل الطلاب..."></nb-loading>
       } @else {
-        <!-- عرض الجدول التقليدي -->
+        <!-- عرض جدول البيانات الاحترافي المحدث -->
         <div *ngIf="viewMode() === 'table'" @fadeSlide>
           <nb-panel [flush]="true">
             <div class="tbl">
               <div class="tbl-head">
                 <span>الرقم الأكاديمي</span>
-                <span>الاسم العربي</span>
+                <span>اسم الطالب</span>
+                <span>الصف الدراسي</span>
+                <span>الفرع / المدرسة</span>
                 <span>الجنس</span>
                 <span>الجنسية</span>
+                <span>ولي الأمر / الهاتف</span>
                 <span>الحالة</span>
                 <span>إجراءات</span>
               </div>
               @for (element of paged(); track element.id) {
-                <div class="tbl-row">
-                  <span class="mono">{{ element.student_number }}</span>
-                  <span class="strong">{{ element.profile.arabic_name || '—' }}</span>
+                <div class="tbl-row clickable" (click)="viewDetails(element.id)">
+                  <span class="mono bold">{{ element.student_number }}</span>
+                  <div class="student-cell">
+                    <span class="strong">{{ element.profile.arabic_name || '—' }}</span>
+                    <span class="sub-text" *ngIf="element.profile.english_name">{{ element.profile.english_name }}</span>
+                  </div>
+                  <span class="grade-badge">{{ element.grade_name || element.enrollments?.[0]?.grade_name || '—' }}</span>
+                  <span class="branch-text">{{ element.branch_name || element.enrollments?.[0]?.branch_name || '—' }}</span>
                   <span>{{ element.profile.gender === 'male' ? 'ذكر' : element.profile.gender === 'female' ? 'أنثى' : '—' }}</span>
-                  <span>{{ element.profile.nationality || '—' }}</span>
+                  <span>{{ element.profile.nationality || 'سوداني' }}</span>
+                  <div class="guardian-cell">
+                    <span class="g-name">{{ element.guardian_name || element.family_relations?.[0]?.full_name || '—' }}</span>
+                    <span class="g-phone mono" *ngIf="element.guardian_phone || element.family_relations?.[0]?.phone">
+                      📞 {{ element.guardian_phone || element.family_relations?.[0]?.phone }}
+                    </span>
+                  </div>
                   <span><span [class]="statusBadge(element.status)">{{ statusText(element.status) }}</span></span>
-                  <span class="row-actions">
-                    <button class="nb-btn-ghost sm" (click)="openMessageModal(element)">مراسلة</button>
-                    <button class="nb-btn-ghost sm" (click)="viewDetails(element.id)">عرض</button>
-                    <button class="nb-btn-secondary sm" (click)="edit(element.id)">تعديل</button>
-                    <button class="nb-btn-danger sm" (click)="archive(element)">أرشفة</button>
+                  <span class="row-actions" (click)="$event.stopPropagation()">
+                    <button class="nb-btn-ghost sm" (click)="openMessageModal(element)" title="مراسلة سريعة">💬</button>
+                    <button class="nb-btn-ghost sm" (click)="viewDetails(element.id)" title="عرض التفاصيل">👁️</button>
+                    <button class="nb-btn-secondary sm" (click)="edit(element.id)" title="تعديل">✏️</button>
+                    <button class="nb-btn-danger sm" (click)="archive(element)" title="أرشفة">🗑️</button>
                   </span>
                 </div>
               }
@@ -417,18 +431,53 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         border-color: var(--nb-danger-300);
       }
 
-      /* جدول تقليدي */
-      .tbl { display: flex; flex-direction: column; }
-      .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.2fr 1.8fr 0.7fr 1fr 1fr 1.6fr; gap: 8px; padding: 9px 16px; align-items: center; }
-      .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); padding: 8px 16px; font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
-      .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
+      /* جدول البيانات المطور */
+      .tbl { display: flex; flex-direction: column; overflow-x: auto; min-width: 900px; }
+      .tbl-head, .tbl-row {
+        display: grid;
+        grid-template-columns: 1.1fr 1.6fr 1fr 1fr 0.6fr 0.8fr 1.5fr 0.8fr 1.6fr;
+        gap: 10px;
+        padding: 10px 16px;
+        align-items: center;
+      }
+      .tbl-head {
+        background: var(--nb-surface-raised);
+        border-bottom: 1px solid var(--nb-border-soft);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--nb-text-muted);
+      }
+      .tbl-row {
+        border-bottom: 1px solid var(--nb-border-row);
+        font-size: 13px;
+        color: var(--nb-text);
+        transition: background 0.15s ease;
+      }
+      .tbl-row.clickable { cursor: pointer; }
       .tbl-row:last-child { border-bottom: none; }
       .tbl-row:hover { background: var(--nb-surface-raised); }
       .strong { font-weight: 600; }
-      .mono { font-variant-numeric: tabular-nums; color: var(--nb-text-secondary); }
+      .bold { font-weight: 700; color: var(--nb-primary-600); }
+      .mono { font-variant-numeric: tabular-nums; font-family: monospace; }
+      .student-cell { display: flex; flex-direction: column; gap: 2px; }
+      .sub-text { font-size: 11px; color: var(--nb-text-muted); }
+      .grade-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border-soft);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--nb-text);
+      }
+      .branch-text { font-size: 12px; color: var(--nb-text-secondary); }
+      .guardian-cell { display: flex; flex-direction: column; gap: 2px; }
+      .guardian-cell .g-name { font-weight: 600; font-size: 12px; }
+      .guardian-cell .g-phone { font-size: 11px; color: var(--nb-text-muted); }
       .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
       .tbl-empty, .grid-empty-state { padding: 40px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); width: 100%; grid-column: 1 / -1; }
-      .nb-btn-ghost.sm, .nb-btn-secondary.sm, .nb-btn-danger.sm { height: 26px; padding: 0 12px; font-size: 12px; }
+      .nb-btn-ghost.sm, .nb-btn-secondary.sm, .nb-btn-danger.sm { height: 26px; padding: 0 10px; font-size: 12px; }
       
       .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
       .pager-info { font-size: 12px; color: var(--nb-text-muted); }
@@ -448,7 +497,7 @@ export class StudentsListComponent implements OnInit {
   readonly students = this.studentsService.students;
   readonly loading = this.studentsService.loading;
   readonly exporting = signal(false);
-  readonly viewMode = signal<'grid' | 'table'>('grid');
+  readonly viewMode = signal<'grid' | 'table'>('table');
 
   searchQuery = '';
   statusFilter = '';

@@ -8,13 +8,14 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
 
 @Component({
   selector: 'app-student-create',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, RegistrationFinanceFormComponent],
+  imports: [CommonModule, FormsModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, RegistrationFinanceFormComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -543,6 +544,7 @@ export class StudentCreateComponent implements OnInit {
   private studentsService = inject(StudentsService);
   private admissionsService = inject(AdmissionsService);
   private router = inject(Router);
+  private snack = inject(MatSnackBar);
 
   regMode = signal<'admission' | 'manual'>('admission');
   activeFormTab = signal<'personal' | 'medical' | 'financial'>('personal');
@@ -613,11 +615,20 @@ export class StudentCreateComponent implements OnInit {
     this.studentsService.createStudentFromApplicant(applicant.id, this.financialConfig()).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        if (res && res.success) {
-          this.router.navigate(['/students/edit', res.data.id]);
+        const studentId = res?.data?.id || res?.id;
+        if (studentId) {
+          this.snack.open('تم تسجيل الطالب وتوليد الرقم الأكاديمي بنجاح!', 'إغلاق', { duration: 5000 });
+          this.router.navigate(['/students/details', studentId]);
+        } else {
+          this.snack.open('تم تسجيل الطالب بنجاح.', 'إغلاق', { duration: 4000 });
+          this.router.navigate(['/students/list']);
         }
       },
-      error: () => this.submitting.set(false)
+      error: (err) => {
+        this.submitting.set(false);
+        const msg = err?.error?.error?.message || err?.error?.message || err?.error?.detail || 'تعذّر تسجيل الطالب. تحقق من أن الطالب ليس مسجلاً مسبقاً.';
+        this.snack.open(msg, 'إغلاق', { duration: 6000 });
+      }
     });
   }
 
@@ -625,6 +636,7 @@ export class StudentCreateComponent implements OnInit {
     event.preventDefault();
     if (!this.personalForm.arabic_name || !this.personalForm.date_of_birth) {
       this.errorMessage.set('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
+      this.snack.open('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)', 'إغلاق', { duration: 4000 });
       return;
     }
 
@@ -658,12 +670,19 @@ export class StudentCreateComponent implements OnInit {
     this.studentsService.createStudent(payload).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        if (res && res.success) {
-          this.router.navigate(['/students/details', res.data.id]);
+        const studentId = res?.data?.id || res?.id;
+        if (studentId) {
+          this.snack.open('تم حفظ وتسجيل الطالب يدوياً بنجاح!', 'إغلاق', { duration: 5000 });
+          this.router.navigate(['/students/details', studentId]);
+        } else {
+          this.snack.open('تم حفظ الطالب بنجاح.', 'إغلاق', { duration: 4000 });
+          this.router.navigate(['/students/list']);
         }
       },
-      error: () => {
+      error: (err) => {
         this.submitting.set(false);
+        const msg = err?.error?.error?.message || err?.error?.message || err?.error?.detail || 'تعذّر حفظ الطالب. تحقق من صحة الحقول.';
+        this.snack.open(msg, 'إغلاق', { duration: 6000 });
       }
     });
   }

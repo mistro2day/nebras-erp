@@ -38,6 +38,11 @@ export interface Student {
   };
   family_relations: any[];
   enrollments?: any[];
+  grade_name?: string;
+  academic_year_name?: string;
+  branch_name?: string;
+  guardian_name?: string;
+  guardian_phone?: string;
 }
 
 const EMPTY_STUDENT: Student = {
