@@ -28,11 +28,16 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent],
   template: `
-    @if (student(); as s) {
-      <div class="page" dir="rtl">
-        
-        <!-- الهيدر والملخص العلوي الفاخر -->
-        <div class="nb-card summary-card">
+    @if (pageLoading() || !student().id) {
+      <div class="page" dir="rtl" style="display: flex; align-items: center; justify-content: center; min-height: 480px;">
+        <nb-loading message="جارٍ استرجاع ملف وبيانات الطالب…"></nb-loading>
+      </div>
+    } @else {
+      @if (student(); as s) {
+        <div class="page" dir="rtl">
+          
+          <!-- الهيدر والملخص العلوي الفاخر -->
+          <div class="nb-card summary-card">
           <div class="summary-content">
             <div class="avatar-section">
               <div class="avatar-wrapper" (click)="photoInput.click()" title="انقر لتحديث الصورة الشخصية">
@@ -135,89 +140,93 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             <!-- تبويب 2: الرسوم والمالية (حقيقي) -->
             <mat-tab label="الرسوم والمالية">
               <div class="tab-content">
-                <div class="finance-header-box" *ngIf="billingAccount(); else noFinance">
-                  <div class="fin-stat-card">
-                    <span class="fin-label">رقم الحساب المالي</span>
-                    <span class="fin-value">{{ billingAccount().account_number }}</span>
+                @if (financeLoading()) {
+                  <div style="padding: 40px 0; display: flex; justify-content: center;">
+                    <nb-loading message="جارٍ تحميل الحساب المالي والفواتير والسندات…"></nb-loading>
                   </div>
-                  <div class="fin-stat-card">
-                    <span class="fin-label">الرصيد المستحق</span>
-                    <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ج.س</span>
-                  </div>
-                  <div class="fin-stat-card">
-                    <span class="fin-label">إجمالي المُحصّل</span>
-                    <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ج.س</span>
-                  </div>
-                  <div class="fin-stat-card">
-                    <span class="fin-label">الرصيد الدائن</span>
-                    <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ج.س</span>
-                  </div>
-                  <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
-                </div>
-
-                <h3 style="margin-top: 20px;">الفواتير الصادرة</h3>
-                <div class="tbl" *ngIf="invoices().length > 0; else noInvoices">
-                  <div class="tbl-head finance-tbl">
-                    <span>رقم الفاتورة</span>
-                    <span>المبلغ الإجمالي</span>
-                    <span>الرصيد المتبقي</span>
-                    <span>حالة الفاتورة</span>
-                    <span>تاريخ الاستحقاق</span>
-                  </div>
-                  @for (inv of invoices(); track inv.id) {
-                    <div class="tbl-row finance-tbl clickable" (click)="openDoc('invoice', inv)">
-                      <span class="strong">{{ inv.invoice_number }}</span>
-                      <span>{{ inv.total_amount | number:'1.2-2' }} ج.س</span>
-                      <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ج.س</span>
-                      <span>
-                        <span class="badge" [class.success]="+inv.outstanding_amount === 0" [class.warning]="+inv.outstanding_amount > 0 && +inv.paid_amount > 0" [class.danger]="+inv.outstanding_amount > 0 && +inv.paid_amount === 0">
-                          {{ +inv.outstanding_amount === 0 ? 'مدفوعة بالكامل' : (+inv.paid_amount > 0 ? 'مدفوعة جزئياً' : 'مستحقة') }}
-                        </span>
-                      </span>
-                      <span>{{ inv.due_date }}</span>
+                } @else if (billingAccount()) {
+                  <div class="finance-header-box">
+                    <div class="fin-stat-card">
+                      <span class="fin-label">رقم الحساب المالي</span>
+                      <span class="fin-value">{{ billingAccount().account_number }}</span>
                     </div>
-                  }
-                </div>
-
-                <ng-template #noInvoices>
-                  <div class="tbl-empty">لا توجد فواتير صادرة لهذا الطالب حالياً.</div>
-                </ng-template>
-
-                <!-- سندات القبض / التحصيلات المالية -->
-                <div *ngIf="billingAccount()">
-                  <h3 style="margin-top: 24px;">السندات المالية (سندات القبض)</h3>
-                  <div class="tbl" *ngIf="receipts().length > 0; else noReceipts">
-                    <div class="tbl-head receipts-tbl">
-                      <span>رقم السند</span>
-                      <span>تاريخ الدفع</span>
-                      <span>المبلغ المحصّل</span>
-                      <span>الحالة</span>
+                    <div class="fin-stat-card">
+                      <span class="fin-label">الرصيد المستحق</span>
+                      <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ج.س</span>
                     </div>
-                    @for (r of receipts(); track r.id) {
-                      <div class="tbl-row receipts-tbl clickable" (click)="openDoc('receipt', r)">
-                        <span class="strong">{{ r.receipt_number }}</span>
-                        <span>{{ r.payment_date }}</span>
-                        <span class="text-success">{{ r.amount | number:'1.2-2' }} ج.س</span>
+                    <div class="fin-stat-card">
+                      <span class="fin-label">إجمالي المُحصّل</span>
+                      <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ج.س</span>
+                    </div>
+                    <div class="fin-stat-card">
+                      <span class="fin-label">الرصيد الدائن</span>
+                      <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ج.س</span>
+                    </div>
+                    <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
+                  </div>
+
+                  <h3 style="margin-top: 20px;">الفواتير الصادرة</h3>
+                  <div class="tbl" *ngIf="invoices().length > 0; else noInvoices">
+                    <div class="tbl-head finance-tbl">
+                      <span>رقم الفاتورة</span>
+                      <span>المبلغ الإجمالي</span>
+                      <span>الرصيد المتبقي</span>
+                      <span>حالة الفاتورة</span>
+                      <span>تاريخ الاستحقاق</span>
+                    </div>
+                    @for (inv of invoices(); track inv.id) {
+                      <div class="tbl-row finance-tbl clickable" (click)="openDoc('invoice', inv)">
+                        <span class="strong">{{ inv.invoice_number }}</span>
+                        <span>{{ inv.total_amount | number:'1.2-2' }} ج.س</span>
+                        <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ج.س</span>
                         <span>
-                          <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'">
-                            {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
+                          <span class="badge" [class.success]="+inv.outstanding_amount === 0" [class.warning]="+inv.outstanding_amount > 0 && +inv.paid_amount > 0" [class.danger]="+inv.outstanding_amount > 0 && +inv.paid_amount === 0">
+                            {{ +inv.outstanding_amount === 0 ? 'مدفوعة بالكامل' : (+inv.paid_amount > 0 ? 'مدفوعة جزئياً' : 'مستحقة') }}
                           </span>
                         </span>
+                        <span>{{ inv.due_date }}</span>
                       </div>
                     }
                   </div>
-                  <ng-template #noReceipts>
-                    <div class="tbl-empty">لا توجد سندات قبض (تحصيلات) لهذا الطالب حالياً.</div>
-                  </ng-template>
-                </div>
 
-                <ng-template #noFinance>
+                  <ng-template #noInvoices>
+                    <div class="tbl-empty">لا توجد فواتير صادرة لهذا الطالب حالياً.</div>
+                  </ng-template>
+
+                  <!-- سندات القبض / التحصيلات المالية -->
+                  <div style="margin-top: 24px;">
+                    <h3>السندات المالية (سندات القبض)</h3>
+                    <div class="tbl" *ngIf="receipts().length > 0; else noReceipts">
+                      <div class="tbl-head receipts-tbl">
+                        <span>رقم السند</span>
+                        <span>تاريخ الدفع</span>
+                        <span>المبلغ المحصّل</span>
+                        <span>الحالة</span>
+                      </div>
+                      @for (r of receipts(); track r.id) {
+                        <div class="tbl-row receipts-tbl clickable" (click)="openDoc('receipt', r)">
+                          <span class="strong">{{ r.receipt_number }}</span>
+                          <span>{{ r.payment_date }}</span>
+                          <span class="text-success">{{ r.amount | number:'1.2-2' }} ج.س</span>
+                          <span>
+                            <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'">
+                              {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
+                            </span>
+                          </span>
+                        </div>
+                      }
+                    </div>
+                    <ng-template #noReceipts>
+                      <div class="tbl-empty">لا توجد سندات قبض (تحصيلات) لهذا الطالب حالياً.</div>
+                    </ng-template>
+                  </div>
+                } @else {
                   <div class="no-data-box">
                     <span class="icon">💳</span>
                     <h4>لا يوجد حساب مالي نشط</h4>
                     <p>هذا الطالب ليس لديه حساب مالي نشط في الوقت الحالي. يمكنك إنشاء حساب مالي من شؤون الطلاب المالية.</p>
                   </div>
-                </ng-template>
+                }
               </div>
             </mat-tab>
 
@@ -577,9 +586,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
           </div>
         </div>
 
-      </div>
-    } @else {
-      <div class="page" dir="rtl"><nb-loading message="جارٍ تحميل بيانات الطالب..."></nb-loading></div>
+        </div>
+      }
     }
   `,
   styles: [`
@@ -926,6 +934,8 @@ export class StudentDetailsComponent implements OnInit {
   private http = inject(HttpClient);
 
   student = this.studentsService.selectedStudent;
+  readonly pageLoading = signal<boolean>(true);
+  readonly financeLoading = signal<boolean>(true);
   timeline = signal<any[]>([]);
 
   deleteStudent(s: any): void {
@@ -1071,7 +1081,17 @@ export class StudentDetailsComponent implements OnInit {
   }
 
   private reload(): void {
-    this.studentsService.getStudentById(this.id).subscribe();
+    this.pageLoading.set(true);
+    this.financeLoading.set(true);
+    this.billingAccount.set(null);
+    this.invoices.set([]);
+    this.receipts.set([]);
+
+    this.studentsService.getStudentById(this.id).subscribe({
+      next: () => this.pageLoading.set(false),
+      error: () => this.pageLoading.set(false),
+    });
+
     this.studentsService.getTimeline(this.id).subscribe((res) => {
       if (res && res.success) this.timeline.set(res.data || []);
     });
@@ -1102,20 +1122,31 @@ export class StudentDetailsComponent implements OnInit {
       );
     });
     
-    // جلب الحساب المالي والفواتير الصادرة للطالب (عبر خدمة فوترة الطلاب — المسار الصحيح مع المعترضات)
-    this.billingAccount.set(null);
-    this.invoices.set([]);
-    this.receipts.set([]);
-    this.sfService.listBillingAccounts({ page_size: 500 }).subscribe((res) => {
-      const accounts = res?.data || [];
-      // الربط عبر معرّف الطالب (student_id) في حساب الفوترة
-      const account = accounts.find((a: any) => a.student_id === this.id);
-      if (account) {
-        this.billingAccount.set(account);
-        this.sfService.invoicesForAccount(account.id).subscribe((invRes) => this.invoices.set(invRes?.data || []));
-        this.sfService.receiptsForAccount(account.id).subscribe((rcpRes) => this.receipts.set(rcpRes?.data || []));
-        this.sfService.listPaymentMethods().subscribe((pmRes) => this.paymentMethods.set(pmRes?.data || []));
-      }
+    // جلب الحساب المالي والفواتير الصادرة للطالب
+    this.sfService.listBillingAccounts({ page_size: 500 }).subscribe({
+      next: (res) => {
+        const accounts = res?.data || [];
+        const account = accounts.find((a: any) => a.student_id === this.id);
+        if (account) {
+          this.billingAccount.set(account);
+          forkJoin({
+            inv: this.sfService.invoicesForAccount(account.id),
+            rcp: this.sfService.receiptsForAccount(account.id),
+            pm: this.sfService.listPaymentMethods(),
+          }).subscribe({
+            next: ({ inv, rcp, pm }) => {
+              this.invoices.set(inv?.data || []);
+              this.receipts.set(rcp?.data || []);
+              this.paymentMethods.set(pm?.data || []);
+              this.financeLoading.set(false);
+            },
+            error: () => this.financeLoading.set(false),
+          });
+        } else {
+          this.financeLoading.set(false);
+        }
+      },
+      error: () => this.financeLoading.set(false),
     });
   }
 
