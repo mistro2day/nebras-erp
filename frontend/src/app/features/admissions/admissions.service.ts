@@ -203,6 +203,11 @@ export class AdmissionsService {
     return this.apiClient.put('admissions/settings/save/', body);
   }
 
+  // ---- المواد الدراسية ----
+  getSubjects(params?: any): Observable<any> {
+    return this.apiClient.get('academics/subjects/', { page_size: 200, ...(params ?? {}) });
+  }
+
   // ---- المتقدمون ----
   getApplicants(params?: Record<string, any>): Observable<any> {
     return this.apiClient.get<any>('admissions/applicants/', params);

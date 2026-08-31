@@ -198,6 +198,16 @@ const ADM_SUBMITTED_TEMPLATE = {
               </div>
             } @else {
               <div class="apt-table-wrapper">
+                <datalist id="availableSubjectsList">
+                  @for (sub of availableSubjects(); track sub.id) {
+                    <option [value]="sub.arabic_name">{{ sub.code ? ('[' + sub.code + '] ') : '' }}{{ sub.arabic_name }}</option>
+                  }
+                  <option value="مقابلة شخصية">مقابلة شخصية وتقييم سلوكي</option>
+                  <option value="اختبار تحريري عام">اختبار تحريري عام</option>
+                  <option value="اختبار شفهي وقراءة">اختبار شفهي وقراءة</option>
+                  <option value="قرآن كريم وتلاوة">قرآن كريم وتلاوة</option>
+                </datalist>
+
                 <table class="apt-custom-table">
                   <thead>
                     <tr>
@@ -212,7 +222,12 @@ const ADM_SUBMITTED_TEMPLATE = {
                     @for (row of aptitudeScores(); track $index; let i = $index) {
                       <tr>
                         <td>
-                          <input type="text" [(ngModel)]="row.subject" placeholder="اسم المادة (مثال: رياضيات)" class="apt-text-input" />
+                          <input type="text"
+                                 list="availableSubjectsList"
+                                 [(ngModel)]="row.subject"
+                                 (change)="onSubjectChosen(row)"
+                                 placeholder="اختر أو اكتب اسم المادة (مثال: رياضيات)"
+                                 class="apt-text-input" />
                         </td>
                         <td>
                           <input type="number" min="1" [(ngModel)]="row.max" class="apt-num-input" />
@@ -759,6 +774,7 @@ export class ApplicationDetailsComponent implements OnInit {
   // مراجع أكاديمية لتحويل UUID → اسم مقروء (العام/الصف) في العرض والطباعة
   readonly grades = signal<any[]>([]);
   readonly academicYears = signal<any[]>([]);
+  readonly availableSubjects = signal<any[]>([]);
   // الرسوم المعروضة في الاستمارة الورقية — من إعدادات القبول (أو الافتراضيات)
   readonly printFees = signal<AdmissionFees>(DEFAULT_ADMISSION_FEES);
 
@@ -939,6 +955,7 @@ export class ApplicationDetailsComponent implements OnInit {
     this.service.getGuardians().subscribe((res) => this.guardians.set(pickList<Guardian>(res).filter((g) => g.applicant === this.id)));
     this.service.getDocuments().subscribe((res) => this.documents.set(pickList<RequiredDocument>(res).filter((d) => d.applicant === this.id)));
     this.service.getInterviews().subscribe((res) => this.interviews.set(pickList<Interview>(res).filter((i) => i.applicant === this.id)));
+    this.service.getSubjects().subscribe((res) => this.availableSubjects.set(pickList<any>(res)));
     this.service.getPlacementTests().subscribe((res) => {
       const tests = pickList<PlacementTest>(res).filter((t) => t.applicant === this.id);
       this.placements.set(tests);
@@ -995,6 +1012,21 @@ export class ApplicationDetailsComponent implements OnInit {
   /** حذف مادة من قائمة امتحان القدرات. */
   removeSubjectRow(index: number): void {
     this.aptitudeScores.update(list => list.filter((_, i) => i !== index));
+  }
+
+  /** عند اختيار مادة من القائمة المنسدلة، ملء الدرجة القصوى ودرجة النجاح تلقائياً. */
+  onSubjectChosen(row: any): void {
+    if (!row || !row.subject) return;
+    const subName = row.subject.trim();
+    const found = this.availableSubjects().find(s => s.arabic_name === subName || s.name === subName || s.code === subName);
+    if (found) {
+      if (found.maximum_mark !== undefined && found.maximum_mark !== null) {
+        row.max = Number(found.maximum_mark) || 100;
+      }
+      if (found.passing_mark !== undefined && found.passing_mark !== null) {
+        row.pass = Number(found.passing_mark) || 50;
+      }
+    }
   }
 
   /** «قبول الطلب» → تأهيل لامتحان القدرات (ينشئ صفوف المواد من الإعدادات). */
