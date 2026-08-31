@@ -16,13 +16,13 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
-        title="إدارة الحساب والمؤسسات التعليمية"
-        subtitle="المدارس والمؤسسات المشتركة في منصّة نبراس — إعدادات الحساب، الهوية، الاشتراكات والتشغيل.">
-        <button class="btn primary" (click)="openNew()">+ مدرسة / مستأجر جديد</button>
+        title="إدارة المستأجرين (منصة المالك)"
+        subtitle="لوحة تحكم مالك المنصة والمطور — متابعة وإدارة المدارس المشتركة، مراجعة طلبات الانضمام، وإدارة اشتراكات SaaS.">
+        <button class="btn primary" (click)="openNew()">+ إضافة مستأجر جديد</button>
       </nb-page-header>
 
       <div class="tabs">
-        <button [class.on]="tab() === 'tenants'" (click)="tab.set('tenants')">المؤسسات والمدارس</button>
+        <button [class.on]="tab() === 'tenants'" (click)="tab.set('tenants')">قائمة المستأجرين</button>
         <button [class.on]="tab() === 'requests'" (click)="tab.set('requests')">
           طلبات الانضمام
           @if (pendingRequests() > 0) { <span class="tab-badge">{{ pendingRequests() }}</span> }
@@ -61,9 +61,9 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
       } @else {
 
       <div class="stat-row">
-        <div class="stat"><span class="s-val">{{ tenants().length }}</span><span class="s-lbl">إجمالي المؤسسات</span></div>
-        <div class="stat ok"><span class="s-val">{{ activeCount() }}</span><span class="s-lbl">نشط ومفعّل</span></div>
-        <div class="stat"><span class="s-val">{{ subscribedCount() }}</span><span class="s-lbl">لديه اشتراك</span></div>
+        <div class="stat"><span class="s-val">{{ tenants().length }}</span><span class="s-lbl">إجمالي المستأجرين</span></div>
+        <div class="stat ok"><span class="s-val">{{ activeCount() }}</span><span class="s-lbl">مستأجر نشط</span></div>
+        <div class="stat"><span class="s-val">{{ subscribedCount() }}</span><span class="s-lbl">لديه اشتراك سارٍ</span></div>
       </div>
 
       @if (loading()) {
