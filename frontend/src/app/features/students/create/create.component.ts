@@ -162,7 +162,7 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   <div class="field">
                     <label>الشعبة / الفصل الدراسي (توزيع فوري)</label>
                     <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)" class="section-select-control">
-                      <option value="">-- اختر الشعبة أو الفصل لتسكين الطالب --</option>
+                      <option value="">{{ availableSections().length > 0 ? '-- اختر الشعبة أو الفصل لتسكين الطالب --' : '-- لا توجد شعب معرفة لهذا الصف حالياً --' }}</option>
                       @for (sec of availableSections(); track sec.id) {
                         <option [value]="sec.id">
                           {{ sec.name }} (السعة: {{ sec.capacity }} · المقاعد الشاغرة: {{ sec.available_seats !== undefined ? sec.available_seats : (sec.capacity - (sec.occupied_seats || 0)) }})
@@ -731,9 +731,13 @@ export class StudentCreateComponent implements OnInit {
     this.selectedApplicant.set(applicant || null);
     if (applicant) {
       this.selectedSectionId.set(applicant.applying_section_id || '');
-      this.admissionsService.getSections(applicant.applying_grade_id).subscribe({
+      const gradeId = applicant.applying_grade_id || applicant.grade_id;
+      this.admissionsService.getSections(gradeId).subscribe({
         next: (res) => {
-          const secs = res?.data?.results || res?.data || res || [];
+          let secs = res?.data?.results || res?.data || res || [];
+          if (Array.isArray(secs) && gradeId) {
+            secs = secs.filter((s: any) => s.grade === gradeId || s.grade_id === gradeId || s.grade?.id === gradeId);
+          }
           this.availableSections.set(secs as any[]);
         }
       });

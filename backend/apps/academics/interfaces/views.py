@@ -85,6 +85,16 @@ class SectionViewSet(AcademicsBaseViewSet):
     serializer_class = SectionSerializer
     search_fields = ['name', 'code']
 
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('grade')
+        grade = self.request.query_params.get('grade') or self.request.query_params.get('grade_id')
+        if grade:
+            qs = qs.filter(grade_id=grade)
+        gender = self.request.query_params.get('gender')
+        if gender:
+            qs = qs.filter(models.Q(gender=gender) | models.Q(gender='mixed'))
+        return qs
+
 
 class SubjectGroupViewSet(AcademicsBaseViewSet):
     model_class = SubjectGroup
