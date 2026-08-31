@@ -161,7 +161,7 @@ export interface FinancialConfig {
       </nb-panel>
 
       <!-- 3. قسم إصدار إيصال السداد الفوري عند التسجيل -->
-      <nb-panel title="إصدار إيصال سداد فوري عند التسجيل" subtitle="تحصيل دفعة كاش أو تحويل بنكي فوري عند التسجيل وإصدار سند القبض.">
+      <nb-panel title="إصدار إيصال سداد فوري عند التسجيل" subtitle="تحصيل دفعة كاش أو تحويل بنكي فوري عند التسجيل مع توضيح وتفصيل بنود المبلغ المسدد.">
         <div class="receipt-toggle-box">
           <label class="toggle-switch">
             <input type="checkbox" [(ngModel)]="isImmediatePayment" (ngModelChange)="onReceiptToggle()" />
@@ -171,49 +171,113 @@ export interface FinancialConfig {
         </div>
 
         @if (isImmediatePayment()) {
-          <div class="receipt-details-grid fade-in">
-            <div class="field">
-              <label>المبلغ المحصّل فوراً (دفعة مقدمة / رسوم تسجيل)</label>
-              <input type="number" [(ngModel)]="receiptAmount" (ngModelChange)="notifyParent()" min="0" />
+          <div class="receipt-breakdown-container fade-in">
+            <div class="breakdown-header-bar">
+              <h5 class="breakdown-title">📌 تحديد بنود ومكونات المبلغ المسدد بالإيصال:</h5>
+              <span class="breakdown-hint">حدد البنود المشمولة بالدفعة الفورية وسيتم احتساب الإجمالي والبيان تلقائياً</span>
             </div>
 
-            <div class="field">
-              <label>طريقة الدفع والتحصيل</label>
-              <select [(ngModel)]="paymentMethodId" (ngModelChange)="onPaymentMethodChange()">
-                <option value="">اختر طريقة الدفع...</option>
-                @for (pm of paymentMethods(); track pm.id) {
-                  <option [value]="pm.id">{{ pm.name_ar || pm.name }}</option>
+            <div class="breakdown-cards-grid">
+              <!-- بند 1: رسوم التسجيل والقبول -->
+              <div class="breakdown-card" [class.active]="includeRegistrationFee()">
+                <div class="breakdown-card-head">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [ngModel]="includeRegistrationFee()" (ngModelChange)="includeRegistrationFee.set($event); onBreakdownItemToggle('reg');" />
+                    <span class="card-label-title">📝 رسوم التسجيل والقبول</span>
+                  </label>
+                  <span class="badge-mini">رسوم القبول</span>
+                </div>
+                @if (includeRegistrationFee()) {
+                  <div class="breakdown-input-box">
+                    <label>المبلغ المخصص:</label>
+                    <input type="number" [ngModel]="payRegistrationAmount()" (ngModelChange)="payRegistrationAmount.set($event); updateImmediateBreakdown();" min="0" />
+                  </div>
                 }
-              </select>
+              </div>
+
+              <!-- بند 2: الدفعة الأولى / القسط الأول من الرسوم الدراسية -->
+              <div class="breakdown-card" [class.active]="includeFirstInstallment()">
+                <div class="breakdown-card-head">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [ngModel]="includeFirstInstallment()" (ngModelChange)="includeFirstInstallment.set($event); onBreakdownItemToggle('first_inst');" />
+                    <span class="card-label-title">🎓 الدفعة الأولى / القسط الأول</span>
+                  </label>
+                  <span class="badge-mini secondary">رسوم دراسية</span>
+                </div>
+                @if (includeFirstInstallment()) {
+                  <div class="breakdown-input-box">
+                    <label>المبلغ المخصص (من القسط 1):</label>
+                    <input type="number" [ngModel]="payFirstInstallmentAmount()" (ngModelChange)="payFirstInstallmentAmount.set($event); updateImmediateBreakdown();" min="0" />
+                  </div>
+                }
+              </div>
+
+              <!-- بند 3: بند إضافي / مخصص (اختياري) -->
+              <div class="breakdown-card" [class.active]="includeCustomPay()">
+                <div class="breakdown-card-head">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [ngModel]="includeCustomPay()" (ngModelChange)="includeCustomPay.set($event); onBreakdownItemToggle('custom');" />
+                    <span class="card-label-title">✨ بند تحصيل إضافي / مخصص</span>
+                  </label>
+                  <span class="badge-mini tertiary">اختياري</span>
+                </div>
+                @if (includeCustomPay()) {
+                  <div class="breakdown-input-box-multi">
+                    <input type="text" [ngModel]="payCustomName()" (ngModelChange)="payCustomName.set($event); updateImmediateBreakdown();" placeholder="اسم البند (مثال: زي مدرسي / كتب)" />
+                    <input type="number" [ngModel]="payCustomAmount()" (ngModelChange)="payCustomAmount.set($event); updateImmediateBreakdown();" min="0" placeholder="المبلغ" />
+                  </div>
+                }
+              </div>
             </div>
 
-            @if (selectedPaymentMethodType() === 'cash' || isCashMethod()) {
+            <!-- إجمالي وتفاصيل طريقة الدفع والخزينة -->
+            <div class="receipt-details-grid">
               <div class="field">
-                <label>الخزنة المستلمة (الصندوق)</label>
-                <select [(ngModel)]="cashBoxId" (ngModelChange)="notifyParent()">
-                  <option value="">{{ cashBoxes().length > 0 ? 'اختر الصندوق...' : 'الخزينة الرئيسية' }}</option>
-                  @for (cb of cashBoxes(); track cb.id) {
-                    <option [value]="cb.id">{{ cb.name_ar || cb.name_en || cb.name || 'الصندوق الرئيسي' }}</option>
+                <label>إجمالي المبلغ المحصّل بالإيصال (محسوب آلياً)</label>
+                <div class="total-receipt-amount-display">
+                  <span class="currency">جنيه / ريال</span>
+                  <input type="number" [ngModel]="receiptAmount()" (ngModelChange)="receiptAmount.set($event); notifyParent();" min="0" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label>طريقة الدفع والتحصيل</label>
+                <select [(ngModel)]="paymentMethodId" (ngModelChange)="onPaymentMethodChange()">
+                  <option value="">اختر طريقة الدفع...</option>
+                  @for (pm of paymentMethods(); track pm.id) {
+                    <option [value]="pm.id">{{ pm.name_ar || pm.name }}</option>
                   }
                 </select>
               </div>
-            }
 
-            @if (selectedPaymentMethodType() === 'bank' || isBankMethod()) {
-              <div class="field">
-                <label>الحساب البنكي المستلم</label>
-                <select [(ngModel)]="bankAccountId" (ngModelChange)="notifyParent()">
-                  <option value="">اختر البنك...</option>
-                  @for (ba of bankAccounts(); track ba.id) {
-                    <option [value]="ba.id">{{ ba.bank_name ? (ba.bank_name + ' - ' + ba.account_number) : (ba.account_number || ba.name_ar || ba.name) }}</option>
-                  }
-                </select>
+              @if (selectedPaymentMethodType() === 'cash' || isCashMethod()) {
+                <div class="field">
+                  <label>الخزنة المستلمة (الصندوق)</label>
+                  <select [(ngModel)]="cashBoxId" (ngModelChange)="notifyParent()">
+                    <option value="">{{ cashBoxes().length > 0 ? 'اختر الصندوق...' : 'الخزينة الرئيسية' }}</option>
+                    @for (cb of cashBoxes(); track cb.id) {
+                      <option [value]="cb.id">{{ cb.name_ar || cb.name_en || cb.name || 'الصندوق الرئيسي' }}</option>
+                    }
+                  </select>
+                </div>
+              }
+
+              @if (selectedPaymentMethodType() === 'bank' || isBankMethod()) {
+                <div class="field">
+                  <label>الحساب البنكي المستلم</label>
+                  <select [(ngModel)]="bankAccountId" (ngModelChange)="notifyParent()">
+                    <option value="">اختر البنك...</option>
+                    @for (ba of bankAccounts(); track ba.id) {
+                      <option [value]="ba.id">{{ ba.bank_name ? (ba.bank_name + ' - ' + ba.account_number) : (ba.account_number || ba.name_ar || ba.name) }}</option>
+                    }
+                  </select>
+                </div>
+              }
+
+              <div class="field full-width">
+                <label>البيان وملاحظات سند الإيصال</label>
+                <input type="text" [(ngModel)]="receiptNotes" (ngModelChange)="notifyParent()" placeholder="بيان سند القبض والملاحظات" />
               </div>
-            }
-
-            <div class="field full-width">
-              <label>ملاحظات وسند الإيصال</label>
-              <input type="text" [(ngModel)]="receiptNotes" (ngModelChange)="notifyParent()" placeholder="مثال: سداد رسوم التسجيل والقسط الأول نقداً عند التسجيل" />
             </div>
           </div>
         }
@@ -390,6 +454,152 @@ export interface FinancialConfig {
       input:checked + .slider:before { transform: translateX(20px); }
       .toggle-label { font-size: 13px; font-weight: 700; color: var(--nb-text); }
 
+      .receipt-breakdown-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 14px;
+      }
+      .breakdown-header-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .breakdown-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+      .breakdown-hint {
+        font-size: 11px;
+        color: var(--nb-text-muted);
+      }
+      .breakdown-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .breakdown-card {
+        background: var(--nb-surface);
+        border: 1.5px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: all 0.2s ease;
+      }
+      .breakdown-card.active {
+        border-color: var(--nb-primary-500);
+        background: var(--nb-surface-raised);
+        box-shadow: 0 2px 8px rgba(14, 116, 144, 0.08);
+      }
+      .breakdown-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .checkbox-label input[type="checkbox"] {
+        width: 17px;
+        height: 17px;
+        accent-color: var(--nb-primary-600);
+        cursor: pointer;
+      }
+      .card-label-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+      .badge-mini {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+        background: rgba(14, 116, 144, 0.1);
+        color: var(--nb-primary-700);
+      }
+      .badge-mini.secondary {
+        background: rgba(16, 185, 129, 0.1);
+        color: #047857;
+      }
+      .badge-mini.tertiary {
+        background: rgba(245, 158, 11, 0.1);
+        color: #b45309;
+      }
+      .breakdown-input-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .breakdown-input-box label {
+        font-size: 11px;
+        color: var(--nb-text-muted);
+        white-space: nowrap;
+      }
+      .breakdown-input-box input {
+        height: 34px;
+        border: 1px solid var(--nb-border);
+        border-radius: 6px;
+        padding: 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--nb-text);
+        background: var(--nb-surface);
+        width: 100%;
+        outline: none;
+      }
+      .breakdown-input-box input:focus {
+        border-color: var(--nb-primary-500);
+      }
+      .breakdown-input-box-multi {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 8px;
+      }
+      .breakdown-input-box-multi input {
+        height: 34px;
+        border: 1px solid var(--nb-border);
+        border-radius: 6px;
+        padding: 0 10px;
+        font-size: 12px;
+        color: var(--nb-text);
+        background: var(--nb-surface);
+        outline: none;
+      }
+      .total-receipt-amount-display {
+        display: flex;
+        align-items: center;
+        position: relative;
+      }
+      .total-receipt-amount-display input {
+        height: 38px;
+        width: 100%;
+        border: 1.5px solid var(--nb-primary-400);
+        background: var(--nb-surface-raised);
+        border-radius: var(--nb-radius);
+        padding: 0 12px 0 75px;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--nb-primary-700);
+        outline: none;
+      }
+      .total-receipt-amount-display .currency {
+        position: absolute;
+        left: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--nb-text-muted);
+        pointer-events: none;
+      }
+
       .receipt-details-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -408,7 +618,10 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   @Input() set config(val: Partial<FinancialConfig> | null) {
     if (val) {
-      if (val.registration_fee !== undefined) this.registrationFee.set(val.registration_fee);
+      if (val.registration_fee !== undefined) {
+        this.registrationFee.set(val.registration_fee);
+        this.payRegistrationAmount.set(val.registration_fee);
+      }
       if (val.tuition_fee !== undefined) this.tuitionFee.set(val.tuition_fee);
       if (val.discount_amount !== undefined) this.discountAmount.set(val.discount_amount);
       if (val.discount_reason !== undefined) this.discountReason.set(val.discount_reason);
@@ -447,6 +660,17 @@ export class RegistrationFinanceFormComponent implements OnInit {
   cashBoxId = signal('');
   bankAccountId = signal('');
   receiptNotes = signal('سداد رسوم التسجيل والقبول عند التسجيل');
+
+  // تفصيل بنود التحصيل الفوري بالإيصال
+  includeRegistrationFee = signal(true);
+  payRegistrationAmount = signal(150000);
+
+  includeFirstInstallment = signal(false);
+  payFirstInstallmentAmount = signal(0);
+
+  includeCustomPay = signal(false);
+  payCustomName = signal('');
+  payCustomAmount = signal(0);
 
   paymentMethods = signal<any[]>([]);
   cashBoxes = signal<any[]>([]);
@@ -487,7 +711,8 @@ export class RegistrationFinanceFormComponent implements OnInit {
   ngOnInit() {
     this.loadFinanceMetadata();
     this.recalculateInstallments();
-    this.notifyParent();
+    this.payRegistrationAmount.set(this.registrationFee());
+    this.updateImmediateBreakdown();
   }
 
   loadFinanceMetadata() {
@@ -533,16 +758,20 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   onFeesChange() {
     this.recalculateInstallments();
-    if (this.isImmediatePayment() && (this.receiptAmount() === 0 || this.receiptAmount() === 150000)) {
-      this.receiptAmount.set(this.registrationFee());
+    this.payRegistrationAmount.set(this.registrationFee());
+    if (this.installments().length > 0 && (!this.payFirstInstallmentAmount() || this.payFirstInstallmentAmount() === 0)) {
+      this.payFirstInstallmentAmount.set(this.installments()[0].amount);
     }
-    this.notifyParent();
+    this.updateImmediateBreakdown();
   }
 
   selectPlanType(type: string) {
     this.planType.set(type);
     this.recalculateInstallments();
-    this.notifyParent();
+    if (this.installments().length > 0) {
+      this.payFirstInstallmentAmount.set(this.installments()[0].amount);
+    }
+    this.updateImmediateBreakdown();
   }
 
   recalculateInstallments() {
@@ -614,9 +843,60 @@ export class RegistrationFinanceFormComponent implements OnInit {
     this.notifyParent();
   }
 
+  onBreakdownItemToggle(type: 'reg' | 'first_inst' | 'custom') {
+    if (type === 'first_inst' && this.includeFirstInstallment()) {
+      if (this.payFirstInstallmentAmount() === 0) {
+        const firstAmt = this.installments()[0]?.amount || Math.round(this.netTotal() / 3);
+        this.payFirstInstallmentAmount.set(firstAmt);
+      }
+    }
+    if (type === 'reg' && this.includeRegistrationFee()) {
+      if (this.payRegistrationAmount() === 0) {
+        this.payRegistrationAmount.set(this.registrationFee());
+      }
+    }
+    this.updateImmediateBreakdown();
+  }
+
+  updateImmediateBreakdown() {
+    let total = 0;
+    const parts: string[] = [];
+
+    if (this.includeRegistrationFee()) {
+      const reg = Number(this.payRegistrationAmount()) || 0;
+      total += reg;
+      parts.push(`رسوم التسجيل (${reg.toLocaleString()})`);
+    }
+
+    if (this.includeFirstInstallment()) {
+      const inst = Number(this.payFirstInstallmentAmount()) || 0;
+      total += inst;
+      parts.push(`القسط الأول (${inst.toLocaleString()})`);
+    }
+
+    if (this.includeCustomPay()) {
+      const custAmt = Number(this.payCustomAmount()) || 0;
+      const custName = this.payCustomName() || 'بند مخصص';
+      total += custAmt;
+      parts.push(`${custName} (${custAmt.toLocaleString()})`);
+    }
+
+    this.receiptAmount.set(total);
+    if (parts.length > 0) {
+      this.receiptNotes.set(`سداد فوري عند التسجيل: ${parts.join(' + ')}`);
+    } else {
+      this.receiptNotes.set('سداد دفعة فورية عند التسجيل');
+    }
+    this.notifyParent();
+  }
+
   onReceiptToggle() {
-    if (this.isImmediatePayment() && this.receiptAmount() === 0) {
-      this.receiptAmount.set(this.registrationFee());
+    if (this.isImmediatePayment()) {
+      this.payRegistrationAmount.set(this.registrationFee());
+      if (this.installments().length > 0 && this.payFirstInstallmentAmount() === 0) {
+        this.payFirstInstallmentAmount.set(this.installments()[0].amount);
+      }
+      this.updateImmediateBreakdown();
     }
     this.notifyParent();
   }
