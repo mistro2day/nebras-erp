@@ -191,9 +191,9 @@ export interface FinancialConfig {
               <div class="field">
                 <label>الخزنة المستلمة (الصندوق)</label>
                 <select [(ngModel)]="cashBoxId" (ngModelChange)="notifyParent()">
-                  <option value="">اختر الصندوق...</option>
+                  <option value="">{{ cashBoxes().length > 0 ? 'اختر الصندوق...' : 'الخزينة الرئيسية' }}</option>
                   @for (cb of cashBoxes(); track cb.id) {
-                    <option [value]="cb.id">{{ cb.name }}</option>
+                    <option [value]="cb.id">{{ cb.name_ar || cb.name_en || cb.name || 'الصندوق الرئيسي' }}</option>
                   }
                 </select>
               </div>
@@ -205,7 +205,7 @@ export interface FinancialConfig {
                 <select [(ngModel)]="bankAccountId" (ngModelChange)="notifyParent()">
                   <option value="">اختر البنك...</option>
                   @for (ba of bankAccounts(); track ba.id) {
-                    <option [value]="ba.id">{{ ba.bank_name }} - {{ ba.account_number }}</option>
+                    <option [value]="ba.id">{{ ba.bank_name ? (ba.bank_name + ' - ' + ba.account_number) : (ba.account_number || ba.name_ar || ba.name) }}</option>
                   }
                 </select>
               </div>
@@ -491,30 +491,42 @@ export class RegistrationFinanceFormComponent implements OnInit {
   }
 
   loadFinanceMetadata() {
-    this.financeSvc.listPaymentMethods().subscribe(res => {
-      const list = (res?.data as any)?.results || res?.data || [];
-      this.paymentMethods.set(list);
-      if (list.length > 0 && !this.paymentMethodId()) {
-        this.paymentMethodId.set(list[0].id);
-        this.notifyParent();
+    this.financeSvc.listPaymentMethods().subscribe({
+      next: (res) => {
+        const list = (res?.data as any)?.results || res?.data || res || [];
+        if (Array.isArray(list)) {
+          this.paymentMethods.set(list);
+          if (list.length > 0 && !this.paymentMethodId()) {
+            this.paymentMethodId.set(list[0].id);
+            this.notifyParent();
+          }
+        }
       }
     });
 
-    this.financeSvc.listCashBoxes().subscribe(res => {
-      const list = (res?.data as any)?.results || res?.data || [];
-      this.cashBoxes.set(list);
-      if (list.length > 0 && !this.cashBoxId()) {
-        this.cashBoxId.set(list[0].id);
-        this.notifyParent();
+    this.financeSvc.listCashBoxes().subscribe({
+      next: (res) => {
+        const list = (res?.data as any)?.results || res?.data || res || [];
+        if (Array.isArray(list)) {
+          this.cashBoxes.set(list);
+          if (list.length > 0 && !this.cashBoxId()) {
+            this.cashBoxId.set(list[0].id);
+            this.notifyParent();
+          }
+        }
       }
     });
 
-    this.financeSvc.listBankAccounts().subscribe(res => {
-      const list = (res?.data as any)?.results || res?.data || [];
-      this.bankAccounts.set(list);
-      if (list.length > 0 && !this.bankAccountId()) {
-        this.bankAccountId.set(list[0].id);
-        this.notifyParent();
+    this.financeSvc.listBankAccounts().subscribe({
+      next: (res) => {
+        const list = (res?.data as any)?.results || res?.data || res || [];
+        if (Array.isArray(list)) {
+          this.bankAccounts.set(list);
+          if (list.length > 0 && !this.bankAccountId()) {
+            this.bankAccountId.set(list[0].id);
+            this.notifyParent();
+          }
+        }
       }
     });
   }
