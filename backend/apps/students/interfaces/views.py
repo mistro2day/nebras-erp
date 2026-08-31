@@ -72,9 +72,19 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return StandardResponse(serializer.data, message="تم جلب بيانات الطالب بنجاح.")
 
+    def destroy(self, request, *args, **kwargs):
+        """حذف الطالب آمنياً (Soft Delete)"""
+        instance = self.get_object()
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        user_id = request.user.id if request.user else None
+        StudentApplicationService.delete_student(student_id=instance.id, tenant_id=tenant_id, user_id=user_id)
+        return StandardResponse(None, message="تم حذف الطالب بنجاح.", status=status.HTTP_200_OK)
+
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        user_id = request.user.id if request.user else uuid.uuid4()
         
         # 1. تحديث البروفايل الشخصي
         profile_data = request.data.get('profile', {})
@@ -90,7 +100,21 @@ class StudentViewSet(viewsets.ModelViewSet):
             medical_serializer.is_valid(raise_exception=True)
             medical_serializer.save()
 
-        # 3. تحديث حالة الطالب مباشرة (للمستخدم الخارق)
+        # 3. تحديث البيانات المالية وإنشائها/تحديثها إن وُجدت
+        financial_config = request.data.get('financial_config', None)
+        if financial_config:
+            grade_id = request.data.get('grade_id')
+            academic_year_id = request.data.get('academic_year_id')
+            StudentApplicationService.process_student_registration_finance(
+                tenant_id=tenant_id,
+                student_id=instance.id,
+                grade_id=uuid.UUID(str(grade_id)) if grade_id else None,
+                academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else None,
+                financial_config=financial_config,
+                user_id=user_id
+            )
+
+        # 4. تحديث حالة الطالب مباشرة
         status_val = request.data.get('status')
         if status_val:
             instance.status = status_val
@@ -103,21 +127,23 @@ class StudentViewSet(viewsets.ModelViewSet):
         return StandardResponse(serializer.data, message="تم تحديث بيانات الطالب بنجاح.")
 
     def create(self, request, *args, **kwargs):
-        """إنشاء ملف طالب يدوياً بالكامل"""
+        """إنشاء ملف طالب يدوياً بالكامل مع دعم الفوترة والأقساط والسداد الفوري"""
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
         user_id = request.user.id if request.user else uuid.uuid4()
         
-        # استخراج البيانات المتداخلة
         profile_data = request.data.get('profile', {})
         medical_data = request.data.get('medical_profile', {})
+        academic_data = request.data.get('academic_data', {})
+        financial_config = request.data.get('financial_config', None)
         
-        # دمج البيانات
         full_data = {**profile_data, **medical_data}
         
         student = StudentApplicationService.create_student_manually(
             profile_data=full_data,
             tenant_id=tenant_id,
-            user_id=user_id
+            user_id=user_id,
+            academic_data=academic_data,
+            financial_config=financial_config
         )
         
         serializer = self.get_serializer(student)
@@ -125,45 +151,24 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='create-from-applicant')
     def create_from_applicant(self, request):
-        """إنشاء طالب من طلب تقديم مقبول"""
+        """إنشاء طالب من طلب تقديم مقبول مع الفوترة والأقساط والسداد الفوري"""
         applicant_id = request.data.get('applicant_id')
         if not applicant_id:
             raise ValidationError("يجب توفير applicant_id.")
             
+        financial_config = request.data.get('financial_config', None)
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
         user_id = request.user.id if request.user else uuid.uuid4()
         
         student = StudentApplicationService.create_student_from_applicant(
             applicant_id=uuid.UUID(applicant_id),
             tenant_id=tenant_id,
-            user_id=user_id
+            user_id=user_id,
+            financial_config=financial_config
         )
 
-        # توليد فاتورة رسوم التسجيل تلقائياً (best-effort — لا يُفشل التسجيل عند نقص الإعداد المالي)
-        fee_notice = None
-        try:
-            from apps.student_finance.application.services import BillingService
-            from apps.admissions.domain.models import Applicant as _Applicant
-            _app = _Applicant.objects.filter(id=uuid.UUID(applicant_id), tenant_id=tenant_id).first()
-            invoice = BillingService.bill_new_student_registration(
-                tenant_id=tenant_id,
-                student_id=student.id,
-                grade_id=getattr(_app, 'applying_grade_id', None) if _app else None,
-                user_id=user_id,
-            )
-            if invoice is not None:
-                fee_notice = f"تم توليد فاتورة رسوم التسجيل رقم {invoice.invoice_number} بمبلغ {invoice.total_amount}."
-        except Exception as exc:  # نقص إعداد مالي أو غيره — يُسجّل ولا يُفشل التسجيل
-            import logging
-            logging.getLogger('nebras.students').warning(
-                "تعذّر توليد فاتورة رسوم التسجيل للطالب %s: %s", student.id, exc)
-            fee_notice = "تم التسجيل، لكن تعذّر توليد فاتورة الرسوم تلقائياً — راجع إعدادات المالية."
-
         serializer = StudentSerializer(student)
-        message = "تم تسجيل الطالب بنجاح وتوليد الرقم المدرسي."
-        if fee_notice:
-            message += " " + fee_notice
-        return StandardResponse(serializer.data, message=message, status=status.HTTP_201_CREATED)
+        return StandardResponse(serializer.data, message="تم تسجيل الطالب بنجاح وتوليد الرقم المدرسي.", status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='enroll')
     def enroll(self, request, pk=None):

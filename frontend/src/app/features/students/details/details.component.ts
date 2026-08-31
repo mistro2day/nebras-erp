@@ -20,11 +20,13 @@ import {
 
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+
 @Component({
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, NbLoadingComponent, SfDocumentDrawerComponent],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent],
   template: `
     @if (student(); as s) {
       <div class="page" dir="rtl">
@@ -73,6 +75,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
             <button class="nb-btn-secondary" (click)="graduate(s)" [disabled]="s.status === 'graduated'">تخريج</button>
             <button class="nb-btn-secondary" (click)="withdraw(s)" [disabled]="s.status === 'withdrawn'">تسجيل انسحاب</button>
             <button class="nb-btn-danger" (click)="archive(s)">أرشفة</button>
+            <button class="nb-btn-danger" (click)="deleteStudent(s)">حذف الطالب 🗑️</button>
           </div>
         </div>
 
@@ -918,10 +921,36 @@ export class StudentDetailsComponent implements OnInit {
   private libraryService = inject(LibraryService);
   private examService = inject(ExaminationsService);
   private dialog = inject(MatDialog);
+  private snack = inject(MatSnackBar);
   private http = inject(HttpClient);
 
   student = this.studentsService.selectedStudent;
   timeline = signal<any[]>([]);
+
+  deleteStudent(s: any): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'تأكيد حذف الطالب',
+        message: `هل أنت متأكد من حذف الطالب «${s.profile.arabic_name}» نهائياً؟ سيتم نقل الملف إلى سلة المحذوفات.`,
+        confirmText: 'حذف الطالب',
+        color: 'warn',
+      },
+    });
+
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.studentsService.deleteStudent(s.id).subscribe({
+        next: () => {
+          this.snack.open('تم حذف الطالب بنجاح', 'إغلاق', { duration: 5000 });
+          this.router.navigate(['/students/list']);
+        },
+        error: (err) => {
+          this.snack.open(err?.error?.message || 'تعذّر حذف الطالب. حاول مجددًا.', 'إغلاق', { duration: 5000 });
+        }
+      });
+    });
+  }
   billingAccount = signal<any | null>(null);
   invoices = signal<any[]>([]);
   receipts = signal<any[]>([]);

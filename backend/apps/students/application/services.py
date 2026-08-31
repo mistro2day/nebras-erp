@@ -61,9 +61,9 @@ class StudentApplicationService:
 
     @classmethod
     @transaction.atomic
-    def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None) -> Student:
+    def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, financial_config: dict = None) -> Student:
         """
-        إنشاء طالب جديد بناءً على طلب قبول معتمد ومقبول
+        إنشاء طالب جديد بناءً على طلب قبول معتمد ومقبول مع معالجة اختيارات الرسوم والأقساط والسداد الفوري
         """
         # 1. جلب المتقدم والتحقق من حالته
         try:
@@ -118,7 +118,6 @@ class StudentApplicationService:
         )
         
         # 4b. نقل أولياء الأمور وجهات الطوارئ من طلب القبول إلى ملف الطالب
-        #     (بيانات الاستمارة يجب أن تنتقل مع الطالب المُسجّل).
         for g in Guardian.objects.filter(applicant=applicant):
             StudentFamilyRelation.objects.create(
                 student=student,
@@ -133,7 +132,6 @@ class StudentApplicationService:
                 tenant_id=tenant_id,
                 created_by=user_id,
             )
-            # جهة اتصال الطوارئ البديلة إن وُجدت في بيانات ولي الأمر
             if getattr(g, 'emergency_contact_name', None):
                 StudentEmergencyContact.objects.create(
                     student=student,
@@ -145,8 +143,7 @@ class StudentApplicationService:
                     created_by=user_id,
                 )
 
-        # 5. إنشاء الملف الطبي للطالب — الحقائق الطبية مرجعها العيادة،
-        # وهذا السجل يبقى للربط فقط (حقول JSON فيه لم تعد تُستخدم).
+        # 5. إنشاء الملف الطبي للطالب
         StudentMedicalProfile.objects.create(
             student=student,
             tenant_id=tenant_id,
@@ -168,9 +165,7 @@ class StudentApplicationService:
                     created_by=user_id
                 )
                 
-        # 6b. إنشاء التسجيل الدراسي مع ربطه بالفرع المناسب (بنين/بنات) —
-        #     الفرع يُستنتج من جنس المتقدم ويُنشأ تلقائياً إن لم يوجد.
-        #     بهذا يُوحَّد مفهوم المدرسة/الفرع من لحظة القيد لا بمعالجة لاحقة.
+        # 6b. إنشاء التسجيل الدراسي
         if applicant.academic_year_id and applicant.applying_grade_id:
             branch = resolve_branch_for_gender(tenant_id, applicant.gender)
             StudentEnrollment.objects.create(
@@ -186,11 +181,22 @@ class StudentApplicationService:
                 created_by=user_id,
             )
 
-        # 7. تحديث حالة طلب التقديم إلى "مُسجّل" (ذرّي ضمن نفس المعاملة)
+        # 7. تحديث حالة طلب التقديم إلى "مُسجّل"
         applicant.status = 'enrolled'
         applicant.save(update_fields=['status', 'updated_at'])
 
-        # 8. نشر حدث النطاق
+        # 8. معالجة الإعدادات المالية والأقساط والإيصالات (إن وُجدت)
+        if financial_config:
+            cls.process_student_registration_finance(
+                tenant_id=tenant_id,
+                student_id=student.id,
+                grade_id=applicant.applying_grade_id,
+                academic_year_id=applicant.academic_year_id,
+                financial_config=financial_config,
+                user_id=user_id
+            )
+
+        # 9. نشر حدث النطاق
         DomainEventPublisher.publish("StudentCreated", {
             "student_id": str(student.id),
             "student_number": student_number,
@@ -201,11 +207,10 @@ class StudentApplicationService:
 
     @classmethod
     @transaction.atomic
-    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None) -> Student:
+    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, academic_data: dict = None, financial_config: dict = None) -> Student:
         """
-        إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية الأساسية
+        إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأكاديمية والمالية
         """
-        # التحقق من حدّ الطلاب في خطة اشتراك المستأجر
         cls._enforce_student_limit(tenant_id)
 
         # 1. توليد رقم الطالب الأكاديمي
@@ -249,9 +254,7 @@ class StudentApplicationService:
             created_by=user_id
         )
         
-        # 4. إنشاء الملف الطبي — يُكتب في سجلّات العيادة وحدها.
-        # العيادة هي مرجع الحقائق الطبية للطلاب والموظفين معاً؛ حفظها هنا
-        # أيضاً كان يخلق مصدرين يتباعدان. راجع clinic/application/profile_service.
+        # 4. إنشاء الملف الطبي
         StudentMedicalProfile.objects.create(
             student=student, tenant_id=tenant_id, created_by=user_id,
         )
@@ -267,8 +270,37 @@ class StudentApplicationService:
             },
             user_id=user_id,
         )
+
+        # 4b. تسكين الطالب دراسياً إن توفرت البيانات الأكاديمية
+        if academic_data and academic_data.get('grade_id') and academic_data.get('academic_year_id'):
+            branch = resolve_branch_for_gender(tenant_id, profile_data.get('gender', 'male'))
+            StudentEnrollment.objects.create(
+                tenant_id=tenant_id,
+                student=student,
+                academic_year_id=uuid.UUID(str(academic_data['academic_year_id'])),
+                grade_id=uuid.UUID(str(academic_data['grade_id'])),
+                section_id=uuid.UUID(str(academic_data['section_id'])) if academic_data.get('section_id') else None,
+                branch_id=branch.id,
+                enrollment_date=datetime.date.today(),
+                enrollment_type='new',
+                status='active',
+                created_by=user_id,
+            )
         
-        # 5. نشر حدث النطاق
+        # 5. معالجة الإعدادات المالية والأقساط والإيصالات (إن وُجدت)
+        if financial_config:
+            grade_id = academic_data.get('grade_id') if academic_data else None
+            academic_year_id = academic_data.get('academic_year_id') if academic_data else None
+            cls.process_student_registration_finance(
+                tenant_id=tenant_id,
+                student_id=student.id,
+                grade_id=uuid.UUID(str(grade_id)) if grade_id else None,
+                academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else None,
+                financial_config=financial_config,
+                user_id=user_id
+            )
+
+        # 6. نشر حدث النطاق
         DomainEventPublisher.publish("StudentCreated", {
             "student_id": str(student.id),
             "student_number": student_number,
@@ -276,6 +308,213 @@ class StudentApplicationService:
         })
         
         return student
+
+    @classmethod
+    @transaction.atomic
+    def process_student_registration_finance(cls, tenant_id: uuid.UUID, student_id: uuid.UUID,
+                                              grade_id: uuid.UUID = None, academic_year_id: uuid.UUID = None,
+                                              financial_config: dict = None, user_id: uuid.UUID = None):
+        """
+        معالجة البيانات المالية للطالب عند التسجيل أو التعديل (فاتورة مخصصة، خطة أقساط، وسداد فوري)
+        """
+        if not financial_config:
+            return None
+
+        from apps.student_finance.domain.models import (
+            StudentBillingAccount, StudentInvoice, InvoiceItem, InvoiceDiscount,
+            InstallmentPlan, Installment, FeeType, FeeCategory, StudentReceivable
+        )
+        from apps.student_finance.application.services import PaymentService
+        from decimal import Decimal
+
+        account, _ = StudentBillingAccount.objects.get_or_create(
+            tenant_id=tenant_id,
+            student_id=student_id,
+            defaults={'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M%S')}-{str(student_id)[:8]}"}
+        )
+
+        reg_fee = Decimal(str(financial_config.get('registration_fee', 0) or 0))
+        tuition_fee = Decimal(str(financial_config.get('tuition_fee', 0) or 0))
+        discount_amt = Decimal(str(financial_config.get('discount_amount', 0) or 0))
+        discount_reason = financial_config.get('discount_reason', 'خصم مالي مخصص')
+        custom_items = financial_config.get('custom_fee_items', []) or []
+
+        # البحث عن فاتورة قائمة أو إحلال فاتورة مسودة
+        invoice = StudentInvoice.objects.filter(tenant_id=tenant_id, student_billing_account=account).first()
+        if invoice and invoice.status == 'draft':
+            invoice.items.all().delete()
+            invoice.discounts.all().delete()
+        elif not invoice:
+            inv_num = f"INV-ST-{timezone.now().strftime('%y%m%d%H%M%S')}-{str(student_id)[:4]}"
+            invoice = StudentInvoice.objects.create(
+                tenant_id=tenant_id,
+                student_billing_account=account,
+                invoice_number=inv_num,
+                issue_date=datetime.date.today(),
+                due_date=datetime.date.today() + datetime.timedelta(days=30),
+                status='posted',
+                total_amount=Decimal('0.0'),
+                paid_amount=Decimal('0.0'),
+                outstanding_amount=Decimal('0.0')
+            )
+
+        total_amount = reg_fee + tuition_fee
+        for c_item in custom_items:
+            total_amount += Decimal(str(c_item.get('amount', 0) or 0))
+
+        final_total = max(Decimal('0.0'), total_amount - discount_amt)
+        invoice.total_amount = final_total
+        invoice.outstanding_amount = max(Decimal('0.0'), final_total - invoice.paid_amount)
+        invoice.save()
+
+        # إضافة البنود
+        if reg_fee > 0:
+            reg_type = FeeType.objects.filter(tenant_id=tenant_id, code='registration').first()
+            if not reg_type:
+                cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='registration', defaults={'name_ar': 'رسوم التسجيل', 'name_en': 'Registration'})
+                reg_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='registration', name_ar='رسوم التسجيل والقبول', name_en='Registration & Admission')
+            InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=reg_type, amount=reg_fee, description='رسوم التسجيل والقبول المعدلة')
+
+        if tuition_fee > 0:
+            tuition_type = FeeType.objects.filter(tenant_id=tenant_id, code='tuition_annual').first()
+            if not tuition_type:
+                cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='tuition', defaults={'name_ar': 'الرسوم الدراسية', 'name_en': 'Tuition'})
+                tuition_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='tuition_annual', name_ar='الرسوم الدراسية السنوية', name_en='Annual Tuition')
+            InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=tuition_type, amount=tuition_fee, description='الرسوم الدراسية السنوية المعدلة')
+
+        for c_item in custom_items:
+            c_name = c_item.get('name', 'رسوم مخصصة')
+            c_amt = Decimal(str(c_item.get('amount', 0) or 0))
+            if c_amt > 0:
+                generic_type = FeeType.objects.filter(tenant_id=tenant_id, code='activities').first()
+                if not generic_type:
+                    cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='activities', defaults={'name_ar': 'أنشطة ورسوم أخرى', 'name_en': 'Activities'})
+                    generic_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='activities', name_ar='رسوم أخرى', name_en='Other Fees')
+                InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=generic_type, amount=c_amt, description=c_name)
+
+        if discount_amt > 0:
+            InvoiceDiscount.objects.create(
+                tenant_id=tenant_id,
+                invoice=invoice,
+                discount_type='fixed',
+                amount=discount_amt,
+                discount_reason=discount_reason
+            )
+
+        # تحديث المستحقات
+        rec, _ = StudentReceivable.objects.get_or_create(
+            tenant_id=tenant_id,
+            student_billing_account=account,
+            invoice=invoice,
+            defaults={
+                'amount': final_total,
+                'paid_amount': Decimal('0.0'),
+                'outstanding_amount': final_total,
+                'status': 'outstanding'
+            }
+        )
+        rec.amount = final_total
+        rec.outstanding_amount = max(Decimal('0.0'), final_total - rec.paid_amount)
+        rec.save()
+
+        account.outstanding_balance = rec.outstanding_amount
+        account.current_balance = final_total
+        account.save(update_fields=['outstanding_balance', 'current_balance'])
+
+        # 2. إنشاء الأقساط المجدولة
+        inst_plan_data = financial_config.get('installment_plan') or {}
+        installments_list = inst_plan_data.get('installments') or []
+
+        if installments_list:
+            default_plan, _ = InstallmentPlan.objects.get_or_create(
+                tenant_id=tenant_id,
+                name="خطة أقساط مخصصة للطالب",
+                defaults={'number_of_installments': len(installments_list), 'is_active': True}
+            )
+            Installment.objects.filter(tenant_id=tenant_id, invoice=invoice, status='pending').delete()
+            for idx, inst in enumerate(installments_list, start=1):
+                i_amt = Decimal(str(inst.get('amount', 0) or 0))
+                i_date_str = inst.get('due_date') or str(datetime.date.today() + datetime.timedelta(days=30 * idx))
+                if isinstance(i_date_str, str):
+                    try:
+                        i_date = datetime.date.fromisoformat(i_date_str)
+                    except ValueError:
+                        i_date = datetime.date.today() + datetime.timedelta(days=30 * idx)
+                else:
+                    i_date = i_date_str
+
+                if i_amt > 0:
+                    Installment.objects.create(
+                        tenant_id=tenant_id,
+                        student_billing_account=account,
+                        invoice=invoice,
+                        installment_plan=default_plan,
+                        due_date=i_date,
+                        amount=i_amt,
+                        paid_amount=Decimal('0.0'),
+                        status='pending'
+                    )
+
+        # 3. إصدار إيصال السداد الفوري (إن وُجد)
+        receipt_data = None
+        init_pay = financial_config.get('initial_payment') or {}
+        if init_pay.get('is_paid') and Decimal(str(init_pay.get('amount', 0) or 0)) > 0:
+            pay_amt = Decimal(str(init_pay.get('amount', 0)))
+            pay_method_id = init_pay.get('payment_method_id')
+            cash_box_id = init_pay.get('cash_box_id')
+            bank_account_id = init_pay.get('bank_account_id')
+
+            if pay_method_id:
+                try:
+                    receipt = PaymentService.receive_payment(
+                        tenant_id=tenant_id,
+                        billing_account_id=account.id,
+                        amount=pay_amt,
+                        payment_method_id=uuid.UUID(str(pay_method_id)),
+                        bank_account_id=uuid.UUID(str(bank_account_id)) if bank_account_id else None,
+                        cash_box_id=uuid.UUID(str(cash_box_id)) if cash_box_id else None,
+                        user_id=user_id
+                    )
+                    receipt_data = {
+                        'id': str(receipt.id),
+                        'receipt_number': receipt.receipt_number,
+                        'amount': float(receipt.amount),
+                        'status': receipt.status
+                    }
+                except Exception as exc:
+                    import logging
+                    logging.getLogger('nebras.students').warning("تعذّر إصدار إيصال السداد الفوري للطالب %s: %s", student_id, exc)
+
+        return {
+            'invoice_id': str(invoice.id),
+            'invoice_number': invoice.invoice_number,
+            'total_amount': float(final_total),
+            'receipt': receipt_data
+        }
+
+    @classmethod
+    @transaction.atomic
+    def delete_student(cls, student_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        """
+        حذف الطالب آمنياً بنمط Soft Delete
+        """
+        student = Student.objects.filter(id=student_id, tenant_id=tenant_id, deleted_at__isnull=True).first()
+        if not student:
+            raise BusinessException("الطالب غير موجود أو تم حذفه مسبقاً.", code="student_not_found")
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        student.deleted_at = now
+        student.save(update_fields=['deleted_at'])
+
+        if hasattr(student, 'profile') and student.profile:
+            student.profile.deleted_at = now
+            student.profile.save(update_fields=['deleted_at'])
+
+        DomainEventPublisher.publish("StudentDeleted", {
+            "student_id": str(student.id),
+            "tenant_id": str(tenant_id)
+        })
+        return True
 
     @classmethod
     @transaction.atomic

@@ -150,9 +150,12 @@ export class AdmissionsService {
     return this.apiClient.patch(`admissions/applicants/${id}/set-status/`, { status });
   }
 
-  /** تحويل المتقدم المقبول إلى طالب مُسجّل (وحدة الطلاب). */
-  enrollApplicantAsStudent(applicantId: string): Observable<any> {
-    return this.apiClient.post('students/students/create-from-applicant/', { applicant_id: applicantId });
+  /** تحويل المتقدم المقبول إلى طالب مُسجّل مع الفوترة والأقساط والسداد الفوري. */
+  enrollApplicantAsStudent(applicantId: string, financialConfig?: any): Observable<any> {
+    return this.apiClient.post('students/students/create-from-applicant/', {
+      applicant_id: applicantId,
+      financial_config: financialConfig
+    });
   }
 
   scheduleInterview(id: string, body: { scheduled_at: string; evaluation_score?: number; recommendation?: string }): Observable<any> {

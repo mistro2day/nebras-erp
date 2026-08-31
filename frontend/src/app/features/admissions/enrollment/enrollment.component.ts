@@ -5,13 +5,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApplicantQueueComponent } from '../shared/applicant-queue.component';
 import { QueueAction } from '../shared/admissions.shared';
 import { AdmissionsService } from '../admissions.service';
-import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { EnrollmentDialogComponent } from './enrollment-dialog.component';
 
 /**
  * تسجيل المقبولين — الخطوة الختامية لدورة القبول:
- * «إتمام التسجيل» يحوّل المتقدم المقبول إلى طالب فعلي عبر
- * students/students/create-from-applicant/ (الخادم يولّد الرقم المدرسي
- * ويحدّث حالة الطلب إلى مُسجّل ذرّيًا)، ثم تُحدَّث القائمة ويُعرض إشعار.
+ * «إتمام التسجيل» يفتح نافذة الفوترة وتحديد الرسوم وخطة الأقساط وإصدار الإيصال الفوري
+ * ويحوّل المتقدم المقبول إلى طالب فعلي.
  */
 @Component({
   selector: 'app-admissions-enrollment',
@@ -21,7 +20,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   template: `
     <app-applicant-queue
       title="تسجيل المقبولين"
-      subtitle="إتمام تسجيل المتقدمين المقبولين وتحويلهم إلى طلاب مُسجّلين للعام الدراسي."
+      subtitle="إتمام تسجيل المتقدمين المقبولين وتحويلهم إلى طلاب مُسجّلين وتحديد خطط الرسوم والأقساط وإصدار إيصالات السداد."
       [statuses]="statuses"
       [actions]="actions"
       emptyText="لا يوجد متقدمون مقبولون بانتظار التسجيل."
@@ -38,27 +37,23 @@ export class AdmissionsEnrollmentComponent {
 
   statuses = ['accepted'];
   actions: QueueAction[] = [
-    { label: 'إتمام التسجيل', kind: 'primary', toStatus: 'enrolled' },
+    { label: 'إتمام التسجيل والفوترة', kind: 'primary', toStatus: 'enrolled' },
   ];
 
   onAction({ row }: { row: Record<string, any> }): void {
     const name = row['arabic_full_name'] || '';
 
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      width: '400px',
-      data: {
-        title: 'تأكيد التسجيل',
-        message: `إتمام تسجيل «${name}» كطالب؟ سيُولَّد له رقم مدرسي وينتقل إلى وحدة الطلاب.`,
-        confirmText: 'تسجيل',
-        color: 'primary',
-      },
+    const ref = this.dialog.open(EnrollmentDialogComponent, {
+      width: '850px',
+      maxWidth: '95vw',
+      data: { applicant: row },
     });
 
-    ref.afterClosed().subscribe((ok: boolean) => {
-      if (!ok) return;
-      this.svc.enrollApplicantAsStudent(row['id']).subscribe({
-        next: (res) => {
-          const num = res?.data?.student_number || '';
+    ref.afterClosed().subscribe((res: any) => {
+      if (!res || !res.confirmed) return;
+      this.svc.enrollApplicantAsStudent(row['id'], res.financial_config).subscribe({
+        next: (response) => {
+          const num = response?.data?.student_number || '';
           this.snack.open(
             num ? `تم تسجيل «${name}» بنجاح — الرقم المدرسي: ${num}` : `تم تسجيل «${name}» بنجاح.`,
             'إغلاق', { duration: 6000 },

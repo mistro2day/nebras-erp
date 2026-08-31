@@ -2,24 +2,29 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentsService } from '../students.service';
+import { StudentFinanceService } from '../../student-finance/student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
-
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
+import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-student-edit',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, RegistrationFinanceFormComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
         [title]="'تعديل ملف: ' + (formTitle() || 'طالب')"
-        subtitle="تعديل شامل لكافة حقول ملف الطالب الشخصية والأكاديمية والطبية (لصلاحيات المستخدم الخارق)."
+        subtitle="تعديل شامل لكافة حقول ملف الطالب الشخصية والأكاديمية والمالية والطبية."
       >
+        <button class="nb-btn-danger" (click)="confirmDeleteStudent()">🗑️ حذف الطالب</button>
         <button class="nb-btn-ghost" (click)="cancel()">إلغاء</button>
         <button class="nb-btn-primary" (click)="save()" [disabled]="saving()">
           {{ saving() ? 'جارٍ الحفظ…' : 'حفظ التعديلات ✓' }}
@@ -31,6 +36,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
         <div class="form-tabs">
           <button type="button" [class.active]="activeTab() === 'personal'" (click)="activeTab.set('personal')">👤 البيانات الشخصية والبرامج</button>
           <button type="button" [class.active]="activeTab() === 'academic'" (click)="activeTab.set('academic')">🎓 الحالة الأكاديمية</button>
+          <button type="button" [class.active]="activeTab() === 'financial'" (click)="activeTab.set('financial')">💳 البيانات المالية والأقساط</button>
           <button type="button" [class.active]="activeTab() === 'medical'" (click)="activeTab.set('medical')">🏥 الملف الطبي</button>
           <button type="button" [class.active]="activeTab() === 'guardians'" (click)="activeTab.set('guardians')">👥 أولياء الأمور والروابط</button>
         </div>
@@ -99,7 +105,15 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           </nb-panel>
         </div>
 
-        <!-- تبويب 3: الملف الطبي للعيادة -->
+        <!-- تبويب 3: البيانات المالية والأقساط -->
+        <div *ngIf="activeTab() === 'financial'" class="tab-panel">
+          <app-registration-finance-form
+            [config]="existingFinancialConfig()"
+            (configChange)="financialConfig.set($event)"
+          ></app-registration-finance-form>
+        </div>
+
+        <!-- تبويب 4: الملف الطبي للعيادة -->
         <div *ngIf="activeTab() === 'medical'" class="tab-panel">
           <nb-panel title="الملف الطبي الخاص بالعيادة المدرسية">
             <div class="form-grid">
@@ -127,7 +141,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
           </nb-panel>
         </div>
 
-        <!-- تبويب 4: أولياء الأمور والروابط العائلية -->
+        <!-- تبويب 5: أولياء الأمور والروابط العائلية -->
         <div *ngIf="activeTab() === 'guardians'" class="tab-panel">
           <nb-panel title="أولياء الأمور المرتبطين بملف الطالب">
             <div class="relations-list">
@@ -275,7 +289,6 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--nb-primary-400); box-shadow: var(--nb-focus-ring); }
     
     .err { color: var(--nb-danger); font-size: 13px; margin-top: 8px; }
-    .loading { text-align: center; padding: 40px; color: var(--nb-text-muted); font-size: 13px; }
 
     .relations-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .relation-card {
@@ -296,27 +309,35 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .status-indicator { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
     .status-indicator.active { background: var(--nb-success, #10b981); box-shadow: 0 0 6px var(--nb-success); }
     .status-text { font-size: 12px; color: var(--nb-text-muted); font-weight: 500; }
-    .active-btn { font-size: 11.5px; height: 32px; padding: 0 12px; }
     .add-relation-btn-wrapper { display: flex; justify-content: flex-end; margin-top: 12px; }
     
     .checkbox-field { display: flex; align-items: center; justify-content: flex-start; height: 100%; margin-top: 20px; }
     .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
     .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
     .relation-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; border-top: 1px solid var(--nb-border-soft); padding-top: 12px; }
+    .nb-btn-danger { background: #dc3545; color: white; border: none; padding: 0 14px; height: 38px; border-radius: var(--nb-radius); font-weight: 600; cursor: pointer; }
+    .nb-btn-danger:hover { background: #c82333; }
   `]
 })
 export class StudentEditComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private dialog = inject(MatDialog);
+  private snack = inject(MatSnackBar);
   private studentsService = inject(StudentsService);
+  private financeService = inject(StudentFinanceService);
 
   private id = '';
   readonly loaded = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
-  readonly activeTab = signal<'personal' | 'academic' | 'medical' | 'guardians'>('personal');
+  readonly activeTab = signal<'personal' | 'academic' | 'financial' | 'medical' | 'guardians'>('personal');
   readonly familyRelations = signal<any[]>([]);
   readonly showRelationForm = signal(false);
+
+  financialConfig = signal<FinancialConfig | null>(null);
+  existingFinancialConfig = signal<FinancialConfig | null>(null);
+
   relationForm = {
     id: '',
     relationship: 'guardian',
@@ -329,7 +350,6 @@ export class StudentEditComponent implements OnInit {
     emergency_contact: false,
   };
 
-  // نماذج النموذج
   personalForm = {
     arabic_name: '', english_name: '', gender: 'male', date_of_birth: '', nationality: '',
     national_id: '', passport: '', religion: '', blood_group: '',
@@ -356,26 +376,54 @@ export class StudentEditComponent implements OnInit {
         const p = student.profile || {};
         const med = student.medical_profile || {};
 
-        // تعبئة البيانات الشخصية
         (Object.keys(this.personalForm) as (keyof typeof this.personalForm)[]).forEach((k) => {
           if (p[k] !== undefined && p[k] !== null) this.personalForm[k] = p[k];
         });
 
-        // تعبئة الحالة الأكاديمية
         this.studentStatus = student.status || 'active';
 
-        // تعبئة الملف الطبي
         this.medicalForm.allergiesInput = (med.allergies || []).join(', ');
         this.medicalForm.chronicDiseasesInput = (med.chronic_diseases || []).join(', ');
         this.medicalForm.medicationInput = (med.medication || []).join(', ');
         this.medicalForm.doctor = med.doctor || '';
         this.medicalForm.medical_notes = med.medical_notes || '';
 
-        // تعبئة أولياء الأمور
         this.familyRelations.set(student.family_relations || []);
-
         this.formTitle.set(this.personalForm.arabic_name);
         this.loaded.set(true);
+
+        this.loadStudentFinance();
+      }
+    });
+  }
+
+  loadStudentFinance() {
+    this.financeService.invoicesForAccount(this.id).subscribe(res => {
+      const invs = (res?.data as any)?.results || res?.data || [];
+      if (invs.length > 0) {
+        const inv = invs[0];
+        const regItem = (inv.items || []).find((i: any) => i.description?.includes('تسجيل'));
+        const tuiItem = (inv.items || []).find((i: any) => i.description?.includes('دراسي'));
+        const regAmt = regItem ? Number(regItem.amount) : 150000;
+        const tuiAmt = tuiItem ? Number(tuiItem.amount) : 1200000;
+        const discAmt = (inv.discounts || []).reduce((acc: number, d: any) => acc + Number(d.amount), 0);
+
+        this.existingFinancialConfig.set({
+          registration_fee: regAmt,
+          tuition_fee: tuiAmt,
+          discount_amount: discAmt,
+          discount_reason: (inv.discounts || [])[0]?.discount_reason || '',
+          custom_fee_items: [],
+          installment_plan: {
+            plan_type: 'custom',
+            installments: []
+          },
+          initial_payment: {
+            is_paid: false,
+            amount: 0,
+            payment_method_id: ''
+          }
+        });
       }
     });
   }
@@ -384,7 +432,6 @@ export class StudentEditComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    // تجهيز مصفوفات الحقول الطبية
     const allergies = this.medicalForm.allergiesInput
       ? this.medicalForm.allergiesInput.split(',').map(s => s.trim()).filter(Boolean)
       : [];
@@ -404,18 +451,45 @@ export class StudentEditComponent implements OnInit {
         medication,
         doctor: this.medicalForm.doctor,
         medical_notes: this.medicalForm.medical_notes
-      }
+      },
+      financial_config: this.financialConfig()
     };
 
     this.studentsService.updateStudent(this.id, payload).subscribe({
       next: () => {
         this.saving.set(false);
+        this.snack.open('تم حفظ تعديلات الطالب بنجاح', 'إغلاق', { duration: 4000 });
         this.router.navigate(['/students/details', this.id]);
       },
       error: (e) => {
         this.saving.set(false);
         this.error.set(e?.error?.error?.message || 'تعذّر حفظ التعديلات. تحقّق من الحقول والصلاحيات.');
       },
+    });
+  }
+
+  confirmDeleteStudent(): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'تأكيد حذف الطالب',
+        message: `هل أنت متأكد من حذف الطالب «${this.personalForm.arabic_name}» نهائياً؟ سيتم نقل السجل للبيانات المحذوفة.`,
+        confirmText: 'حذف الطالب',
+        color: 'warn',
+      },
+    });
+
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.studentsService.deleteStudent(this.id).subscribe({
+        next: () => {
+          this.snack.open('تم حذف الطالب بنجاح', 'إغلاق', { duration: 5000 });
+          this.router.navigate(['/students/list']);
+        },
+        error: (err) => {
+          this.snack.open(err?.error?.message || 'تعذّر حذف الطالب. حاول مجددًا.', 'إغلاق', { duration: 5000 });
+        }
+      });
     });
   }
 
@@ -456,27 +530,38 @@ export class StudentEditComponent implements OnInit {
 
   saveRelationForm(e: Event): void {
     e.preventDefault();
-    this.studentsService.saveRelation(this.id, this.relationForm).subscribe({
-      next: (res) => {
+    (this.studentsService as any).saveRelation(this.id, this.relationForm).subscribe({
+      next: (res: any) => {
         if (res && res.success) {
           this.showRelationForm.set(false);
           this.reloadRelations();
         }
       },
-      error: (err) => {
+      error: (err: any) => {
         this.error.set(err?.error?.error?.message || 'تعذّر حفظ بيانات ولي الأمر.');
       }
     });
   }
 
   deleteRelation(relationId: string): void {
-    if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
-      this.studentsService.deleteRelation(this.id, relationId).subscribe({
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'تأكيد الحذف',
+        message: 'هل أنت متأكد من حذف ولي الأمر هذا؟',
+        confirmText: 'حذف',
+        color: 'warn'
+      }
+    });
+
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      (this.studentsService as any).deleteRelation(this.id, relationId).subscribe({
         next: () => {
           this.reloadRelations();
         }
       });
-    }
+    });
   }
 
   private reloadRelations(): void {

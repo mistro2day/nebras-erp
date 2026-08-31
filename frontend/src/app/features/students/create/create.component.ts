@@ -8,12 +8,13 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
 
 @Component({
   selector: 'app-student-create',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, RegistrationFinanceFormComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -39,7 +40,7 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
     <div class="page" dir="rtl">
       <nb-page-header
         title="تسجيل طالب جديد"
-        subtitle="إضافة الطلاب إلى العام الأكاديمي، إما عن طريق ربط طلب قبول مقبول أو التسجيل اليدوي المباشر."
+        subtitle="إضافة الطلاب إلى العام الأكاديمي، إما عن طريق ربط طلب قبول مقبول أو التسجيل اليدوي المباشر مع تحديد الفوترة والسداد."
       >
         <button class="nb-btn-secondary" (click)="cancel()">رجوع للقائمة</button>
       </nb-page-header>
@@ -94,7 +95,7 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
           </div>
         </nb-panel>
 
-        <!-- تفاصيل المتقدم والتأكيد -->
+        <!-- تفاصيل المتقدم والتأكيد والفوترة -->
         @if (selectedApplicant(); as a) {
           <div class="applicant-confirm-panel" @fadeSlide>
             <nb-panel [title]="'تأكيد إكمال ملف التسجيل: ' + a.arabic_full_name">
@@ -130,20 +131,19 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
                      <span class="field-label">الرقم الوطني / الجواز:</span>
                     <span class="field-value">{{ a.national_id }}</span>
                   </div>
-                  <div class="detail-field">
-                    <span class="field-label">رقم جواز السفر:</span>
-                    <span class="field-value">{{ a.passport_number || '—' }}</span>
-                  </div>
-                  <div class="detail-field">
-                    <span class="field-label">المدرسة السابقة:</span>
-                    <span class="field-value">{{ a.previous_school || '—' }}</span>
-                  </div>
                 </div>
+              </div>
+
+              <!-- قسم الرسوم والأقساط والإيصال الفوري عند التسجيل -->
+              <div class="finance-step-wrapper">
+                <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
               </div>
 
               <div class="form-actions">
                 <button class="nb-btn-secondary" (click)="cancelSelection()">إلغاء التحديد</button>
-                <button class="nb-btn-primary" (click)="registerStudent()">إكمال تسجيل الطالب وتوليد الرقم الأكاديمي ✓</button>
+                <button class="nb-btn-primary" (click)="registerStudent()" [disabled]="submitting()">
+                  {{ submitting() ? 'جارٍ تسجيل الطالب والفوترة…' : 'إكمال تسجيل الطالب وإصدار السندات ✓' }}
+                </button>
               </div>
             </nb-panel>
           </div>
@@ -152,12 +152,13 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
 
       <!-- نموذج التسجيل اليدوي للطلاب -->
       <div class="registration-manual-layout" *ngIf="regMode() === 'manual'" @fadeSlide>
-        <nb-panel title="بيانات الطالب الشخصية والطبية" subtitle="أدخل كافة بيانات الطالب يدوياً ليتم توليد رقمه الأكاديمي وحفظه فوراً.">
+        <nb-panel title="بيانات الطالب الشخصية والأكاديمية والمالية" subtitle="أدخل كافة بيانات الطالب يدوياً مع تحديد خطة الرسوم والأقساط والسداد الفوري.">
           <form (submit)="submitManualStudent($event)" class="manual-form">
             <!-- تبويبات النموذج اليدوي -->
             <div class="form-tabs">
               <button type="button" [class.active]="activeFormTab() === 'personal'" (click)="activeFormTab.set('personal')">البيانات الشخصية</button>
               <button type="button" [class.active]="activeFormTab() === 'medical'" (click)="activeFormTab.set('medical')">الملف الطبي</button>
+              <button type="button" [class.active]="activeFormTab() === 'financial'" (click)="activeFormTab.set('financial')">البيانات المالية والأقساط</button>
             </div>
 
             <!-- تبويب البيانات الشخصية -->
@@ -241,10 +242,15 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
               </div>
             </div>
 
+            <!-- تبويب البيانات المالية والأقساط -->
+            <div class="tab-panel-content" *ngIf="activeFormTab() === 'financial'">
+              <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
+            </div>
+
             <div class="form-actions">
               <button type="button" class="nb-btn-secondary" (click)="cancel()">إلغاء</button>
               <button type="submit" class="nb-btn-primary" [disabled]="submitting()">
-                {{ submitting() ? 'جارٍ تسجيل الطالب…' : 'حفظ وتسجيل الطالب يدوياً ✓' }}
+                {{ submitting() ? 'جارٍ تسجيل الطالب والفوترة…' : 'حفظ وتسجيل الطالب يدوياً ✓' }}
               </button>
             </div>
           </form>
@@ -539,11 +545,12 @@ export class StudentCreateComponent implements OnInit {
   private router = inject(Router);
 
   regMode = signal<'admission' | 'manual'>('admission');
-  activeFormTab = signal<'personal' | 'medical'>('personal');
+  activeFormTab = signal<'personal' | 'medical' | 'financial'>('personal');
   applicants = signal<any[]>([]);
   selectedApplicant = signal<any | null>(null);
   submitting = signal(false);
   errorMessage = signal('');
+  financialConfig = signal<FinancialConfig | null>(null);
 
   // حقول النموذج اليدوي
   personalForm = {
@@ -571,11 +578,9 @@ export class StudentCreateComponent implements OnInit {
   }
 
   loadAcceptedApplicants() {
-    // المرور عبر AdmissionsService/ApiClientService لضمان الرابط الصحيح للخادم وحقن المصادقة والمستأجر.
     this.admissionsService.getApplicants({ status: 'accepted', page_size: 100 }).subscribe(res => {
       if (res && res.success) {
         const data = res.data?.results || res.data || [];
-        // احتياط إضافي: نعرض المقبولين فقط (غير المُحوّلين لطلاب بعد).
         this.applicants.set((data as any[]).filter(a => a.status === 'accepted'));
       }
     });
@@ -605,11 +610,10 @@ export class StudentCreateComponent implements OnInit {
     if (!applicant) return;
 
     this.submitting.set(true);
-    this.studentsService.createStudentFromApplicant(applicant.id).subscribe({
+    this.studentsService.createStudentFromApplicant(applicant.id, this.financialConfig()).subscribe({
       next: (res) => {
         this.submitting.set(false);
         if (res && res.success) {
-          // فتح صفحة التعديل لاستكمال بيانات الطالب بعد توليد رقمه الأكاديمي.
           this.router.navigate(['/students/edit', res.data.id]);
         }
       },
@@ -626,7 +630,6 @@ export class StudentCreateComponent implements OnInit {
 
     this.submitting.set(true);
 
-    // تجهيز مصفوفات الحساسية والأمراض المزمنة
     const allergies = this.medicalForm.allergiesInput
       ? this.medicalForm.allergiesInput.split(',').map(s => s.trim()).filter(Boolean)
       : [];
@@ -648,7 +651,8 @@ export class StudentCreateComponent implements OnInit {
         medication,
         doctor: this.medicalForm.doctor,
         medical_notes: this.medicalForm.medical_notes
-      }
+      },
+      financial_config: this.financialConfig()
     };
 
     this.studentsService.createStudent(payload).subscribe({

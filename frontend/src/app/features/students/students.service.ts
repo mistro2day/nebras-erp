@@ -114,8 +114,15 @@ export class StudentsService {
     );
   }
 
-  createStudentFromApplicant(applicantId: string): Observable<any> {
-    return this.apiClient.post('students/students/create-from-applicant/', { applicant_id: applicantId });
+  createStudentFromApplicant(applicantId: string, financialConfig?: any): Observable<any> {
+    return this.apiClient.post('students/students/create-from-applicant/', {
+      applicant_id: applicantId,
+      financial_config: financialConfig
+    });
+  }
+
+  deleteStudent(id: string): Observable<any> {
+    return this.apiClient.delete(`students/students/${id}/`);
   }
 
   updateStudent(id: string, data: any): Observable<any> {
