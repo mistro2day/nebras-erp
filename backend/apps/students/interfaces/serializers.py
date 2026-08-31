@@ -267,6 +267,7 @@ class StudentSerializer(serializers.ModelSerializer):
     grade_name = serializers.SerializerMethodField()
     academic_year_name = serializers.SerializerMethodField()
     branch_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
     guardian_name = serializers.SerializerMethodField()
     guardian_phone = serializers.SerializerMethodField()
     
@@ -276,7 +277,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'id', 'student_number', 'status', 'created_at', 'updated_at',
             'profile', 'medical_profile', 'addresses', 'family_relations',
             'enrollments', 'tags', 'identifiers',
-            'grade_name', 'academic_year_name', 'branch_name',
+            'grade_name', 'academic_year_name', 'branch_name', 'section_name',
             'guardian_name', 'guardian_phone'
         ]
         read_only_fields = ['id', 'student_number', 'status']
@@ -307,6 +308,14 @@ class StudentSerializer(serializers.ModelSerializer):
             from apps.organization.domain.models import Branch
             b = Branch.objects.filter(id=enr.branch_id).first()
             return (b.name_ar or b.name) if b else None
+        return None
+
+    def get_section_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.section_id:
+            from apps.academics.domain.models import Section
+            s = Section.objects.filter(id=enr.section_id).first()
+            return s.name if s else None
         return None
 
     def get_guardian_name(self, obj):

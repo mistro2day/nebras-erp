@@ -135,6 +135,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                 <span>الرقم الأكاديمي</span>
                 <span>اسم الطالب</span>
                 <span>الصف الدراسي</span>
+                <span>اسم الفصل</span>
                 <span>الفرع / المدرسة</span>
                 <span>الجنس</span>
                 <span>الجنسية</span>
@@ -150,6 +151,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                     <span class="sub-text" *ngIf="element.profile.english_name">{{ element.profile.english_name }}</span>
                   </div>
                   <span class="grade-badge">{{ element.grade_name || element.enrollments?.[0]?.grade_name || '—' }}</span>
+                  <span class="section-badge">{{ element.section_name || element.enrollments?.[0]?.section_name || '—' }}</span>
                   <span class="branch-text">{{ element.branch_name || element.enrollments?.[0]?.branch_name || '—' }}</span>
                   <span>{{ element.profile.gender === 'male' ? 'ذكر' : element.profile.gender === 'female' ? 'أنثى' : '—' }}</span>
                   <span>{{ element.profile.nationality || 'سوداني' }}</span>
@@ -194,6 +196,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                 <div class="meta-row">
                   <span class="meta-item">🚻 {{ student.profile.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
                   <span class="meta-item" *ngIf="student.grade_name || student.enrollments?.[0]?.grade_name">📚 {{ student.grade_name || student.enrollments?.[0]?.grade_name }}</span>
+                  <span class="meta-item" *ngIf="student.section_name || student.enrollments?.[0]?.section_name">🏫 {{ student.section_name || student.enrollments?.[0]?.section_name }}</span>
                   <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations[0]?.phone">📞 {{ student.guardian_phone || student.family_relations[0]?.phone }}</span>
                 </div>
               </div>
@@ -433,10 +436,10 @@ import { SendMessageModalComponent } from '../../communications/components/send-
       }
 
       /* جدول البيانات المطور */
-      .tbl { display: flex; flex-direction: column; overflow-x: auto; min-width: 900px; }
+      .tbl { display: flex; flex-direction: column; overflow-x: auto; min-width: 1050px; }
       .tbl-head, .tbl-row {
         display: grid;
-        grid-template-columns: 1.1fr 1.6fr 1fr 1fr 0.6fr 0.8fr 1.5fr 0.8fr 1.6fr;
+        grid-template-columns: 1.1fr 1.5fr 1fr 0.9fr 1.1fr 0.6fr 0.7fr 1.4fr 0.8fr 1.5fr;
         gap: 10px;
         padding: 10px 16px;
         align-items: center;
@@ -471,6 +474,18 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         font-size: 12px;
         font-weight: 600;
         color: var(--nb-text);
+        width: fit-content;
+      }
+      .section-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: var(--nb-primary-50, #eef5ff);
+        border: 1px solid var(--nb-primary-200, #cce3ff);
+        color: var(--nb-primary-700, #0056b3);
+        font-size: 11.5px;
+        font-weight: 600;
+        width: fit-content;
       }
       .branch-text { font-size: 12px; color: var(--nb-text-secondary); }
       .guardian-cell { display: flex; flex-direction: column; gap: 2px; }
@@ -628,9 +643,12 @@ export class StudentsListComponent implements OnInit {
           return;
         }
         
-        let csv = '\uFEFFالرقم الأكاديمي,الاسم,الجنس,الجنسية,الحالة\n';
+        let csv = '\uFEFFالرقم الأكاديمي,الاسم,الصف الدراسي,اسم الفصل,الفرع,الجنس,الجنسية,الحالة\n';
         for (const s of list) {
-          csv += `"${s.student_number}","${s.profile?.arabic_name || ''}","${s.profile?.gender === 'male' ? 'ذكر' : 'أنثى'}","${s.profile?.nationality || ''}","${this.statusText(s.status)}"\n`;
+          const grade = s.grade_name || s.enrollments?.[0]?.grade_name || '';
+          const sec = s.section_name || s.enrollments?.[0]?.section_name || '';
+          const branch = s.branch_name || s.enrollments?.[0]?.branch_name || '';
+          csv += `"${s.student_number}","${s.profile?.arabic_name || ''}","${grade}","${sec}","${branch}","${s.profile?.gender === 'male' ? 'ذكر' : 'أنثى'}","${s.profile?.nationality || ''}","${this.statusText(s.status)}"\n`;
         }
         
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
