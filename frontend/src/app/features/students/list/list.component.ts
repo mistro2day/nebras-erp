@@ -154,9 +154,9 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                   <span>{{ element.profile.gender === 'male' ? 'ذكر' : element.profile.gender === 'female' ? 'أنثى' : '—' }}</span>
                   <span>{{ element.profile.nationality || 'سوداني' }}</span>
                   <div class="guardian-cell">
-                    <span class="g-name">{{ element.guardian_name || element.family_relations?.[0]?.full_name || '—' }}</span>
-                    <span class="g-phone mono" *ngIf="element.guardian_phone || element.family_relations?.[0]?.phone">
-                      📞 {{ element.guardian_phone || element.family_relations?.[0]?.phone }}
+                    <span class="g-name">{{ element.guardian_name || element.family_relations[0]?.full_name || '—' }}</span>
+                    <span class="g-phone mono" *ngIf="element.guardian_phone || element.family_relations[0]?.phone">
+                      📞 {{ element.guardian_phone || element.family_relations[0]?.phone }}
                     </span>
                   </div>
                   <span><span [class]="statusBadge(element.status)">{{ statusText(element.status) }}</span></span>
@@ -194,7 +194,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                 <div class="meta-row">
                   <span class="meta-item">🚻 {{ student.profile.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
                   <span class="meta-item" *ngIf="student.grade_name || student.enrollments?.[0]?.grade_name">📚 {{ student.grade_name || student.enrollments?.[0]?.grade_name }}</span>
-                  <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations?.[0]?.phone">📞 {{ student.guardian_phone || student.family_relations?.[0]?.phone }}</span>
+                  <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations[0]?.phone">📞 {{ student.guardian_phone || student.family_relations[0]?.phone }}</span>
                 </div>
               </div>
               
