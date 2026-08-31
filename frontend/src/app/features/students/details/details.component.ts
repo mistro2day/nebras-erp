@@ -142,15 +142,15 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                   </div>
                   <div class="fin-stat-card">
                     <span class="fin-label">الرصيد المستحق</span>
-                    <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ر.س</span>
+                    <span class="fin-value text-danger">{{ billingAccount().outstanding_balance | number:'1.2-2' }} ج.س</span>
                   </div>
                   <div class="fin-stat-card">
                     <span class="fin-label">إجمالي المُحصّل</span>
-                    <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ر.س</span>
+                    <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ج.س</span>
                   </div>
                   <div class="fin-stat-card">
                     <span class="fin-label">الرصيد الدائن</span>
-                    <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ر.س</span>
+                    <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ج.س</span>
                   </div>
                   <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
                 </div>
@@ -167,8 +167,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                   @for (inv of invoices(); track inv.id) {
                     <div class="tbl-row finance-tbl clickable" (click)="openDoc('invoice', inv)">
                       <span class="strong">{{ inv.invoice_number }}</span>
-                      <span>{{ inv.total_amount | number:'1.2-2' }} ر.س</span>
-                      <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ر.س</span>
+                      <span>{{ inv.total_amount | number:'1.2-2' }} ج.س</span>
+                      <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ج.س</span>
                       <span>
                         <span class="badge" [class.success]="+inv.outstanding_amount === 0" [class.warning]="+inv.outstanding_amount > 0 && +inv.paid_amount > 0" [class.danger]="+inv.outstanding_amount > 0 && +inv.paid_amount === 0">
                           {{ +inv.outstanding_amount === 0 ? 'مدفوعة بالكامل' : (+inv.paid_amount > 0 ? 'مدفوعة جزئياً' : 'مستحقة') }}
@@ -197,7 +197,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                       <div class="tbl-row receipts-tbl clickable" (click)="openDoc('receipt', r)">
                         <span class="strong">{{ r.receipt_number }}</span>
                         <span>{{ r.payment_date }}</span>
-                        <span class="text-success">{{ r.amount | number:'1.2-2' }} ر.س</span>
+                        <span class="text-success">{{ r.amount | number:'1.2-2' }} ج.س</span>
                         <span>
                           <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'">
                             {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}

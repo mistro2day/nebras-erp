@@ -52,7 +52,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
             @for (fs of feeStructures(); track fs.id) {
               <label class="chip" [class.sel]="isFeeSelected(fs.id)">
                 <input type="checkbox" [checked]="isFeeSelected(fs.id)" (change)="toggleFee(fs.id)" />
-                {{ fs.name }} — {{ fs.amount | number:'1.2-2' }} ر.س
+                {{ fs.name }} — {{ fs.amount | number:'1.2-2' }} ج.س
               </label>
             }
             @if (feeStructures().length === 0 && lookupsLoaded()) {
@@ -64,8 +64,8 @@ import { SendMessageModalComponent } from '../../communications/components/send-
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">إجمالي الفواتير المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
-        <div class="mini"><span class="mini-label">إجمالي القيمة</span><span class="mini-val">{{ sumTotal() | number:'1.2-2' }} ر.س</span></div>
-        <div class="mini"><span class="mini-label">إجمالي المتبقي</span><span class="mini-val due">{{ sumOutstanding() | number:'1.2-2' }} ر.س</span></div>
+        <div class="mini"><span class="mini-label">إجمالي القيمة</span><span class="mini-val">{{ sumTotal() | number:'1.2-2' }} ج.س</span></div>
+        <div class="mini"><span class="mini-label">إجمالي المتبقي</span><span class="mini-val due">{{ sumOutstanding() | number:'1.2-2' }} ج.س</span></div>
       </div>
 
       <div class="filter-bar">

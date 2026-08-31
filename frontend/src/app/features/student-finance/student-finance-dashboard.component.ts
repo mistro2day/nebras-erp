@@ -49,9 +49,9 @@ interface Tile { key: string; title: string; desc: string; icon: string; route: 
           <h2 class="hero-title">أداء التحصيل هذا الشهر</h2>
           <p class="hero-sub">نسبة ما تم تحصيله مقابل إجمالي المطلوب (المُحصّل + المستحق المتبقّي).</p>
           <div class="hero-figs">
-            <div class="fig"><span class="fl">تحصيلات الشهر</span><span class="fv success">{{ fmt(s().monthly_collections) }} <em>ر.س</em></span></div>
-            <div class="fig"><span class="fl">المستحقات المعلّقة</span><span class="fv danger">{{ fmt(s().outstanding_receivables) }} <em>ر.س</em></span></div>
-            <div class="fig"><span class="fl">تحصيلات اليوم</span><span class="fv">{{ fmt(s().today_collections) }} <em>ر.س</em></span></div>
+            <div class="fig"><span class="fl">تحصيلات الشهر</span><span class="fv success">{{ fmt(s().monthly_collections) }} <em>ج.س</em></span></div>
+            <div class="fig"><span class="fl">المستحقات المعلّقة</span><span class="fv danger">{{ fmt(s().outstanding_receivables) }} <em>ج.س</em></span></div>
+            <div class="fig"><span class="fl">تحصيلات اليوم</span><span class="fv">{{ fmt(s().today_collections) }} <em>ج.س</em></span></div>
           </div>
         </div>
       </section>
@@ -59,7 +59,7 @@ interface Tile { key: string; title: string; desc: string; icon: string; route: 
       <!-- تنبيهات تشغيلية -->
       <div class="alert-row">
         <div class="al" [class.hot]="s().active_holds > 0"><span class="an">{{ s().active_holds || 0 }}</span><span class="at">حالات حظر مالي نشطة</span></div>
-        <div class="al"><span class="an">{{ fmt(s().due_installments) }}</span><span class="at">أقساط مستحقة خلال 7 أيام (ر.س)</span></div>
+        <div class="al"><span class="an">{{ fmt(s().due_installments) }}</span><span class="at">أقساط مستحقة خلال 7 أيام (ج.س)</span></div>
         <div class="al" [class.hot]="s().pending_refunds > 0"><span class="an">{{ s().pending_refunds || 0 }}</span><span class="at">طلبات استرداد معلّقة</span></div>
       </div>
 

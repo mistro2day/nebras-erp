@@ -29,7 +29,7 @@ import { downloadCsv } from '../../../shared/export';
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">عدد المطالبات المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
-        <div class="mini"><span class="mini-label">إجمالي المتبقي</span><span class="mini-val due">{{ sumOutstanding() | number:'1.2-2' }} ر.س</span></div>
+        <div class="mini"><span class="mini-label">إجمالي المتبقي</span><span class="mini-val due">{{ sumOutstanding() | number:'1.2-2' }} ج.س</span></div>
       </div>
 
       <div class="filter-bar">
@@ -68,9 +68,9 @@ import { downloadCsv } from '../../../shared/export';
           } @else {
             @for (r of paged(); track r.id) {
               <div class="tbl-row">
-                <span class="mono">{{ r.amount | number:'1.2-2' }} ر.س</span>
-                <span class="mono">{{ r.paid_amount | number:'1.2-2' }} ر.س</span>
-                <span class="mono due">{{ r.outstanding_amount | number:'1.2-2' }} ر.س</span>
+                <span class="mono">{{ r.amount | number:'1.2-2' }} ج.س</span>
+                <span class="mono">{{ r.paid_amount | number:'1.2-2' }} ج.س</span>
+                <span class="mono due">{{ r.outstanding_amount | number:'1.2-2' }} ج.س</span>
                 <span><span [class]="badge(r.status)">{{ statusText(r.status) }}</span></span>
               </div>
             }

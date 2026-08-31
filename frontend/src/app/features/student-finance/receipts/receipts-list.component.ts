@@ -41,7 +41,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
                 }
               </select>
             </div>
-            <div class="cfld req"><label>المبلغ (ر.س)</label>
+            <div class="cfld req"><label>المبلغ (ج.س)</label>
               <input type="number" min="0" step="0.01" [(ngModel)]="pf.amount" />
             </div>
             <div class="cfld req"><label>طريقة الدفع</label>
@@ -62,7 +62,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">عدد السندات المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
-        <div class="mini"><span class="mini-label">إجمالي المقبوضات</span><span class="mini-val ok">{{ sumAmount() | number:'1.2-2' }} ر.س</span></div>
+        <div class="mini"><span class="mini-label">إجمالي المقبوضات</span><span class="mini-val ok">{{ sumAmount() | number:'1.2-2' }} ج.س</span></div>
       </div>
 
       <div class="filter-bar">

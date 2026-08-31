@@ -67,8 +67,8 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 
       <!-- مؤشرات سريعة -->
       <div class="kpis">
-        <div class="kpi"><span class="l">إجمالي المديونية</span><span class="v danger">{{ totalOutstanding() | number:'1.2-2' }} <em>ر.س</em></span></div>
-        <div class="kpi"><span class="l">الأرصدة الدائنة</span><span class="v success">{{ totalCredit() | number:'1.2-2' }} <em>ر.س</em></span></div>
+        <div class="kpi"><span class="l">إجمالي المديونية</span><span class="v danger">{{ totalOutstanding() | number:'1.2-2' }} <em>ج.س</em></span></div>
+        <div class="kpi"><span class="l">الأرصدة الدائنة</span><span class="v success">{{ totalCredit() | number:'1.2-2' }} <em>ج.س</em></span></div>
         <div class="kpi"><span class="l">حسابات محظورة</span><span class="v warning">{{ blockedCount() }}</span></div>
         <div class="kpi"><span class="l">إجمالي الحسابات</span><span class="v">{{ rows().length }}</span></div>
       </div>
@@ -143,12 +143,12 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
               <h4>إصدار فاتورة رسوم</h4>
               <div class="fee-list">
                 @for (fs of feeStructures(); track fs.id) {
-                  <label class="chk"><input type="checkbox" [checked]="picked.has(fs.id)" (change)="togglePick(fs.id)" /> {{ fs.name }} <span class="amt">{{ fs.amount | number:'1.0-0' }} ر.س</span></label>
+                  <label class="chk"><input type="checkbox" [checked]="picked.has(fs.id)" (change)="togglePick(fs.id)" /> {{ fs.name }} <span class="amt">{{ fs.amount | number:'1.0-0' }} ج.س</span></label>
                 }
               </div>
               <div class="row2">
                 <label>تاريخ الاستحقاق<nb-datepicker [value]="invForm.due_date" (valueChange)="invForm.due_date = $event"></nb-datepicker></label>
-                <div class="tot">الإجمالي المختار: <strong>{{ pickedTotal() | number:'1.0-0' }} ر.س</strong></div>
+                <div class="tot">الإجمالي المختار: <strong>{{ pickedTotal() | number:'1.0-0' }} ج.س</strong></div>
               </div>
               <button class="btn primary" [disabled]="busy() || !picked.size || !invForm.due_date" (click)="issueInvoice(a)">{{ busy() ? 'جارٍ الإصدار…' : 'إصدار وترحيل الفاتورة' }}</button>
             </div>
@@ -205,7 +205,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
             @if (tab() === 'invoices') {
               @for (i of invoices(); track i.id) {
                 <div class="sub-row clickable" (click)="openDoc('invoice', i)"><span><strong>{{ i.invoice_number }}</strong> <span class="nm">{{ i.issue_date }}</span></span>
-                  <span class="mono">{{ i.total_amount | number:'1.0-0' }} ر.س</span>
+                  <span class="mono">{{ i.total_amount | number:'1.0-0' }} ج.س</span>
                   <span class="mono due" [class.paid]="+i.outstanding_amount===0">متبقٍ {{ i.outstanding_amount | number:'1.0-0' }}</span>
                   <span class="badge" [class.ok]="i.status==='posted'">{{ i.status === 'posted' ? 'مرحلة' : i.status }}</span></div>
               } @empty { <div class="empty sm">لا توجد فواتير.</div> }
@@ -213,7 +213,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
             @if (tab() === 'receipts') {
               @for (r of receipts(); track r.id) {
                 <div class="sub-row clickable" (click)="openDoc('receipt', r)"><span><strong>{{ r.receipt_number }}</strong> <span class="nm">{{ r.payment_date }}</span></span>
-                  <span class="mono success">{{ r.amount | number:'1.0-0' }} ر.س</span>
+                  <span class="mono success">{{ r.amount | number:'1.0-0' }} ج.س</span>
                   <span class="badge ok">{{ r.status === 'posted' ? 'مرحل' : r.status }}</span></div>
               } @empty { <div class="empty sm">لا توجد تحصيلات.</div> }
             }
@@ -228,7 +228,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
             @if (tab() === 'scholarships') {
               @for (s of scholarships(); track s.id) {
                 <div class="sub-row"><span><strong>{{ s.name }}</strong></span>
-                  <span>{{ s.amount_percentage > 0 ? s.amount_percentage + '%' : (s.fixed_amount | number:'1.0-0') + ' ر.س' }}</span>
+                  <span>{{ s.amount_percentage > 0 ? s.amount_percentage + '%' : (s.fixed_amount | number:'1.0-0') + ' ج.س' }}</span>
                   <span class="badge" [class.ok]="s.status==='approved'">{{ s.status === 'approved' ? 'نشطة' : s.status }}</span></div>
               } @empty { <div class="empty sm">لا توجد منح.</div> }
             }
