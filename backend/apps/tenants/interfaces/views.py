@@ -9,6 +9,22 @@ class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
         fields = '__all__'
+        extra_kwargs = {
+            'logo': {'required': False, 'allow_null': True},
+            'stamp': {'required': False, 'allow_null': True},
+            'icon': {'required': False, 'allow_null': True},
+        }
+
+    def to_internal_value(self, data):
+        # السماح بعناوين URL وحذف الحقول الزائدة مثل sub لتجنب أخطاء التحقق
+        if isinstance(data, dict):
+            clean_data = data.copy()
+            clean_data.pop('sub', None)
+            for img_field in ('logo', 'stamp', 'icon'):
+                if img_field in clean_data and isinstance(clean_data[img_field], str):
+                    clean_data.pop(img_field)
+            return super().to_internal_value(clean_data)
+        return super().to_internal_value(data)
 
 
 class TenantViewSet(viewsets.ModelViewSet):

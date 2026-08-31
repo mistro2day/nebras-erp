@@ -1336,7 +1336,7 @@ export class DashboardLayoutComponent {
           ownerOnly: true,
           children: [
             { label: 'لوحة النظام', link: '/platform/dashboard' },
-            { label: 'إدارة المستأجرين', link: '/platform/tenants' },
+            { label: 'إدارة الحساب والمؤسسات', link: '/platform/tenants' },
             { label: 'فوترة المنصّة والاشتراكات', link: '/saas-billing' },
             { label: 'السجلات', link: '/platform/logs' },
           ],

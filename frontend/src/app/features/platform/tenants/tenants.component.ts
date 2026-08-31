@@ -7,7 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { PlatformService } from '../platform.service';
 import { SaasBillingService } from '../../saas-billing/saas-billing.service';
 
-/** إدارة المستأجرين (المدارس المشتركة) — شاشة مالك المنصّة. */
+/** إدارة الحساب والمؤسسات التعليمية (المستأجرين) — شاشة الإدارة وضبط المدارس. */
 @Component({
   selector: 'app-platform-tenants',
   standalone: true,
@@ -16,13 +16,13 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
-        title="إدارة المستأجرين"
-        subtitle="المدارس والمؤسسات المشتركة في منصّة نبراس — الحسابات، الاشتراكات، والتفعيل.">
-        <button class="btn primary" (click)="openNew()">+ مستأجر جديد</button>
+        title="إدارة الحساب والمؤسسات التعليمية"
+        subtitle="المدارس والمؤسسات المشتركة في منصّة نبراس — إعدادات الحساب، الهوية، الاشتراكات والتشغيل.">
+        <button class="btn primary" (click)="openNew()">+ مدرسة / مستأجر جديد</button>
       </nb-page-header>
 
       <div class="tabs">
-        <button [class.on]="tab() === 'tenants'" (click)="tab.set('tenants')">المستأجرون</button>
+        <button [class.on]="tab() === 'tenants'" (click)="tab.set('tenants')">المؤسسات والمدارس</button>
         <button [class.on]="tab() === 'requests'" (click)="tab.set('requests')">
           طلبات الانضمام
           @if (pendingRequests() > 0) { <span class="tab-badge">{{ pendingRequests() }}</span> }
@@ -61,19 +61,19 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
       } @else {
 
       <div class="stat-row">
-        <div class="stat"><span class="s-val">{{ tenants().length }}</span><span class="s-lbl">إجمالي المستأجرين</span></div>
-        <div class="stat ok"><span class="s-val">{{ activeCount() }}</span><span class="s-lbl">نشط</span></div>
+        <div class="stat"><span class="s-val">{{ tenants().length }}</span><span class="s-lbl">إجمالي المؤسسات</span></div>
+        <div class="stat ok"><span class="s-val">{{ activeCount() }}</span><span class="s-lbl">نشط ومفعّل</span></div>
         <div class="stat"><span class="s-val">{{ subscribedCount() }}</span><span class="s-lbl">لديه اشتراك</span></div>
       </div>
 
       @if (loading()) {
-        <div class="empty">جارٍ التحميل…</div>
+        <div class="muted empty">جارٍ تحميل بيانات المؤسسات…</div>
       } @else {
         <div class="scroll-x">
           <table class="data">
             <thead><tr>
-              <th>المدرسة</th><th>النطاق الفرعي</th><th>البريد</th><th>الاشتراك</th>
-              <th>حالة الاشتراك</th><th>الحالة</th><th>إجراءات</th>
+              <th>المدرسة / المؤسسة</th><th>النطاق الفرعي</th><th>البريد الإلكتروني</th>
+              <th>باقة الاشتراك</th><th>حالة الاشتراك</th><th>الحالة</th><th>إجراءات</th>
             </tr></thead>
             <tbody>
               @for (t of rows(); track t.id) {
@@ -96,31 +96,67 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
                     }
                   </td>
                 </tr>
-              } @empty { <tr><td colspan="7" class="muted">لا يوجد مستأجرون.</td></tr> }
+              } @empty { <tr><td colspan="7" class="muted">لا توجد مؤسسات مسجلة.</td></tr> }
             </tbody>
           </table>
         </div>
       }
       }
 
-      <!-- مودال المستأجر -->
+      <!-- مودال تعديل الحساب والمدرسة المصمم بأعلى معايير Nebras OS -->
       @if (editing()) {
         <div class="overlay" (click)="editing.set(null)">
           <div class="modal" (click)="$event.stopPropagation()">
-            <h3>{{ form.id ? 'تعديل المستأجر' : 'مستأجر جديد' }}</h3>
+            <div class="modal-header">
+              <h3>{{ form.id ? 'تعديل بيانات المدرسة والمستأجر' : 'تسجيل مدرسة / مستأجر جديد' }}</h3>
+              <p class="modal-sub">تحديث البيانات الأساسية لحساب المدرسة والنطاق ومعلومات التواصل.</p>
+            </div>
             <div class="fields">
-              <label>اسم المدرسة<input [(ngModel)]="form.name_ar" placeholder="مثال: مدارس المورد النموذجية" /></label>
               <div class="grid2">
-                <label>النطاق الفرعي<input [(ngModel)]="form.subdomain" placeholder="al-mawrid" [disabled]="!!form.id" /></label>
-                <label>البريد<input [(ngModel)]="form.email" /></label>
-                <label>الهاتف<input [(ngModel)]="form.phone_number" /></label>
-                <label class="chk"><input type="checkbox" [(ngModel)]="form.is_active" /> مستأجر نشط</label>
+                <label>
+                  <span>اسم المدرسة (بالعربي) <b class="req">*</b></span>
+                  <input type="text" [(ngModel)]="form.name_ar" placeholder="مثال: مدارس المورد الأهلية النموذجية" />
+                </label>
+                <label>
+                  <span>اسم المدرسة (بالإنجليزي)</span>
+                  <input type="text" [(ngModel)]="form.name_en" placeholder="Al-Mawrid Model Schools" />
+                </label>
+              </div>
+
+              <div class="grid2">
+                <label>
+                  <span>النطاق الفرعي (Subdomain) <b class="req">*</b></span>
+                  <input type="text" [(ngModel)]="form.subdomain" placeholder="al-mawrid" [disabled]="!!form.id" />
+                </label>
+                <label>
+                  <span>البريد الإلكتروني</span>
+                  <input type="email" [(ngModel)]="form.email" placeholder="admin@school.com" />
+                </label>
+              </div>
+
+              <div class="grid2">
+                <label>
+                  <span>رقم الهاتف والتواصل</span>
+                  <input type="tel" [(ngModel)]="form.phone_number" placeholder="09123456789" />
+                </label>
+                <label>
+                  <span>العنوان والمدينة</span>
+                  <input type="text" [(ngModel)]="form.address" placeholder="الخرطوم / الرياض" />
+                </label>
+              </div>
+
+              <div class="chk-wrapper">
+                <label class="chk">
+                  <input type="checkbox" [(ngModel)]="form.is_active" />
+                  <span>حساب نشط ومفعّل على المنصة</span>
+                </label>
               </div>
             </div>
+
             <div class="modal-actions">
               <button class="btn ghost" (click)="editing.set(null)">إلغاء</button>
               <button class="btn primary" [disabled]="saving() || !form.name_ar || !form.subdomain" (click)="save()">
-                {{ saving() ? 'جارٍ الحفظ…' : 'حفظ' }}
+                {{ saving() ? 'جارٍ الحفظ…' : 'حفظ التعديلات' }}
               </button>
             </div>
           </div>
@@ -131,15 +167,22 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
       @if (provisioning(); as t) {
         <div class="overlay" (click)="provisioning.set(null)">
           <div class="modal" (click)="$event.stopPropagation()">
-            <h3>تفعيل اشتراك — {{ t.name_ar || t.name }}</h3>
+            <div class="modal-header">
+              <h3>تفعيل اشتراك — {{ t.name_ar || t.name }}</h3>
+              <p class="modal-sub">تعيين الباقة المعتمدة والفترة التجريبية لحساب المؤسسة.</p>
+            </div>
             <div class="fields">
-              <label>الخطة
+              <label>
+                <span>الخطة / الباقة</span>
                 <select [(ngModel)]="provForm.plan_id">
                   <option value="" disabled>اختر خطة…</option>
                   @for (p of plans(); track p.id) { <option [value]="p.id">{{ p.name_ar }} — {{ p.price | number:'1.0-0' }} {{ p.currency }}</option> }
                 </select>
               </label>
-              <label>أيام تجريبية (اختياري)<input type="number" [(ngModel)]="provForm.trial_days" min="0" /></label>
+              <label>
+                <span>أيام تجريبية (اختياري)</span>
+                <input type="number" [(ngModel)]="provForm.trial_days" min="0" />
+              </label>
             </div>
             <div class="modal-actions">
               <button class="btn ghost" (click)="provisioning.set(null)">إلغاء</button>
@@ -154,31 +197,33 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
   `,
   styles: [`
     .page { flex: 1; padding: 22px; overflow-y: auto; background: var(--nb-bg); color: var(--nb-text); font-family: var(--nb-font-family); }
-    .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--nb-radius); cursor: pointer; border: none; }
-    .btn.xs { height: 26px; padding: 0 10px; font-size: 11.5px; }
-    .btn.primary { background: var(--nb-primary-600); color: #fff; }
-    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn { height: 36px; padding: 0 16px; font-family: inherit; font-size: 13px; font-weight: 700; border-radius: var(--nb-radius, 8px); cursor: pointer; border: none; transition: all 0.2s ease; }
+    .btn.xs { height: 28px; padding: 0 12px; font-size: 12px; }
+    .btn.primary { background: var(--nb-primary-600, #0284c7); color: #fff; }
+    .btn.primary:hover:not(:disabled) { background: var(--nb-primary-700, #0369a1); }
+    .btn.ghost { background: var(--nb-surface-raised, #f8fafc); border: 1px solid var(--nb-border, #cbd5e1); color: var(--nb-text, #0f172a); }
+    .btn.ghost:hover { background: var(--nb-border-soft, #e2e8f0); }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    .stat { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; position: relative; overflow: hidden; }
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .stat { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; }
     .stat::before { content:''; position:absolute; inset-block:0; inset-inline-start:0; width:4px; background: var(--nb-primary-600); }
     .stat.ok::before { background: var(--nb-success); }
-    .s-val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .s-lbl { font-size: 12px; color: var(--nb-text-muted); font-weight: 600; }
+    .s-val { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .s-lbl { font-size: 12.5px; color: var(--nb-text-muted); font-weight: 600; }
 
     .scroll-x { overflow-x: auto; background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); }
     table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-    table.data th { background: var(--nb-primary-600); color: #fff; text-align: center; padding: 11px 12px; font-weight: 700; white-space: nowrap; }
-    table.data td { text-align: center; padding: 10px 12px; border-bottom: 1px solid var(--nb-border-soft); white-space: nowrap; }
+    table.data th { background: var(--nb-primary-600); color: #fff; text-align: start; padding: 11px 14px; font-weight: 700; white-space: nowrap; }
+    table.data td { text-align: start; padding: 11px 14px; border-bottom: 1px solid var(--nb-border-soft); white-space: nowrap; }
     table.data tbody tr:nth-child(even) { background: color-mix(in srgb, var(--nb-primary-600) 3%, transparent); }
-    .name { font-weight: 700; }
-    .mono { font-family: ui-monospace, monospace; direction: ltr; }
-    .acts { display: flex; gap: 6px; justify-content: center; }
+    .name { font-weight: 700; color: var(--nb-text); }
+    .mono { font-family: ui-monospace, monospace; direction: ltr; text-align: start; }
+    .acts { display: flex; gap: 6px; }
     .muted, .empty { color: var(--nb-text-muted); }
-    .empty { text-align: center; padding: 30px; }
+    .empty { text-align: center; padding: 36px; }
 
-    .chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--nb-bg); color: var(--nb-text-muted); }
+    .chip { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--nb-bg); color: var(--nb-text-muted); }
     .chip.on { background: color-mix(in srgb, var(--nb-success) 14%, transparent); color: var(--nb-success); }
     .muted-chip { background: color-mix(in srgb, var(--nb-text-muted) 14%, transparent); }
     .st-active { background: color-mix(in srgb, var(--nb-success) 16%, transparent); color: var(--nb-success); }
@@ -190,21 +235,33 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
     .sg-rejected { background: color-mix(in srgb, var(--nb-danger) 16%, transparent); color: var(--nb-danger); }
     .done { color: var(--nb-success); font-weight: 700; }
 
-    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--nb-border); margin: 4px 0 20px; }
-    .tabs button { height: 38px; padding: 0 16px; border: none; background: transparent; color: var(--nb-text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--nb-border); margin: 4px 0 20px; }
+    .tabs button { height: 40px; padding: 0 18px; border: none; background: transparent; color: var(--nb-text-muted); font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; }
     .tabs button.on { color: var(--nb-primary-600); border-bottom-color: var(--nb-primary-600); }
     .tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-inline-start: 6px; border-radius: 99px; background: var(--nb-danger); color: #fff; font-size: 11px; font-weight: 800; }
 
-    .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-    .modal { background: var(--nb-surface); border-radius: var(--nb-radius-card); padding: 22px; width: 100%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,.25); }
-    .modal h3 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
-    .fields { display: flex; flex-direction: column; gap: 12px; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .fields label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; }
-    .fields label.chk { flex-direction: row; align-items: center; gap: 8px; }
-    .fields input:not([type=checkbox]), .fields select { height: 38px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 12px; font-family: inherit; font-size: 13px; background: var(--nb-surface); color: var(--nb-text); outline: none; }
-    .fields input:focus, .fields select:focus { border-color: var(--nb-primary-500); }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    /* المودال */
+    .overlay { position: fixed; inset: 0; background: rgba(15,23,42,.6); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 20px; }
+    .modal { background: var(--nb-surface, #ffffff); border: 1px solid var(--nb-border, #cbd5e1); border-radius: 14px; padding: 26px; width: 100%; max-width: 580px; box-shadow: 0 24px 48px rgba(0,0,0,.2); box-sizing: border-box; }
+    .modal-header { margin-bottom: 18px; border-bottom: 1px solid var(--nb-border-soft, #e2e8f0); padding-bottom: 12px; }
+    .modal-header h3 { margin: 0 0 4px; font-size: 17px; font-weight: 800; color: var(--nb-text, #0f172a); }
+    .modal-sub { margin: 0; font-size: 12px; color: var(--nb-text-muted, #64748b); }
+
+    .fields { display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+    
+    .fields label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: var(--nb-text, #334155); min-width: 0; }
+    .fields label .req { color: #dc2626; }
+    .fields input:not([type=checkbox]), .fields select { width: 100%; height: 40px; border: 1.5px solid var(--nb-border, #cbd5e1); border-radius: 8px; padding: 0 12px; font-family: inherit; font-size: 13px; background: var(--nb-surface, #ffffff); color: var(--nb-text, #0f172a); outline: none; box-sizing: border-box; transition: all 0.2s ease; }
+    .fields input:focus, .fields select:focus { border-color: var(--nb-primary-500, #0284c7); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
+    .fields input:disabled { background: var(--nb-surface-raised, #f1f5f9); color: var(--nb-text-muted, #94a3b8); cursor: not-allowed; }
+
+    .chk-wrapper { padding: 4px 0; }
+    .fields label.chk { flex-direction: row; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--nb-text, #1e293b); }
+    .fields label.chk input { width: 18px; height: 18px; accent-color: var(--nb-primary-600, #0284c7); cursor: pointer; }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--nb-border-soft, #e2e8f0); }
   `]
 })
 export class PlatformTenantsComponent implements OnInit {
@@ -268,15 +325,71 @@ export class PlatformTenantsComponent implements OnInit {
     });
   }
 
-  openNew(): void { this.form = { name_ar: '', subdomain: '', email: '', phone_number: '', is_active: true }; this.editing.set({}); }
-  openEdit(t: any): void { this.form = { ...t }; this.editing.set(t); }
+  openNew(): void { 
+    this.form = { 
+      name_ar: '', 
+      name_en: '', 
+      subdomain: '', 
+      email: '', 
+      phone_number: '', 
+      address: '', 
+      is_active: true 
+    }; 
+    this.editing.set({}); 
+  }
+
+  openEdit(t: any): void { 
+    this.form = { 
+      id: t.id,
+      name_ar: t.name_ar || t.name || '',
+      name_en: t.name_en || '',
+      subdomain: t.subdomain || '',
+      email: t.email || '',
+      phone_number: t.phone_number || '',
+      address: t.address || '',
+      is_active: t.is_active !== false
+    }; 
+    this.editing.set(t); 
+  }
+
   save(): void {
+    if (!this.form.name_ar || !this.form.subdomain) return;
     this.saving.set(true);
-    const body = { ...this.form, name: this.form.name_ar || this.form.name };
-    const done = () => { this.saving.set(false); this.editing.set(null); this.load(); };
-    const fail = () => { this.saving.set(false); this.notify.error('تعذّر حفظ المستأجر.'); };
-    const req = this.form.id ? this.svc.updateTenant(this.form.id, body) : this.svc.createTenant(body);
-    req.subscribe({ next: () => { this.notify.success('تم حفظ المستأجر.'); done(); }, error: fail });
+
+    const body: any = {
+      name: this.form.name_ar,
+      name_ar: this.form.name_ar,
+      name_en: this.form.name_en || '',
+      subdomain: this.form.subdomain,
+      email: this.form.email || '',
+      phone_number: this.form.phone_number || '',
+      address: this.form.address || '',
+      is_active: this.form.is_active !== false,
+    };
+
+    const done = () => { 
+      this.saving.set(false); 
+      this.editing.set(null); 
+      this.load(); 
+    };
+
+    const fail = (e: any) => { 
+      this.saving.set(false); 
+      const msg = e?.error?.message || e?.error?.detail || 'تعذّر حفظ بيانات المؤسسة.';
+      this.notify.error(msg); 
+    };
+
+    const req = this.form.id 
+      ? this.svc.updateTenant(this.form.id, body) 
+      : this.svc.createTenant(body);
+
+    req.subscribe({ 
+      next: () => { 
+        this.notify.success('تم حفظ بيانات المدرسة والمستأجر بنجاح.'); 
+        done(); 
+      }, 
+      error: fail 
+    });
   }
 
   openProvision(t: any): void { this.provForm = { plan_id: '', trial_days: 0 }; this.provisioning.set(t); }
