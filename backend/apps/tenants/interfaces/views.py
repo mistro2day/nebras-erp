@@ -61,8 +61,12 @@ class TenantViewSet(viewsets.ModelViewSet):
         if not tenant:
             return Response({"detail": "المستأجر غير موجود"}, status=404)
             
-        # إضافة المسارات الكاملة للوغو والختم
+        # إضافة المسارات الكاملة للوغو والختم وبيانات المدرسة
         data = self.get_serializer(tenant).data
+        data['name'] = tenant.name or 'مدارس المورد الأهلية'
+        data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الأهلية النموذجية'
+        data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الأهلية النموذجية'
+        data['school_name_en'] = tenant.name_en or 'Al-Mawrid Private Schools'
         if tenant.logo:
             data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
         else:
@@ -71,6 +75,6 @@ class TenantViewSet(viewsets.ModelViewSet):
         if tenant.stamp:
             data['stamp_url'] = request.build_absolute_uri(tenant.stamp.url)
         else:
-            data['stamp_url'] = "/assets/default_school_stamp.png"
+            data['stamp_url'] = None
             
         return Response(data)

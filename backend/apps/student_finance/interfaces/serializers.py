@@ -58,58 +58,88 @@ class InvoiceAdjustmentSerializer(BaseStudentFinanceSerializer):
         model = InvoiceAdjustment
         fields = '__all__'
 
+def _extract_student_finance_metadata(billing_account):
+    data = {
+        'student_id': '',
+        'student_number': '',
+        'student_name': '',
+        'grade_name': '',
+        'section_name': '',
+        'guardian_name': '',
+        'guardian_phone': '',
+        'account_number': '',
+    }
+    if not billing_account:
+        return data
+    data['account_number'] = billing_account.account_number or ''
+    if not billing_account.student_id:
+        return data
+    try:
+        from apps.students.domain.models import Student
+        student = Student.objects.filter(id=billing_account.student_id).first()
+        if student:
+            data['student_id'] = str(student.id)
+            data['student_number'] = student.student_number or ''
+            if hasattr(student, 'profile') and student.profile:
+                data['student_name'] = student.profile.arabic_name or student.profile.english_name or ''
+            
+            enrollment = student.enrollments.filter(status='active').first() or student.enrollments.first()
+            if enrollment and enrollment.grade:
+                data['grade_name'] = getattr(enrollment.grade, 'name_ar', '') or getattr(enrollment.grade, 'name', '') or ''
+            if enrollment and enrollment.section:
+                data['section_name'] = getattr(enrollment.section, 'name_ar', '') or getattr(enrollment.section, 'name', '') or ''
+            
+            family = student.family_relations.first()
+            if family:
+                data['guardian_name'] = family.full_name or ''
+                data['guardian_phone'] = family.phone or ''
+    except Exception:
+        pass
+    return data
+
+
 class StudentInvoiceSerializer(BaseStudentFinanceSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     discounts = InvoiceDiscountSerializer(many=True, read_only=True)
     adjustments = InvoiceAdjustmentSerializer(many=True, read_only=True)
     
+    student_id = serializers.SerializerMethodField()
+    student_number = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
     guardian_name = serializers.SerializerMethodField()
     guardian_phone = serializers.SerializerMethodField()
+    account_number = serializers.SerializerMethodField()
 
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = StudentInvoice
         fields = '__all__'
 
+    def get_student_id(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_id']
+
+    def get_student_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_number']
+
     def get_student_name(self, obj):
-        try:
-            from apps.students.domain.models import Student
-            if not obj.student_billing_account or not obj.student_billing_account.student_id:
-                return ""
-            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
-            if student and hasattr(student, 'profile') and student.profile:
-                return student.profile.arabic_name or ""
-            return ""
-        except Exception:
-            return ""
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_name']
+
+    def get_grade_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['grade_name']
+
+    def get_section_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['section_name']
 
     def get_guardian_name(self, obj):
-        try:
-            from apps.students.domain.models import Student
-            if not obj.student_billing_account or not obj.student_billing_account.student_id:
-                return ""
-            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
-            if student:
-                family = student.family_relations.first()
-                if family:
-                    return family.full_name or ""
-            return ""
-        except Exception:
-            return ""
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_name']
 
     def get_guardian_phone(self, obj):
-        try:
-            from apps.students.domain.models import Student
-            if not obj.student_billing_account or not obj.student_billing_account.student_id:
-                return ""
-            student = Student.objects.filter(id=obj.student_billing_account.student_id).first()
-            if student:
-                family = student.family_relations.first()
-                if family:
-                    return family.phone or ""
-            return ""
-        except Exception:
-            return ""
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_phone']
+
+    def get_account_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['account_number']
+
 
 class ScholarshipSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
@@ -146,10 +176,44 @@ class PaymentAllocationSerializer(BaseStudentFinanceSerializer):
         model = PaymentAllocation
         fields = '__all__'
 
+
 class ReceiptSerializer(BaseStudentFinanceSerializer):
+    student_id = serializers.SerializerMethodField()
+    student_number = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+    account_number = serializers.SerializerMethodField()
+
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Receipt
         fields = '__all__'
+
+    def get_student_id(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_id']
+
+    def get_student_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_number']
+
+    def get_student_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_name']
+
+    def get_grade_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['grade_name']
+
+    def get_section_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['section_name']
+
+    def get_guardian_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_name']
+
+    def get_guardian_phone(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_phone']
+
+    def get_account_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['account_number']
 
 class RefundSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):

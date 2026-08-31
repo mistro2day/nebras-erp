@@ -62,7 +62,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 
 /**
  * نافذة وتصميم مستند فوترة الطلاب الفاخر (فاتورة رسوم دراسية / سند قبض مالي رسمي / مستحق)
- * مزوّد بترويسة وتذييل المدرسة (المستأجر)، تفاصيل الطالب والولي، تفقيط المبالغ، والتوقيعات الرسمية والطباعة A4.
+ * مزوّد بترويسة وتذييل مدرسة المستأجر (المورد)، تفاصيل الطالب والولي، تفقيط المبالغ، والختم المعتمد والطباعة A4.
  */
 @Component({
   selector: 'sf-document-drawer',
@@ -87,19 +87,19 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 
         <!-- ورقة المستند الرسمية الفاخرة (سند قبض / فاتورة) -->
         <div class="official-voucher-card" id="official-print-voucher">
-          <!-- 1. ترويسة المدرسة الرسمية (Tenant Header) -->
+          <!-- 1. ترويسة المدرسة الرسمية (Tenant Header - المورد) -->
           <div class="voucher-header">
             <div class="school-brand-meta">
-              <h2 class="school-name-ar">{{ schoolData()?.school_name_ar || schoolData()?.name_ar || schoolData()?.name || 'مدارس نبراس النموذجية الأهلية' }}</h2>
-              <h4 class="school-name-en">{{ schoolData()?.school_name_en || schoolData()?.name_en || 'Nebras Model Private Schools' }}</h4>
+              <h2 class="school-name-ar">{{ getSchoolNameAr() }}</h2>
+              <h4 class="school-name-en">{{ getSchoolNameEn() }}</h4>
               <p class="accreditation-line">وزارة التربية والتعليم — قطاع التعليم الأهلي والأجنبي</p>
               @if (schoolData()?.address) {
                 <p class="school-contact-line">📍 {{ schoolData()?.address }}</p>
               }
             </div>
             <div class="school-logo-wrapper">
-              @if (schoolData()?.logo_url || schoolData()?.logo) {
-                <img [src]="schoolData()?.logo_url || schoolData()?.logo" alt="شعار المدرسة" class="school-logo-img" />
+              @if (getLogoUrl()) {
+                <img [src]="getLogoUrl()" alt="شعار المدرسة" class="school-logo-img" />
               } @else {
                 <div class="school-logo-placeholder">
                   <span>🏛️</span>
@@ -113,7 +113,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             <span class="divider-diamond">◆</span>
           </div>
 
-          <!-- 2. شريط عنوان المستند ورقمه وتاريخه -->
+          <!-- 2. شريط عنوان المستند ورقمه وتاريخه في سطر واحد ومحاذاة متناسقة -->
           <div class="doc-banner">
             <div class="doc-title-box">
               <h1 class="doc-main-title">
@@ -123,12 +123,12 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
                 {{ d.type === 'receipt' ? 'OFFICIAL PAYMENT RECEIPT' : (d.type === 'invoice' ? 'TUITION FEES INVOICE' : 'PAYMENT NOTICE') }}
               </span>
             </div>
-            <div class="doc-meta-pills">
-              <div class="pill-item">
+            <div class="doc-meta-row">
+              <div class="meta-item-box">
                 <span class="lbl">رقم المستند:</span>
                 <span class="val mono">{{ d.data?.receipt_number || d.data?.invoice_number || '—' }}</span>
               </div>
-              <div class="pill-item">
+              <div class="meta-item-box">
                 <span class="lbl">التاريخ:</span>
                 <span class="val">{{ d.data?.payment_date || d.data?.issue_date || todayDate }}</span>
               </div>
@@ -240,7 +240,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             <p><strong>ملاحظات هامة:</strong> الرسوم المدفوعة تخضع للائحة والسياسة المالية للمدرسة. يرجى الاحتفاظ بهذا السند كإثبات رسمي لعملية السداد.</p>
           </div>
 
-          <!-- 7. التذييل والتوقيعات الرسمية والأختام -->
+          <!-- 7. التذييل والتوقيعات الرسمية والختم المعتمد -->
           <div class="signatures-section">
             <div class="sig-box">
               <span class="sig-title">أمين الصندوق / المحاسب</span>
@@ -254,8 +254,16 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             </div>
             <div class="sig-box stamp-box">
               <span class="sig-title">ختم الإدارة المالية للمدرسة</span>
-              <div class="stamp-circle">
-                <span>الختم الرسمي</span>
+              <div class="stamp-container">
+                @if (getStampUrl()) {
+                  <img [src]="getStampUrl()" alt="الختم الرسمي للمدرسة" class="official-school-stamp-img" />
+                } @else {
+                  <div class="stamp-circle">
+                    <span class="stamp-school-text">{{ getSchoolNameAr() }}</span>
+                    <span class="stamp-center-text">الإدارة المالية</span>
+                    <span class="stamp-approved-text">★ معتمد ★</span>
+                  </div>
+                }
               </div>
             </div>
           </div>
@@ -321,11 +329,11 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 
     /* كرت السند / الفاتورة الرسمي الفاخر */
     .official-voucher-card {
-      background: var(--nb-surface, #ffffff);
-      border: 1px solid var(--nb-border, #e2e8f0);
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
       border-radius: 12px;
       padding: 24px;
-      color: var(--nb-text, #1e293b);
+      color: #0f172a;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
       position: relative;
     }
@@ -338,26 +346,26 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       gap: 16px;
     }
     .school-brand-meta .school-name-ar {
-      font-size: 18px;
+      font-size: 19px;
       font-weight: 800;
-      color: var(--nb-primary-700, #0369a1);
+      color: #0284c7;
       margin: 0 0 2px;
     }
     .school-brand-meta .school-name-en {
       font-size: 12px;
       font-weight: 600;
-      color: var(--nb-text-muted, #64748b);
+      color: #64748b;
       margin: 0 0 4px;
       letter-spacing: 0.5px;
     }
     .school-brand-meta .accreditation-line {
       font-size: 11px;
-      color: var(--nb-text-secondary, #475569);
+      color: #475569;
       margin: 0 0 2px;
     }
     .school-brand-meta .school-contact-line {
       font-size: 11px;
-      color: var(--nb-text-muted, #64748b);
+      color: #64748b;
       margin: 0;
     }
     .school-logo-wrapper {
@@ -395,54 +403,63 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: var(--nb-surface, #ffffff);
+      background: #ffffff;
       padding: 0 8px;
       color: #0284c7;
       font-size: 12px;
     }
 
-    /* شريط عنوان المستند */
+    /* شريط عنوان المستند الموحد في سطر واحد */
     .doc-banner {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: var(--nb-surface-raised, #f8fafc);
-      border: 1px solid var(--nb-border-soft, #e2e8f0);
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
       border-radius: 8px;
       padding: 10px 16px;
       margin-bottom: 16px;
     }
+    .doc-title-box {
+      display: flex;
+      flex-direction: column;
+    }
     .doc-main-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 800;
-      color: var(--nb-primary-800, #0f172a);
+      color: #0f172a;
       margin: 0;
     }
     .doc-sub-title {
-      font-size: 9px;
-      color: var(--nb-text-muted, #64748b);
+      font-size: 9.5px;
+      color: #64748b;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
     }
-    .doc-meta-pills {
+    .doc-meta-row {
       display: flex;
-      gap: 14px;
+      align-items: center;
+      gap: 12px;
     }
-    .pill-item {
+    .meta-item-box {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
     }
-    .pill-item .lbl { font-size: 10px; color: var(--nb-text-muted, #64748b); }
-    .pill-item .val { font-size: 12px; font-weight: 700; color: var(--nb-text, #0f172a); }
+    .meta-item-box .lbl { font-size: 11px; color: #64748b; font-weight: 600; }
+    .meta-item-box .val { font-size: 12px; font-weight: 800; color: #0f172a; }
 
     /* تفاصيل الطالب */
     .student-info-section {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px 16px;
-      background: var(--nb-surface, #ffffff);
-      border: 1px dashed var(--nb-border, #cbd5e1);
+      background: #ffffff;
+      border: 1px dashed #cbd5e1;
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 16px;
@@ -453,9 +470,9 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       gap: 8px;
       font-size: 12px;
     }
-    .info-cell .c-label { color: var(--nb-text-muted, #64748b); width: 140px; flex-shrink: 0; }
-    .info-cell .c-val { color: var(--nb-text, #1e293b); font-weight: 600; }
-    .info-cell .c-val.strong { font-weight: 800; color: var(--nb-primary-700, #0284c7); }
+    .info-cell .c-label { color: #64748b; width: 140px; flex-shrink: 0; }
+    .info-cell .c-val { color: #1e293b; font-weight: 600; }
+    .info-cell .c-val.strong { font-weight: 800; color: #0284c7; }
 
     /* جدول البنود */
     .breakdown-section {
@@ -464,7 +481,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     .section-heading {
       font-size: 13px;
       font-weight: 700;
-      color: var(--nb-text, #1e293b);
+      color: #1e293b;
       margin: 0 0 8px;
     }
     .voucher-table {
@@ -473,28 +490,28 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       font-size: 12px;
     }
     .voucher-table th {
-      background: var(--nb-surface-raised, #f1f5f9);
-      color: var(--nb-text-secondary, #475569);
+      background: #f1f5f9;
+      color: #475569;
       font-weight: 700;
       padding: 8px 12px;
-      border: 1px solid var(--nb-border-soft, #e2e8f0);
+      border: 1px solid #cbd5e1;
       text-align: start;
     }
     .voucher-table td {
       padding: 8px 12px;
-      border: 1px solid var(--nb-border-soft, #e2e8f0);
-      color: var(--nb-text, #1e293b);
+      border: 1px solid #cbd5e1;
+      color: #1e293b;
     }
     .voucher-table .discount-row td {
       color: #dc2626;
       background: rgba(220, 38, 38, 0.03);
     }
     .voucher-table tfoot .total-row td {
-      background: var(--nb-surface-raised, #f8fafc);
-      border-top: 2px solid var(--nb-border, #cbd5e1);
+      background: #f8fafc;
+      border-top: 2px solid #cbd5e1;
       font-weight: 800;
     }
-    .total-label { font-size: 13px; color: var(--nb-text, #0f172a); }
+    .total-label { font-size: 13px; color: #0f172a; }
     .total-amount { font-size: 15px; color: #059669; font-weight: 800; }
 
     /* التفقيط */
@@ -510,12 +527,12 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       font-size: 12px;
     }
     .tafqeet-title { font-weight: 700; color: #0284c7; flex-shrink: 0; }
-    .tafqeet-text { font-weight: 700; color: var(--nb-text, #0f172a); }
+    .tafqeet-text { font-weight: 700; color: #0f172a; }
 
     /* الملاحظات */
     .terms-box {
       font-size: 11px;
-      color: var(--nb-text-muted, #64748b);
+      color: #64748b;
       margin-bottom: 18px;
       line-height: 1.5;
     }
@@ -527,7 +544,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       padding-top: 14px;
-      border-top: 1px solid var(--nb-border-soft, #e2e8f0);
+      border-top: 1px solid #cbd5e1;
       margin-bottom: 14px;
     }
     .sig-box {
@@ -536,21 +553,37 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       align-items: center;
       text-align: center;
     }
-    .sig-title { font-size: 11px; font-weight: 700; color: var(--nb-text-secondary, #475569); margin-bottom: 30px; }
-    .sig-space { width: 100%; border-bottom: 1px dashed var(--nb-border, #cbd5e1); margin-bottom: 4px; }
-    .sig-hint { font-size: 10px; color: var(--nb-text-muted, #94a3b8); }
-    .stamp-box .stamp-circle {
-      width: 64px;
-      height: 64px;
-      border: 1.5px dashed #0284c7;
-      border-radius: 50%;
+    .sig-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 24px; }
+    .sig-space { width: 100%; border-bottom: 1px dashed #cbd5e1; margin-bottom: 4px; }
+    .sig-hint { font-size: 10px; color: #94a3b8; }
+    .stamp-container {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 9px;
+      min-height: 70px;
+    }
+    .official-school-stamp-img {
+      max-height: 80px;
+      max-width: 110px;
+      object-fit: contain;
+      transform: rotate(-6deg);
+    }
+    .stamp-circle {
+      width: 70px;
+      height: 70px;
+      border: 1.5px dashed #0284c7;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
       color: #0284c7;
       font-weight: 700;
-      transform: rotate(-10deg);
+      transform: rotate(-6deg);
+      text-align: center;
+      line-height: 1.2;
+      padding: 4px;
     }
 
     /* التذييل النهائي */
@@ -559,36 +592,14 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       justify-content: space-between;
       align-items: center;
       font-size: 10px;
-      color: var(--nb-text-muted, #94a3b8);
-      border-top: 1px solid var(--nb-border-soft, #f1f5f9);
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
       padding-top: 8px;
     }
 
     .mono { font-family: monospace, sans-serif; }
     .text-center { text-align: center; }
     .text-end { text-align: end; }
-
-    /* تنسيقات الطباعة A4 */
-    @media print {
-      body * {
-        visibility: hidden !important;
-      }
-      #official-print-voucher, #official-print-voucher * {
-        visibility: visible !important;
-      }
-      #official-print-voucher {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-      }
-      .no-print {
-        display: none !important;
-      }
-    }
   `],
 })
 export class SfDocumentDrawerComponent implements OnInit {
@@ -618,6 +629,22 @@ export class SfDocumentDrawerComponent implements OnInit {
     return this.schoolInfo || this.brandingData() || null;
   }
 
+  getSchoolNameAr(): string {
+    return this.schoolData()?.school_name_ar || this.schoolData()?.name_ar || this.schoolData()?.name || 'مدارس المورد الأهلية النموذجية';
+  }
+
+  getSchoolNameEn(): string {
+    return this.schoolData()?.school_name_en || this.schoolData()?.name_en || 'Al-Mawrid Model Private Schools';
+  }
+
+  getLogoUrl(): string {
+    return this.schoolData()?.logo_url || this.schoolData()?.logo || '';
+  }
+
+  getStampUrl(): string {
+    return this.schoolData()?.stamp_url || this.schoolData()?.stamp || '';
+  }
+
   methodName(id: string): string {
     return this.methods.find((m) => m.id === id)?.name_ar || 'نقداً — الخزينة الرئيسية';
   }
@@ -631,31 +658,34 @@ export class SfDocumentDrawerComponent implements OnInit {
   }
 
   getStudentName(): string {
-    return this.studentName || this.student?.profile?.arabic_name || this.student?.profile?.english_name || 'طالب المدرسة';
+    return this.doc?.data?.student_name || this.studentName || this.student?.profile?.arabic_name || this.student?.profile?.english_name || '—';
   }
 
   getStudentNumber(): string {
-    return this.student?.student_number || this.doc?.data?.student_number || '—';
+    return this.doc?.data?.student_number || this.student?.student_number || '—';
   }
 
   getGradeName(): string {
-    return this.student?.grade_name || this.student?.enrollments?.[0]?.grade_level || 'الصف المسجل';
+    return this.doc?.data?.grade_name || this.student?.grade_name || this.student?.enrollments?.[0]?.grade_level || '—';
   }
 
   getSectionName(): string {
-    return this.student?.enrollments?.[0]?.section_name || 'الشعبة العامة';
+    return this.doc?.data?.section_name || this.student?.enrollments?.[0]?.section_name || '—';
   }
 
   getGuardianName(): string {
-    return this.student?.guardian_name || this.student?.family_relations?.[0]?.full_name || 'ولي أمر الطالب';
+    return this.doc?.data?.guardian_name || this.student?.guardian_name || this.student?.family_relations?.[0]?.full_name || '—';
   }
 
   getGuardianPhone(): string {
-    return this.student?.guardian_phone || this.student?.family_relations?.[0]?.phone || '—';
+    return this.doc?.data?.guardian_phone || this.student?.guardian_phone || this.student?.family_relations?.[0]?.phone || '—';
   }
 
   getAccountNumber(): string {
-    return this.doc?.data?.student_billing_account?.account_number || `ACC-${this.getStudentNumber()}`;
+    if (this.doc?.data?.account_number) return this.doc.data.account_number;
+    if (this.doc?.data?.student_billing_account?.account_number) return this.doc.data.student_billing_account.account_number;
+    const stdNum = this.getStudentNumber();
+    return stdNum && stdNum !== '—' ? `ACC-${stdNum}` : '—';
   }
 
   getTafqeetText(): string {
@@ -669,7 +699,121 @@ export class SfDocumentDrawerComponent implements OnInit {
   }
 
   printDocument(): void {
-    window.print();
+    const printContent = document.getElementById('official-print-voucher');
+    if (!printContent) {
+      window.print();
+      return;
+    }
+
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (!frameDoc) {
+      window.print();
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>${this.meta().title}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            direction: rtl;
+            background: #ffffff;
+            color: #0f172a;
+            padding: 24px;
+            font-size: 12px;
+          }
+          .official-voucher-card {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #0f172a;
+            border-radius: 12px;
+            padding: 24px;
+            background: #ffffff;
+          }
+          .voucher-header { display: flex; justify-content: space-between; align-items: center; }
+          .school-brand-meta .school-name-ar { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+          .school-brand-meta .school-name-en { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+          .school-brand-meta .accreditation-line { font-size: 11px; color: #334155; }
+          .school-brand-meta .school-contact-line { font-size: 11px; color: #64748b; }
+          .school-logo-wrapper { width: 75px; height: 75px; border-radius: 50%; border: 2px solid #0284c7; padding: 2px; display: flex; align-items: center; justify-content: center; }
+          .school-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+          .school-logo-placeholder { font-size: 32px; }
+          .luxury-divider { position: relative; height: 2px; background: #0284c7; margin: 16px 0; text-align: center; }
+          .divider-diamond { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #ffffff; padding: 0 8px; color: #0284c7; font-size: 12px; }
+          .doc-banner { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; }
+          .doc-main-title { font-size: 17px; font-weight: 800; color: #0f172a; margin: 0; }
+          .doc-sub-title { font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+          .doc-meta-row { display: flex; align-items: center; gap: 14px; }
+          .meta-item-box { display: flex; align-items: center; gap: 6px; background: #ffffff; padding: 5px 12px; border-radius: 6px; border: 1px solid #cbd5e1; }
+          .meta-item-box .lbl { font-size: 11px; color: #64748b; font-weight: 600; }
+          .meta-item-box .val { font-size: 12px; font-weight: 800; color: #0f172a; }
+          .student-info-section { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; background: #ffffff; }
+          .info-cell { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+          .info-cell .c-label { color: #64748b; width: 140px; font-weight: 600; flex-shrink: 0; }
+          .info-cell .c-val { color: #0f172a; font-weight: 600; }
+          .info-cell .c-val.strong { font-weight: 800; color: #0284c7; }
+          .section-heading { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+          .breakdown-section { margin-bottom: 14px; }
+          .voucher-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          .voucher-table th { background: #f1f5f9; color: #334155; font-weight: 700; padding: 8px 12px; border: 1px solid #cbd5e1; text-align: start; }
+          .voucher-table td { padding: 8px 12px; border: 1px solid #cbd5e1; color: #0f172a; }
+          .voucher-table .discount-row td { color: #dc2626; }
+          .voucher-table tfoot .total-row td { background: #f8fafc; border-top: 2px solid #0f172a; font-weight: 800; }
+          .total-label { font-size: 13px; }
+          .total-amount { font-size: 15px; color: #059669; font-weight: 800; }
+          .tafqeet-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+          .tafqeet-title { font-weight: 700; color: #0284c7; }
+          .tafqeet-text { font-weight: 700; color: #0f172a; }
+          .terms-box { font-size: 11px; color: #64748b; margin-bottom: 18px; line-height: 1.5; }
+          .signatures-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 14px; border-top: 1px solid #cbd5e1; margin-bottom: 14px; }
+          .sig-box { display: flex; flex-direction: column; align-items: center; text-align: center; }
+          .sig-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 30px; }
+          .sig-space { width: 100%; border-bottom: 1px dashed #94a3b8; margin-bottom: 4px; }
+          .sig-hint { font-size: 10px; color: #94a3b8; }
+          .stamp-container { display: flex; align-items: center; justify-content: center; min-height: 70px; }
+          .official-school-stamp-img { max-height: 80px; max-width: 110px; object-fit: contain; transform: rotate(-5deg); }
+          .stamp-circle { width: 70px; height: 70px; border: 1.5px dashed #0284c7; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; color: #0284c7; font-weight: 700; transform: rotate(-5deg); text-align: center; line-height: 1.2; padding: 4px; }
+          .voucher-footer-meta { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 12px; }
+          .mono { font-family: monospace, sans-serif; }
+          .text-center { text-align: center; }
+          .text-end { text-align: end; }
+        </style>
+      </head>
+      <body>
+        ${printContent.outerHTML}
+      </body>
+      </html>
+    `;
+
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 1500);
+    }, 300);
   }
 
   exportCols(): ExportColumn[] {
