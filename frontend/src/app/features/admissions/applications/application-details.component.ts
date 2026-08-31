@@ -198,36 +198,57 @@ const ADM_SUBMITTED_TEMPLATE = {
               </div>
             } @else {
               <div class="apt-table-wrapper">
-                <datalist id="availableSubjectsList">
-                  @for (sub of availableSubjects(); track sub.id) {
-                    <option [value]="sub.arabic_name">{{ sub.code ? ('[' + sub.code + '] ') : '' }}{{ sub.arabic_name }}</option>
-                  }
-                  <option value="مقابلة شخصية">مقابلة شخصية وتقييم سلوكي</option>
-                  <option value="اختبار تحريري عام">اختبار تحريري عام</option>
-                  <option value="اختبار شفهي وقراءة">اختبار شفهي وقراءة</option>
-                  <option value="قرآن كريم وتلاوة">قرآن كريم وتلاوة</option>
-                </datalist>
-
                 <table class="apt-custom-table">
                   <thead>
                     <tr>
-                      <th style="width: 32%;">المادة / الاختبار</th>
-                      <th style="width: 18%;">الدرجة العظمى (Max)</th>
-                      <th style="width: 18%;">درجة النجاح (Pass)</th>
-                      <th style="width: 22%;">الدرجة المرصودة</th>
+                      <th style="width: 35%;">المادة / الاختبار</th>
+                      <th style="width: 17%;">الدرجة العظمى (Max)</th>
+                      <th style="width: 17%;">درجة النجاح (Pass)</th>
+                      <th style="width: 21%;">الدرجة المرصودة</th>
                       <th style="width: 10%; text-align: center;">حذف</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (row of aptitudeScores(); track $index; let i = $index) {
                       <tr>
-                        <td>
-                          <input type="text"
-                                 list="availableSubjectsList"
-                                 [(ngModel)]="row.subject"
-                                 (change)="onSubjectChosen(row)"
-                                 placeholder="اختر أو اكتب اسم المادة (مثال: رياضيات)"
-                                 class="apt-text-input" />
+                        <td class="subject-cell">
+                          <div class="nb-autocomplete-wrapper">
+                            <div class="nb-input-icon-group">
+                              <input type="text"
+                                     [(ngModel)]="row.subject"
+                                     (input)="onSubjectInput(row)"
+                                     (focus)="onSubjectFocus(row)"
+                                     (blur)="onSubjectBlur(row)"
+                                     placeholder="اكتب للبحث عن مادة..."
+                                     class="apt-text-input nb-autocomplete-input" />
+                              <span class="nb-search-icon">🔍</span>
+                            </div>
+
+                            @if (row.showDropdown && getFilteredSubjects(row.subject).length > 0) {
+                              <div class="nb-dropdown-menu" (mousedown)="$event.preventDefault()">
+                                <div class="nb-dropdown-header">
+                                  <span>نتائج البحث ({{ getFilteredSubjects(row.subject).length }})</span>
+                                  <span class="nb-dropdown-hint">انقر للاختيار</span>
+                                </div>
+                                <div class="nb-dropdown-list">
+                                  @for (sub of getFilteredSubjects(row.subject); track (sub.id || sub.arabic_name)) {
+                                    <button type="button" class="nb-dropdown-item" (click)="selectSubject(row, sub)">
+                                      <div class="nb-dropdown-item-main">
+                                        <span class="nb-item-title">{{ sub.arabic_name }}</span>
+                                        @if (sub.code) {
+                                          <span class="nb-item-code">[{{ sub.code }}]</span>
+                                        }
+                                      </div>
+                                      <div class="nb-dropdown-item-meta">
+                                        <span class="nb-badge-mark">العظمى: {{ sub.maximum_mark || 100 }}</span>
+                                        <span class="nb-badge-pass">النجاح: {{ sub.passing_mark || 50 }}</span>
+                                      </div>
+                                    </button>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
                         </td>
                         <td>
                           <input type="number" min="1" [(ngModel)]="row.max" class="apt-num-input" />
@@ -587,10 +608,135 @@ const ADM_SUBMITTED_TEMPLATE = {
       .apt-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
       
       .apt-table-wrapper {
-        overflow-x: auto;
+        overflow: visible;
         background: var(--nb-surface);
         border: 1px solid var(--nb-border);
         border-radius: var(--nb-radius-card);
+      }
+      .subject-cell {
+        position: relative;
+        overflow: visible !important;
+      }
+      .nb-autocomplete-wrapper {
+        position: relative;
+        width: 100%;
+      }
+      .nb-input-icon-group {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .nb-search-icon {
+        position: absolute;
+        left: 10px;
+        font-size: 12px;
+        pointer-events: none;
+        opacity: 0.45;
+      }
+      .nb-autocomplete-input {
+        padding-left: 28px !important;
+      }
+      .nb-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        left: 0;
+        min-width: 270px;
+        max-height: 250px;
+        background: var(--nb-surface);
+        border: 1px solid color-mix(in srgb, var(--nb-primary) 35%, var(--nb-border));
+        box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.18), 0 6px 12px -4px rgba(0, 0, 0, 0.08);
+        border-radius: var(--nb-radius, 8px);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+        animation: nbDropIn 160ms ease-out;
+      }
+      @keyframes nbDropIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .nb-dropdown-header {
+        padding: 7px 12px;
+        background: var(--nb-surface-raised);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--nb-text-muted);
+        border-bottom: 1px solid var(--nb-border-soft);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nb-dropdown-hint {
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--nb-primary);
+      }
+      .nb-dropdown-list {
+        overflow-y: auto;
+        max-height: 200px;
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nb-dropdown-item {
+        width: 100%;
+        padding: 7px 10px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        cursor: pointer;
+        font-family: var(--nb-font-family);
+        text-align: right;
+        transition: all 140ms ease;
+      }
+      .nb-dropdown-item:hover {
+        background: color-mix(in srgb, var(--nb-primary) 12%, var(--nb-surface));
+      }
+      .nb-dropdown-item-main {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .nb-item-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+      .nb-item-code {
+        font-size: 10.5px;
+        color: var(--nb-primary);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--nb-primary) 10%, transparent);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .nb-dropdown-item-meta {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .nb-badge-mark {
+        font-size: 10.5px;
+        color: var(--nb-text-muted);
+        background: var(--nb-surface-raised);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .nb-badge-pass {
+        font-size: 10.5px;
+        color: #15803d;
+        background: #dcfce7;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
       }
       .apt-custom-table {
         width: 100%;
@@ -766,8 +912,8 @@ export class ApplicationDetailsComponent implements OnInit {
     const gName = this.gradeName(app?.applying_grade_id) || (app as any)?.applying_grade_name || (app as any)?.grade_name || '';
     return resolveStageConfig(gName);
   });
-  /** درجات القدرات القابلة للتحرير في نموذج الرصد: [{ subject, marks }]. */
-  readonly aptitudeScores = signal<Array<{ subject: string; marks: number | null; max: number; pass: number }>>([]);
+  /** درجات القدرات القابلة للتحرير في نموذج الرصد: [{ subject, marks, max, pass, showDropdown? }]. */
+  readonly aptitudeScores = signal<Array<{ subject: string; marks: number | null; max: number; pass: number; showDropdown?: boolean }>>([]);
   readonly savingAptitude = signal(false);
   readonly evaluation = signal<AptitudeEvaluation | null>(null);
 
@@ -1005,7 +1151,7 @@ export class ApplicationDetailsComponent implements OnInit {
   addSubjectRow(): void {
     this.aptitudeScores.update(list => [
       ...list,
-      { subject: '', marks: null, max: 100, pass: 50 }
+      { subject: '', marks: null, max: 100, pass: 50, showDropdown: false }
     ]);
   }
 
@@ -1014,19 +1160,61 @@ export class ApplicationDetailsComponent implements OnInit {
     this.aptitudeScores.update(list => list.filter((_, i) => i !== index));
   }
 
-  /** عند اختيار مادة من القائمة المنسدلة، ملء الدرجة القصوى ودرجة النجاح تلقائياً. */
-  onSubjectChosen(row: any): void {
-    if (!row || !row.subject) return;
-    const subName = row.subject.trim();
-    const found = this.availableSubjects().find(s => s.arabic_name === subName || s.name === subName || s.code === subName);
-    if (found) {
-      if (found.maximum_mark !== undefined && found.maximum_mark !== null) {
-        row.max = Number(found.maximum_mark) || 100;
-      }
-      if (found.passing_mark !== undefined && found.passing_mark !== null) {
-        row.pass = Number(found.passing_mark) || 50;
-      }
+  /** فلترة المواد المتاحة فقط عند الكتابة (لا تظهر قبل الكتابة لأن القائمة طويلة). */
+  getFilteredSubjects(query?: string): any[] {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return [];
+    const all = this.availableSubjects();
+    const matches = all.filter(s => {
+      const ar = (s.arabic_name || '').toLowerCase();
+      const en = (s.english_name || '').toLowerCase();
+      const code = (s.code || '').toLowerCase();
+      return ar.includes(q) || en.includes(q) || code.includes(q);
+    });
+
+    const presets = [
+      { id: 'p1', arabic_name: 'مقابلة شخصية', maximum_mark: 100, passing_mark: 60 },
+      { id: 'p2', arabic_name: 'قرآن كريم وتلاوة', maximum_mark: 100, passing_mark: 50 },
+      { id: 'p3', arabic_name: 'اختبار شفهي وقراءة', maximum_mark: 100, passing_mark: 50 },
+      { id: 'p4', arabic_name: 'اختبار تحريري عام', maximum_mark: 100, passing_mark: 50 },
+    ].filter(p => p.arabic_name.includes(q));
+
+    const combined = [...matches, ...presets];
+    const seen = new Set<string>();
+    return combined.filter(item => {
+      const name = item.arabic_name;
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    }).slice(0, 12);
+  }
+
+  onSubjectInput(row: any): void {
+    row.showDropdown = Boolean(row.subject && row.subject.trim().length > 0);
+  }
+
+  onSubjectFocus(row: any): void {
+    if (row.subject && row.subject.trim().length > 0) {
+      row.showDropdown = true;
     }
+  }
+
+  onSubjectBlur(row: any): void {
+    setTimeout(() => {
+      row.showDropdown = false;
+    }, 250);
+  }
+
+  /** عند اختيار مادة من القائمة المنسدلة، ملء الدرجة القصوى ودرجة النجاح تلقائياً وإغلاق القائمة. */
+  selectSubject(row: any, sub: any): void {
+    row.subject = sub.arabic_name;
+    if (sub.maximum_mark !== undefined && sub.maximum_mark !== null) {
+      row.max = Number(sub.maximum_mark) || 100;
+    }
+    if (sub.passing_mark !== undefined && sub.passing_mark !== null) {
+      row.pass = Number(sub.passing_mark) || 50;
+    }
+    row.showDropdown = false;
   }
 
   /** «قبول الطلب» → تأهيل لامتحان القدرات (ينشئ صفوف المواد من الإعدادات). */
