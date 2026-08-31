@@ -336,10 +336,14 @@ class StudentApplicationService:
         from apps.student_finance.application.services import PaymentService
         from decimal import Decimal
 
+        student_obj = Student.objects.filter(id=student_id).first()
+        std_num = student_obj.student_number if student_obj else f"{timezone.now().year}-{StudentBillingAccount.objects.filter(tenant_id=tenant_id).count() + 1:04d}"
+        acc_number = f"ACC-{std_num}"
+
         account, _ = StudentBillingAccount.objects.get_or_create(
             tenant_id=tenant_id,
             student_id=student_id,
-            defaults={'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M%S')}-{str(student_id)[:8]}"}
+            defaults={'account_number': acc_number}
         )
 
         reg_fee = Decimal(str(financial_config.get('registration_fee', 0) or 0))
@@ -354,7 +358,8 @@ class StudentApplicationService:
             invoice.items.all().delete()
             invoice.discounts.all().delete()
         elif not invoice:
-            inv_num = f"INV-ST-{timezone.now().strftime('%y%m%d%H%M%S')}-{str(student_id)[:4]}"
+            inv_seq = StudentInvoice.objects.filter(tenant_id=tenant_id).count() + 1
+            inv_num = f"INV-{timezone.now().year}-{inv_seq:04d}"
             invoice = StudentInvoice.objects.create(
                 tenant_id=tenant_id,
                 student_billing_account=account,

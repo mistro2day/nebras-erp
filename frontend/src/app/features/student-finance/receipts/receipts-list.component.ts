@@ -7,17 +7,18 @@ import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.com
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { downloadCsv } from '../../../shared/export';
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
 
 /**
  * سندات القبض / المدفوعات — وحدة عاملة (Nebras OS).
  * قائمة حقيقية من student-finance/receipts/ (تاريخ الدفعات) مع بحث، تصفية حالة،
- * فرز، ترقيم، حالات تحميل/فراغ، وتصدير CSV.
+ * فرز، ترقيم، حالات تحميل/فراغ، وتصدير CSV، والطباعة الرسمية.
  */
 @Component({
   selector: 'app-sf-receipts-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent],
+  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent, SfDocumentDrawerComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -103,10 +104,10 @@ import { downloadCsv } from '../../../shared/export';
             <nb-loading message="جارٍ تحميل السندات…"></nb-loading>
           } @else {
             @for (r of paged(); track r.id) {
-              <div class="tbl-row">
+              <div class="tbl-row clickable" (click)="openDoc(r)">
                 <span class="mono strong">{{ r.receipt_number }}</span>
                 <span class="mono">{{ r.payment_date }}</span>
-                <span class="mono ok">{{ r.amount | number:'1.2-2' }} ر.س</span>
+                <span class="mono ok">{{ r.amount | number:'1.2-2' }} جنيه</span>
                 <span><span [class]="badge(r.status)">{{ statusText(r.status) }}</span></span>
               </div>
             }
@@ -124,6 +125,8 @@ import { downloadCsv } from '../../../shared/export';
           <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
         </div>
       }
+
+      <sf-document-drawer [doc]="doc()" [methods]="methods()" (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -213,6 +216,11 @@ export class SfReceiptsListComponent implements OnInit {
   readonly rows = signal<any[]>([]);
   readonly total = signal(0);
   readonly truncated = computed(() => this.total() > this.rows().length);
+  readonly doc = signal<SfDoc>(null);
+
+  openDoc(r: any): void {
+    this.doc.set({ type: 'receipt', data: r });
+  }
 
   search = '';
   statusFilter = '';

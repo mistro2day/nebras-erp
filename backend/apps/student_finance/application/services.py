@@ -315,8 +315,8 @@ class PaymentService:
             raise ValidationError("يرجى ضبط الإعدادات المالية للطلاب أولاً.")
 
         # 1. إنشاء إيصال التحصيل الداخلي
-        receipt_number = generate_unique_number(
-            Receipt, tenant_id, f"RCP-ST-{timezone.now().strftime('%y%m%d')}-", 'receipt_number')
+        rcp_seq = Receipt.objects.filter(tenant_id=tenant_id).count() + 1
+        receipt_number = f"RCP-{timezone.now().year}-{rcp_seq:04d}"
         receipt = Receipt.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,

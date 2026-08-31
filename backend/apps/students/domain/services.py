@@ -16,49 +16,18 @@ class StudentNumberGenerator:
     @staticmethod
     def generate(tenant_id, branch_code=None, academic_year_code=None, sequence_num=1, config=None) -> str:
         """
-        توليد الرقم الجامعي/المدرسي للطالب
-        :param tenant_id: معرف المستأجر
-        :param branch_code: رمز الفرع (مثال: 'B1')
-        :param academic_year_code: رمز السنة (مثال: '2026')
-        :param sequence_num: الرقم التسلسلي الحالي
-        :param config: إعدادات مخصصة (ديكت)
+        توليد الرقم الأكاديمي/المدرسي للطالب بتسلسل سهل ومريح للحفظ (مثال: 2026-0001)
         """
-        if config is None:
-            # إعدادات افتراضية مرنة
-            config = {
-                'use_branch': True,
-                'use_year': True,
-                'padding': 4,
-                'checksum': True,
-            }
+        import datetime
+        year_str = re.sub(r'\D', '', str(academic_year_code or datetime.date.today().year))
+        if len(year_str) >= 4:
+            year_clean = year_str[-4:]
+        else:
+            year_clean = str(datetime.date.today().year)
 
-        parts = []
-        
-        # 1. بادئة الفرع
-        if config.get('use_branch') and branch_code:
-            parts.append(str(branch_code).upper())
-            
-        # 2. بادئة السنة الدراسية
-        if config.get('use_year') and academic_year_code:
-            # تنظيف الكود ليكون رقمياً فقط إذا لزم الأمر
-            year_clean = re.sub(r'\D', '', str(academic_year_code))
-            parts.append(year_clean[-4:]) # آخر 4 أرقام
-            
-        # 3. الرقم التسلسلي مع حشو
-        padding = config.get('padding', 4)
-        seq_str = str(sequence_num).zfill(padding)
-        parts.append(seq_str)
-        
-        base_number = "-".join(parts)
-        
-        # 4. رقم التحقق (Checksum Placeholder)
-        if config.get('checksum'):
-            # خوارزمية مبسطة لحساب رقم التحقق Mod 10 كرمزplaceholder
-            digits = [int(char) for char in re.sub(r'\D', '', base_number)]
-            checksum_val = sum(digits) % 10
-            base_number = f"{base_number}-{checksum_val}"
-            
-        return base_number
+        count = Student.objects.filter(tenant_id=tenant_id).count() + 1
+        seq = max(count, sequence_num)
+        return f"{year_clean}-{seq:04d}"
 
 
 class StudentDomainService:
