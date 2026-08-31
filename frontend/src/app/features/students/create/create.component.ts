@@ -8,6 +8,7 @@ import { trigger, transition, style, animate, query, stagger } from '@angular/an
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
 
@@ -15,7 +16,7 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
   selector: 'app-student-create',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, RegistrationFinanceFormComponent],
+  imports: [CommonModule, FormsModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, RegistrationFinanceFormComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -68,32 +69,36 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
           title="طلبات القبول المعتمدة المقبولة"
           subtitle="اختر أحد طلبات الالتحاق المقبولة أدناه لإتمام تسجيله وتوليد رقمه المدرسي الجديد."
         >
-          <div class="applicants-selection-grid" [@listAnimation]="applicants().length">
-            @for (app of applicants(); track app.id) {
-              <div 
-                class="applicant-select-card" 
-                [class.selected]="selectedApplicant()?.id === app.id"
-                (click)="onApplicantSelected(app.id)"
-              >
-                <div class="app-card-header">
-                  <span class="app-num">{{ app.application_number }}</span>
-                  <span class="badge success">مقبول</span>
+          @if (loadingApplicants()) {
+            <nb-loading message="جاري تحميل طلبات القبول المعتمدة..."></nb-loading>
+          } @else {
+            <div class="applicants-selection-grid" [@listAnimation]="applicants().length">
+              @for (app of applicants(); track app.id) {
+                <div 
+                  class="applicant-select-card" 
+                  [class.selected]="selectedApplicant()?.id === app.id"
+                  (click)="onApplicantSelected(app.id)"
+                >
+                  <div class="app-card-header">
+                    <span class="app-num">{{ app.application_number }}</span>
+                    <span class="badge success">مقبول</span>
+                  </div>
+                  <h4 class="app-name">{{ app.arabic_full_name }}</h4>
+                  <div class="app-meta">
+                    <span>🚻 {{ app.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
+                    <span>📍 {{ app.nationality }}</span>
+                  </div>
                 </div>
-                <h4 class="app-name">{{ app.arabic_full_name }}</h4>
-                <div class="app-meta">
-                  <span>🚻 {{ app.gender === 'male' ? 'ذكر' : 'أنثى' }}</span>
-                  <span>📍 {{ app.nationality }}</span>
+              }
+              @if (applicants().length === 0) {
+                <div class="no-applicants-box">
+                  <div class="icon">✨</div>
+                  <h4>لا توجد طلبات قبول معلقة</h4>
+                  <p>تم إتمام تسجيل كافة طلبات المتقدمين المقبولين حالياً.</p>
                 </div>
-              </div>
-            }
-            @if (applicants().length === 0) {
-              <div class="no-applicants-box">
-                <div class="icon">✨</div>
-                <h4>لا توجد طلبات قبول معلقة</h4>
-                <p>تم إتمام تسجيل كافة طلبات المتقدمين المقبولين حالياً.</p>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         </nb-panel>
 
         <!-- تفاصيل المتقدم والتأكيد والفوترة -->
@@ -549,6 +554,7 @@ export class StudentCreateComponent implements OnInit {
   regMode = signal<'admission' | 'manual'>('admission');
   activeFormTab = signal<'personal' | 'medical' | 'financial'>('personal');
   applicants = signal<any[]>([]);
+  loadingApplicants = signal<boolean>(false);
   selectedApplicant = signal<any | null>(null);
   submitting = signal(false);
   errorMessage = signal('');
@@ -580,11 +586,16 @@ export class StudentCreateComponent implements OnInit {
   }
 
   loadAcceptedApplicants() {
-    this.admissionsService.getApplicants({ status: 'accepted', page_size: 100 }).subscribe(res => {
-      if (res && res.success) {
-        const data = res.data?.results || res.data || [];
-        this.applicants.set((data as any[]).filter(a => a.status === 'accepted'));
-      }
+    this.loadingApplicants.set(true);
+    this.admissionsService.getApplicants({ status: 'accepted', page_size: 100 }).subscribe({
+      next: (res) => {
+        this.loadingApplicants.set(false);
+        if (res && res.success) {
+          const data = res.data?.results || res.data || [];
+          this.applicants.set((data as any[]).filter(a => a.status === 'accepted'));
+        }
+      },
+      error: () => this.loadingApplicants.set(false)
     });
   }
 
