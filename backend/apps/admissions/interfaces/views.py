@@ -237,43 +237,54 @@ class ApplicantViewSet(AdmissionsBaseViewSet):
     @action(detail=True, methods=['post'], url_path='record-aptitude')
     def record_aptitude(self, request, pk=None):
         """
-        رصد درجات امتحان القدرات.
-        البيانات: { scores: [{ subject, marks }] }
-        يحدّث/ينشئ PlacementTest لكل مادة، ويحسب نجاح كل مادة مقابل عتبتها،
+        رصد درجات امتحان القدرات وتخصيص المواد يدوياً.
+        البيانات: { scores: [{ subject, marks, max, pass }] }
+        يحدّث/ينشئ/يحذف PlacementTest لمزامنة المواد المخصصة، ويحسب نجاح كل مادة،
         ثم ينقل الحالة إلى exam_scored.
         """
         applicant = self.get_object()
         scores = request.data.get('scores') or []
-        if not isinstance(scores, list) or not scores:
-            return Response({'success': False, 'message': 'قائمة الدرجات مطلوبة.'},
+        if not isinstance(scores, list):
+            return Response({'success': False, 'message': 'قائمة الدرجات غير صالحة.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
         settings_obj = _get_admission_settings(applicant.tenant_id)
         subj_cfg = {(s or {}).get('name'): s for s in _aptitude_subjects(settings_obj)}
 
         with transaction.atomic():
+            current_subjects = [row.get('subject') for row in scores if row.get('subject')]
+            if current_subjects:
+                PlacementTest.objects.filter(applicant=applicant).exclude(exam_type__in=current_subjects).delete()
+            elif not scores:
+                PlacementTest.objects.filter(applicant=applicant).delete()
+
             for row in scores:
                 subject = (row or {}).get('subject')
                 marks = (row or {}).get('marks')
-                if not subject or marks is None:
+                if not subject:
                     continue
                 cfg = subj_cfg.get(subject, {})
-                pass_mark = cfg.get('pass', 50)
-                max_mark = cfg.get('max', 100)
+                pass_mark = (row or {}).get('pass') or cfg.get('pass', 50)
+                max_mark = (row or {}).get('max') or cfg.get('max', 100)
                 pt, _ = PlacementTest.objects.get_or_create(
                     applicant=applicant, exam_type=subject,
                     defaults={'tenant_id': applicant.tenant_id},
                 )
-                pt.marks_obtained = marks
                 pt.passing_marks = pass_mark
                 pt.max_marks = max_mark
-                pt.result_status = 'passed' if float(marks) >= float(pass_mark) else 'failed'
+                if marks is not None and marks != '':
+                    pt.marks_obtained = marks
+                    pt.result_status = 'passed' if float(marks) >= float(pass_mark) else 'failed'
+                else:
+                    pt.marks_obtained = None
+                    pt.result_status = 'pending'
                 pt.save()
+
             applicant.status = 'exam_scored'
             applicant.save(update_fields=['status', 'updated_at'])
 
         return StandardResponse(data=ApplicantSerializer(applicant).data,
-                                message='تم رصد درجات القدرات.')
+                                message='تم حفظ وتخصيص درجات القدرات بنجاح.')
 
     @action(detail=True, methods=['get'], url_path='aptitude-evaluation')
     def aptitude_evaluation(self, request, pk=None):

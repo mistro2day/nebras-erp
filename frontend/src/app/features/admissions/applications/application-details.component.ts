@@ -120,16 +120,18 @@ const ADM_SUBMITTED_TEMPLATE = {
           <div class="adm-flow-actions">
             @switch (currentStageIndex()) {
               @case (0) {
-                <span class="adm-flow-hint">الخطوة التالية: مراجعة الطلب ثم قبوله لتأهيله لامتحان القدرات.</span>
+                <span class="adm-flow-hint">الخطوة التالية: مراجعة الطلب واعتماد القبول المباشر أو التأهيل للقدرات.</span>
                 <button type="button" class="nb-btn-ghost sm" (click)="scheduleInterview()">📅 جدولة مقابلة</button>
                 <button type="button" class="nb-btn-danger sm" (click)="setStatus('rejected')">✕ رفض</button>
                 <button type="button" class="nb-btn-warning sm" (click)="setStatus('waitlist')">⏳ انتظار</button>
-                <button type="button" class="nb-btn-primary" (click)="qualifyForExam()">✓ قبول الطلب</button>
+                <button type="button" class="nb-btn-secondary sm" (click)="qualifyForExam()">🎯 تأهيل لامتحان القدرات</button>
+                <button type="button" class="nb-btn-primary" (click)="directAccept()">✓ قبول نهائي مباشر</button>
               }
               @case (1) {
-                <span class="adm-flow-hint">المتقدم مؤهّل — ارصد درجات امتحان القدرات أدناه.</span>
+                <span class="adm-flow-hint">المتقدم مؤهّل — ارصد درجات امتحان القدرات أو اعتمد القبول.</span>
                 <button type="button" class="nb-btn-danger sm" (click)="setStatus('rejected')">✕ رفض</button>
-                <button type="button" class="nb-btn-primary" (click)="scrollToAptitude()">📝 رصد الدرجات</button>
+                <button type="button" class="nb-btn-ghost sm" (click)="finalizeAccept()">✓ تجاوز للقبول النهائي</button>
+                <button type="button" class="nb-btn-primary" (click)="scrollToAptitude()">📝 رصد وتخصيص الدرجات</button>
               }
               @case (2) {
                 <span class="adm-flow-hint">رُصدت الدرجات — اعتمد القرار النهائي.</span>
@@ -172,28 +174,74 @@ const ADM_SUBMITTED_TEMPLATE = {
 
         <!-- لوحة امتحان القدرات: تظهر من مرحلة التأهّل حتى القرار -->
         @if (currentStageIndex() >= 1) {
-          <nb-panel title="🎯 امتحان القدرات ونتيجة القبول" style="margin-top:16px" id="aptitude-panel">
+          <nb-panel title="🎯 امتحان القدرات ونتيجة القبول (اختياري)" style="margin-top:16px" id="aptitude-panel">
+            <div class="apt-panel-header">
+              <div class="apt-header-info">
+                <span class="apt-desc">خصص مواد واختبارات القدرات للطالب، حدد العتبات، ثم ارصد الدرجات. يمكنك إضافة أو حذف أي مادة حسب التقييم المطلوب.</span>
+              </div>
+              <div class="apt-header-actions">
+                <button type="button" class="nb-btn-secondary sm" (click)="addSubjectRow()">
+                  ➕ إضافة مادة / اختبار يدوي
+                </button>
+                <button type="button" class="nb-btn-primary sm" (click)="finalizeAccept()">
+                  ✓ قبول نهائي مباشر (تخطي الامتحان)
+                </button>
+              </div>
+            </div>
+
             @if (aptitudeScores().length === 0) {
-              <div class="empty-box">لم تُعرّف مواد امتحان القدرات في إعدادات القبول بعد. عرّفها من إعدادات القبول ثم أعد «قبول الطلب».</div>
+              <div class="empty-box">
+                لم يتم إدراج أي مواد لاختبار القدرات لهذا الطالب حالياً. يمكنك إضافة مواد يدوياً أو اعتماد القبول النهائي مباشرة.
+                <div style="margin-top:10px;">
+                  <button type="button" class="nb-btn-secondary sm" (click)="addSubjectRow()">➕ إضافة أول مادة</button>
+                </div>
+              </div>
             } @else {
-              <div class="apt-grid">
-                @for (row of aptitudeScores(); track row.subject; let i = $index) {
-                  <div class="apt-cell">
-                    <label>{{ row.subject }} <span class="apt-hint">(النجاح ≥ {{ row.pass }} من {{ row.max }})</span></label>
-                    <input type="number" min="0" [max]="row.max"
-                           [disabled]="a.status !== 'qualified_exam' && a.status !== 'exam_scored'"
-                           [(ngModel)]="row.marks"
-                           [class.pass]="row.marks !== null && row.marks >= row.pass"
-                           [class.fail]="row.marks !== null && row.marks < row.pass"
-                           placeholder="—" />
-                  </div>
-                }
+              <div class="apt-table-wrapper">
+                <table class="apt-custom-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 32%;">المادة / الاختبار</th>
+                      <th style="width: 18%;">الدرجة العظمى (Max)</th>
+                      <th style="width: 18%;">درجة النجاح (Pass)</th>
+                      <th style="width: 22%;">الدرجة المرصودة</th>
+                      <th style="width: 10%; text-align: center;">حذف</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of aptitudeScores(); track $index; let i = $index) {
+                      <tr>
+                        <td>
+                          <input type="text" [(ngModel)]="row.subject" placeholder="اسم المادة (مثال: رياضيات)" class="apt-text-input" />
+                        </td>
+                        <td>
+                          <input type="number" min="1" [(ngModel)]="row.max" class="apt-num-input" />
+                        </td>
+                        <td>
+                          <input type="number" min="0" [max]="row.max" [(ngModel)]="row.pass" class="apt-num-input" />
+                        </td>
+                        <td>
+                          <input type="number" min="0" [max]="row.max"
+                                 [(ngModel)]="row.marks"
+                                 [class.pass]="row.marks !== null && row.marks >= row.pass"
+                                 [class.fail]="row.marks !== null && row.marks < row.pass"
+                                 placeholder="—"
+                                 class="apt-marks-input" />
+                        </td>
+                        <td style="text-align: center;">
+                          <button type="button" class="btn-remove-row" (click)="removeSubjectRow(i)" title="حذف هذه المادة">✕</button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
               </div>
 
               @if (a.status === 'qualified_exam' || a.status === 'exam_scored') {
                 <div class="apt-actions">
+                  <button type="button" class="nb-btn-ghost sm" (click)="addSubjectRow()">➕ إضافة مادة أخرى</button>
                   <button type="button" class="nb-btn-primary" [disabled]="savingAptitude()" (click)="saveAptitude()">
-                    {{ savingAptitude() ? '⏳ جارٍ الحفظ' : '💾 حفظ درجات القدرات' }}
+                    {{ savingAptitude() ? '⏳ جارٍ الحفظ' : '💾 حفظ وتحديث درجات القدرات' }}
                   </button>
                 </div>
               }
@@ -510,20 +558,88 @@ const ADM_SUBMITTED_TEMPLATE = {
       .adm-stepper.negative .adm-step.active .adm-step-label { color: var(--nb-danger); }
 
       /* ==== لوحة امتحان القدرات ==== */
-      .apt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-      .apt-cell { display: flex; flex-direction: column; gap: 6px; }
-      .apt-cell label { font-size: 13px; font-weight: 700; color: var(--nb-text); }
-      .apt-hint { font-size: 11px; font-weight: 400; color: var(--nb-text-faint); }
-      .apt-cell input {
-        height: 40px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 12px;
-        font-family: var(--nb-font-family); font-size: 15px; font-weight: 700; color: var(--nb-text);
-        background: var(--nb-surface); outline: none; text-align: center;
+      .apt-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--nb-border-soft);
       }
-      .apt-cell input:focus { border-color: var(--nb-primary); }
-      .apt-cell input.pass { border-color: var(--nb-success); background: color-mix(in srgb, var(--nb-success) 8%, var(--nb-surface)); }
-      .apt-cell input.fail { border-color: var(--nb-danger); background: color-mix(in srgb, var(--nb-danger) 8%, var(--nb-surface)); }
-      .apt-cell input:disabled { opacity: 0.7; cursor: not-allowed; }
-      .apt-actions { margin-top: 16px; display: flex; justify-content: flex-start; }
+      .apt-desc { font-size: 12px; color: var(--nb-text-muted); }
+      .apt-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      
+      .apt-table-wrapper {
+        overflow-x: auto;
+        background: var(--nb-surface);
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius-card);
+      }
+      .apt-custom-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .apt-custom-table th {
+        background: var(--nb-surface-raised);
+        padding: 10px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nb-text);
+        text-align: right;
+        border-bottom: 1px solid var(--nb-border);
+      }
+      .apt-custom-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--nb-border-soft);
+      }
+      .apt-text-input, .apt-num-input, .apt-marks-input {
+        width: 100%;
+        height: 36px;
+        border: 1px solid var(--nb-border);
+        border-radius: 6px;
+        padding: 0 10px;
+        font-family: var(--nb-font-family);
+        font-size: 13px;
+        background: var(--nb-surface);
+        color: var(--nb-text);
+        outline: none;
+      }
+      .apt-text-input:focus, .apt-num-input:focus, .apt-marks-input:focus {
+        border-color: var(--nb-primary);
+      }
+      .apt-marks-input {
+        font-weight: 700;
+        text-align: center;
+      }
+      .apt-marks-input.pass {
+        border-color: var(--nb-success);
+        background: color-mix(in srgb, var(--nb-success) 10%, var(--nb-surface));
+      }
+      .apt-marks-input.fail {
+        border-color: var(--nb-danger);
+        background: color-mix(in srgb, var(--nb-danger) 10%, var(--nb-surface));
+      }
+      .btn-remove-row {
+        background: transparent;
+        border: 1px solid var(--nb-border);
+        color: var(--nb-danger);
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .btn-remove-row:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+      }
+      .apt-actions { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
       .apt-eval { margin-top: 16px; padding: 14px 16px; border-radius: var(--nb-radius-card); border: 1px solid var(--nb-border); background: var(--nb-surface); display: flex; flex-direction: column; gap: 8px; }
       .apt-eval.ok { border-color: var(--nb-success); background: color-mix(in srgb, var(--nb-success) 6%, var(--nb-surface)); }
       .apt-eval.no { border-color: var(--nb-danger); background: color-mix(in srgb, var(--nb-danger) 6%, var(--nb-surface)); }
@@ -849,14 +965,46 @@ export class ApplicationDetailsComponent implements OnInit {
 
   // ==== إجراءات مراحل القبول ====
 
+  /** «قبول نهائي مباشر» وتخطي امتحان القدرات فوراً. */
+  directAccept(): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'القبول النهائي المباشر',
+        message: 'اعتماد <strong>القبول النهائي المباشر</strong> للمتقدم وتخطي امتحان القدرات؟',
+        confirmText: 'قبول نهائي مباشر', color: 'primary',
+      },
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.service.acceptApplicant(this.id).subscribe((res) => {
+        this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status: 'accepted' });
+        this.autoSendWhatsappNotification('accepted');
+      });
+    });
+  }
+
+  /** إضافة مادة جديدة يدوياً لقائمة امتحان القدرات. */
+  addSubjectRow(): void {
+    this.aptitudeScores.update(list => [
+      ...list,
+      { subject: '', marks: null, max: 100, pass: 50 }
+    ]);
+  }
+
+  /** حذف مادة من قائمة امتحان القدرات. */
+  removeSubjectRow(index: number): void {
+    this.aptitudeScores.update(list => list.filter((_, i) => i !== index));
+  }
+
   /** «قبول الطلب» → تأهيل لامتحان القدرات (ينشئ صفوف المواد من الإعدادات). */
   qualifyForExam(): void {
     const ref = this.dialog.open(ConfirmDialogComponent, {
       width: '420px',
       data: {
-        title: 'قبول الطلب',
-        message: 'قبول الطلب يؤهّل المتقدم لدخول <strong>امتحان القدرات</strong>. سيتم تجهيز مواد الامتحان. متابعة؟',
-        confirmText: 'قبول الطلب', color: 'primary',
+        title: 'تأهيل لامتحان القدرات',
+        message: 'تأهيل المتقدم لدخول <strong>امتحان القدرات</strong>؟ سيتم تجهيز وإتاحة مواد الامتحان للتخصيص والرصد.',
+        confirmText: 'تأهيل للقدرات', color: 'primary',
       },
     });
     ref.afterClosed().subscribe((ok: boolean) => {
@@ -868,12 +1016,17 @@ export class ApplicationDetailsComponent implements OnInit {
     });
   }
 
-  /** حفظ درجات القدرات المرصودة → الحالة exam_scored. */
+  /** حفظ درجات القدرات المرصودة والمواد المخصصة → الحالة exam_scored. */
   saveAptitude(): void {
-    const rows = this.aptitudeScores().filter((r) => r.marks !== null && r.marks !== undefined);
-    if (!rows.length) return;
+    const validRows = this.aptitudeScores().filter((r) => r.subject && r.subject.trim() !== '');
+    if (!validRows.length && this.aptitudeScores().length > 0) return;
     this.savingAptitude.set(true);
-    const scores = rows.map((r) => ({ subject: r.subject, marks: Number(r.marks) }));
+    const scores = validRows.map((r) => ({
+      subject: r.subject.trim(),
+      marks: (r.marks !== null && r.marks !== undefined && r.marks !== ('' as any)) ? Number(r.marks) : null,
+      max: Number(r.max) || 100,
+      pass: Number(r.pass) || 50,
+    }));
     this.service.recordAptitude(this.id, scores).subscribe({
       next: (res) => {
         this.applicant.set(res?.data ?? { ...(this.applicant() as Applicant), status: 'exam_scored' });
@@ -893,7 +1046,7 @@ export class ApplicationDetailsComponent implements OnInit {
       width: '440px',
       data: {
         title: 'القبول النهائي',
-        message: `اعتماد <strong>القبول النهائي</strong> للمتقدم بناءً على درجات القدرات؟${warn}`,
+        message: `اعتماد <strong>القبول النهائي</strong> للمتقدم؟${warn}`,
         confirmText: 'قبول نهائي', color: 'primary',
       },
     });

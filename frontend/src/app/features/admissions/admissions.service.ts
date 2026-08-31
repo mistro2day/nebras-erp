@@ -167,8 +167,8 @@ export class AdmissionsService {
     return this.apiClient.post(`admissions/applicants/${id}/qualify-exam/`, {});
   }
 
-  /** رصد درجات القدرات: scores = [{ subject, marks }]. */
-  recordAptitude(id: string, scores: Array<{ subject: string; marks: number }>): Observable<any> {
+  /** رصد درجات القدرات: scores = [{ subject, marks, max?, pass? }]. */
+  recordAptitude(id: string, scores: Array<{ subject: string; marks: number | null; max?: number; pass?: number }>): Observable<any> {
     return this.apiClient.post(`admissions/applicants/${id}/record-aptitude/`, { scores });
   }
 
