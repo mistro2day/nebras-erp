@@ -1545,7 +1545,7 @@ export class DashboardComponent implements OnInit {
   });
 
   readonly tenantName = computed(() => {
-    return this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'المدرسة';
+    return this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'مدارس النبراس النموذجية الأهلية';
   });
 
   readonly greeting = computed(() => {
@@ -1568,6 +1568,7 @@ export class DashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.tenantService.refreshCurrentTenant();
     this.loadOverview();
   }
 

@@ -266,7 +266,7 @@ class StudentFinanceSettingsSerializer(BaseStudentFinanceSerializer):
         fields = '__all__'
 
 
-class OnlinePaymentRequestSerializer(BaseStudentFinanceSerializer):
+class OnlinePaymentRequestSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     receipt_url = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)

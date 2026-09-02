@@ -112,7 +112,8 @@ export class TenantService {
   }
 
   /** يجلب المستأجر الحالي والاسم الحقيقي من الخادم. */
-  private resolveTenantFromHost(): void {
+  /** يجلب المستأجر الحالي والاسم الحقيقي من الخادم. */
+  resolveTenantFromHost(): void {
     const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
     this.http.get<any>(`${base}tenants/branding/current/`).subscribe({
       next: (res) => {
@@ -121,7 +122,7 @@ export class TenantService {
         const tenant: TenantInfo = {
           id: d.id,
           name: d.name || d.name_en || d.name_ar || 'Nebras',
-          nameAr: d.name_ar || d.name || d.school_name_ar || 'المدرسة',
+          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس النبراس النموذجية الأهلية',
           primaryColor: d.primary_color || '#3F51B5',
           secondaryColor: d.secondary_color || '#7A8093',
           logoUrl: d.logo_url,
@@ -129,9 +130,13 @@ export class TenantService {
         this.setTenant(tenant);
       },
       error: () => {
-        // النطاق الفرعي غير معروف: نبقى بلا مستأجر (تتكفّل الحُرّاس بإعادة التوجيه)
+        // النطاق الفرعي غير معروف
       },
     });
+  }
+
+  refreshCurrentTenant(): void {
+    this.resolveTenantFromHost();
   }
 
   setTenant(tenant: TenantInfo) {

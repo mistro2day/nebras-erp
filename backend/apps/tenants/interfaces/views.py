@@ -79,10 +79,10 @@ class TenantViewSet(viewsets.ModelViewSet):
             
         # إضافة المسارات الكاملة للوغو والختم وبيانات المدرسة
         data = self.get_serializer(tenant).data
-        data['name'] = tenant.name or 'مدارس المورد الأهلية'
-        data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الأهلية النموذجية'
-        data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الأهلية النموذجية'
-        data['school_name_en'] = tenant.name_en or 'Al-Mawrid Private Schools'
+        data['name'] = tenant.name or tenant.name_ar or 'مدارس النبراس النموذجية الأهلية'
+        data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس النبراس النموذجية الأهلية'
+        data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس النبراس النموذجية الأهلية'
+        data['school_name_en'] = tenant.name_en or 'Nebras Model Private Schools'
         if tenant.logo:
             data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
         else:
