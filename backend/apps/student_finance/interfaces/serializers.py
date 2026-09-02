@@ -271,10 +271,11 @@ class OnlinePaymentRequestSerializer(BaseStudentFinanceSerializer):
     receipt_url = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
 
-    class Meta(BaseStudentFinanceSerializer.Meta):
+    class Meta:
         model = OnlinePaymentRequest
         fields = '__all__'
-        read_only_fields = BaseStudentFinanceSerializer.Meta.read_only_fields + (
+        read_only_fields = (
+            'tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at',
             'status', 'reviewed_by', 'reviewed_at', 'rejection_reason',
             'receipt_id', 'posted_to_gl', 'submitted_by_user_id', 'student_id',
         )
