@@ -31,7 +31,7 @@ interface Loan {
     <div class="page" dir="rtl">
       <nb-page-header
         title="إدارة الرواتب والأجور"
-        [subtitle]="'لوحة التحكم الشاملة لإدارة التعويضات، الأجور، الحوافز، والسلف بكادر ' + (($any(tenantService).currentTenant())?.nameAr || 'مجموعة مدارس النبراس الأهلية')"
+        [subtitle]="'لوحة التحكم الشاملة لإدارة التعويضات، الأجور، الحوافز، والسلف بكادر ' + (($any(tenantService).currentTenant())?.nameAr || ($any(tenantService).currentTenant())?.name || 'المدرسة')"
       >
         <div class="header-actions">
           <button class="nb-btn-secondary" (click)="navigate('structures')">👤 هياكل الرواتب والحوافز</button>

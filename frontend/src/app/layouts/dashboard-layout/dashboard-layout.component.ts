@@ -1541,7 +1541,7 @@ export class DashboardLayoutComponent {
   });
 
   readonly tenantName = computed(
-    () => this.tenantService.currentTenant()?.nameAr || 'مجموعة مدارس النبراس الأهلية'
+    () => this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'نبراس ERP'
   );
 
   readonly userAvatarUrl = computed(() => {

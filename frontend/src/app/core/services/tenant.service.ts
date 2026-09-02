@@ -102,40 +102,16 @@ export class TenantService {
     }
 
     const stored = this.readStored();
-    // على نطاق فرعي لمدرسة: إن كان المخزَّن لا يطابق النطاق، نتجاهله ونجلب من الخادم
-    if (stored && !this.subdomain()) {
-      this.currentTenant.set(stored);
-      this.applyBranding(stored);
-      return;
-    }
-
-    // نطاق فرعي لمدرسة: نجلب المستأجر من الخادم (يحلّه الميدلوير عبر Host تلقائياً)
-    if (this.subdomain()) {
-      this.resolveTenantFromHost();
-      return;
-    }
-
     if (stored) {
       this.currentTenant.set(stored);
       this.applyBranding(stored);
-      return;
     }
 
-    const defaultId = (environment as any).defaultTenantId as string | undefined;
-    if (defaultId) {
-      const tenant: TenantInfo = {
-        id: defaultId,
-        name: (environment as any).defaultTenantName || 'Nebras',
-        nameAr: (environment as any).defaultTenantName || 'نبراس ERP',
-        primaryColor: '#3F51B5',
-        secondaryColor: '#7A8093',
-      };
-      this.currentTenant.set(tenant);
-      this.applyBranding(tenant);
-    }
+    // جلب بيانات المستأجر الحقيقية والاسم الفعلي من الخادم لتحديث أي بيانات قديمة
+    this.resolveTenantFromHost();
   }
 
-  /** يجلب المستأجر الحالي من الخادم اعتماداً على النطاق الفرعي في الطلب (Host). */
+  /** يجلب المستأجر الحالي والاسم الحقيقي من الخادم. */
   private resolveTenantFromHost(): void {
     const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
     this.http.get<any>(`${base}tenants/branding/current/`).subscribe({
@@ -144,8 +120,8 @@ export class TenantService {
         if (!d?.id) return;
         const tenant: TenantInfo = {
           id: d.id,
-          name: d.name || d.name_en || 'Nebras',
-          nameAr: d.name_ar || d.name || 'نبراس',
+          name: d.name || d.name_en || d.name_ar || 'Nebras',
+          nameAr: d.name_ar || d.name || d.school_name_ar || 'المدرسة',
           primaryColor: d.primary_color || '#3F51B5',
           secondaryColor: d.secondary_color || '#7A8093',
           logoUrl: d.logo_url,

@@ -394,7 +394,7 @@ export class SchedulingDashboardComponent implements OnInit {
     { title: 'العيادة', desc: 'مواعيد العيادة المدرسية', path: '/clinic', mark: 'ع' },
   ];
 
-  tenantName(): string { return (this.tenant as any).currentTenant()?.nameAr || 'مجموعة مدارس النبراس الأهلية'; }
+  tenantName(): string { return (this.tenant as any).currentTenant()?.nameAr || (this.tenant as any).currentTenant()?.name || 'المدرسة'; }
 
   // ----- مشتقات عامة -----
   readonly activeReservations = computed(() => this.reservations().filter((r) => ['reserved', 'approved'].includes(r.status)).length);
