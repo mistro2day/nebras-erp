@@ -14,6 +14,8 @@ class Tenant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = models.Manager()
+
     # Branding & Settings
     logo = models.ImageField(upload_to='tenants/logos/', null=True, blank=True)
     icon = models.ImageField(upload_to='tenants/icons/', null=True, blank=True)
@@ -33,5 +35,5 @@ class Tenant(models.Model):
     class Meta:
         db_table = 'tenants'
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name or '')

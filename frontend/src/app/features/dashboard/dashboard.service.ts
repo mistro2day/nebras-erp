@@ -12,6 +12,7 @@ export interface DashboardKpis {
   pending_payments_count: number;
   pending_payments_amount: number;
   collection_rate: number;
+  total_staff_count?: number;
 }
 
 export interface FormMatrixItem {

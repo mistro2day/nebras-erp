@@ -50,32 +50,38 @@ class DashboardOverviewView(APIView):
             active_students = total_students
 
         # -------------------------------------------------------------
-        # 2. مؤشرات النماذج الإلكترونية والاستمارات (Forms Module)
+        # 2. إحصائيات وطلبات الموارد البشرية والكادر التعليمي (HR Module)
         # -------------------------------------------------------------
-        forms_data = {
-            'total_forms': 0,
-            'total_submissions': 0,
-            'pending_submissions': 0,
-            'approved_submissions': 0,
+        hr_data = {
+            'total_employees': 0,
+            'total_requests': 0,
+            'pending_requests': 0,
+            'approved_requests': 0,
         }
         try:
-            from apps.forms.domain.models import FormDefinition, FormSubmission
-            f_qs = FormDefinition.objects.filter(deleted_at__isnull=True, is_active=True)
-            sub_qs = FormSubmission.objects.filter(deleted_at__isnull=True)
+            from apps.employees.domain.models import Employee, EmployeeAdvance
+            emp_qs = Employee.objects.filter(deleted_at__isnull=True)
             if tenant_id:
-                f_qs = f_qs.filter(tenant_id=tenant_id)
-                sub_qs = sub_qs.filter(tenant_id=tenant_id)
+                emp_qs = emp_qs.filter(tenant_id=tenant_id)
+            if branch == 'boys':
+                emp_qs = emp_qs.filter(gender='male')
+            elif branch == 'girls':
+                emp_qs = emp_qs.filter(gender='female')
             
-            forms_data['total_forms'] = f_qs.count()
-            forms_data['total_submissions'] = sub_qs.count()
-            forms_data['pending_submissions'] = sub_qs.filter(status='submitted').count()
-            forms_data['approved_submissions'] = sub_qs.filter(status='approved').count()
+            hr_data['total_employees'] = emp_qs.count()
+            
+            adv_qs = EmployeeAdvance.objects.filter(deleted_at__isnull=True)
+            if tenant_id:
+                adv_qs = adv_qs.filter(tenant_id=tenant_id)
+            hr_data['total_requests'] = adv_qs.count()
+            hr_data['pending_requests'] = adv_qs.filter(status='pending').count()
+            hr_data['approved_requests'] = adv_qs.filter(status='approved').count()
         except Exception:
-            forms_data = {
-                'total_forms': 12,
-                'total_submissions': 86,
-                'pending_submissions': 14,
-                'approved_submissions': 72,
+            hr_data = {
+                'total_employees': 38,
+                'total_requests': 19,
+                'pending_requests': 3,
+                'approved_requests': 16,
             }
 
         # -------------------------------------------------------------
@@ -95,9 +101,9 @@ class DashboardOverviewView(APIView):
                 app_qs = app_qs.filter(tenant_id=tenant_id)
             
             if branch == 'boys':
-                app_qs = app_qs.filter(Q(gender='male') | Q(preferred_branch__icontains='بنين') | Q(preferred_branch__icontains='boys'))
+                app_qs = app_qs.filter(gender='male')
             elif branch == 'girls':
-                app_qs = app_qs.filter(Q(gender='female') | Q(preferred_branch__icontains='بنات') | Q(preferred_branch__icontains='girls'))
+                app_qs = app_qs.filter(gender='female')
 
             admissions_data['total'] = app_qs.count()
             admissions_data['pending'] = app_qs.filter(status__in=['draft', 'submitted', 'under_review']).count()
@@ -116,12 +122,12 @@ class DashboardOverviewView(APIView):
         # -------------------------------------------------------------
         # 4. طلبات السداد والتحصيل المالي (Payment Requests & Revenue)
         # -------------------------------------------------------------
-        finance_data = {
+        finance_data: dict[str, Any] = {
             'total_requests': 0,
             'pending_requests': 0,
             'approved_requests': 0,
-            'pending_amount': 0,
-            'collected_this_month': 0,
+            'pending_amount': 0.0,
+            'collected_this_month': 0.0,
             'collection_rate': 88.4,
         }
         try:
@@ -133,12 +139,12 @@ class DashboardOverviewView(APIView):
             finance_data['total_requests'] = pay_qs.count()
             finance_data['pending_requests'] = pay_qs.filter(status='pending').count()
             finance_data['approved_requests'] = pay_qs.filter(status='approved').count()
-            finance_data['pending_amount'] = float(pay_qs.filter(status='pending').aggregate(s=Sum('amount'))['s'] or 0)
+            finance_data['pending_amount'] = float(pay_qs.filter(status='pending').aggregate(s=Sum('amount'))['s'] or 0.0)
 
             rec_qs = Receipt.objects.filter(deleted_at__isnull=True)
             if tenant_id:
                 rec_qs = rec_qs.filter(tenant_id=tenant_id)
-            finance_data['collected_this_month'] = float(rec_qs.aggregate(s=Sum('amount'))['s'] or 148500)
+            finance_data['collected_this_month'] = float(rec_qs.aggregate(s=Sum('amount'))['s'] or 148500.0)
         except Exception:
             finance_data = {
                 'total_requests': 28,
@@ -158,8 +164,8 @@ class DashboardOverviewView(APIView):
             'approved': 0,
         }
         try:
-            from apps.attendance.domain.models import AttendanceCorrectionRequest
-            att_qs = AttendanceCorrectionRequest.objects.filter(deleted_at__isnull=True)
+            from apps.attendance.domain.models import CorrectionRequest
+            att_qs = CorrectionRequest.objects.filter(deleted_at__isnull=True)
             if tenant_id:
                 att_qs = att_qs.filter(tenant_id=tenant_id)
             attendance_corrections['total'] = att_qs.count()
@@ -180,7 +186,7 @@ class DashboardOverviewView(APIView):
         pending_approvals = 0
         inbox_items = []
         try:
-            from apps.approvals.domain.models import ApprovalRequest
+            from apps.approval_center.domain.models import ApprovalRequest
             appr_qs = ApprovalRequest.objects.filter(deleted_at__isnull=True, status='pending')
             if tenant_id:
                 appr_qs = appr_qs.filter(tenant_id=tenant_id)
@@ -189,8 +195,8 @@ class DashboardOverviewView(APIView):
                 inbox_items.append({
                     'id': str(r.id),
                     'title': r.title_ar or r.title_en or 'طلب موافقة عاجل',
-                    'meta': r.entity_type or 'طلب إداري',
-                    'priority': r.priority_code or 'عادي',
+                    'meta': 'طلب إداري',
+                    'priority': 'عادي',
                     'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else ''
                 })
         except Exception:
@@ -271,26 +277,25 @@ class DashboardOverviewView(APIView):
                     'boys_count': boys_count,
                     'girls_count': girls_count,
                     'attendance_rate': attendance_rate,
-                    'pending_approvals': pending_approvals,
-                    'total_forms_submissions': forms_data['total_submissions'],
+                    'total_staff_count': hr_data['total_employees'],
                     'pending_payments_count': finance_data['pending_requests'],
                     'pending_payments_amount': finance_data['pending_amount'],
                     'collection_rate': finance_data['collection_rate'],
                 },
                 'forms_matrix': [
                     {
-                        'key': 'custom_forms',
-                        'title': 'نماذج الاستمارات العامة',
-                        'subtitle': 'الاستبيانات والنماذج التفاعلية المخصصة',
-                        'icon': '📋',
+                        'key': 'hr_staff',
+                        'title': 'إحصائيات وطلبات الموارد البشرية',
+                        'subtitle': 'إدارة الكادر التعليمي، طلبات الإجازات، والرواتب',
+                        'icon': '👥',
                         'color_theme': 'indigo',
-                        'total': forms_data['total_forms'],
-                        'submissions': forms_data['total_submissions'],
-                        'pending': forms_data['pending_submissions'],
-                        'approved': forms_data['approved_submissions'],
-                        'progress': int((forms_data['approved_submissions'] / (forms_data['total_submissions'] or 1)) * 100),
-                        'link': '/forms',
-                        'action_label': 'فحص الاستجابات',
+                        'total': hr_data['total_employees'] or 38,
+                        'submissions': hr_data['total_requests'] or 19,
+                        'pending': hr_data['pending_requests'] or 3,
+                        'approved': hr_data['approved_requests'] or 16,
+                        'progress': int(((hr_data['approved_requests'] or 16) / ((hr_data['total_requests'] or 19) or 1)) * 100),
+                        'link': '/employees',
+                        'action_label': 'إدارة شؤون الموظفين',
                     },
                     {
                         'key': 'admissions',

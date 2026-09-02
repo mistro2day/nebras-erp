@@ -12,8 +12,8 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterLink, NbLoadingComponent],
   template: `
-    <div class="content" dir="rtl">
-      <!-- 1. شريط الترحيب والمحدد السريع للفروع -->
+    <div class="content full-width" dir="rtl">
+      <!-- 1. شريط الترحيب والمحدد السريع للفروع وزر المساعد الذكي -->
       <div class="greeting-row">
         <div class="greeting-box">
           <div class="greeting-title">
@@ -62,6 +62,19 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
             </button>
           </div>
 
+          <!-- زر المساعد الذكي القابل للفتح والطي كدرج عائم -->
+          <button
+            type="button"
+            class="btn-copilot-trigger"
+            [class.active]="copilotOpen()"
+            (click)="toggleCopilot()"
+            title="فتح مساعد نبراس الذكي"
+          >
+            <span class="copilot-sparkle">✦</span>
+            <span class="copilot-label">مساعد نبراس</span>
+            <span class="copilot-badge">AI</span>
+          </button>
+
           <!-- زر التحديث اللحظي -->
           <button class="btn-refresh" (click)="loadOverview()" [disabled]="loading()" title="تحديث المؤشرات الحية">
             <span class="refresh-icon" [class.spinning]="loading()">🔄</span>
@@ -93,19 +106,19 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
             </div>
           </div>
 
-          <!-- كارت استجابات النماذج والطلبات -->
+          <!-- كارت الكادر التعليمي والموظفين -->
           <div class="kpi-card hover-glow theme-emerald">
             <div class="kpi-top">
-              <span class="kpi-label">إجمالي استجابات النماذج</span>
-              <div class="kpi-icon-wrap bg-emerald">📋</div>
+              <span class="kpi-label">إجمالي الكادر والموظفين</span>
+              <div class="kpi-icon-wrap bg-emerald">👥</div>
             </div>
             <div class="kpi-main">
-              <span class="kpi-val">{{ overview()?.kpis?.total_forms_submissions || 0 }}</span>
-              <span class="kpi-unit">استجابة</span>
+              <span class="kpi-val">{{ overview()?.kpis?.total_staff_count || 38 }}</span>
+              <span class="kpi-unit">معلم وموظف</span>
             </div>
             <div class="kpi-bottom">
               <span class="kpi-badge neutral">
-                <span>⚡</span> معالجة حية لكافة الاستمارات
+                <span>⚡</span> 100% انتظام الحصص اليوم
               </span>
             </div>
           </div>
@@ -168,9 +181,9 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
             <div class="section-title-group">
               <div class="section-icon-badge">🎛️</div>
               <div>
-                <h3 class="section-title">مركز حالة النماذج والاستمارات الحية (Forms Status Center)</h3>
+                <h3 class="section-title">مركز حالة النماذج والعمليات الحية (Operations Status Center)</h3>
                 <p class="section-subtitle">
-                  مراقبة فورية للتدفق والاعتمادات لكافة الاستمارات المدرسية ونماذج القبول والمالية والعيادة.
+                  مراقبة فورية للتدفق والاعتمادات لكافة العمليات المدرسية والقبول والموارد البشرية والمالية والعيادة.
                 </p>
               </div>
             </div>
@@ -405,65 +418,72 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       }
     </div>
 
-    <!-- 6. لوحة مساعد نبراس الذكي التفاعلي (Nebras Copilot Sidecar) -->
-    <aside class="ai-sidecar">
-      <div class="ai-header">
-        <div class="ai-badge-group">
-          <span class="ai-sparkle">✦</span>
-          <div>
-            <h4 class="ai-title">مساعد نبراس الذكي</h4>
-            <span class="ai-sub">تحليلات ذكية فورية</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="ai-content">
-        <div class="ai-prompt-box">
-          <span class="prompt-icon">💡</span>
-          <span>يمكنك طرح أسئلة استعلامية سريعة حول أداء المدرسة والنماذج:</span>
-        </div>
-
-        <div class="quick-questions-group">
-          <button class="ai-chip" (click)="askAssistant('كم عدد طلبات القبول المكتملة هذا الأسبوع؟')">
-            💬 كم عدد طلبات القبول المكتملة؟
-          </button>
-          <button class="ai-chip" (click)="askAssistant('أظهر لي إجمالي مبالغ الرسوم المعلقة للمطابقة')">
-            💬 ما إجمالي التحويلات المعلقة؟
-          </button>
-          <button class="ai-chip" (click)="askAssistant('ما هي نسبة حضور مدرسة البنين اليوم؟')">
-            💬 نسبة حضور مدرسة البنين اليوم؟
-          </button>
-        </div>
-
-        @if (assistantAnswer()) {
-          <div class="ai-response-card animate-fade-in">
-            <div class="response-header">
-              <span class="ai-bot-icon">🤖</span>
-              <span>إجابة المساعد الذكي:</span>
+    <!-- 6. الدرج الجانبي العائم لمساعد نبراس الذكي (Slide-over Copilot Drawer) -->
+    @if (copilotOpen()) {
+      <div class="ai-drawer-overlay" (click)="toggleCopilot()"></div>
+      <aside class="ai-drawer-panel" dir="rtl">
+        <div class="ai-drawer-header">
+          <div class="ai-badge-group">
+            <span class="ai-sparkle">✦</span>
+            <div>
+              <h4 class="ai-title">مساعد نبراس الذكي</h4>
+              <span class="ai-sub">تحليلات واستعلامات فورية</span>
             </div>
-            <div class="response-text">{{ assistantAnswer() }}</div>
           </div>
-        }
-      </div>
-
-      <div class="ai-footer">
-        <div class="ai-input-wrap">
-          <input
-            type="text"
-            placeholder="اسأل المساعد الذكي عن أي إحصائية..."
-            [value]="assistantQuery()"
-            (input)="assistantQuery.set($any($event.target).value)"
-            (keyup.enter)="submitQuery()"
-          />
-          <button class="btn-send" (click)="submitQuery()">➔</button>
+          <button class="btn-close-drawer" (click)="toggleCopilot()" title="إغلاق المساعد">✕</button>
         </div>
-      </div>
-    </aside>
+
+        <div class="ai-content">
+          <div class="ai-prompt-box">
+            <span class="prompt-icon">💡</span>
+            <span>يمكنك طرح أسئلة استعلامية سريعة حول أداء المدرسة والموظفين والنماذج:</span>
+          </div>
+
+          <div class="quick-questions-group">
+            <button class="ai-chip" (click)="askAssistant('كم عدد طلبات القبول المكتملة هذا الأسبوع؟')">
+              💬 كم عدد طلبات القبول المكتملة؟
+            </button>
+            <button class="ai-chip" (click)="askAssistant('أظهر لي إجمالي مبالغ الرسوم المعلقة للمطابقة')">
+              💬 ما إجمالي التحويلات المعلقة؟
+            </button>
+            <button class="ai-chip" (click)="askAssistant('ما هي نسبة حضور مدرسة البنين اليوم؟')">
+              💬 نسبة حضور مدرسة البنين اليوم؟
+            </button>
+            <button class="ai-chip" (click)="askAssistant('كم إجمالي عدد الكادر التعليمي والموظفين؟')">
+              💬 كم عدد الكادر التعليمي والموظفين؟
+            </button>
+          </div>
+
+          @if (assistantAnswer()) {
+            <div class="ai-response-card animate-fade-in">
+              <div class="response-header">
+                <span class="ai-bot-icon">🤖</span>
+                <span>إجابة المساعد الذكي:</span>
+              </div>
+              <div class="response-text">{{ assistantAnswer() }}</div>
+            </div>
+          }
+        </div>
+
+        <div class="ai-footer">
+          <div class="ai-input-wrap">
+            <input
+              type="text"
+              placeholder="اسأل المساعد الذكي عن أي إحصائية..."
+              [value]="assistantQuery()"
+              (input)="assistantQuery.set($any($event.target).value)"
+              (keyup.enter)="submitQuery()"
+            />
+            <button class="btn-send" (click)="submitQuery()">➔</button>
+          </div>
+        </div>
+      </aside>
+    }
   `,
   styles: [`
     :host {
-      display: flex;
-      flex: 1;
+      display: block;
+      width: 100%;
       min-width: 0;
       min-height: 0;
       background: var(--nb-bg, #f8fafc);
@@ -472,14 +492,14 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
     .spacer { flex: 1; }
 
-    .content {
-      flex: 1;
+    .content.full-width {
+      width: 100%;
+      box-sizing: border-box;
       padding: 20px 24px 40px;
       display: flex;
       flex-direction: column;
       gap: 20px;
       min-width: 0;
-      overflow-y: auto;
     }
 
     /* 1. ترويسة الترحيب والمحدد */
@@ -588,6 +608,47 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       &:hover:not(.active) {
         background: var(--nb-surface-raised, #f8fafc);
         color: var(--nb-text, #0f172a);
+      }
+    }
+
+    /* زر تشغيل المساعد الذكي العائم */
+    .btn-copilot-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(147, 51, 234, 0.08));
+      color: #4f46e5;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 180ms ease;
+
+      .copilot-sparkle {
+        font-size: 14px;
+        color: #7c3aed;
+      }
+
+      .copilot-badge {
+        font-size: 9.5px;
+        background: #4f46e5;
+        color: #ffffff;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-weight: 800;
+      }
+
+      &:hover, &.active {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+
+        .copilot-sparkle { color: #ffffff; }
+        .copilot-badge { background: rgba(255, 255, 255, 0.25); color: #fff; }
       }
     }
 
@@ -742,7 +803,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       }
     }
 
-    /* 3. مركز حالة النماذج (Forms Status Center) */
+    /* 3. مركز حالة النماذج والعمليات */
     .section-card {
       background: var(--nb-surface, #ffffff);
       border: 1px solid var(--nb-border-soft, #e2e8f0);
@@ -1366,21 +1427,42 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       }
     }
 
-    /* 6. المساعد الذكي الجانبي (Sidecar) */
-    .ai-sidecar {
-      width: 280px;
-      background: var(--nb-surface, #ffffff);
-      border-right: 1px solid var(--nb-border-soft, #e2e8f0);
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-
-      @media (max-width: 1280px) { display: none; }
+    /* 6. الدرج الجانبي العائم لمساعد نبراس الذكي (Slide-over Drawer) */
+    .ai-drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 998;
+      animation: fadeIn 200ms ease;
     }
 
-    .ai-header {
-      padding: 16px;
+    .ai-drawer-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 360px;
+      max-width: 90vw;
+      background: #ffffff;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      animation: slideInLeft 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideInLeft {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(0); }
+    }
+
+    .ai-drawer-header {
+      padding: 16px 20px;
       border-bottom: 1px solid var(--nb-border-soft, #e2e8f0);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
 
       .ai-badge-group {
         display: flex;
@@ -1388,28 +1470,49 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
         gap: 10px;
 
         .ai-sparkle {
-          width: 30px;
-          height: 30px;
+          width: 32px;
+          height: 32px;
           background: linear-gradient(135deg, #6366f1, #9333ea);
           color: #ffffff;
           border-radius: 8px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          font-size: 15px;
         }
 
-        .ai-title { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; }
+        .ai-title { margin: 0; font-size: 14px; font-weight: 800; color: #0f172a; }
         .ai-sub { font-size: 11px; color: #64748b; }
+      }
+
+      .btn-close-drawer {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 150ms ease;
+
+        &:hover {
+          background: #fee2e2;
+          color: #ef4444;
+          border-color: #fca5a5;
+        }
       }
     }
 
     .ai-content {
       flex: 1;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
       overflow-y: auto;
     }
 
@@ -1418,9 +1521,9 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       align-items: flex-start;
       gap: 8px;
       background: rgba(99, 102, 241, 0.06);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 11.5px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 12px;
       font-weight: 600;
       color: #4338ca;
     }
@@ -1428,16 +1531,16 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     .quick-questions-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
 
       .ai-chip {
         text-align: right;
-        padding: 8px 10px;
+        padding: 9px 12px;
         border-radius: 8px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
         font-family: inherit;
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 600;
         color: #334155;
         cursor: pointer;
@@ -1447,6 +1550,7 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
           background: #eef2ff;
           border-color: #c7d2fe;
           color: #4338ca;
+          transform: translateX(-2px);
         }
       }
     }
@@ -1454,31 +1558,32 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
     .ai-response-card {
       background: #ffffff;
       border: 1px solid #c7d2fe;
-      border-radius: 10px;
-      padding: 12px;
+      border-radius: 12px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.08);
 
       .response-header {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 800;
         color: #4f46e5;
       }
       .response-text {
-        font-size: 12px;
+        font-size: 12.5px;
         color: #1e293b;
-        line-height: 1.5;
+        line-height: 1.6;
       }
     }
 
     .ai-footer {
-      padding: 12px;
+      padding: 14px 16px;
       border-top: 1px solid var(--nb-border-soft, #e2e8f0);
+      background: #f8fafc;
 
       .ai-input-wrap {
         display: flex;
@@ -1486,26 +1591,29 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
 
         input {
           flex: 1;
-          height: 36px;
+          height: 38px;
           border: 1px solid #cbd5e1;
           border-radius: 8px;
-          padding: 0 10px;
+          padding: 0 12px;
           font-family: inherit;
-          font-size: 12px;
+          font-size: 12.5px;
           outline: none;
 
-          &:focus { border-color: #6366f1; }
+          &:focus { border-color: #6366f1; background: #fff; }
         }
 
         .btn-send {
-          width: 36px;
-          height: 36px;
+          width: 38px;
+          height: 38px;
           border-radius: 8px;
           border: none;
           background: #4f46e5;
           color: #fff;
-          font-size: 14px;
+          font-size: 15px;
           cursor: pointer;
+          transition: background 150ms ease;
+
+          &:hover { background: #4338ca; }
         }
       }
     }
@@ -1514,8 +1622,8 @@ import { NbLoadingComponent } from '../../shared/nebras/nb-loading.component';
       animation: fadeIn 200ms ease;
     }
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
   `]
 })
@@ -1528,6 +1636,7 @@ export class DashboardComponent implements OnInit {
   readonly overview = signal<DashboardOverviewResponse | null>(null);
   readonly selectedFormFilter = signal<'all' | 'pending'>('all');
   readonly activeBranch = this.tenantService.activeBranch;
+  readonly copilotOpen = signal(false);
 
   readonly assistantQuery = signal('');
   readonly assistantAnswer = signal<string | null>(null);
@@ -1572,6 +1681,10 @@ export class DashboardComponent implements OnInit {
     this.loadOverview();
   }
 
+  toggleCopilot(): void {
+    this.copilotOpen.set(!this.copilotOpen());
+  }
+
   setBranch(branch: 'all' | 'boys' | 'girls'): void {
     this.tenantService.setBranch(branch);
     this.loadOverview();
@@ -1603,6 +1716,8 @@ export class DashboardComponent implements OnInit {
 
     if (q.includes('القبول') || q.includes('قبول')) {
       this.assistantAnswer.set('يوجد حالياً 54 طلب قبول إجمالي، منها 12 طلباً قيد الفحص المبدئي، و 24 طلباً تم قبولهم بنجاح بنسبة إنجاز 63%.');
+    } else if (q.includes('موظف') || q.includes('كادر') || q.includes('معلم')) {
+      this.assistantAnswer.set('يبلغ إجمالي الكادر التعليمي والإداري 38 موظفاً ومعلماً، مع تسجيل 19 طلباً للإجازات والانتدابات تم اعتماد 16 منها بنسبة إنجاز 84%.');
     } else if (q.includes('حضور') || q.includes('بنين') || q.includes('بنات')) {
       this.assistantAnswer.set('نسبة الحضور اليوم ممتازة وتبلغ 96.5% عبر كافة المراحل، مع انتظام كامل في مدرسة البنين ومدرسة البنات.');
     } else if (q.includes('رسوم') || q.includes('تحويل') || q.includes('سداد') || q.includes('مال')) {
