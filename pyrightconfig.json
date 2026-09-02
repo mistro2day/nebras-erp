@@ -14,5 +14,6 @@
       ]
     }
   ],
-  "reportMissingTypeStubs": false
+  "reportMissingTypeStubs": "none",
+  "reportMissingImports": "none"
 }

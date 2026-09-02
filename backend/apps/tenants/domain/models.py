@@ -1,3 +1,4 @@
+# pyright: reportMissingTypeStubs=false
 from django.db import models
 import uuid
 
