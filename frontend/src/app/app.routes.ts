@@ -4,9 +4,20 @@ import { authGuard } from './core/guards/auth.guard';
 import { publicSurfaceGuard, ownerSurfaceGuard } from './core/guards/surface.guard';
 
 export const routes: Routes = [
+  // صفحات المصادقة العامة (بلا شريط جانبي)
   {
-    path: 'accounts',
-    loadChildren: () => import('./features/accounts/accounts.routes').then((m) => m.ACCOUNTS_ROUTES),
+    path: 'accounts/login',
+    loadComponent: () => import('./features/accounts/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'accounts/forgot-password',
+    loadComponent: () =>
+      import('./features/accounts/forgot-password/forgot-password.component').then((m) => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'accounts/reset-password',
+    loadComponent: () =>
+      import('./features/accounts/reset-password/reset-password.component').then((m) => m.ResetPasswordComponent),
   },
   // الموقع العام لمنصّة نبراس — يظهر على النطاق الجذر (nebras.com). تسويقي بلا مصادقة.
   {
@@ -62,6 +73,34 @@ export const routes: Routes = [
       {
         path: 'students',
         loadChildren: () => import('./features/students/students.routes').then((m) => m.STUDENT_ROUTES),
+      },
+      {
+        path: 'users',
+        loadComponent: () =>
+          import('./features/accounts/user-management/user-management.component').then(
+            (m) => m.UserManagementComponent
+          ),
+      },
+      {
+        path: 'accounts/users',
+        loadComponent: () =>
+          import('./features/accounts/user-management/user-management.component').then(
+            (m) => m.UserManagementComponent
+          ),
+      },
+      {
+        path: 'accounts/permissions',
+        loadComponent: () =>
+          import('./features/accounts/permissions-matrix/permissions-matrix.component').then(
+            (m) => m.PermissionsMatrixComponent
+          ),
+      },
+      {
+        path: 'accounts/security',
+        loadComponent: () =>
+          import('./features/accounts/security-dashboard/security-dashboard.component').then(
+            (m) => m.SecurityDashboardComponent
+          ),
       },
       {
         path: 'platform',

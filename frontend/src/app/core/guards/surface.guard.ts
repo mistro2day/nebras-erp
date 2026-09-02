@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { TenantService } from '../services/tenant.service';
+import { AuthService } from '../auth/auth.service';
 
 /**
  * حارس السطح: على النطاق الجذر لنبراس (surface = public) يُحوَّل الزائر إلى الموقع
@@ -16,13 +17,14 @@ export const publicSurfaceGuard: CanActivateFn = () => {
 };
 
 /**
- * حارس منطقة المالك: يمنع الوصول لشاشات المنصّة (إدارة المستأجرين/الفوترة) من
- * داخل لوحة مستأجر. متاح على سطح admin وفي التطوير المحلّي فقط.
+ * حارس منطقة المالك: يمنع الوصول لشاشات المنصّة (إدارة المستأجرين/الفوترة) لغير المالكين.
+ * متاح فقط لمالك المنصة (is_superuser) أو على نطاق admin المركزي.
  */
 export const ownerSurfaceGuard: CanActivateFn = () => {
   const tenant = inject(TenantService);
+  const auth = inject(AuthService);
   const router = inject(Router);
-  if (tenant.showOwnerArea()) {
+  if (auth.isSuperuser() || tenant.isAdminSite()) {
     return true;
   }
   return router.createUrlTree(['/dashboard']);

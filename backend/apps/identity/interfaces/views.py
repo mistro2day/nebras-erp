@@ -5,21 +5,23 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import check_password
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
 from apps.identity.domain.models import User, PasswordHistory
-from apps.identity.domain.rbac import Role, Permission, UserRole, RolePermission
+from apps.identity.domain.rbac import Role, Permission, UserRole, RolePermission, ensure_system_roles
 from apps.identity.domain.sessions import UserSession
 from apps.identity.domain.user_assignment import UserAssignment
 
 from apps.identity.interfaces.serializers import (
     UserSerializer, CreateUserSerializer, RoleSerializer, 
     PermissionSerializer, UserRoleAssignmentSerializer, 
-    ChangePasswordSerializer, ResetPasswordEmailSerializer, 
-    ResetPasswordConfirmSerializer, UserAssignmentSerializer
+    ChangePasswordSerializer, AdminSetPasswordSerializer,
+    ResetPasswordEmailSerializer, ResetPasswordConfirmSerializer,
+    UserAssignmentSerializer
 )
 from apps.identity.application.services import (
     PasswordPolicyService, IdentitySecurityService, PermissionCacheService
@@ -72,18 +74,12 @@ class LoginView(APIView):
 
         IdentitySecurityService.handle_successful_login(user)
 
-        # التحقق من انتهاء صلاحية كلمة المرور
-        if user.password_expires_at and timezone.now() > user.password_expires_at:
-            # تتطلب تغيير كلمة المرور قبل المتابعة
-            pass # هنا يمكن إرجاع كود مخصص لتغيير كلمة المرور
-
         # توليد الرموز الأمنية للـ JWT
         refresh = RefreshToken.for_user(user)
         
         # تسجيل الجلسة والجهاز الفعال
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         
-        # خطوات ثانوية: فشلها لا يجب أن يُفشل الدخول بعد نجاح المصادقة (لا 500)
         import logging
         _log = logging.getLogger(__name__)
         try:
@@ -108,7 +104,6 @@ class LoginView(APIView):
             _log.exception('login: permissions fetch failed')
             user_perms = []
 
-        # نوع مستخدم البوابة (ولي أمر/طالب/متقدم) لتوجيه الواجهة بعد الدخول
         portal_user_type = None
         try:
             from apps.portal.domain.models import PortalUser
@@ -122,7 +117,7 @@ class LoginView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
-                **UserSerializer(user).data,
+                **UserSerializer(user, context={'request': request}).data,
                 'is_superuser': user.is_superuser,
                 'portal_user_type': portal_user_type,
             },
@@ -131,11 +126,10 @@ class LoginView(APIView):
 
 
 class ChangeMyPasswordView(APIView):
-    """تغيير المستخدم الحالي لكلمة مروره (خدمة ذاتية — تعمل لكل مستخدم بما فيهم البوابة)."""
+    """تغيير المستخدم الحالي لكلمة مروره (خدمة ذاتية)."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        from django.contrib.auth.hashers import check_password
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
         if not old_password or not new_password:
@@ -170,7 +164,6 @@ class LogoutView(APIView):
         except Exception:
             pass
 
-        # إنهاء جلسات العمل الفعالة للجهاز الحالي
         UserSession.objects.filter(user=request.user, is_active=True).update(is_active=False)
         return StandardResponse(None, message="تم تسجيل الخروج بنجاح.")
 
@@ -179,27 +172,109 @@ class LogoutAllDevicesView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        # إنهاء جميع الجلسات النشطة للمستخدم
         UserSession.objects.filter(user=request.user, is_active=True).update(is_active=False)
         return StandardResponse(None, message="تم تسجيل الخروج من جميع الأجهزة بنجاح.")
 
 
 class UserViewSet(viewsets.ModelViewSet):
+    """
+    مركز إدارة المستخدمين الموحد للمستأجر:
+    - فرز وتصنيف حسب الفئة (أولياء أمور، معلمين، إدارة، طلاب، موظفين)
+    - إدارة الحالات والأمان وقفل الحساب
+    - إدارة وتعيين الأدوار والصلاحيات
+    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = UserSerializer
     pagination_class = StandardPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['email', 'first_name', 'last_name', 'username', 'phone']
-    ordering_fields = ['created_at', 'email', 'last_name']
+    search_fields = ['email', 'first_name', 'last_name', 'username', 'phone', 'national_id']
+    ordering_fields = ['created_at', 'email', 'first_name', 'last_name', 'status']
+    ordering = ['-created_at']
 
     def get_queryset(self):
-        # تصفية الحذف اللطيف تلقائياً
-        return User.objects.filter(deleted_at__isnull=True)
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        qs = User.objects.filter(deleted_at__isnull=True)
+
+        # استبعاد حسابات المالك المطور (Superusers) من قائمة مستخدمي المدرسة/المستأجر
+        include_superusers = self.request.query_params.get('include_superusers') in ['true', '1']
+        if not include_superusers:
+            qs = qs.filter(is_superuser=False)
+
+        if tenant_id:
+            qs = qs.filter(
+                Q(roles__tenant_id=tenant_id) |
+                Q(assignments__tenant_id=tenant_id) |
+                Q(portal_user__tenant_id=tenant_id)
+            ).distinct()
+
+        # 1. تصفية الفئة / الدور (role_category / role)
+        category = self.request.query_params.get('role_category') or self.request.query_params.get('role')
+        if category:
+            cat = category.lower().strip()
+            if cat in ['parent', 'parents', 'أولياء الأمور']:
+                qs = qs.filter(Q(roles__role__code='parent') | Q(portal_user__user_type='parent')).distinct()
+            elif cat in ['teacher', 'teachers', 'faculty', 'المعلمون']:
+                qs = qs.filter(Q(roles__role__code__in=['teacher', 'faculty'])).distinct()
+            elif cat in ['admin', 'administration', 'administrator', 'الإدارة']:
+                qs = qs.filter(Q(roles__role__code='administrator') | Q(is_staff=True)).distinct()
+            elif cat in ['student', 'students', 'الطلاب']:
+                qs = qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct()
+            elif cat in ['staff', 'employee', 'employees', 'الموظفون']:
+                qs = qs.filter(
+                    ~Q(roles__role__code__in=['parent', 'student']) &
+                    (Q(roles__role__category='custom') | Q(roles__role__code__in=['staff', 'accountant', 'hr', 'registrar']) | Q(is_staff=True))
+                ).distinct()
+            elif cat != 'all':
+                qs = qs.filter(roles__role__code=cat).distinct()
+
+        # 2. تصفية الحالة (status)
+        status_param = self.request.query_params.get('status')
+        if status_param and status_param != 'all':
+            if status_param == 'locked':
+                qs = qs.filter(Q(status='locked') | Q(lockout_until__gt=timezone.now()))
+            else:
+                qs = qs.filter(status=status_param)
+
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'create':
             return CreateUserSerializer
         return UserSerializer
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """إحصائيات المستخدمين الإجمالية وتوزيعهم حسب الفئات والحالات للمستأجر الحالي."""
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        base_qs = User.objects.filter(deleted_at__isnull=True, is_superuser=False)
+        if tenant_id:
+            base_qs = base_qs.filter(
+                Q(roles__tenant_id=tenant_id) |
+                Q(assignments__tenant_id=tenant_id) |
+                Q(portal_user__tenant_id=tenant_id)
+            ).distinct()
+
+        total = base_qs.count()
+        parents = base_qs.filter(Q(roles__role__code='parent') | Q(portal_user__user_type='parent')).distinct().count()
+        teachers = base_qs.filter(roles__role__code__in=['teacher', 'faculty']).distinct().count()
+        admins = base_qs.filter(Q(roles__role__code='administrator') | Q(is_staff=True)).distinct().count()
+        students = base_qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct().count()
+        
+        active_count = base_qs.filter(status='active', is_active=True).count()
+        locked_count = base_qs.filter(Q(status='locked') | Q(lockout_until__gt=timezone.now())).count()
+        suspended_count = base_qs.filter(status='suspended').count()
+
+        return StandardResponse({
+            'total_users': total,
+            'parents_count': parents,
+            'teachers_count': teachers,
+            'admins_count': admins,
+            'students_count': students,
+            'staff_count': max(0, total - (parents + teachers + admins + students)),
+            'active_count': active_count,
+            'locked_count': locked_count,
+            'suspended_count': suspended_count,
+        })
 
     @action(detail=False, methods=['get', 'patch', 'put'], url_path='me', parser_classes=[MultiPartParser, FormParser, JSONParser])
     def me(self, request):
@@ -209,7 +284,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return StandardResponse(serializer.data)
 
         data = request.data.copy()
-        
         if 'avatar' in request.FILES:
             user.avatar = request.FILES['avatar']
         elif data.get('remove_avatar') in [True, 'true', '1']:
@@ -230,68 +304,116 @@ class UserViewSet(viewsets.ModelViewSet):
             return StandardResponse(serializer.data, message="تم تحديث بيانات الملف الشخصي بنجاح.")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.soft_delete()
-        return StandardResponse(None, message="تم حذف المستخدم لطيفاً بنجاح.")
+    @action(detail=True, methods=['post'], url_path='toggle-status')
+    def toggle_status(self, request, pk=None):
+        """تبديل حالة الحساب (نشط / موقوف) أو تعيين حالة محددة."""
+        user = self.get_object()
+        new_status = request.data.get('status')
+        if not new_status:
+            new_status = 'suspended' if user.status == 'active' else 'active'
 
-    @action(detail=True, methods=['post'], url_path='restore')
-    def restore(self, request, pk=None):
-        # استرجاع مستخدم محذوف لطيفاً
-        try:
-            user = User.objects.get(pk=pk, deleted_at__isnull=False)
-            user.restore()
-            return StandardResponse(UserSerializer(user).data, message="تم استرجاع الحساب بنجاح.")
-        except User.DoesNotExist:
-            return Response({'error': 'المستخدم غير موجود أو غير محذوف.'}, status=status.HTTP_404_NOT_FOUND)
+        user.status = new_status
+        user.is_active = (new_status == 'active')
+        if new_status == 'active':
+            user.failed_login_attempts = 0
+            user.lockout_until = None
+        user.save(update_fields=['status', 'is_active', 'failed_login_attempts', 'lockout_until'])
+
+        status_labels = {'active': 'تفعيل', 'suspended': 'تعليق', 'locked': 'قفل', 'inactive': 'تعطيل'}
+        label = status_labels.get(new_status, new_status)
+        return StandardResponse(
+            UserSerializer(user, context={'request': request}).data,
+            message=f"تم {label} حساب المستخدم بنجاح."
+        )
+
+    @action(detail=True, methods=['post'], url_path='unlock')
+    def unlock(self, request, pk=None):
+        """فك قفل الحساب وإعادة تصفير محاولات الدخول الفاشلة."""
+        user = self.get_object()
+        user.status = 'active'
+        user.is_active = True
+        user.failed_login_attempts = 0
+        user.lockout_until = None
+        user.save(update_fields=['status', 'is_active', 'failed_login_attempts', 'lockout_until'])
+        return StandardResponse(
+            UserSerializer(user, context={'request': request}).data,
+            message="تم إلغاء قفل الحساب وإعادة تفعيله بنجاح."
+        )
+
+    @action(detail=True, methods=['post'], url_path='admin-reset-password')
+    def admin_reset_password(self, request, pk=None):
+        """إعادة تعيين كلمة المرور للمستخدم بواسطة مدير النظام."""
+        user = self.get_object()
+        serializer = AdminSetPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            new_password = serializer.validated_data['new_password']
+            user.set_password(new_password)
+            user.failed_login_attempts = 0
+            user.lockout_until = None
+            user.save(update_fields=['password', 'failed_login_attempts', 'lockout_until'])
+            
+            # إنهاء الجلسات الحالية لفرض تسجيل الدخول بكلمة المرور الجديدة
+            UserSession.objects.filter(user=user, is_active=True).update(is_active=False)
+
+            return StandardResponse(None, message="تم تحديث كلمة مرور المستخدم وإنهاء جلساته السابقة بنجاح.")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='terminate-sessions')
+    def terminate_sessions(self, request, pk=None):
+        """إنهاء جميع الجلسات النشطة للمستخدم فوراً."""
+        user = self.get_object()
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        qs = UserSession.objects.filter(user=user, is_active=True)
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        count = qs.update(is_active=False)
+        return StandardResponse({'terminated_count': count}, message="تم تسجيل خروج المستخدم من جميع الأجهزة بنجاح.")
 
     @action(detail=True, methods=['post'], url_path='assign-roles')
     def assign_roles(self, request, pk=None):
+        """تعيين وتعديل أدوار المستخدم للمستأجر الحالي."""
         user = self.get_object()
-        serializer = UserRoleAssignmentSerializer(data=request.data, many=True)
-        serializer.is_validate_only = False
-        if serializer.is_valid():
-            tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
-            if not tenant_id:
-                return Response({'error': 'معرف المستأجر غير متوفر.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # إزالة الأدوار القديمة لنفس المستأجر
-            UserRole.objects.filter(user=user, tenant_id=tenant_id).delete()
-            
-            # تعيين الأدوار الجديدة
-            for item in serializer.validated_data:
-                role = Role.objects.get(id=item['role_id'])
-                UserRole.objects.create(
-                    user=user,
-                    role=role,
-                    tenant_id=tenant_id,
-                    expires_at=item.get('expires_at')
-                )
-            # مسح كاش الصلاحيات
-            PermissionCacheService.clear_user_permissions_cache(user.id, tenant_id)
-            return StandardResponse(None, message="تم تحديث أدوار المستخدم بنجاح.")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        if not tenant_id:
+            return Response({'error': 'معرف المستأجر غير متوفر.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'], url_path='change-password')
-    def change_password(self, request, pk=None):
-        user = self.get_object()
-        serializer = ChangePasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            if not check_password(serializer.validated_data['old_password'], user.password):
-                return Response({'error': 'كلمة المرور الحالية غير صحيحة.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            new_password = serializer.validated_data['new_password']
+        role_ids = request.data.get('role_ids', [])
+        # إذا تم تمرير دور واحد عبر role_id
+        if 'role_id' in request.data:
+            role_ids = [request.data['role_id']]
+
+        ensure_system_roles(tenant_id)
+
+        # حذف الأدوار السابقة للمستأجر
+        UserRole.objects.filter(user=user, tenant_id=tenant_id).delete()
+
+        # إضافة الأدوار الجديدة
+        for r_id in role_ids:
             try:
-                PasswordPolicyService.validate_password_strength(new_password)
-                PasswordPolicyService.check_password_history(user, new_password)
-            except ValidationError as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                role = Role.objects.get(id=r_id, tenant_id=tenant_id)
+                UserRole.objects.create(user=user, role=role, tenant_id=tenant_id)
+            except Role.DoesNotExist:
+                pass
 
-            user.set_password(new_password)
-            user.save()
-            PasswordPolicyService.record_password_change(user, user.password)
-            return StandardResponse(None, message="تم تغيير كلمة المرور بنجاح.")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        PermissionCacheService.clear_user_permissions_cache(user.id, tenant_id)
+        return StandardResponse(
+            UserSerializer(user, context={'request': request}).data,
+            message="تم تحديث أدوار المستخدم بنجاح."
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.soft_delete()
+        return StandardResponse(None, message="تم حذف المستخدم بنجاح.")
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        try:
+            user = User.objects.get(pk=pk, deleted_at__isnull=False)
+            user.restore()
+            return StandardResponse(UserSerializer(user, context={'request': request}).data, message="تم استرجاع الحساب بنجاح.")
+        except User.DoesNotExist:
+            return Response({'error': 'المستخدم غير موجود أو غير محذوف.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class RoleViewSet(viewsets.ModelViewSet):
@@ -300,6 +422,8 @@ class RoleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        if tenant_id:
+            ensure_system_roles(tenant_id)
         return Role.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)
 
     def perform_create(self, serializer):
@@ -311,10 +435,8 @@ class RoleViewSet(viewsets.ModelViewSet):
         role = self.get_object()
         new_name = request.data.get('name', f"{role.name} (نسخة)")
         new_code = request.data.get('code', f"{role.code}_clone")
-        
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         
-        # إنشاء الدور الجديد
         cloned_role = Role.objects.create(
             tenant_id=tenant_id,
             name=new_name,
@@ -324,7 +446,6 @@ class RoleViewSet(viewsets.ModelViewSet):
             parent=role.parent
         )
         
-        # نسخ الصلاحيات
         permissions = RolePermission.objects.filter(role=role)
         for p in permissions:
             RolePermission.objects.create(role=cloned_role, permission=p.permission)
@@ -337,8 +458,10 @@ class PermissionMatrixView(APIView):
 
     def get(self, request):
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        if tenant_id:
+            ensure_system_roles(tenant_id)
         roles = Role.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)
-        perms = Permission.objects.all()
+        perms = Permission.objects.all().order_by('module', 'name')
         
         matrix = []
         for p in perms:
@@ -350,11 +473,11 @@ class PermissionMatrixView(APIView):
             
         return StandardResponse({
             'roles': RoleSerializer(roles, many=True).data,
-            'matrix': matrix
+            'matrix': matrix,
+            'permissions': PermissionSerializer(perms, many=True).data
         })
 
     def post(self, request):
-        # تحديث مصفوفة الصلاحيات بالكامل
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         role_id = request.data.get('role_id')
         permission_ids = request.data.get('permission_ids', [])
@@ -364,7 +487,6 @@ class PermissionMatrixView(APIView):
         except Role.DoesNotExist:
             return Response({'error': 'الدور المحدد غير موجود.'}, status=status.HTTP_404_NOT_FOUND)
             
-        # إزالة جميع الصلاحيات القديمة وتعيين الجديدة
         RolePermission.objects.filter(role=role).delete()
         for p_id in permission_ids:
             try:
@@ -373,7 +495,6 @@ class PermissionMatrixView(APIView):
             except Permission.DoesNotExist:
                 pass
                 
-        # مسح كاش الصلاحيات لجميع المستخدمين الذين يملكون هذا الدور
         user_ids = UserRole.objects.filter(role=role, tenant_id=tenant_id).values_list('user_id', flat=True)
         for u_id in user_ids:
             PermissionCacheService.clear_user_permissions_cache(u_id, tenant_id)
@@ -387,12 +508,10 @@ class SecurityDashboardView(APIView):
     def get(self, request):
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         
-        # إحصائيات سريعة
         active_sessions = UserSession.objects.filter(tenant_id=tenant_id, is_active=True).count()
         total_users = User.objects.filter(deleted_at__isnull=True).count()
         locked_users = User.objects.filter(status='locked').count()
         
-        # الجلسات النشطة حالياً للمستخدم الحالي
         my_sessions = UserSession.objects.filter(user=request.user, is_active=True)
         
         data = {

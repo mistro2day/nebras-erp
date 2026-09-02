@@ -3,9 +3,11 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } fro
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { MatMenuModule } from '@angular/material/menu';
-import { TenantService } from '../../core/services/tenant.service';
+import { HttpClient } from '@angular/common/http';
+import { TenantService, TenantInfo } from '../../core/services/tenant.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationsService, AppNotification } from '../../core/services/notifications.service';
+import { environment } from '../../../environments/environment';
 
 interface NavItem {
   label: string;
@@ -214,7 +216,19 @@ import { FormsModule } from '@angular/forms';
       <div class="main">
         <header class="topbar">
           <div class="breadcrumb">
-            {{ tenantName() }} <span class="sep">/</span>
+            @if (isSuperuser()) {
+              <div class="tenant-switcher-badge">
+                <span class="tenant-icon">🏢</span>
+                <select [value]="currentTenantId()" (change)="onTenantSwitch($event)" title="تبديل المستأجر / المدرسة (خاص بمالك المنصة)">
+                  @for (t of platformTenants(); track t.id) {
+                    <option [value]="t.id">{{ t.name_ar || t.name }} ({{ t.subdomain }})</option>
+                  }
+                </select>
+              </div>
+            } @else {
+              {{ tenantName() }}
+            }
+            <span class="sep">/</span>
             <div class="branch-selector-inline">
               <select [value]="activeBranch()" (change)="onBranchChange($event)" title="اختر الفرع أو المدرسة">
                 <option value="all">🏫 جميع الفروع والمدارس</option>
@@ -817,6 +831,31 @@ import { FormsModule } from '@angular/forms';
         .current { color: var(--nb-text); font-weight: 600; }
       }
 
+      .tenant-switcher-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(79, 70, 229, 0.06));
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        padding: 2px 8px;
+        border-radius: 8px;
+
+        .tenant-icon {
+          font-size: 13px;
+        }
+
+        select {
+          background: transparent;
+          border: none;
+          font-family: inherit;
+          font-size: 12px;
+          font-weight: 800;
+          color: #4f46e5;
+          cursor: pointer;
+          outline: none;
+        }
+      }
+
       .branch-selector-inline select {
         background: var(--nb-surface-raised, #f8fafc);
         border: 1px solid var(--nb-border, #cbd5e1);
@@ -970,6 +1009,11 @@ export class DashboardLayoutComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly notifications = inject(NotificationsService);
+  private readonly http = inject(HttpClient);
+
+  readonly isSuperuser = this.authService.isSuperuser;
+  readonly platformTenants = signal<any[]>([]);
+  readonly currentTenantId = computed(() => this.tenantService.currentTenant()?.id || '');
 
   readonly searchQuery = signal('');
   readonly navFilterQuery = signal('');
@@ -978,6 +1022,36 @@ export class DashboardLayoutComponent {
   onBranchChange(event: Event): void {
     const val = (event.target as HTMLSelectElement).value as 'all' | 'boys' | 'girls';
     this.tenantService.setBranch(val);
+  }
+
+  onTenantSwitch(event: Event): void {
+    const targetId = (event.target as HTMLSelectElement).value;
+    const found = this.platformTenants().find((t) => t.id === targetId);
+    if (found) {
+      const tenantInfo: TenantInfo = {
+        id: found.id,
+        name: found.name_en || found.name || 'School',
+        nameAr: found.name_ar || found.name || 'المدرسة',
+        primaryColor: found.primary_color || '#3F51B5',
+        secondaryColor: found.secondary_color || '#7A8093',
+        logoUrl: found.logo_url,
+      };
+      this.tenantService.setTenant(tenantInfo);
+      window.location.reload();
+    }
+  }
+
+  loadPlatformTenants(): void {
+    const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
+    this.http.get<any>(`${base}tenants/branding/`).subscribe({
+      next: (res) => {
+        const list = res?.data || res?.results || res || [];
+        if (Array.isArray(list)) {
+          this.platformTenants.set(list);
+        }
+      },
+      error: () => {},
+    });
   }
 
   updateNavFilter(event: Event): void {
@@ -995,6 +1069,9 @@ export class DashboardLayoutComponent {
 
   constructor() {
     this.notifications.load().subscribe();
+    if (this.isSuperuser()) {
+      this.loadPlatformTenants();
+    }
   }
 
   openNotification(n: AppNotification): void {
@@ -1329,6 +1406,40 @@ export class DashboardLayoutComponent {
       permission: 'settings:read',
       items: [
         {
+          label: 'إدارة المستخدمين والأدوار',
+          icon: '👥',
+          match: '/users',
+          link: '/users',
+          children: [
+            { label: 'دليل المستخدمين الموحد', link: '/users' },
+            { label: 'مصفوفة الصلاحيات', link: '/accounts/permissions' },
+            { label: 'مركز الأمان والجلسات', link: '/accounts/security' },
+          ],
+        },
+        {
+          label: 'الهيكل التنظيمي',
+          icon: '🏛️',
+          match: '/organization',
+          link: '/organization/overview',
+          children: [
+            { label: 'نظرة عامة', link: '/organization/overview' },
+            { label: 'الفروع والمدارس', link: '/organization/branches' },
+            { label: 'الأقسام', link: '/organization/departments' },
+          ],
+        },
+        {
+          label: 'تكوين وإعدادات النظام',
+          icon: '🛠️',
+          match: '/config',
+          link: '/config',
+          children: [
+            { label: 'الإعدادات والميزات', link: '/config' },
+            { label: 'التكامل والربط الخارجي', link: '/integration' },
+            { label: 'التخصيص والمظهر', link: '/personalization' },
+            { label: 'لوحة الأوامر المتقدمة', link: '/command' },
+          ],
+        },
+        {
           label: 'منصة النظام (المالك)',
           icon: '🖥️',
           match: '/platform',
@@ -1339,21 +1450,6 @@ export class DashboardLayoutComponent {
             { label: 'إدارة المستأجرين', link: '/platform/tenants' },
             { label: 'فوترة المنصّة والاشتراكات', link: '/saas-billing' },
             { label: 'السجلات', link: '/platform/logs' },
-          ],
-        },
-        { label: 'الإعدادات والميزات', icon: '🛠️', link: '/config' },
-        { label: 'التكامل', icon: '🔗', link: '/integration' },
-        { label: 'التخصيص', icon: '🎨', link: '/personalization' },
-        { label: 'لوحة الأوامر', icon: '💻', link: '/command' },
-        {
-          label: 'الهيكل التنظيمي',
-          icon: '🏛️',
-          match: '/organization',
-          link: '/organization/overview',
-          children: [
-            { label: 'نظرة عامة', link: '/organization/overview' },
-            { label: 'الفروع والمدارس', link: '/organization/branches' },
-            { label: 'الأقسام', link: '/organization/departments' },
           ],
         },
       ],
@@ -1369,8 +1465,8 @@ export class DashboardLayoutComponent {
     this.authService.userPermissions();
 
     const canSee = (perm?: string) => !perm || this.authService.hasPermission(perm);
-    // عناصر المالك تُخفى داخل لوحة المستأجر (تظهر على سطح admin أو في التطوير المحلّي)
-    const showOwner = this.tenantService.showOwnerArea();
+    // عناصر المالك تظهر فقط لمالك المنصة الحقيقي (isSuperuser) أو عند الدخول عبر نطاق المالك المركزي (admin)
+    const showOwner = this.authService.isSuperuser() || this.tenantService.isAdminSite();
     const query = this.navFilterQuery().trim().toLowerCase();
 
     return this.navGroups
@@ -1414,6 +1510,8 @@ export class DashboardLayoutComponent {
 
   private readonly pageTitles: Record<string, string> = {
     dashboard: 'لوحة القيادة التنفيذية',
+    users: 'إدارة المستخدمين الموحدة',
+    accounts: 'إدارة المستخدمين والصلاحيات',
     approvals: 'مركز الموافقات',
     students: 'الطلاب',
     admissions: 'القبول والتسجيل',

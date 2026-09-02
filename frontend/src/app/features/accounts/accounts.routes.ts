@@ -22,6 +22,12 @@ export const ACCOUNTS_ROUTES: Routes = [
       import('./reset-password/reset-password.component').then((m) => m.ResetPasswordComponent),
   },
   {
+    path: 'users',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./user-management/user-management.component').then((m) => m.UserManagementComponent),
+  },
+  {
     path: 'security',
     canActivate: [authGuard],
     loadComponent: () =>

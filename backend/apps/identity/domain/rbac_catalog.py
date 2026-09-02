@@ -47,6 +47,19 @@ PERMISSION_CATALOG = [
     ("settings:update", "إدارة الإعدادات", "settings", "settings", "update"),
     ("roles:manage", "إدارة الأدوار والصلاحيات", "identity", "role", "custom"),
 
+    # --- النماذج والطلبات الإلكترونية ---
+    ("forms:read", "عرض النماذج والطلبات", "forms", "form", "read"),
+    ("forms:create", "إنشاء وتصميم النماذج", "forms", "form", "create"),
+    ("forms:update", "تعديل وإدارة النماذج", "forms", "form", "update"),
+    ("forms:delete", "حذف النماذج", "forms", "form", "delete"),
+    ("forms:manage", "التحكم الكامل بنماذج واستبيانات المنشأة", "forms", "form", "custom"),
+
+    # --- القبول والتسجيل والاتصالات ---
+    ("admissions:read", "عرض طلبات القبول", "admissions", "admission", "read"),
+    ("admissions:update", "إدارة واعتماد طلبات القبول", "admissions", "admission", "update"),
+    ("communications:read", "عرض المراسلات والإشعارات", "communications", "communication", "read"),
+    ("communications:send", "إرسال الإشعارات والرسائل", "communications", "communication", "create"),
+
     # --- صلاحيات البوابة (أولياء الأمور / الطلاب) ---
     ("portal:parent", "بوابة ولي الأمر", "portal", "portal", "read"),
     ("portal:student", "بوابة الطالب", "portal", "portal", "read"),

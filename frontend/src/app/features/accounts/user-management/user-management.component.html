@@ -1,0 +1,961 @@
+<div class="user-mgmt-page" dir="rtl">
+  <!-- رأس الصفحة -->
+  <nb-page-header
+    title="إدارة المستخدمين الموحدة (User Management)"
+    subtitle="لوحة تحكم مركزية لفرز وإدارة كافة حسابات المنشأة (أولياء أمور، معلمين، إدارة، وطلاب) وضبط الصلاحيات والوصول للنماذج."
+  >
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="openPermissionsModal()">
+        <span class="icon">🔐</span>
+        صلاحيات النماذج والموديولات
+      </button>
+      <button class="btn btn-primary" (click)="openAddModal()">
+        <span class="icon">➕</span>
+        إضافة مستخدم جديد
+      </button>
+      <button class="btn-icon-refresh" (click)="loadData()" [disabled]="loading()" title="تحديث البيانات">
+        🔄
+      </button>
+    </div>
+  </nb-page-header>
+
+  <!-- تنبيهات النجاح والخطأ -->
+  @if (successMessage()) {
+    <div class="alert alert-success animate-fade-in">
+      <span class="alert-icon">✓</span>
+      <span class="alert-text">{{ successMessage() }}</span>
+      <button class="alert-close" (click)="successMessage.set(null)">✕</button>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="alert alert-danger animate-fade-in">
+      <span class="alert-icon">⚠️</span>
+      <span class="alert-text">{{ errorMessage() }}</span>
+      <button class="alert-close" (click)="errorMessage.set(null)">✕</button>
+    </div>
+  }
+
+  <!-- شريط مؤشرات الأداء السريعة (KPI Ribbon) -->
+  <div class="stats-grid">
+    <div class="stat-card" [class.active-filter]="activeTab() === 'all'" (click)="setTab('all')">
+      <div class="stat-icon-wrapper bg-blue-subtle">
+        <span class="stat-icon">👥</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">إجمالي المستخدمين</div>
+        <div class="stat-value">{{ stats().total_users }}</div>
+      </div>
+    </div>
+
+    <div class="stat-card" [class.active-filter]="activeTab() === 'parents'" (click)="setTab('parents')">
+      <div class="stat-icon-wrapper bg-emerald-subtle">
+        <span class="stat-icon">👨‍👩‍👧</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">أولياء الأمور</div>
+        <div class="stat-value text-emerald">{{ stats().parents_count }}</div>
+      </div>
+    </div>
+
+    <div class="stat-card" [class.active-filter]="activeTab() === 'teachers'" (click)="setTab('teachers')">
+      <div class="stat-icon-wrapper bg-indigo-subtle">
+        <span class="stat-icon">👨‍🏫</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">المعلمون وهيئة التدريس</div>
+        <div class="stat-value text-indigo">{{ stats().teachers_count }}</div>
+      </div>
+    </div>
+
+    <div class="stat-card" [class.active-filter]="activeTab() === 'admin'" (click)="setTab('admin')">
+      <div class="stat-icon-wrapper bg-purple-subtle">
+        <span class="stat-icon">🛡️</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">الإدارة والمشرفون</div>
+        <div class="stat-value text-purple">{{ stats().admins_count }}</div>
+      </div>
+    </div>
+
+    <div class="stat-card" [class.active-filter]="activeTab() === 'students'" (click)="setTab('students')">
+      <div class="stat-icon-wrapper bg-amber-subtle">
+        <span class="stat-icon">🎓</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">الطلاب</div>
+        <div class="stat-value text-amber">{{ stats().students_count }}</div>
+      </div>
+    </div>
+
+    <div class="stat-card" [class.active-filter]="statusFilter() === 'locked'" (click)="setStatus('locked')">
+      <div class="stat-icon-wrapper bg-rose-subtle">
+        <span class="stat-icon">🔒</span>
+      </div>
+      <div class="stat-content">
+        <div class="stat-label">حسابات مقفلة أمنياً</div>
+        <div class="stat-value text-rose">{{ stats().locked_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- لوحة التحكم الرئيسية مع جدول البيانات -->
+  <nb-panel [flush]="true">
+    <!-- شريط التبويبات الفئوية (Role Tabs) -->
+    <div class="tab-navigation-bar">
+      <div class="role-tabs">
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'all'"
+          (click)="setTab('all')"
+        >
+          <span>🌟 جميع المستخدمين</span>
+          <span class="tab-count">{{ stats().total_users }}</span>
+        </button>
+
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'parents'"
+          (click)="setTab('parents')"
+        >
+          <span>👨‍👩‍👧 أولياء الأمور</span>
+          <span class="tab-count">{{ stats().parents_count }}</span>
+        </button>
+
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'teachers'"
+          (click)="setTab('teachers')"
+        >
+          <span>👨‍🏫 المعلمون وهيئة التدريس</span>
+          <span class="tab-count">{{ stats().teachers_count }}</span>
+        </button>
+
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'admin'"
+          (click)="setTab('admin')"
+        >
+          <span>🛡️ الإدارة والمشرفون</span>
+          <span class="tab-count">{{ stats().admins_count }}</span>
+        </button>
+
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'students'"
+          (click)="setTab('students')"
+        >
+          <span>🎓 الطلاب</span>
+          <span class="tab-count">{{ stats().students_count }}</span>
+        </button>
+
+        <button
+          class="role-tab-btn"
+          [class.active]="activeTab() === 'staff'"
+          (click)="setTab('staff')"
+        >
+          <span>💼 الكادر الإداري</span>
+          <span class="tab-count">{{ stats().staff_count }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- شريط أدوات البحث والتصفية -->
+    <div class="toolbar-wrapper">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="ابحث بالاسم، البريد، اسم المستخدم، رقم الجوال أو الهوية..."
+          [value]="searchQuery()"
+          (input)="searchQuery.set($any($event.target).value)"
+        />
+        @if (searchQuery()) {
+          <button class="clear-search-btn" (click)="searchQuery.set('')">✕</button>
+        }
+      </div>
+
+      <div class="filters-group">
+        <!-- تصفية الحالة -->
+        <div class="status-filters">
+          <button
+            class="filter-pill"
+            [class.active]="statusFilter() === 'all'"
+            (click)="setStatus('all')"
+          >
+            الكل
+          </button>
+          <button
+            class="filter-pill pill-active"
+            [class.active]="statusFilter() === 'active'"
+            (click)="setStatus('active')"
+          >
+            نشط
+          </button>
+          <button
+            class="filter-pill pill-locked"
+            [class.active]="statusFilter() === 'locked'"
+            (click)="setStatus('locked')"
+          >
+            مقفل
+          </button>
+          <button
+            class="filter-pill pill-suspended"
+            [class.active]="statusFilter() === 'suspended'"
+            (click)="setStatus('suspended')"
+          >
+            موقوف
+          </button>
+        </div>
+
+        <div class="view-toggle">
+          <button
+            class="toggle-btn"
+            [class.active]="viewMode() === 'table'"
+            (click)="viewMode.set('table')"
+            title="عرض كجدول"
+          >
+            📋
+          </button>
+          <button
+            class="toggle-btn"
+            [class.active]="viewMode() === 'grid'"
+            (click)="viewMode.set('grid')"
+            title="عرض كشبكة بطاقات"
+          >
+            🔲
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- حالة التحميل -->
+    @if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <div class="loading-text">جاري تحميل بيانات المستخدمين وتجهيز القائمة...</div>
+      </div>
+    } @else if (filteredUsers().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <div class="empty-title">لم يتم العثور على مستخدمين</div>
+        <div class="empty-subtitle">
+          لا توجد نتائج مطابقة لشروط البحث أو الفئة المحددة حالياً.
+        </div>
+        <button class="btn btn-outline" (click)="openAddModal(activeTab() === 'parents' ? 'parent' : activeTab() === 'teachers' ? 'teacher' : 'administrator')">
+          ➕ إضافة مستخدم لهذه الفئة
+        </button>
+      </div>
+    } @else {
+      <!-- طريقة العرض كجدول (Table View) -->
+      @if (viewMode() === 'table') {
+        <div class="table-responsive">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th class="col-user">المستخدم</th>
+                <th class="col-contact">معلومات الاتصال</th>
+                <th class="col-role">الفئة والدور</th>
+                <th class="col-status">حالة الحساب</th>
+                <th class="col-security">الجلسات والأمان</th>
+                <th class="col-date">تاريخ الانضمام</th>
+                <th class="col-actions">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of filteredUsers(); track user.id) {
+                <tr [class.row-locked]="user.status === 'locked'" [class.row-suspended]="user.status === 'suspended'">
+                  <!-- المستخدم والاسم -->
+                  <td class="col-user">
+                    <div class="user-profile-cell">
+                      <div class="avatar-wrapper">
+                        @if (user.avatar_url) {
+                          <img [src]="user.avatar_url" [alt]="user.full_name" class="user-avatar" />
+                        } @else {
+                          <div class="user-avatar-placeholder" [class]="'avatar-' + user.user_type">
+                            {{ getUserInitials(user.full_name) }}
+                          </div>
+                        }
+                        <span class="status-indicator" [class]="'indicator-' + user.status"></span>
+                      </div>
+                      <div class="user-info">
+                        <div class="user-fullname" (click)="openDetailsDrawer(user)">
+                          {{ user.full_name }}
+                          @if (user.is_superuser) {
+                            <span class="badge-superuser">مالك المنصة</span>
+                          }
+                        </div>
+                        <div class="user-username">&#64;{{ user.username || user.email.split('@')[0] }}</div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- الاتصال -->
+                  <td class="col-contact">
+                    <div class="contact-info">
+                      <div class="contact-email" title="{{ user.email }}">📧 {{ user.email }}</div>
+                      @if (user.phone) {
+                        <div class="contact-phone" dir="ltr">📱 {{ user.phone }}</div>
+                      }
+                      @if (user.national_id) {
+                        <div class="contact-id">🪪 الرقم الوطني: {{ user.national_id }}</div>
+                      }
+                    </div>
+                  </td>
+
+                  <!-- الفئة والدور -->
+                  <td class="col-role">
+                    <div class="role-cell">
+                      <span class="role-badge" [class]="getRoleBadgeClass(user.user_type)">
+                        {{ user.primary_role || user.user_type_label }}
+                      </span>
+                      @if (user.roles.length > 1) {
+                        <span class="roles-count-tag" title="{{ user.roles.length }} أدوار مفعلة">
+                          +{{ user.roles.length - 1 }}
+                        </span>
+                      }
+                    </div>
+                  </td>
+
+                  <!-- الحالة -->
+                  <td class="col-status">
+                    <div class="status-cell">
+                      <span class="status-badge" [class]="getStatusBadgeClass(user.status)">
+                        <span class="status-dot"></span>
+                        {{ getStatusText(user.status) }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- الأمان والجلسات -->
+                  <td class="col-security">
+                    <div class="security-cell">
+                      @if (user.failed_login_attempts > 0) {
+                        <span class="failed-attempts-tag" title="محاولات تسجيل دخول فاشلة">
+                          ⚠️ {{ user.failed_login_attempts }} محاولات فاشلة
+                        </span>
+                      }
+                      <div class="sessions-indicator">
+                        <span class="dot-online"></span>
+                        <span>{{ user.active_sessions_count }} جلسة نشطة</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- التاريخ -->
+                  <td class="col-date">
+                    <span class="date-text">{{ user.created_at | date: 'dd/MM/yyyy' }}</span>
+                  </td>
+
+                  <!-- الإجراءات -->
+                  <td class="col-actions">
+                    <div class="actions-wrapper">
+                      <!-- زر معاينة -->
+                      <button class="action-btn" (click)="openDetailsDrawer(user)" title="عرض التفاصيل والجلسات">
+                        👁️
+                      </button>
+
+                      <!-- زر تعديل -->
+                      <button class="action-btn" (click)="openEditModal(user)" title="تعديل البيانات والأدوار">
+                        ✏️
+                      </button>
+
+                      <!-- زر كلمة المرور -->
+                      <button class="action-btn" (click)="openResetPasswordModal(user)" title="إعادة تعيين كلمة المرور">
+                        🔑
+                      </button>
+
+                      <!-- زر إلغاء القفل إذا كان مقفلاً -->
+                      @if (user.status === 'locked') {
+                        <button class="action-btn btn-unlock" (click)="confirmUnlock(user)" title="فك قفل الحساب">
+                          🔓
+                        </button>
+                      } @else {
+                        <!-- زر تبديل الحالة -->
+                        <button
+                          class="action-btn"
+                          [class.btn-suspend]="user.status === 'active'"
+                          [class.btn-activate]="user.status !== 'active'"
+                          (click)="confirmToggleStatus(user)"
+                          title="{{ user.status === 'active' ? 'تعليق الحساب' : 'تفعيل الحساب' }}"
+                        >
+                          {{ user.status === 'active' ? '⏸️' : '▶️' }}
+                        </button>
+                      }
+
+                      <!-- إنهاء الجلسات -->
+                      @if (user.active_sessions_count > 0) {
+                        <button class="action-btn btn-terminate" (click)="confirmTerminateSessions(user)" title="إنهاء جميع الجلسات">
+                          🚪
+                        </button>
+                      }
+
+                      <!-- حذف -->
+                      <button class="action-btn btn-delete" (click)="confirmDeleteUser(user)" title="حذف المستخدم">
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <!-- طريقة العرض كشبكة بطاقات (Grid View) -->
+        <div class="cards-grid">
+          @for (user of filteredUsers(); track user.id) {
+            <div class="user-card" [class.card-locked]="user.status === 'locked'">
+              <div class="card-header">
+                <div class="avatar-wrapper">
+                  @if (user.avatar_url) {
+                    <img [src]="user.avatar_url" [alt]="user.full_name" class="user-avatar" />
+                  } @else {
+                    <div class="user-avatar-placeholder" [class]="'avatar-' + user.user_type">
+                      {{ getUserInitials(user.full_name) }}
+                    </div>
+                  }
+                  <span class="status-indicator" [class]="'indicator-' + user.status"></span>
+                </div>
+                <div class="card-title-group">
+                  <div class="card-user-name" (click)="openDetailsDrawer(user)">{{ user.full_name }}</div>
+                  <div class="card-user-email">{{ user.email }}</div>
+                </div>
+                <span class="role-badge" [class]="getRoleBadgeClass(user.user_type)">
+                  {{ user.primary_role || user.user_type_label }}
+                </span>
+              </div>
+
+              <div class="card-body">
+                @if (user.phone) {
+                  <div class="card-meta-row">
+                    <span class="meta-icon">📱</span>
+                    <span dir="ltr">{{ user.phone }}</span>
+                  </div>
+                }
+                @if (user.national_id) {
+                  <div class="card-meta-row">
+                    <span class="meta-icon">🪪</span>
+                    <span>الرقم الوطني / الهوية: {{ user.national_id }}</span>
+                  </div>
+                }
+                <div class="card-meta-row">
+                  <span class="meta-icon">💻</span>
+                  <span>{{ user.active_sessions_count }} جلسة نشطة</span>
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <span class="status-badge" [class]="getStatusBadgeClass(user.status)">
+                  <span class="status-dot"></span>
+                  {{ getStatusText(user.status) }}
+                </span>
+
+                <div class="card-actions">
+                  <button class="action-btn" (click)="openEditModal(user)" title="تعديل">✏️</button>
+                  <button class="action-btn" (click)="openResetPasswordModal(user)" title="كلمة المرور">🔑</button>
+                  @if (user.status === 'locked') {
+                    <button class="action-btn btn-unlock" (click)="confirmUnlock(user)" title="فك القفل">🔓</button>
+                  } @else {
+                    <button class="action-btn" (click)="confirmToggleStatus(user)" title="الحالة">
+                      {{ user.status === 'active' ? '⏸️' : '▶️' }}
+                    </button>
+                  }
+                  <button class="action-btn btn-delete" (click)="confirmDeleteUser(user)" title="حذف">🗑️</button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </nb-panel>
+
+  <!-- ==================== نوافذ الحوار والمودال المخصصة (Custom Modals) ==================== -->
+
+  <!-- 1. مودال إضافة مستخدم جديد (Add User Modal) -->
+  @if (showAddModal()) {
+    <div class="nb-modal-backdrop animate-fade-in" (click)="closeAddModal()">
+      <div class="nb-modal-dialog" (click)="$event.stopPropagation()">
+        <div class="nb-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">➕</span>
+            <div>
+              <h3 class="modal-title">إضافة مستخدم جديد للنظام</h3>
+              <p class="modal-subtitle">إنشاء حساب مستخدم جديد وتعيين فئته ودوره للمنشأة التعليمية.</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" (click)="closeAddModal()">✕</button>
+        </div>
+
+        <form [formGroup]="userForm" (ngSubmit)="submitCreateUser()">
+          <div class="nb-modal-body">
+            @if (errorMessage()) {
+              <div class="alert alert-danger">{{ errorMessage() }}</div>
+            }
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">الاسم الأول <span class="required">*</span></label>
+                <input type="text" formControlName="first_name" class="form-input" placeholder="مثال: أحمد" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">اسم العائلة <span class="required">*</span></label>
+                <input type="text" formControlName="last_name" class="form-input" placeholder="مثال: الفاتح" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">البريد الإلكتروني <span class="required">*</span></label>
+                <input type="email" formControlName="email" class="form-input" placeholder="name@school.com" dir="ltr" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">اسم المستخدم (اختياري)</label>
+                <input type="text" formControlName="username" class="form-input" placeholder="ahmed_f" dir="ltr" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">رقم الجوال</label>
+                <input type="tel" formControlName="phone" class="form-input" placeholder="+249..." dir="ltr" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">رقم الهوية الوطنية / الإقامة ( الرقم الوطني )</label>
+                <input type="text" formControlName="national_id" class="form-input" placeholder="مثال: 123456789..." />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">فئة الحساب والدور الأساسي <span class="required">*</span></label>
+                <select formControlName="role_code" class="form-select">
+                  <option value="administrator">🛡️ إداري النظام والمشرف</option>
+                  <option value="teacher">👨‍🏫 معلم / هيئة تدريس</option>
+                  <option value="parent">👨‍👩‍👧 ولي أمر</option>
+                  <option value="student">🎓 طالب</option>
+                  @for (r of roles(); track r.id) {
+                    @if (!['administrator', 'teacher', 'parent', 'student'].includes(r.code)) {
+                      <option [value]="r.code">💼 {{ r.name }}</option>
+                    }
+                  }
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label class="form-label">حالة الحساب الأولية</label>
+                <select formControlName="status" class="form-select">
+                  <option value="active">✅ نشط فوراً</option>
+                  <option value="suspended">⏸️ معلق مؤقتاً</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field password-generator-field">
+              <label class="form-label">كلمة المرور الأولية للحساب</label>
+              <div class="input-with-action">
+                <input type="text" formControlName="password" class="form-input" dir="ltr" />
+                <button type="button" class="btn-subtle" (click)="userForm.patchValue({ password: generateRandomPassword() })">
+                  ⚡ توليد كلمة مرور
+                </button>
+              </div>
+              <div class="form-hint">يمكن للمستخدم تغيير كلمة مروره في أي وقت من خلال ملفه الشخصي.</div>
+            </div>
+          </div>
+
+          <div class="nb-modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeAddModal()">إلغاء</button>
+            <button type="submit" class="btn btn-primary" [disabled]="actionLoading() || userForm.invalid">
+              @if (actionLoading()) {
+                <span class="spinner-sm"></span> جاري الحفظ...
+              } @else {
+                <span>حفظ وإنشاء المستخدم</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- 2. مودال تعديل بيانات المستخدم والأدوار (Edit User Modal) -->
+  @if (showEditModal()) {
+    <div class="nb-modal-backdrop animate-fade-in" (click)="closeEditModal()">
+      <div class="nb-modal-dialog" (click)="$event.stopPropagation()">
+        <div class="nb-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">✏️</span>
+            <div>
+              <h3 class="modal-title">تعديل بيانات المستخدم والأدوار</h3>
+              <p class="modal-subtitle">{{ selectedUser()?.full_name }} ({{ selectedUser()?.email }})</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" (click)="closeEditModal()">✕</button>
+        </div>
+
+        <form [formGroup]="userForm" (ngSubmit)="submitEditUser()">
+          <div class="nb-modal-body">
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">الاسم الأول <span class="required">*</span></label>
+                <input type="text" formControlName="first_name" class="form-input" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">اسم العائلة <span class="required">*</span></label>
+                <input type="text" formControlName="last_name" class="form-input" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">البريد الإلكتروني <span class="required">*</span></label>
+                <input type="email" formControlName="email" class="form-input" dir="ltr" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">اسم المستخدم</label>
+                <input type="text" formControlName="username" class="form-input" dir="ltr" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label class="form-label">رقم الجوال</label>
+                <input type="tel" formControlName="phone" class="form-input" dir="ltr" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">رقم الهوية الوطنية / الإقامة ( الرقم الوطني )</label>
+                <input type="text" formControlName="national_id" class="form-input" placeholder="مثال: 123456789..." />
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label">حالة الحساب</label>
+              <select formControlName="status" class="form-select">
+                <option value="active">✅ نشط</option>
+                <option value="suspended">⏸️ معلق مؤقتاً</option>
+                <option value="locked">🔒 مقفل</option>
+                <option value="inactive">❌ غير نشط</option>
+              </select>
+            </div>
+
+            <!-- اختيار الأدوار المتعددة للمستخدم -->
+            <div class="roles-assignment-section">
+              <div class="section-title">الأدوار المخصصة للمستخدم في هذا المستأجر:</div>
+              <div class="roles-checkboxes-grid">
+                @for (role of roles(); track role.id) {
+                  <label class="role-checkbox-item">
+                    <input
+                      type="checkbox"
+                      [checked]="selectedUserRoles().includes(role.id)"
+                      (change)="toggleEditUserRole(role.id)"
+                    />
+                    <div class="role-meta">
+                      <span class="role-name">{{ role.name }}</span>
+                      <span class="role-code-badge">{{ role.code }}</span>
+                    </div>
+                  </label>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="nb-modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">إلغاء</button>
+            <button type="submit" class="btn btn-primary" [disabled]="actionLoading() || userForm.invalid">
+              @if (actionLoading()) {
+                <span class="spinner-sm"></span> جاري الحفظ...
+              } @else {
+                <span>حفظ التعديلات</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- 3. مودال إعادة تعيين كلمة المرور (Reset Password Modal) -->
+  @if (showResetPasswordModal()) {
+    <div class="nb-modal-backdrop animate-fade-in" (click)="closeResetPasswordModal()">
+      <div class="nb-modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="nb-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon text-amber">🔑</span>
+            <div>
+              <h3 class="modal-title">إعادة تعيين كلمة المرور</h3>
+              <p class="modal-subtitle">للمستخدم: {{ selectedUser()?.full_name }}</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" (click)="closeResetPasswordModal()">✕</button>
+        </div>
+
+        <div class="nb-modal-body">
+          <div class="form-field">
+            <label class="form-label">كلمة المرور الجديدة المقترحة</label>
+            <div class="password-display-card">
+              <span class="password-text">{{ resetPasswordValue() }}</span>
+              <button class="btn-copy" (click)="copyPassword()" title="نسخ إلى الحافظة">
+                {{ passwordCopied() ? '✓ تم النسخ' : '📋 نسخ' }}
+              </button>
+            </div>
+          </div>
+
+          <button type="button" class="btn-subtle w-full" (click)="regeneratePassword()">
+            🔄 توليد كلمة مرور جديدة أخرى
+          </button>
+
+          <div class="security-note">
+            ℹ️ عند تعيين كلمة المرور الجديدة، سيتم تلقائياً إنهاء أي جلسات مفتوحة للمستخدم لحماية حسابه.
+          </div>
+        </div>
+
+        <div class="nb-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeResetPasswordModal()">إلغاء</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="submitResetPassword()"
+            [disabled]="actionLoading() || !resetPasswordValue()"
+          >
+            @if (actionLoading()) {
+              <span class="spinner-sm"></span> جاري التعيين...
+            } @else {
+              <span>تأكيد وتعيين كلمة المرور</span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 4. مودال صلاحيات النماذج والموديولات (Permissions & Form Access Matrix Modal) -->
+  @if (showPermissionsModal()) {
+    <div class="nb-modal-backdrop animate-fade-in" (click)="closePermissionsModal()">
+      <div class="nb-modal-dialog modal-lg" (click)="$event.stopPropagation()">
+        <div class="nb-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon text-indigo">🔐</span>
+            <div>
+              <h3 class="modal-title">مصفوفة الصلاحيات والوصول إلى النماذج والموديولات</h3>
+              <p class="modal-subtitle">تحديد صلاحيات الوصول إلى النماذج الإلكترونية، القبول، المالية، والأكاديميات لكل دور.</p>
+            </div>
+          </div>
+          <button class="modal-close-btn" (click)="closePermissionsModal()">✕</button>
+        </div>
+
+        <div class="nb-modal-body">
+          <!-- اختيار الدور المطلوب تعديل صلاحياته -->
+          <div class="role-selector-bar">
+            <span class="selector-label">الدور المحدد:</span>
+            <div class="role-pill-group">
+              @for (r of roles(); track r.id) {
+                <button
+                  type="button"
+                  class="role-select-pill"
+                  [class.active]="currentPermRoleId() === r.id"
+                  (click)="currentPermRoleId.set(r.id)"
+                >
+                  {{ r.name }}
+                  <span class="sub-code">({{ r.code }})</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- قائمة الصلاحيات مصنفة حسب الموديول -->
+          <div class="permissions-container">
+            <div class="perm-category-header">
+              <span>📋 صلاحيات النماذج والطلبات (Forms Module)</span>
+            </div>
+            <div class="perms-grid">
+              @for (perm of permissions(); track perm.id) {
+                @if (perm.module === 'forms' || perm.code.startsWith('forms')) {
+                  <label class="perm-item" [class.perm-active]="hasPermission(perm.id)">
+                    <input
+                      type="checkbox"
+                      [checked]="hasPermission(perm.id)"
+                      (change)="toggleRolePermission(perm.id)"
+                    />
+                    <div class="perm-details">
+                      <div class="perm-title">{{ perm.name }}</div>
+                      <div class="perm-code">{{ perm.code }}</div>
+                    </div>
+                  </label>
+                }
+              }
+            </div>
+
+            <div class="perm-category-header mt-4">
+              <span>🏛️ صلاحيات النظام والعمليات الرئيسية</span>
+            </div>
+            <div class="perms-grid">
+              @for (perm of permissions(); track perm.id) {
+                @if (perm.module !== 'forms' && !perm.code.startsWith('forms')) {
+                  <label class="perm-item" [class.perm-active]="hasPermission(perm.id)">
+                    <input
+                      type="checkbox"
+                      [checked]="hasPermission(perm.id)"
+                      (change)="toggleRolePermission(perm.id)"
+                    />
+                    <div class="perm-details">
+                      <div class="perm-title">{{ perm.name }}</div>
+                      <div class="perm-code">{{ perm.code }}</div>
+                    </div>
+                  </label>
+                }
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="nb-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closePermissionsModal()">إغلاق</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="saveRolePermissions()"
+            [disabled]="actionLoading()"
+          >
+            @if (actionLoading()) {
+              <span class="spinner-sm"></span> جاري الحفظ...
+            } @else {
+              <span>حفظ وتطبيق الصلاحيات</span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 5. درج تفاصيل المستخدم (User Details Drawer) -->
+  @if (showDetailsDrawer() && selectedUser()) {
+    <div class="drawer-backdrop animate-fade-in" (click)="closeDetailsDrawer()">
+      <div class="drawer-panel" (click)="$event.stopPropagation()">
+        <div class="drawer-header">
+          <div class="drawer-user-card">
+            <div class="avatar-lg-wrapper">
+              @if (selectedUser()?.avatar_url) {
+                <img [src]="selectedUser()?.avatar_url" [alt]="selectedUser()?.full_name" class="avatar-lg" />
+              } @else {
+                <div class="avatar-lg-placeholder" [class]="'avatar-' + selectedUser()?.user_type">
+                  {{ getUserInitials(selectedUser()?.full_name || '') }}
+                </div>
+              }
+            </div>
+            <div class="drawer-user-meta">
+              <h3 class="drawer-name">{{ selectedUser()?.full_name }}</h3>
+              <div class="drawer-email">{{ selectedUser()?.email }}</div>
+              <span class="role-badge mt-2" [class]="getRoleBadgeClass(selectedUser()?.user_type || 'staff')">
+                {{ selectedUser()?.primary_role }}
+              </span>
+            </div>
+          </div>
+          <button class="drawer-close-btn" (click)="closeDetailsDrawer()">✕</button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="drawer-section">
+            <div class="section-heading">بيانات الحساب والاتصال</div>
+            <div class="detail-row">
+              <span class="detail-label">اسم المستخدم:</span>
+              <span class="detail-val">&#64;{{ selectedUser()?.username || '—' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">رقم الهاتف:</span>
+              <span class="detail-val" dir="ltr">{{ selectedUser()?.phone || 'غير مسجل' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">الرقم الوطني / الهوية:</span>
+              <span class="detail-val">{{ selectedUser()?.national_id || 'غير مسجل' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">حالة الحساب:</span>
+              <span class="status-badge" [class]="getStatusBadgeClass(selectedUser()?.status || 'active')">
+                {{ getStatusText(selectedUser()?.status || 'active') }}
+              </span>
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <div class="section-heading">الأدوار الممنوحة</div>
+            <div class="roles-chips-list">
+              @for (role of selectedUser()?.roles; track role.id) {
+                <div class="role-chip">
+                  <span class="chip-name">{{ role.name }}</span>
+                  <span class="chip-code">{{ role.code }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <div class="section-heading">الأمان والجلسات</div>
+            <div class="detail-row">
+              <span class="detail-label">الجلسات المفتوحة:</span>
+              <span class="detail-val">{{ selectedUser()?.active_sessions_count }} جلسة</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">محاولات الدخول الفاشلة:</span>
+              <span class="detail-val">{{ selectedUser()?.failed_login_attempts }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">تاريخ الإنشاء:</span>
+              <span class="detail-val">{{ selectedUser()?.created_at | date: 'dd/MM/yyyy - hh:mm a' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="drawer-footer">
+          <button class="btn btn-outline w-full" (click)="openEditModal(selectedUser()!); closeDetailsDrawer()">
+            ✏️ تعديل البيانات
+          </button>
+          <button class="btn btn-primary w-full" (click)="openResetPasswordModal(selectedUser()!); closeDetailsDrawer()">
+            🔑 تغيير كلمة المرور
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 6. مودال التأكيد المخصص (Custom Confirmation Modal - Strictly No native confirm) -->
+  @if (showConfirmModal() && confirmActionData()) {
+    <div class="nb-modal-backdrop animate-fade-in" (click)="closeConfirmModal()">
+      <div class="nb-modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="nb-modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon" [class.text-rose]="confirmActionData()?.danger" [class.text-indigo]="!confirmActionData()?.danger">
+              {{ confirmActionData()?.danger ? '⚠️' : 'ℹ️' }}
+            </span>
+            <div>
+              <h3 class="modal-title">{{ confirmActionData()?.title }}</h3>
+            </div>
+          </div>
+          <button class="modal-close-btn" (click)="closeConfirmModal()">✕</button>
+        </div>
+
+        <div class="nb-modal-body">
+          <p class="confirm-message-text">{{ confirmActionData()?.message }}</p>
+        </div>
+
+        <div class="nb-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeConfirmModal()">إلغاء</button>
+          <button
+            type="button"
+            class="btn"
+            [class.btn-danger]="confirmActionData()?.danger"
+            [class.btn-primary]="!confirmActionData()?.danger"
+            (click)="executeConfirmAction()"
+            [disabled]="actionLoading()"
+          >
+            @if (actionLoading()) {
+              <span class="spinner-sm"></span> جاري التنفيذ...
+            } @else {
+              <span>{{ confirmActionData()?.confirmText }}</span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

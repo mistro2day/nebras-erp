@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NotificationService } from '../../../core/services/notification.service';
+import { TenantService } from '../../../core/services/tenant.service';
 import { PlatformService } from '../platform.service';
 import { SaasBillingService } from '../../saas-billing/saas-billing.service';
 
@@ -88,11 +89,12 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
                   </td>
                   <td><span class="chip" [class.on]="t.is_active">{{ t.is_active ? 'نشط' : 'معطّل' }}</span></td>
                   <td class="acts">
+                    <button class="btn primary xs" (click)="switchToTenant(t)" title="التبديل إلى لوحة هذه المدرسة">👁️ دخول المستأجر</button>
                     <button class="btn ghost xs" (click)="openEdit(t)">تعديل</button>
                     @if (t.sub) {
                       <button class="btn ghost xs" (click)="goBilling(t)">الفوترة</button>
                     } @else {
-                      <button class="btn primary xs" (click)="openProvision(t)">تفعيل اشتراك</button>
+                      <button class="btn ghost xs" (click)="openProvision(t)">تفعيل اشتراك</button>
                     }
                   </td>
                 </tr>
@@ -269,6 +271,7 @@ export class PlatformTenantsComponent implements OnInit {
   private billing = inject(SaasBillingService);
   private notify = inject(NotificationService);
   private router = inject(Router);
+  private tenantService = inject(TenantService);
 
   readonly tab = signal<'tenants' | 'requests'>('tenants');
   readonly tenants = signal<any[]>([]);
@@ -405,4 +408,20 @@ export class PlatformTenantsComponent implements OnInit {
   }
 
   goBilling(t: any): void { this.router.navigate(['/saas-billing']); }
+
+  switchToTenant(t: any): void {
+    const tenantInfo = {
+      id: t.id,
+      name: t.name_en || t.name || 'School',
+      nameAr: t.name_ar || t.name || 'المدرسة',
+      primaryColor: t.primary_color || '#3F51B5',
+      secondaryColor: t.secondary_color || '#7A8093',
+      logoUrl: t.logo_url,
+    };
+    this.tenantService.setTenant(tenantInfo);
+    this.notify.success(`تم الانتقال للعمل على مستأجر: ${tenantInfo.nameAr}`);
+    this.router.navigate(['/dashboard']).then(() => {
+      window.location.reload();
+    });
+  }
 }
