@@ -3,6 +3,8 @@ from django.http import JsonResponse
 from django.urls import path, include
 
 
+from apps.common.interfaces.dashboard_views import DashboardOverviewView
+
 def health_check(request):
     """نقطة نهاية بسيطة للتحقق من حياة الخدمة دون الحاجة لمستأجر."""
     return JsonResponse({'status': 'ok'})
@@ -10,6 +12,7 @@ def health_check(request):
 
 urlpatterns = [
     path('api/v1/health/', health_check, name='health-check'),
+    path('api/v1/dashboard/overview/', DashboardOverviewView.as_view(), name='dashboard-overview'),
     path('admin/', admin.site.urls),
     path('api/v1/tenants/', include('apps.tenants.interfaces.urls')),
     path('api/v1/identity/', include('apps.identity.interfaces.urls')),
