@@ -8,12 +8,12 @@ class AppConfig {
   /// --dart-define=API_BASE_URL=https://api.example.com/api/v1
   static const String _envBase = String.fromEnvironment('API_BASE_URL');
 
-  /// عنوان الـ API الأساسي. إن لم يُمرَّر عبر البيئة، يُختار تلقائياً:
-  /// - الويب/سطح المكتب: 127.0.0.1 (نفس الجهاز).
-  /// - محاكي Android: 10.0.2.2 يشير إلى localhost الجهاز المضيف.
+  /// عنوان الـ API الأساسي (خادم ريندر السحابي المباشر):
+  static const String renderBaseUrl = 'https://nebras-erp-api-85v9.onrender.com/api/v1';
+
   static String get apiBaseUrl {
     if (_envBase.isNotEmpty) return _envBase;
-    return kIsWeb ? 'http://127.0.0.1:8000/api/v1' : 'http://10.0.2.2:8000/api/v1';
+    return renderBaseUrl;
   }
 
   /// معرّف المستأجر الافتراضي (مدرسة نبراس) — يُستخدم عند تشغيل خادم مستأجر واحد.
