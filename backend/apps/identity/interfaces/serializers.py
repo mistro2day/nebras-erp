@@ -75,10 +75,22 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.portal_user.user_type
         # 2. فحص أدوار النظام
         codes = self.get_role_codes(obj)
-        if 'administrator' in codes or obj.is_superuser or obj.is_staff:
-            return 'admin'
         if 'teacher' in codes or 'faculty' in codes:
             return 'teacher'
+        # 3. فحص الارتباط بهيئة التدريس عبر البريد
+        try:
+            from apps.employees.domain.models import Employee
+            from apps.faculty.domain.models import FacultyMember
+            tenant_id = self._get_tenant_id()
+            emp = Employee.objects.filter(email__iexact=obj.email, deleted_at__isnull=True).first()
+            if emp and FacultyMember.objects.filter(employee_id=emp.id, deleted_at__isnull=True).exists():
+                return 'teacher'
+        except Exception:
+            pass
+        if 'administrator' in codes or obj.is_superuser:
+            return 'admin'
+        if obj.is_staff:
+            return 'admin'
         if 'parent' in codes:
             return 'parent'
         if 'student' in codes:

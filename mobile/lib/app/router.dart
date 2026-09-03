@@ -10,16 +10,23 @@ import '../features/parent/presentation/child_detail_page.dart';
 import '../features/parent/presentation/pay_page.dart';
 import '../features/student/presentation/student_shell.dart';
 import '../features/teacher/presentation/teacher_shell.dart';
+import '../features/teacher/presentation/take_attendance_page.dart';
+import '../features/teacher/presentation/class_students_page.dart';
+import '../features/admin/presentation/admin_shell.dart';
+import '../features/admissions/presentation/admissions_list_page.dart';
+import '../features/admissions/presentation/applicant_detail_page.dart';
+import '../features/admissions/presentation/new_applicant_form_page.dart';
 import '../features/common/role_placeholder_page.dart';
 
 String _homePathFor(UserRole role) {
   switch (role) {
+    case UserRole.admin:
+      return '/admin';
     case UserRole.parent:
       return '/parent';
     case UserRole.student:
       return '/student';
     case UserRole.teacher:
-    case UserRole.admin:
       return '/teacher';
     default:
       return '/placeholder';
@@ -45,9 +52,30 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
+      GoRoute(path: '/admin', builder: (c, s) => const AdminShell()),
+      GoRoute(path: '/admin/admissions', builder: (c, s) => const AdmissionsListPage()),
+      GoRoute(path: '/admin/admissions/new', builder: (c, s) => const NewApplicantFormPage()),
+      GoRoute(
+        path: '/admin/admissions/:id',
+        builder: (c, s) => ApplicantDetailPage(applicantId: s.pathParameters['id']!),
+      ),
       GoRoute(path: '/parent', builder: (c, s) => const ParentShell()),
       GoRoute(path: '/student', builder: (c, s) => const StudentShell()),
       GoRoute(path: '/teacher', builder: (c, s) => const TeacherShell()),
+      GoRoute(
+        path: '/teacher/sections/:id/attendance',
+        builder: (c, s) => TakeAttendancePage(
+          sectionId: s.pathParameters['id']!,
+          title: (s.extra as String?) ?? 'رصد الحضور',
+        ),
+      ),
+      GoRoute(
+        path: '/teacher/sections/:id/students',
+        builder: (c, s) => ClassStudentsPage(
+          sectionId: s.pathParameters['id']!,
+          title: (s.extra as String?) ?? 'قائمة الطلاب',
+        ),
+      ),
       GoRoute(
         path: '/parent/child/:id',
         builder: (c, s) => ChildDetailPage(studentId: s.pathParameters['id']!),

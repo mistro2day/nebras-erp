@@ -515,6 +515,103 @@ class TeacherPortalService:
         out.sort(key=lambda x: x['name'])
         return {'students': out, 'count': len(out)}
 
+    @classmethod
+    def get_section_attendance(cls, tenant_id, user, section_id, target_date):
+        """جلب طلاب الشعبة مع حالات حضورهم لتاريخ محدد."""
+        fm = cls.resolve_faculty_member(tenant_id, user)
+        if not fm:
+            return None
+        from apps.faculty.domain.models import TeacherAssignment
+        allowed = TeacherAssignment.objects.filter(
+            tenant_id=tenant_id, faculty_member_id=fm.id,
+            section_id=section_id, deleted_at__isnull=True).exists()
+        if not allowed:
+            raise PermissionDenied('هذه الشعبة ليست ضمن إسناداتك.')
+
+        students_data = cls.get_section_students(tenant_id, user, section_id)
+        if not students_data:
+            return {'students': [], 'date': str(target_date)}
+
+        from apps.attendance.domain.models import StudentDailyAttendance
+        student_ids = [s['student_id'] for s in students_data['students']]
+        existing_recs = {
+            str(r.student_id): r
+            for r in StudentDailyAttendance.objects.filter(
+                tenant_id=tenant_id, student_id__in=student_ids, date=target_date, deleted_at__isnull=True
+            )
+        }
+
+        records = []
+        for s in students_data['students']:
+            rec = existing_recs.get(s['student_id'])
+            records.append({
+                'student_id': s['student_id'],
+                'student_number': s['student_number'],
+                'name': s['name'],
+                'gender': s['gender'],
+                'status': rec.status if rec else 'present',
+                'notes': rec.notes if rec else '',
+                'recorded': rec is not None,
+            })
+
+        return {
+            'date': str(target_date),
+            'section_id': str(section_id),
+            'students': records,
+            'summary': {
+                'total': len(records),
+                'present': sum(1 for r in records if r['status'] == 'present'),
+                'absent': sum(1 for r in records if r['status'] == 'absent'),
+                'late': sum(1 for r in records if r['status'] == 'late'),
+                'excused': sum(1 for r in records if r['status'] in ('excused', 'excused_absence')),
+            }
+        }
+
+    @classmethod
+    def save_section_attendance(cls, tenant_id, user, section_id, target_date, records):
+        """حفظ كشف حضور طلاب الشعبة لتاريخ محدد."""
+        fm = cls.resolve_faculty_member(tenant_id, user)
+        if not fm:
+            return None
+        from apps.faculty.domain.models import TeacherAssignment
+        allowed = TeacherAssignment.objects.filter(
+            tenant_id=tenant_id, faculty_member_id=fm.id,
+            section_id=section_id, deleted_at__isnull=True).exists()
+        if not allowed:
+            raise PermissionDenied('هذه الشعبة ليست ضمن إسناداتك.')
+
+        from django.db import transaction
+        from apps.attendance.domain.models import StudentDailyAttendance
+
+        valid_statuses = {'present', 'absent', 'late', 'excused_absence', 'excused'}
+        saved_count = 0
+
+        with transaction.atomic():
+            for item in records:
+                s_id = item.get('student_id')
+                raw_status = item.get('status', 'present')
+                status = 'excused_absence' if raw_status == 'excused' else raw_status
+                if status not in valid_statuses:
+                    status = 'present'
+                notes = item.get('notes', '')
+
+                StudentDailyAttendance.objects.update_or_create(
+                    tenant_id=tenant_id,
+                    student_id=s_id,
+                    date=target_date,
+                    defaults={
+                        'status': status,
+                        'notes': notes,
+                    }
+                )
+                saved_count += 1
+
+        return {
+            'saved': saved_count,
+            'date': str(target_date),
+            'section_id': str(section_id),
+        }
+
 
 class PortalReportService:
     """

@@ -45,6 +45,33 @@ class ApiService {
     }
   }
 
+  Future<dynamic> patch(String path, {dynamic data}) async {
+    try {
+      final res = await _dio.patch(path, data: data);
+      return res.data;
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<dynamic> put(String path, {dynamic data}) async {
+    try {
+      final res = await _dio.put(path, data: data);
+      return res.data;
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<dynamic> delete(String path, {dynamic data}) async {
+    try {
+      final res = await _dio.delete(path, data: data);
+      return res.data;
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// تنزيل محتوى ثنائي (مثل PDF) مع حقن التوكن والمستأجر.
   Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
     try {

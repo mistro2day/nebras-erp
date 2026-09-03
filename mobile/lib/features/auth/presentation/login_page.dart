@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/theme/app_theme.dart';
+import 'package:nebras_mobile/core/theme/app_theme.dart';
 import '../application/auth_controller.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -68,14 +68,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     child: const Icon(Icons.school_rounded, color: Colors.white, size: 44),
                   ),
-                  const SizedBox(height: 18),
                   Text('نبراس',
                       style: GoogleFonts.tajawal(
-                          fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white)),
-                  Text('بوابة ولي الأمر',
+                          fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Text('المنصة المدرسية الموحدة',
                       style: GoogleFonts.tajawal(
-                          fontSize: 15, color: Colors.white.withAlpha(180))),
-                  const SizedBox(height: 30),
+                          fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white.withAlpha(220))),
+                  const SizedBox(height: 2),
+                  Text('تسجيل الدخول الموحد لجميع البوابات (إدارة • معلمين • أولياء أمور • طلاب)',
+                      style: GoogleFonts.tajawal(
+                          fontSize: 12, color: Colors.white.withAlpha(160))),
+                  const SizedBox(height: 28),
                   Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(

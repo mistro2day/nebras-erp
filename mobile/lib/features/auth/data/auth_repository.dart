@@ -25,10 +25,7 @@ class AuthRepository {
     if (token == null || user == null) {
       throw ApiException('استجابة الدخول غير متوقّعة من الخادم.');
     }
-    final role = roleFromPortalType(
-      user['portal_user_type']?.toString(),
-      isStaff: user['is_staff'] == true || user['is_superuser'] == true,
-    );
+    final role = roleFromUserData(user);
     return (token: token, user: user, role: role);
   }
 

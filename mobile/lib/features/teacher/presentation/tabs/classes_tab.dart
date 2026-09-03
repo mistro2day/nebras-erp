@@ -7,6 +7,7 @@ import '../../../auth/application/auth_controller.dart';
 import '../../application/teacher_providers.dart';
 import '../../domain/models.dart';
 import '../class_students_page.dart';
+import '../take_attendance_page.dart';
 
 /// تبويب فصول المعلّم: بطاقات إسناداته (المادة/الشعبة/الصف/عدد الطلاب).
 class ClassesTab extends ConsumerWidget {
@@ -109,50 +110,125 @@ class _ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = '${cls.subject} · ${cls.grade ?? ''} (${cls.section ?? ''})';
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ClassStudentsPage(
-            sectionId: cls.sectionId,
-            title: '${cls.subject} · ${cls.section ?? ''}',
-          ),
-        )),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: NebrasTheme.accent.withAlpha(24),
-                  borderRadius: BorderRadius.circular(12),
+      margin: const EdgeInsets.only(bottom: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 1.5,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: NebrasTheme.accent.withAlpha(24),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.menu_book, color: NebrasTheme.accent, size: 26),
                 ),
-                child: const Icon(Icons.menu_book, color: NebrasTheme.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(cls.subject,
-                        style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 2),
-                    Text('${cls.grade ?? ''} · شعبة ${cls.section ?? ''}',
-                        style: GoogleFonts.tajawal(fontSize: 12, color: NebrasTheme.textMuted)),
-                    const SizedBox(height: 4),
-                    Text('${cls.students} طالب · ${cls.weeklyHours} حصص أسبوعياً',
-                        style: GoogleFonts.tajawal(fontSize: 12, color: NebrasTheme.accent)),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cls.subject,
+                        style: GoogleFonts.tajawal(fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${cls.grade ?? ''} · شعبة ${cls.section ?? ''}',
+                        style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_left, color: NebrasTheme.textMuted),
-            ],
-          ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F3F5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${cls.students} طالب',
+                    style: GoogleFonts.tajawal(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            // أزرار الإجراءات السريعة
+            Row(
+              children: [
+                // زر رصد الحضور الرئيسي
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B4D3E), // أخضر زمردي داكن نبراس
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    icon: const Icon(Icons.fact_check_outlined, size: 18),
+                    label: Text(
+                      'رصد الحضور والغياب',
+                      style: GoogleFonts.tajawal(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TakeAttendancePage(
+                          sectionId: cls.sectionId,
+                          title: title,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // زر قائمة الطلاب
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    icon: const Icon(Icons.people_outline, size: 18),
+                    label: Text(
+                      'الطلاب',
+                      style: GoogleFonts.tajawal(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ClassStudentsPage(
+                          sectionId: cls.sectionId,
+                          title: title,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
+

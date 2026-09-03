@@ -77,6 +77,56 @@ class TeacherSectionStudentsView(APIView):
         return Response(data)
 
 
+class TeacherSectionAttendanceView(APIView):
+    """جلب وحفظ كشف حضور طلاب شعبة يدرّسها المعلّم."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, section_id):
+        tenant_id = request.headers.get('X-Tenant-ID') or getattr(request, 'tenant_id', None)
+        date_str = request.query_params.get('date')
+        if not date_str:
+            import datetime
+            target_date = datetime.date.today()
+        else:
+            import datetime
+            try:
+                target_date = datetime.date.fromisoformat(date_str)
+            except ValueError:
+                target_date = datetime.date.today()
+
+        try:
+            data = TeacherPortalService.get_section_attendance(tenant_id, request.user, section_id, target_date)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        if data is None:
+            return Response({"detail": "حسابك غير مرتبط بعضو هيئة تدريس."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response(data)
+
+    def post(self, request, section_id):
+        tenant_id = request.headers.get('X-Tenant-ID') or getattr(request, 'tenant_id', None)
+        date_str = request.data.get('date')
+        if not date_str:
+            import datetime
+            target_date = datetime.date.today()
+        else:
+            import datetime
+            try:
+                target_date = datetime.date.fromisoformat(date_str)
+            except ValueError:
+                target_date = datetime.date.today()
+
+        records = request.data.get('attendances', [])
+        try:
+            res = TeacherPortalService.save_section_attendance(tenant_id, request.user, section_id, target_date, records)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        if res is None:
+            return Response({"detail": "حسابك غير مرتبط بعضو هيئة تدريس."},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response({'success': True, 'message': 'تم تثبيت كشف الحضور بنجاح.', 'data': res})
+
+
 class ParentDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 

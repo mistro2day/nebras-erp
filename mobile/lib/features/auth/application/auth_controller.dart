@@ -22,10 +22,7 @@ class AuthController extends Notifier<Session?> {
     final token = await store.readToken();
     final user = await store.readUser();
     if (token != null && user != null) {
-      final role = roleFromPortalType(
-        user['portal_user_type']?.toString(),
-        isStaff: user['is_staff'] == true || user['is_superuser'] == true,
-      );
+      final role = roleFromUserData(user);
       state = Session(token: token, user: user, role: role);
     }
   }
