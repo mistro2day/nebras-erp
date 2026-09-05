@@ -55,19 +55,53 @@ export class TenantService {
   private resolveSurface(hostname: string): void {
     const host = (hostname || '').split(':')[0].toLowerCase();
 
-    // نطاقات التطوير/الاستضافة أو IP
-    const isDevHost = DEV_HOST_SUFFIXES.some(s => host === s || host.endsWith(s));
+    // 1. فحص عناوين IP المباشرة (مثل 127.0.0.1 أو 192.168.x.x)
     const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-    if (isDevHost || isIp) {
+    if (isIp) {
       this.isDevHost.set(true);
-      const parts = host.split('.');
-      if (parts.length > 2 && !RESERVED_SUBDOMAINS.includes(parts[0]) && !parts[0].startsWith('nebras-erp')) {
+      this.surface.set('public');
+      this.subdomain.set(null);
+      return;
+    }
+
+    // 2. فحص نطاقات التطوير (localhost ومشتقاتها)
+    if (host === 'localhost') {
+      this.isDevHost.set(true);
+      this.surface.set('public');
+      this.subdomain.set(null);
+      return;
+    }
+
+    if (host.endsWith('.localhost')) {
+      this.isDevHost.set(true);
+      const sub = host.replace('.localhost', '');
+      if (sub && !RESERVED_SUBDOMAINS.includes(sub)) {
         this.surface.set('tenant');
-        this.subdomain.set(parts[0]);
+        this.subdomain.set(sub);
       } else {
         this.surface.set('public');
         this.subdomain.set(null);
       }
+      return;
+    }
+
+    // 3. نطاقات الاستضافة السحابية التجريبية (Vercel / Render / Ngrok)
+    const isCloudDev = DEV_HOST_SUFFIXES.some(s => host.endsWith(s));
+    if (isCloudDev) {
+      this.isDevHost.set(true);
+      const parts = host.split('.');
+      if (parts[0].startsWith('nebras-erp') || RESERVED_SUBDOMAINS.includes(parts[0])) {
+        this.surface.set('public');
+        this.subdomain.set(null);
+        return;
+      }
+      if (parts.length >= 4) {
+        this.surface.set('tenant');
+        this.subdomain.set(parts[0]);
+        return;
+      }
+      this.surface.set('public');
+      this.subdomain.set(null);
       return;
     }
 

@@ -21,6 +21,19 @@ export const publicSurfaceGuard: CanActivateFn = () => {
 };
 
 /**
+ * حارس بوابة الترحيب: إذا دخل الزائر على /welcome وهو على الموقع العام لنبراس (بلا نطاق مدرسة)،
+ * يتم توجيهه إلى الموقع التسويقي الرئيسي /nebras.
+ */
+export const welcomeSurfaceGuard: CanActivateFn = () => {
+  const tenant = inject(TenantService);
+  const router = inject(Router);
+  if (tenant.isPublicSite()) {
+    return router.createUrlTree(['/nebras']);
+  }
+  return true;
+};
+
+/**
  * حارس منطقة المالك: يمنع الوصول لشاشات المنصّة (إدارة المستأجرين/الفوترة) لغير المالكين.
  * متاح فقط لمالك المنصة (is_superuser) أو على نطاق admin المركزي.
  */

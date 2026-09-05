@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { DashboardLayoutComponent } from './layouts/dashboard-layout/dashboard-layout.component';
 import { authGuard } from './core/guards/auth.guard';
-import { publicSurfaceGuard, ownerSurfaceGuard } from './core/guards/surface.guard';
+import { publicSurfaceGuard, ownerSurfaceGuard, welcomeSurfaceGuard } from './core/guards/surface.guard';
 
 export const routes: Routes = [
   // صفحات المصادقة العامة (بلا شريط جانبي)
@@ -24,9 +24,10 @@ export const routes: Routes = [
     path: 'nebras',
     loadComponent: () => import('./features/public-site/nebras-home.component').then((m) => m.NebrasHomeComponent),
   },
-  // بوابة الهبوط العامة — أول ما يراه الزائر (تقديم / تتبّع / دخول الإدارة).
+  // بوابة الهبوط العامة — أول ما يراه الزائر لمدرسة (تقديم / تتبّع / دخول الإدارة).
   {
     path: 'welcome',
+    canActivate: [welcomeSurfaceGuard],
     loadComponent: () => import('./features/public/landing.component').then((m) => m.LandingComponent),
   },
   // البوابة العامة لتسجيل الطلاب — عامة بلا مصادقة ولا شريط جانبي.
