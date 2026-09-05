@@ -12,7 +12,6 @@ class AdmissionsListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(admissionsStatsProvider);
-    final stats = statsAsync.value ?? AdmissionsStats.mock();
     final filter = ref.watch(admissionsFilterProvider);
     final applicantsAsync = ref.watch(admissionsListProvider);
 

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 /// إعدادات التطبيق العامّة (قابلة للتهيئة حسب البيئة).
 class AppConfig {
   AppConfig._();
