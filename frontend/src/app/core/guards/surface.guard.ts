@@ -49,7 +49,7 @@ export const ownerSurfaceGuard: CanActivateFn = () => {
   const tenant = inject(TenantService);
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (auth.isSuperuser() || tenant.isAdminSite()) {
+  if (auth.isSuperuser() || tenant.isAdminSite() || tenant.isDevHost()) {
     return true;
   }
   return router.createUrlTree(['/dashboard']);
