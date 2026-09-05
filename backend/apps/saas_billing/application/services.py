@@ -305,20 +305,98 @@ def create_signup_request(*, school_name, subdomain, email, contact_name=None,
 
 
 @transaction.atomic
-def approve_signup_request(req, *, reviewed_by=None, trial_days: int = 14):
-    """يعتمد طلب الانضمام: يُنشئ المستأجر + اشتراكاً تجريبياً على الخطة المطلوبة."""
+def approve_signup_request(req, *, reviewed_by=None, trial_days: int = 7):
+    """يعتمد طلب الانضمام: يُنشئ المستأجر + الفرع الرئيسي + السنة الدراسية + الأدوار النظامية + حساب المدير + اشتراكاً تجريبياً (7 أيام)."""
     from apps.tenants.domain.models import Tenant
+    from apps.identity.domain.rbac import ensure_system_roles, UserRole
+    from apps.identity.domain.models import User
+    import datetime
+
     if req.status != 'pending':
         raise ValueError('لا يمكن اعتماد طلب غير معلّق.')
     if not subdomain_available(req.subdomain, exclude_request_id=req.id):
         raise ValueError('النطاق الفرعي لم يعد متاحاً.')
 
+    # 1. إنشاء المستأجر
     tenant = Tenant.objects.create(
-        name=req.school_name, name_ar=req.school_name, subdomain=req.subdomain,
-        email=req.email, phone_number=req.phone, is_active=True,
+        name=req.school_name,
+        name_ar=req.school_name,
+        subdomain=req.subdomain,
+        email=req.email,
+        phone_number=req.phone,
+        address=req.city or 'السودان',
+        is_active=True,
     )
-    if req.plan:
-        create_subscription(tenant_id=tenant.id, plan=req.plan, trial_days=trial_days)
+
+    # 2. تهيئة الأدوار والصلاحيات النظامية
+    roles = ensure_system_roles(tenant.id)
+    admin_role = roles.get('administrator')
+
+    # 3. إنشاء أو ربط حساب مدير المدرسة
+    user_email = (req.email or '').strip().lower()
+    admin_user = User.objects.filter(email=user_email).first()
+    contact_parts = (req.contact_name or req.school_name or 'مدير المدرسة').strip().split()
+    first_name = contact_parts[0] if contact_parts else 'مدير'
+    last_name = ' '.join(contact_parts[1:]) if len(contact_parts) > 1 else 'المدرسة'
+
+    if not admin_user:
+        admin_user = User.objects.create_user(
+            email=user_email,
+            username=f"admin_{req.subdomain}",
+            first_name=first_name,
+            last_name=last_name,
+            phone=req.phone,
+            password='Nebras@2026Password'  # كلمة مرور أولية قابلة للتغيير
+        )
+
+    if admin_role:
+        UserRole.objects.get_or_create(tenant_id=tenant.id, user=admin_user, role=admin_role)
+
+    # 4. إنشاء الفرع الرئيسي الافتراضي
+    try:
+        from apps.organization.domain.models import Branch
+        Branch.objects.get_or_create(
+            tenant_id=tenant.id,
+            code='MAIN',
+            defaults={
+                'name': f'الفرع الرئيسي - {tenant.name_ar or tenant.name}',
+                'name_ar': f'الفرع الرئيسي - {tenant.name_ar or tenant.name}',
+                'city': req.city or 'الخرطوم',
+                'state': req.city or 'ولاية الخرطوم',
+                'country': 'السودان',
+                'school_gender_type': 'coed',
+                'is_active': True,
+            }
+        )
+    except Exception:
+        pass
+
+    # 5. إنشاء العام الدراسي الحالي الافتراضي
+    try:
+        from apps.academics.domain.models import AcademicYear
+        now_year = timezone.now().year
+        AcademicYear.objects.get_or_create(
+            tenant_id=tenant.id,
+            code=f"{now_year}-{now_year+1}",
+            defaults={
+                'name': f"العام الدراسي {now_year}/{now_year+1}",
+                'start_date': datetime.date(now_year, 7, 1),
+                'end_date': datetime.date(now_year + 1, 6, 30),
+                'status': 'active',
+                'current_flag': True,
+            }
+        )
+    except Exception:
+        pass
+
+    # 6. ربط باقة الاشتراك بفترة التجربة (افتراضياً 7 أيام)
+    plan_to_use = req.plan
+    if not plan_to_use:
+        from apps.saas_billing.domain.models import SubscriptionPlan
+        plan_to_use = SubscriptionPlan.objects.filter(is_active=True).order_by('price').first()
+
+    if plan_to_use:
+        create_subscription(tenant_id=tenant.id, plan=plan_to_use, trial_days=trial_days or 7)
 
     req.status = 'approved'
     req.created_tenant = tenant

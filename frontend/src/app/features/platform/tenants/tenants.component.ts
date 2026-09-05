@@ -48,8 +48,8 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
                   <td><span class="chip" [class]="'sg-' + r.status">{{ r.status_display }}</span></td>
                   <td class="acts">
                     @if (r.status === 'pending') {
-                      <button class="btn primary xs" (click)="approveReq(r)">اعتماد وإنشاء</button>
-                      <button class="btn ghost xs" (click)="rejectReq(r)">رفض</button>
+                      <button class="btn primary xs" (click)="openApproveModal(r)">اعتماد وتفعيل أسبوع</button>
+                      <button class="btn ghost xs btn-danger-txt" (click)="openRejectModal(r)">رفض</button>
                     } @else if (r.created_tenant_subdomain) {
                       <span class="mono done">{{ r.created_tenant_subdomain }}</span>
                     }
@@ -195,6 +195,78 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
           </div>
         </div>
       }
+
+      <!-- مودال اعتماد وتفعيل أسبوع تجريبي لمدرسة -->
+      @if (approvingReq(); as r) {
+        <div class="overlay" (click)="approvingReq.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>اعتماد وتفعيل مدرسة — {{ r.school_name }}</h3>
+              <p class="modal-sub">سيتم إنشاء حساب المستأجر، الفرع الرئيسي، الأدوار النظامية، وحساب المدير تلقائياً.</p>
+            </div>
+            <div class="fields">
+              <div class="grid2">
+                <label>
+                  <span>اسم المدرسة</span>
+                  <input type="text" [value]="r.school_name" disabled />
+                </label>
+                <label>
+                  <span>النطاق الفرعي المخصص</span>
+                  <input type="text" [value]="r.subdomain + '.nebras.sd'" disabled />
+                </label>
+              </div>
+              <div class="grid2">
+                <label>
+                  <span>اسم المسؤول / المدير</span>
+                  <input type="text" [value]="r.contact_name || '—'" disabled />
+                </label>
+                <label>
+                  <span>البريد الإلكتروني</span>
+                  <input type="text" [value]="r.email" disabled />
+                </label>
+              </div>
+              <label>
+                <span>مدة الفترة التجريبية المجانية</span>
+                <select [(ngModel)]="approvalTrialDays">
+                  <option [value]="7">أسبوع واحد (7 أيام) — الخيار القياسي للتجربة</option>
+                  <option [value]="14">أسبوعين (14 يوماً)</option>
+                  <option [value]="30">شهر كامل (30 يوماً)</option>
+                </select>
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button class="btn ghost" (click)="approvingReq.set(null)">إلغاء</button>
+              <button class="btn primary" [disabled]="saving()" (click)="confirmApprove(r)">
+                {{ saving() ? 'جارٍ التهيئة والاعتماد…' : 'تأكيد الاعتماد وتفعيل المدرسة' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- مودال رفض الطلب المخصص -->
+      @if (rejectingReq(); as r) {
+        <div class="overlay" (click)="rejectingReq.set(null)">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>رفض طلب الانضمام — {{ r.school_name }}</h3>
+              <p class="modal-sub">يمكنك توضيح سبب الرفض لتسجيله في المنظومة.</p>
+            </div>
+            <div class="fields">
+              <label>
+                <span>سبب الرفض (اختياري)</span>
+                <input type="text" [(ngModel)]="rejectionReason" placeholder="اكتب سبب الرفض إن وُجد..." />
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button class="btn ghost" (click)="rejectingReq.set(null)">تراجع</button>
+              <button class="btn ghost btn-danger-txt" [disabled]="saving()" (click)="confirmReject(r)">
+                {{ saving() ? 'جارٍ الرفض…' : 'تأكيد رفض الطلب' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -313,18 +385,50 @@ export class PlatformTenantsComponent implements OnInit {
     this.billing.getSignupRequests().subscribe({ next: (r) => this.requests.set(r?.data ?? []) });
   }
 
-  approveReq(r: any): void {
-    if (!confirm(`اعتماد طلب «${r.school_name}» وإنشاء نطاق ${r.subdomain}.nebras.com؟`)) return;
-    this.billing.approveSignup(r.id).subscribe({
-      next: (res) => { this.notify.success(res?.message || 'تم الاعتماد وإنشاء المستأجر.'); this.load(); },
-      error: (e) => this.notify.error(e?.error?.message || 'تعذّر الاعتماد.'),
+  readonly approvingReq = signal<any | null>(null);
+  readonly rejectingReq = signal<any | null>(null);
+  approvalTrialDays = 7;
+  rejectionReason = '';
+
+  openApproveModal(r: any): void {
+    this.approvalTrialDays = 7;
+    this.approvingReq.set(r);
+  }
+
+  confirmApprove(r: any): void {
+    this.saving.set(true);
+    this.billing.approveSignup(r.id, Number(this.approvalTrialDays) || 7).subscribe({
+      next: (res) => {
+        this.saving.set(false);
+        this.approvingReq.set(null);
+        this.notify.success(res?.message || 'تم الاعتماد وتفعيل المدرسة بنجاح.');
+        this.load();
+      },
+      error: (e) => {
+        this.saving.set(false);
+        this.notify.error(e?.error?.message || 'تعذّر الاعتماد.');
+      },
     });
   }
-  rejectReq(r: any): void {
-    const reason = prompt('سبب الرفض (اختياري):') ?? undefined;
-    this.billing.rejectSignup(r.id, reason).subscribe({
-      next: () => { this.notify.success('تم رفض الطلب.'); this.load(); },
-      error: () => this.notify.error('تعذّر الرفض.'),
+
+  openRejectModal(r: any): void {
+    this.rejectionReason = '';
+    this.rejectingReq.set(r);
+  }
+
+  confirmReject(r: any): void {
+    this.saving.set(true);
+    this.billing.rejectSignup(r.id, this.rejectionReason || undefined).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.rejectingReq.set(null);
+        this.notify.success('تم رفض الطلب.');
+        this.load();
+      },
+      error: (e) => {
+        this.saving.set(false);
+        this.notify.error(e?.error?.message || 'تعذّر الرفض.');
+      },
     });
   }
 

@@ -20,8 +20,14 @@ class AdmissionsListPage extends ConsumerWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('إدارة القبول والتسجيل',
-              style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          title: Text(
+            'إدارة القبول والتسجيل',
+            style: GoogleFonts.tajawal(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded, color: Colors.white),
@@ -38,7 +44,13 @@ class AdmissionsListPage extends ConsumerWidget {
           foregroundColor: Colors.white,
           elevation: 4,
           icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: Text('تقديم طلب جديد', style: GoogleFonts.tajawal(fontWeight: FontWeight.bold, fontSize: 14)),
+          label: Text(
+            'تقديم طلب جديد',
+            style: GoogleFonts.tajawal(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
           onPressed: () => context.push('/admin/admissions/new'),
         ),
         body: Column(
@@ -54,15 +66,22 @@ class AdmissionsListPage extends ConsumerWidget {
                     child: SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: NebrasTheme.primary),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: NebrasTheme.primary,
+                      ),
                     ),
                   ),
                 ),
-                error: (_, __) => Row(
+                error: (_, _) => Row(
                   children: [
                     _buildStatItem('إجمالي الطلبات', '-', NebrasTheme.primary),
                     _buildDivider(),
-                    _buildStatItem('قيد المراجعة', '-', const Color(0xFF0284C7)),
+                    _buildStatItem(
+                      'قيد المراجعة',
+                      '-',
+                      const Color(0xFF0284C7),
+                    ),
                     _buildDivider(),
                     _buildStatItem('مقابلات', '-', Colors.amber.shade800),
                     _buildDivider(),
@@ -71,13 +90,29 @@ class AdmissionsListPage extends ConsumerWidget {
                 ),
                 data: (stats) => Row(
                   children: [
-                    _buildStatItem('إجمالي الطلبات', '${stats.totalApplicants}', NebrasTheme.primary),
+                    _buildStatItem(
+                      'إجمالي الطلبات',
+                      '${stats.totalApplicants}',
+                      NebrasTheme.primary,
+                    ),
                     _buildDivider(),
-                    _buildStatItem('قيد المراجعة', '${stats.underReviewCount}', const Color(0xFF0284C7)),
+                    _buildStatItem(
+                      'قيد المراجعة',
+                      '${stats.underReviewCount}',
+                      const Color(0xFF0284C7),
+                    ),
                     _buildDivider(),
-                    _buildStatItem('مقابلات', '${stats.interviewScheduledCount}', Colors.amber.shade800),
+                    _buildStatItem(
+                      'مقابلات',
+                      '${stats.interviewScheduledCount}',
+                      Colors.amber.shade800,
+                    ),
                     _buildDivider(),
-                    _buildStatItem('مقبولون', '${stats.acceptedCount}', NebrasTheme.success),
+                    _buildStatItem(
+                      'مقبولون',
+                      '${stats.acceptedCount}',
+                      NebrasTheme.success,
+                    ),
                   ],
                 ),
               ),
@@ -90,15 +125,30 @@ class AdmissionsListPage extends ConsumerWidget {
               child: Column(
                 children: [
                   TextField(
-                    onChanged: (val) => ref.read(admissionsFilterProvider.notifier).setSearch(val),
+                    onChanged: (val) => ref
+                        .read(admissionsFilterProvider.notifier)
+                        .setSearch(val),
                     decoration: InputDecoration(
                       hintText: 'بحث باسم الطالب أو رقم الطلب...',
-                      hintStyle: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted),
-                      prefixIcon: const Icon(Icons.search, color: NebrasTheme.textMuted, size: 20),
+                      hintStyle: GoogleFonts.tajawal(
+                        fontSize: 13,
+                        color: NebrasTheme.textMuted,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: NebrasTheme.textMuted,
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: NebrasTheme.background,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 0,
+                        horizontal: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -109,27 +159,40 @@ class AdmissionsListPage extends ConsumerWidget {
                         _buildFilterChip(
                           label: 'الكل',
                           isSelected: filter.status == null,
-                          onSelected: () => ref.read(admissionsFilterProvider.notifier).setStatus(null),
+                          onSelected: () => ref
+                              .read(admissionsFilterProvider.notifier)
+                              .setStatus(null),
                         ),
                         _buildFilterChip(
                           label: 'قيد المراجعة',
-                          isSelected: filter.status == ApplicantStatus.underReview,
-                          onSelected: () => ref.read(admissionsFilterProvider.notifier).setStatus(ApplicantStatus.underReview),
+                          isSelected:
+                              filter.status == ApplicantStatus.underReview,
+                          onSelected: () => ref
+                              .read(admissionsFilterProvider.notifier)
+                              .setStatus(ApplicantStatus.underReview),
                         ),
                         _buildFilterChip(
                           label: 'مقابلة مجدولة',
-                          isSelected: filter.status == ApplicantStatus.interviewScheduled,
-                          onSelected: () => ref.read(admissionsFilterProvider.notifier).setStatus(ApplicantStatus.interviewScheduled),
+                          isSelected:
+                              filter.status ==
+                              ApplicantStatus.interviewScheduled,
+                          onSelected: () => ref
+                              .read(admissionsFilterProvider.notifier)
+                              .setStatus(ApplicantStatus.interviewScheduled),
                         ),
                         _buildFilterChip(
                           label: 'تم القبول',
                           isSelected: filter.status == ApplicantStatus.accepted,
-                          onSelected: () => ref.read(admissionsFilterProvider.notifier).setStatus(ApplicantStatus.accepted),
+                          onSelected: () => ref
+                              .read(admissionsFilterProvider.notifier)
+                              .setStatus(ApplicantStatus.accepted),
                         ),
                         _buildFilterChip(
                           label: 'مرفوض',
                           isSelected: filter.status == ApplicantStatus.rejected,
-                          onSelected: () => ref.read(admissionsFilterProvider.notifier).setStatus(ApplicantStatus.rejected),
+                          onSelected: () => ref
+                              .read(admissionsFilterProvider.notifier)
+                              .setStatus(ApplicantStatus.rejected),
                         ),
                       ],
                     ),
@@ -152,11 +215,16 @@ class AdmissionsListPage extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const CircularProgressIndicator(color: NebrasTheme.primary),
+                        const CircularProgressIndicator(
+                          color: NebrasTheme.primary,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'جاري تحميل طلبات القبول والتسجيل من السيرفر...',
-                          style: GoogleFonts.tajawal(color: NebrasTheme.textMuted, fontSize: 13),
+                          style: GoogleFonts.tajawal(
+                            color: NebrasTheme.textMuted,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -167,21 +235,37 @@ class AdmissionsListPage extends ConsumerWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.grey),
+                          const Icon(
+                            Icons.cloud_off_rounded,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'تعذر تحميل الطلبات الحالية',
-                            style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.tajawal(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: NebrasTheme.primary),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: NebrasTheme.primary,
+                            ),
                             onPressed: () {
                               ref.invalidate(admissionsStatsProvider);
                               ref.invalidate(admissionsListProvider);
                             },
-                            icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
-                            label: Text('إعادة المحاولة', style: GoogleFonts.tajawal(color: Colors.white)),
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            label: Text(
+                              'إعادة المحاولة',
+                              style: GoogleFonts.tajawal(color: Colors.white),
+                            ),
                           ),
                         ],
                       ),
@@ -192,12 +276,20 @@ class AdmissionsListPage extends ConsumerWidget {
                       return Center(
                         child: Text(
                           'لا توجد طلبات تطابق معايير البحث.',
-                          style: GoogleFonts.tajawal(color: NebrasTheme.textMuted, fontSize: 14),
+                          style: GoogleFonts.tajawal(
+                            color: NebrasTheme.textMuted,
+                            fontSize: 14,
+                          ),
                         ),
                       );
                     }
                     return ListView.separated(
-                      padding: const EdgeInsets.only(top: 14, left: 16, right: 16, bottom: 90),
+                      padding: const EdgeInsets.only(
+                        top: 14,
+                        left: 16,
+                        right: 16,
+                        bottom: 90,
+                      ),
                       itemCount: applicants.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, i) {
@@ -219,8 +311,22 @@ class AdmissionsListPage extends ConsumerWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(count, style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-          Text(title, style: GoogleFonts.tajawal(fontSize: 10, color: NebrasTheme.textMuted), maxLines: 1),
+          Text(
+            count,
+            style: GoogleFonts.tajawal(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            title,
+            style: GoogleFonts.tajawal(
+              fontSize: 10,
+              color: NebrasTheme.textMuted,
+            ),
+            maxLines: 1,
+          ),
         ],
       ),
     );
@@ -230,15 +336,27 @@ class AdmissionsListPage extends ConsumerWidget {
     return Container(height: 24, width: 1, color: Colors.grey.shade300);
   }
 
-  Widget _buildFilterChip({required String label, required bool isSelected, required VoidCallback onSelected}) {
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onSelected,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(left: 6),
       child: FilterChip(
-        label: Text(label, style: GoogleFonts.tajawal(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+        label: Text(
+          label,
+          style: GoogleFonts.tajawal(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
         selected: isSelected,
         selectedColor: NebrasTheme.primary,
         backgroundColor: NebrasTheme.background,
-        labelStyle: TextStyle(color: isSelected ? Colors.white : NebrasTheme.textDark),
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : NebrasTheme.textDark,
+        ),
         onSelected: (_) => onSelected(),
       ),
     );
@@ -281,7 +399,11 @@ class AdmissionsListPage extends ConsumerWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(4), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withAlpha(4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -298,21 +420,31 @@ class AdmissionsListPage extends ConsumerWidget {
                 children: [
                   Text(
                     app.arabicFullName,
-                    style: GoogleFonts.tajawal(fontSize: 14, fontWeight: FontWeight.bold, color: NebrasTheme.textDark),
+                    style: GoogleFonts.tajawal(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: NebrasTheme.textDark,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '${app.applyingGrade} • رقم الطلب: ${app.applicationNumber}',
-                    style: GoogleFonts.tajawal(fontSize: 11, color: NebrasTheme.textMuted),
+                    style: GoogleFonts.tajawal(
+                      fontSize: 11,
+                      color: NebrasTheme.textMuted,
+                    ),
                   ),
                   if (app.primaryGuardian != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         'ولي الأمر: ${app.primaryGuardian!.fullName} (${app.primaryGuardian!.phone})',
-                        style: GoogleFonts.tajawal(fontSize: 11, color: NebrasTheme.primary),
+                        style: GoogleFonts.tajawal(
+                          fontSize: 11,
+                          color: NebrasTheme.primary,
+                        ),
                       ),
                     ),
                 ],
@@ -321,10 +453,17 @@ class AdmissionsListPage extends ConsumerWidget {
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: statusColor.withAlpha(20), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: statusColor.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Text(
                 statusToDisplayLabel(app.status),
-                style: GoogleFonts.tajawal(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                style: GoogleFonts.tajawal(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: statusColor,
+                ),
               ),
             ),
           ],

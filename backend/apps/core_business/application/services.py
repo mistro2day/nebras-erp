@@ -13,9 +13,17 @@ class UniversalNumberGeneratorService(BaseService):
     خدمة الترقيم القياسي الموحد لكيانات المنظومة
     """
     @staticmethod
-    def generate_number(prefix: str, year_suffix: bool = True, padding: int = 6) -> str:
-        # حساب العدد الإجمالي لتحديد الرقم التالي
-        count = 101  # رقم افتراضي لبدء السلسلة
+    def generate_number(prefix: str, year_suffix: bool = True, padding: int = 6, tenant_id=None, model_class=None, number_field='code') -> str:
+        # حساب العدد الإجمالي الخاص بالمستأجر لتحديد الرقم التالي بدقة وعزل تام
+        count = 1
+        if tenant_id and model_class:
+            try:
+                count = model_class.objects.filter(tenant_id=tenant_id).count() + 1
+            except Exception:
+                count = 101
+        elif not tenant_id:
+            count = 101
+
         year_str = f"-{timezone.now().year}" if year_suffix else ""
         num_str = str(count).zfill(padding)
         return f"{prefix}{year_str}-{num_str}"

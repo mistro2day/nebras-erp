@@ -29,11 +29,14 @@ Future<void> showNebrasMessageModal({
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: (isSuccess ? NebrasTheme.success : NebrasTheme.primary).withAlpha(25),
+                  color: (isSuccess ? NebrasTheme.success : NebrasTheme.primary)
+                      .withAlpha(25),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isSuccess ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                  isSuccess
+                      ? Icons.check_circle_rounded
+                      : Icons.info_outline_rounded,
                   color: isSuccess ? NebrasTheme.success : NebrasTheme.primary,
                   size: 36,
                 ),
@@ -41,13 +44,20 @@ Future<void> showNebrasMessageModal({
               const SizedBox(height: 16),
               Text(
                 title,
-                style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.bold, color: NebrasTheme.textDark),
+                style: GoogleFonts.tajawal(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: NebrasTheme.textDark,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 message,
-                style: GoogleFonts.tajawal(fontSize: 14, color: NebrasTheme.textMuted),
+                style: GoogleFonts.tajawal(
+                  fontSize: 14,
+                  color: NebrasTheme.textMuted,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -56,11 +66,20 @@ Future<void> showNebrasMessageModal({
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NebrasTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text('حسناً', style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text(
+                    'حسناً',
+                    style: GoogleFonts.tajawal(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -96,12 +115,16 @@ Future<void> showApprovalDecisionModal({
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: (isApprove ? NebrasTheme.success : NebrasTheme.danger).withAlpha(25),
+                      color:
+                          (isApprove ? NebrasTheme.success : NebrasTheme.danger)
+                              .withAlpha(25),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       isApprove ? Icons.check_rounded : Icons.close_rounded,
-                      color: isApprove ? NebrasTheme.success : NebrasTheme.danger,
+                      color: isApprove
+                          ? NebrasTheme.success
+                          : NebrasTheme.danger,
                       size: 24,
                     ),
                   ),
@@ -109,7 +132,11 @@ Future<void> showApprovalDecisionModal({
                   Expanded(
                     child: Text(
                       isApprove ? 'تأكيد اعتماد الطلب' : 'رفض الطلب',
-                      style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.bold, color: NebrasTheme.textDark),
+                      style: GoogleFonts.tajawal(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: NebrasTheme.textDark,
+                      ),
                     ),
                   ),
                 ],
@@ -125,24 +152,50 @@ Future<void> showApprovalDecisionModal({
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title, style: GoogleFonts.tajawal(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      item.title,
+                      style: GoogleFonts.tajawal(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('${item.requesterName} - ${item.requesterRole}', style: GoogleFonts.tajawal(fontSize: 12, color: NebrasTheme.textMuted)),
+                    Text(
+                      '${item.requesterName} - ${item.requesterRole}',
+                      style: GoogleFonts.tajawal(
+                        fontSize: 12,
+                        color: NebrasTheme.textMuted,
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              Text('ملاحظة القرار (اختياري):', style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(
+                'ملاحظة القرار (اختياري):',
+                style: GoogleFonts.tajawal(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 6),
               TextField(
                 controller: reasonController,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: isApprove ? 'ملاحظة اعتماد...' : 'اذكر سبب الرفض...',
-                  hintStyle: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted),
+                  hintText: isApprove
+                      ? 'ملاحظة اعتماد...'
+                      : 'اذكر سبب الرفض...',
+                  hintStyle: GoogleFonts.tajawal(
+                    fontSize: 13,
+                    color: NebrasTheme.textMuted,
+                  ),
                   filled: true,
                   fillColor: NebrasTheme.background,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -151,28 +204,46 @@ Future<void> showApprovalDecisionModal({
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text('إلغاء', style: GoogleFonts.tajawal(color: NebrasTheme.textMuted)),
+                      child: Text(
+                        'إلغاء',
+                        style: GoogleFonts.tajawal(
+                          color: NebrasTheme.textMuted,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isApprove ? NebrasTheme.success : NebrasTheme.danger,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        backgroundColor: isApprove
+                            ? NebrasTheme.success
+                            : NebrasTheme.danger,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () async {
                         Navigator.of(ctx).pop();
-                        await onConfirm(reasonController.text.trim().isEmpty ? null : reasonController.text.trim());
+                        await onConfirm(
+                          reasonController.text.trim().isEmpty
+                              ? null
+                              : reasonController.text.trim(),
+                        );
                       },
                       child: Text(
                         isApprove ? 'اعتماد' : 'تأكيد الرفض',
-                        style: GoogleFonts.tajawal(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.tajawal(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -198,7 +269,9 @@ Future<void> showGatePassModal({
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
     backgroundColor: Colors.white,
     builder: (ctx) => Directionality(
       textDirection: TextDirection.rtl,
@@ -218,7 +291,10 @@ Future<void> showGatePassModal({
                 child: Container(
                   width: 44,
                   height: 5,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -226,19 +302,48 @@ Future<void> showGatePassModal({
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: const Color(0xFF6366F1).withAlpha(25), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.meeting_room_rounded, color: Color(0xFF6366F1), size: 24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withAlpha(25),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.meeting_room_rounded,
+                      color: Color(0xFF6366F1),
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Text('إصدار تصريح خروج مبكر (Gate Pass)',
-                      style: GoogleFonts.tajawal(fontSize: 17, fontWeight: FontWeight.bold, color: NebrasTheme.textDark)),
+                  Text(
+                    'إصدار تصريح خروج مبكر (Gate Pass)',
+                    style: GoogleFonts.tajawal(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: NebrasTheme.textDark,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
-              _buildField('اسم الطالب:', studentCtrl, 'مثال: مهند دفع الله المهدي'),
-              _buildField('الصف والفصل:', classCtrl, 'مثال: الصف الثاني متوسط / أ'),
-              _buildField('ولي الأمر / الشخص المستلم:', guardianCtrl, 'مثال: والده - دفع الله المهدي'),
-              _buildField('سبب الخروج المبكر:', reasonCtrl, 'مثال: موعد طبي عاجل بمستشفى الخرطوم'),
+              _buildField(
+                'اسم الطالب:',
+                studentCtrl,
+                'مثال: مهند دفع الله المهدي',
+              ),
+              _buildField(
+                'الصف والفصل:',
+                classCtrl,
+                'مثال: الصف الثاني متوسط / أ',
+              ),
+              _buildField(
+                'ولي الأمر / الشخص المستلم:',
+                guardianCtrl,
+                'مثال: والده - دفع الله المهدي',
+              ),
+              _buildField(
+                'سبب الخروج المبكر:',
+                reasonCtrl,
+                'مثال: موعد طبي عاجل بمستشفى الخرطوم',
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -246,7 +351,9 @@ Future<void> showGatePassModal({
                   style: ElevatedButton.styleFrom(
                     backgroundColor: NebrasTheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   onPressed: () async {
                     if (studentCtrl.text.trim().isEmpty) return;
@@ -254,22 +361,36 @@ Future<void> showGatePassModal({
                     await onSubmit(
                       DailyGatePass(
                         studentName: studentCtrl.text.trim(),
-                        gradeAndSection: classCtrl.text.trim().isEmpty ? 'عام' : classCtrl.text.trim(),
-                        guardianName: guardianCtrl.text.trim().isEmpty ? 'ولي الأمر' : guardianCtrl.text.trim(),
-                        reason: reasonCtrl.text.trim().isEmpty ? 'ظرف طارئ' : reasonCtrl.text.trim(),
-                        departureTime: 'الآن (${TimeOfDay.now().format(context)})',
+                        gradeAndSection: classCtrl.text.trim().isEmpty
+                            ? 'عام'
+                            : classCtrl.text.trim(),
+                        guardianName: guardianCtrl.text.trim().isEmpty
+                            ? 'ولي الأمر'
+                            : guardianCtrl.text.trim(),
+                        reason: reasonCtrl.text.trim().isEmpty
+                            ? 'ظرف طارئ'
+                            : reasonCtrl.text.trim(),
+                        departureTime:
+                            'الآن (${TimeOfDay.now().format(context)})',
                       ),
                     );
                     if (context.mounted) {
                       showNebrasMessageModal(
                         context: context,
                         title: 'تم إصدار تصريح الخروج',
-                        message: 'تم تسجيل التصريح وتمرير إشعار الحارس بالبوابة وولي الأمر.',
+                        message:
+                            'تم تسجيل التصريح وتمرير إشعار الحارس بالبوابة وولي الأمر.',
                       );
                     }
                   },
-                  child: Text('اعتماد وإصدار التصريح فوراً',
-                      style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text(
+                    'اعتماد وإصدار التصريح فوراً',
+                    style: GoogleFonts.tajawal(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -292,7 +413,9 @@ Future<void> showAnnouncementModal({
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
     backgroundColor: Colors.white,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setModalState) => Directionality(
@@ -313,7 +436,10 @@ Future<void> showAnnouncementModal({
                   child: Container(
                     width: 44,
                     height: 5,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -321,32 +447,67 @@ Future<void> showAnnouncementModal({
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.campaign_rounded, color: Colors.amber, size: 24),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withAlpha(30),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    Text('بث تعميم مدرسي فوري',
-                        style: GoogleFonts.tajawal(fontSize: 17, fontWeight: FontWeight.bold, color: NebrasTheme.textDark)),
+                    Text(
+                      'بث تعميم مدرسي فوري',
+                      style: GoogleFonts.tajawal(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: NebrasTheme.textDark,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                _buildField('عنوان التعميم:', titleCtrl, 'مثال: تعليق الدراسة الحضورية غداً لسوء الأحوال'),
+                _buildField(
+                  'عنوان التعميم:',
+                  titleCtrl,
+                  'مثال: تعليق الدراسة الحضورية غداً لسوء الأحوال',
+                ),
                 const SizedBox(height: 10),
-                Text('نص التعميم / الرسالة:', style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  'نص التعميم / الرسالة:',
+                  style: GoogleFonts.tajawal(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: contentCtrl,
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'اكتب نص التعميم بالتفصيل...',
-                    hintStyle: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted),
+                    hintStyle: GoogleFonts.tajawal(
+                      fontSize: 13,
+                      color: NebrasTheme.textMuted,
+                    ),
                     filled: true,
                     fillColor: NebrasTheme.background,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('الفئة المستهدفة:', style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  'الفئة المستهدفة:',
+                  style: GoogleFonts.tajawal(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: ['الكل', 'أولياء الأمور', 'المعلمين'].map((role) {
@@ -354,10 +515,20 @@ Future<void> showAnnouncementModal({
                     return Padding(
                       padding: const EdgeInsets.only(left: 8),
                       child: ChoiceChip(
-                        label: Text(role, style: GoogleFonts.tajawal(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                        label: Text(
+                          role,
+                          style: GoogleFonts.tajawal(
+                            fontSize: 12,
+                            fontWeight: isSel
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
                         selected: isSel,
                         selectedColor: NebrasTheme.primary,
-                        labelStyle: TextStyle(color: isSel ? Colors.white : NebrasTheme.textDark),
+                        labelStyle: TextStyle(
+                          color: isSel ? Colors.white : NebrasTheme.textDark,
+                        ),
                         onSelected: (val) {
                           if (val) setModalState(() => target = role);
                         },
@@ -368,9 +539,15 @@ Future<void> showAnnouncementModal({
                 const SizedBox(height: 10),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('تنبيه عاجل (إشعار دفع منبثق فوري)', style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600)),
+                  title: Text(
+                    'تنبيه عاجل (إشعار دفع منبثق فوري)',
+                    style: GoogleFonts.tajawal(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   value: isUrgent,
-                  activeColor: NebrasTheme.danger,
+                  activeThumbColor: NebrasTheme.danger,
                   onChanged: (val) => setModalState(() => isUrgent = val),
                 ),
                 const SizedBox(height: 16),
@@ -380,7 +557,9 @@ Future<void> showAnnouncementModal({
                     style: ElevatedButton.styleFrom(
                       backgroundColor: NebrasTheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: () async {
                       if (titleCtrl.text.trim().isEmpty) return;
@@ -397,12 +576,19 @@ Future<void> showAnnouncementModal({
                         showNebrasMessageModal(
                           context: context,
                           title: 'تم إرسال التعميم بنجاح',
-                          message: 'وصل التعميم إلى كافة المستخدمين المحددين عبر البوابة.',
+                          message:
+                              'وصل التعميم إلى كافة المستخدمين المحددين عبر البوابة.',
                         );
                       }
                     },
-                    child: Text('نشر وبث التعميم الآن',
-                        style: GoogleFonts.tajawal(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: Text(
+                      'نشر وبث التعميم الآن',
+                      style: GoogleFonts.tajawal(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -420,17 +606,29 @@ Widget _buildField(String label, TextEditingController ctrl, String hint) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: GoogleFonts.tajawal(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted),
+            hintStyle: GoogleFonts.tajawal(
+              fontSize: 13,
+              color: NebrasTheme.textMuted,
+            ),
             filled: true,
             fillColor: NebrasTheme.background,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
           ),
         ),
       ],

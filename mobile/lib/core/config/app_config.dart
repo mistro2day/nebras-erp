@@ -23,6 +23,6 @@ class AppConfig {
     defaultValue: 'b943665a-19ff-4ef3-9c24-221cf4057a55',
   );
 
-  static const Duration connectTimeout = Duration(seconds: 20);
-  static const Duration receiveTimeout = Duration(seconds: 20);
+  static const Duration connectTimeout = Duration(seconds: 35);
+  static const Duration receiveTimeout = Duration(seconds: 35);
 }

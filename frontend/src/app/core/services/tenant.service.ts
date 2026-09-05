@@ -55,13 +55,19 @@ export class TenantService {
   private resolveSurface(hostname: string): void {
     const host = (hostname || '').split(':')[0].toLowerCase();
 
-    // نطاقات التطوير/الاستضافة أو IP: سطح مستأجر بلا نطاق فرعي (مدرسة واحدة افتراضية)
+    // نطاقات التطوير/الاستضافة أو IP
     const isDevHost = DEV_HOST_SUFFIXES.some(s => host === s || host.endsWith(s));
     const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
     if (isDevHost || isIp) {
       this.isDevHost.set(true);
-      this.surface.set('tenant');
-      this.subdomain.set(null);
+      const parts = host.split('.');
+      if (parts.length > 2 && !RESERVED_SUBDOMAINS.includes(parts[0]) && !parts[0].startsWith('nebras-erp')) {
+        this.surface.set('tenant');
+        this.subdomain.set(parts[0]);
+      } else {
+        this.surface.set('public');
+        this.subdomain.set(null);
+      }
       return;
     }
 

@@ -16,18 +16,37 @@ class StudentNumberGenerator:
     @staticmethod
     def generate(tenant_id, branch_code=None, academic_year_code=None, sequence_num=1, config=None) -> str:
         """
-        توليد الرقم الأكاديمي/المدرسي للطالب بتسلسل سهل ومريح للحفظ (مثال: 2026-0001)
+        توليد الرقم الأكاديمي/المدرسي للطالب بتسلسل فريد ومعزول لكل مستأجر (مثال: ALSA-2026-0001)
         """
         import datetime
         year_str = re.sub(r'\D', '', str(academic_year_code or datetime.date.today().year))
-        if len(year_str) >= 4:
-            year_clean = year_str[-4:]
-        else:
-            year_clean = str(datetime.date.today().year)
+        year_clean = year_str[-4:] if len(year_str) >= 4 else str(datetime.date.today().year)
+
+        # بادئة مخصصة للمدرسة / المستأجر لضمان عزل تام للأرقام
+        prefix = 'STD'
+        if branch_code and branch_code not in ('BR', 'MAIN'):
+            prefix = re.sub(r'[^a-zA-Z0-9]', '', str(branch_code)).upper()[:4]
+        elif tenant_id:
+            try:
+                from apps.tenants.domain.models import Tenant
+                t = Tenant.objects.filter(id=tenant_id).only('subdomain').first()
+                if t and t.subdomain:
+                    clean_sub = re.sub(r'[^a-zA-Z0-9]', '', t.subdomain).upper()
+                    if clean_sub:
+                        prefix = clean_sub[:4]
+            except Exception:
+                prefix = 'STD'
 
         count = Student.objects.filter(tenant_id=tenant_id).count() + 1
         seq = max(count, sequence_num)
-        return f"{year_clean}-{seq:04d}"
+        candidate = f"{prefix}-{year_clean}-{seq:04d}"
+
+        # التحقق ضد أي تعارض في قاعدة البيانات
+        while Student.objects.filter(student_number=candidate).exists():
+            seq += 1
+            candidate = f"{prefix}-{year_clean}-{seq:04d}"
+
+        return candidate
 
 
 class StudentDomainService:

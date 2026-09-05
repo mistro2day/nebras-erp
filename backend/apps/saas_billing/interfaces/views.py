@@ -245,13 +245,14 @@ class TenantSignupRequestViewSet(viewsets.ModelViewSet):
     def approve(self, request, pk=None):
         req = self.get_object()
         try:
+            trial_days = int(request.data.get('trial_days') or 7)
             tenant = services.approve_signup_request(req, reviewed_by=getattr(request.user, 'id', None),
-                                                     trial_days=int(request.data.get('trial_days') or 14))
+                                                     trial_days=trial_days)
         except ValueError as exc:
             return StandardResponse(success=False, message=str(exc), status=status.HTTP_400_BAD_REQUEST)
         req.refresh_from_db()
         return StandardResponse(data=TenantSignupRequestSerializer(req).data,
-                                message=f'تم إنشاء المستأجر «{tenant.name}» ونطاقه {tenant.subdomain}.')
+                                message=f'تم اعتماد طلب «{tenant.name}»، وتهيئة الحساب والنطاق {tenant.subdomain} مع تفعيل فترة تجريبية ({trial_days} أيام).')
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):

@@ -9,8 +9,12 @@ import { AuthService } from '../auth/auth.service';
  */
 export const publicSurfaceGuard: CanActivateFn = () => {
   const tenant = inject(TenantService);
+  const auth = inject(AuthService);
   const router = inject(Router);
   if (tenant.isPublicSite()) {
+    if (auth.currentUser() || auth.isAuthenticated()) {
+      return router.createUrlTree(['/dashboard']);
+    }
     return router.createUrlTree(['/nebras']);
   }
   return true;
