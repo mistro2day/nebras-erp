@@ -4,21 +4,29 @@ import { TenantService } from '../services/tenant.service';
 import { AuthService } from '../auth/auth.service';
 
 /**
- * حارس السطح: على النطاق الجذر لنبراس (surface = public) يُحوَّل الزائر إلى الموقع
- * التسويقي بدل لوحة المستأجر. على نطاق مدرسة فرعي يمرّ الطلب كالمعتاد.
+ * حارس المسار الجذري (/): يوجّه الزائر حسب حالته وحالة السطح (عام أم مدرسة)
+ * دون الدخول في أي حلقة إعادة توجيه لا نهائية.
  */
-export const publicSurfaceGuard: CanActivateFn = () => {
+export const rootSurfaceGuard: CanActivateFn = () => {
   const tenant = inject(TenantService);
   const auth = inject(AuthService);
   const router = inject(Router);
+
+  // إذا كان المستخدم مسجلاً دخوله بالفعل ← إلى لوحة التحكم
+  if (auth.isAuthenticated() || auth.currentUser()) {
+    return router.createUrlTree(['/dashboard']);
+  }
+
+  // إذا كان على الموقع العام لنبراس (SaaS) ← إلى الموقع التسويقي
   if (tenant.isPublicSite()) {
-    if (auth.currentUser() || auth.isAuthenticated()) {
-      return router.createUrlTree(['/dashboard']);
-    }
     return router.createUrlTree(['/nebras']);
   }
-  return true;
+
+  // إذا كان على نطاق مدرسة خاصة ← إلى بوابة ترحيب المدرسة
+  return router.createUrlTree(['/welcome']);
 };
+
+export const publicSurfaceGuard: CanActivateFn = rootSurfaceGuard;
 
 /**
  * حارس بوابة الترحيب: إذا دخل الزائر على /welcome وهو على الموقع العام لنبراس (بلا نطاق مدرسة)،

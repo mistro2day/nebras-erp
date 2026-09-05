@@ -47,11 +47,17 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadChildren: () => import('./features/portal/parent/parent.routes').then((m) => m.PARENT_ROUTES),
   },
+  // توجيه المسار الجذري بدقة عند فتح الرابط المباشر
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [publicSurfaceGuard],
+    children: [],
+  },
   {
     path: '',
     component: DashboardLayoutComponent,
-    // أولاً حارس السطح (نطاق نبراس الجذر ← الموقع العام)، ثم بوابة الدخول.
-    canActivate: [publicSurfaceGuard, authGuard],
+    canActivate: [authGuard],
     children: [
       {
         path: 'dashboard',
