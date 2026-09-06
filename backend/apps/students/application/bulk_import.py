@@ -16,7 +16,10 @@ from apps.organization.domain.models import Branch
 from apps.students.domain.services import StudentNumberGenerator
 from apps.students.domain.events import DomainEventPublisher
 from apps.students.application.services import resolve_branch_for_gender, StudentApplicationService
-from apps.clinic.application import profile_service as clinic_profiles
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import openpyxl
 
 
 class StudentBulkImportService:
@@ -199,6 +202,7 @@ class StudentBulkImportService:
         # جلب الصفوف والشعب الحالية للمستأجر
         grades_qs = Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).prefetch_related('sections', 'stage')
         r_counter = 4
+        grades_count = 0
         if grades_qs.exists():
             for g in grades_qs:
                 sections_list = [s.name for s in g.sections.filter(deleted_at__isnull=True)]
@@ -214,6 +218,7 @@ class StudentBulkImportService:
                     ws_guide.cell(row=r_counter, column=c_idx).font = Font(name='Arial', size=10)
                     ws_guide.cell(row=r_counter, column=c_idx).border = thin_border
                 r_counter += 1
+                grades_count += 1
         else:
             ws_guide.cell(row=4, column=1, value='لم يتم تعريف صفوف بعد، يرجى تهيئة المرحلة الدراسية أو كتابة الصف في الكشف.').alignment = right_align
 
@@ -238,6 +243,87 @@ class StudentBulkImportService:
             ws_guide.cell(row=r_counter, column=2, value=vals).border = thin_border
             r_counter += 1
 
+        # --- تطبيق القوائم المنسدلة (Data Validation) لمنع الإدخال الخاطئ نهائياً ---
+        # 1. الجنس (العمود C)
+        dv_gender = DataValidation(
+            type="list",
+            formula1='"ذكر,أنثى"',
+            allow_blank=True,
+            promptTitle="تحديد الجنس",
+            prompt="يرجى اختيار الجنس (ذكر / أنثى) من القائمة المنسدلة.",
+            errorTitle="قيمة غير صالحة",
+            error="يرجى اختيار قيمة صحيحة للجنس (ذكر أو أنثى) من القائمة المنسدلة."
+        )
+        ws.add_data_validation(dv_gender)
+        dv_gender.add("C5:C1000")
+
+        # 2. الجنسية (العمود F)
+        dv_nationality = DataValidation(
+            type="list",
+            formula1='"سوداني,أخرى"',
+            allow_blank=True,
+            promptTitle="الجنسية",
+            prompt="يرجى اختيار الجنسية من القائمة.",
+            errorTitle="قيمة غير صالحة",
+            error="يرجى اختيار الجنسية من القائمة المنسدلة."
+        )
+        ws.add_data_validation(dv_nationality)
+        dv_nationality.add("F5:F1000")
+
+        # 3. الديانة (العمود G)
+        dv_religion = DataValidation(
+            type="list",
+            formula1='"مسلم,مسيحي"',
+            allow_blank=True,
+            promptTitle="الديانة",
+            prompt="يرجى اختيار الديانة من القائمة.",
+            errorTitle="قيمة غير صالحة",
+            error="يرجى اختيار الديانة (مسلم أو مسيحي) من القائمة."
+        )
+        ws.add_data_validation(dv_religion)
+        dv_religion.add("G5:G1000")
+
+        # 4. فصيلة الدم (العمود H)
+        dv_blood = DataValidation(
+            type="list",
+            formula1='"O+,A+,B+,AB+,O-,A-,B-,AB-"',
+            allow_blank=True,
+            promptTitle="فصيلة الدم",
+            prompt="يرجى اختيار فصيلة دم الطالب.",
+            errorTitle="قيمة غير صالحة",
+            error="يرجى اختيار إحدى فصائل الدم المعيارية (O+, A+, B+, AB+, إلخ)."
+        )
+        ws.add_data_validation(dv_blood)
+        dv_blood.add("H5:H1000")
+
+        # 5. الصف الدراسي (العمود I)
+        if grades_count > 0:
+            grade_formula = f"='دليل الخيارات والصفوف المتاحة'!$A$4:$A${3 + grades_count}"
+            dv_grade = DataValidation(
+                type="list",
+                formula1=grade_formula,
+                allow_blank=True,
+                promptTitle="الصف الدراسي",
+                prompt="يرجى اختيار الصف الدراسي المعتمد من القائمة المنسدلة.",
+                errorTitle="صف غير معتمد",
+                error="يرجى اختيار أحد الصفوف الدراسية المعتمدة بالمدرسة من القائمة المنسدلة."
+            )
+            ws.add_data_validation(dv_grade)
+            dv_grade.add("I5:I1000")
+
+        # 6. صلة القرابة (العمود L)
+        dv_relation = DataValidation(
+            type="list",
+            formula1='"أب,أم,ولي أمر,كفيل,شقيق"',
+            allow_blank=True,
+            promptTitle="صلة القرابة",
+            prompt="يرجى اختيار صلة القرابة بولي الأمر.",
+            errorTitle="صلة قرابة غير صالحة",
+            error="يرجى اختيار صلة القرابة من القائمة المنسدلة."
+        )
+        ws.add_data_validation(dv_relation)
+        dv_relation.add("L5:L1000")
+
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
@@ -248,7 +334,7 @@ class StudentBulkImportService:
         """
         قراءة الملف المرفوع سواء كان .xlsx أو .xls أو .csv وتحويله إلى قائمة قواميس منظمة.
         """
-        filename = uploaded_file.name.lower()
+        filename = getattr(uploaded_file, 'name', 'template.xlsx').lower()
         rows = []
 
         if filename.endswith('.csv'):
@@ -351,6 +437,69 @@ class StudentBulkImportService:
 
         return normalized
 
+    @staticmethod
+    def _normalize_arabic(text: str) -> str:
+        """
+        تطبيع النصوص العربية لتوحيد الهمزات والألف والياء والتاء المربوطة والمسافات الزائدة
+        لضمان دقة المطابقة وتجنب رفض المدخلات بسبب اختلافات كتابة الألف (أ / إ / آ / ا) أو (ى / ي) أو (ة / ه).
+        """
+        if not text:
+            return ""
+        t = str(text).strip().lower()
+        # إزالة التشكيل
+        t = re.sub(r'[\u064B-\u065F\u0670]', '', t)
+        # توحيد الألفات
+        t = re.sub(r'[إأآا]', 'ا', t)
+        # توحيد الياء والألف المقصورة
+        t = re.sub(r'[ىي]', 'ي', t)
+        # توحيد التاء المربوطة والهاء في نهايات الكلمات
+        t = re.sub(r'ة\b', 'ه', t)
+        # إزالة المسافات المكررة
+        t = re.sub(r'\s+', ' ', t).strip()
+        return t
+
+    @classmethod
+    def _match_grade(cls, input_grade_name: str, grades_dict: dict):
+        """
+        مطابقة ذكية للصف الدراسي بين ما أدخله المستخدم والصفوف المسجلة بالمستأجر.
+        يدعم المطابقة الدقيقة، التطبيع العربي، وتجاهل 'الـ' التعريفية، مثل مطابقة
+        «الصف الخامس ابتدائي» مع «الصف الخامس الابتدائي».
+        """
+        if not input_grade_name or not grades_dict:
+            return None
+
+        raw = input_grade_name.strip()
+        if raw in grades_dict:
+            return grades_dict[raw]
+
+        norm_input = cls._normalize_arabic(raw)
+
+        # 1. مطابقة بعد التطبيع المباشر
+        for g_name, g_obj in grades_dict.items():
+            if cls._normalize_arabic(g_name) == norm_input:
+                return g_obj
+
+        # 2. تفكيك الكلمات ومقارنة المعنى بعد تجريد "ال" التعريف
+        def clean_tokens(text):
+            tokens = cls._normalize_arabic(text).split()
+            cleaned = []
+            for tok in tokens:
+                if tok.startswith('ال') and len(tok) > 2:
+                    tok = tok[2:]
+                cleaned.append(tok)
+            return sorted(cleaned)
+
+        input_tokens = clean_tokens(raw)
+        for g_name, g_obj in grades_dict.items():
+            g_tokens = clean_tokens(g_name)
+            if input_tokens == g_tokens:
+                return g_obj
+            # فحص إذا كانت جميع كلمات أحدهما موجودة بالكامل في الآخر
+            if all(t in g_tokens for t in input_tokens) or all(t in input_tokens for t in g_tokens):
+                return g_obj
+
+        return None
+
     @classmethod
     def validate_and_preview(cls, uploaded_file, tenant_id: uuid.UUID) -> dict:
         """
@@ -395,14 +544,15 @@ class StudentBulkImportService:
             elif len(name.split()) < 2:
                 row_warnings.append("يُفضل كتابة الاسم كاملاً (ثلاثي أو رباعي).")
 
-            # 2. فحص الجنس
-            gender_raw = row.get('gender', '').strip().lower()
+            # 2. فحص الجنس مع التطبيع الذكي (يقبل أنثى، انثى، أنثي، ذكر، ولد، إلخ)
+            gender_raw = row.get('gender', '').strip()
+            norm_gender = cls._normalize_arabic(gender_raw)
             if not gender_raw:
                 row_errors.append("حقل الجنس إلزامي (ذكر أو أنثى).")
-            elif gender_raw in ['ذكر', 'ولد', 'بنين', 'male', 'm']:
+            elif norm_gender in ['ذكر', 'ولد', 'بنين', 'male', 'm']:
                 row['gender'] = 'male'
                 row['gender_label'] = 'ذكر'
-            elif gender_raw in ['أنثى', 'بنت', 'بنات', 'female', 'f']:
+            elif norm_gender in ['انثي', 'انثى', 'بنت', 'بنات', 'female', 'f']:
                 row['gender'] = 'female'
                 row['gender_label'] = 'أنثى'
             else:
@@ -445,12 +595,21 @@ class StudentBulkImportService:
                 row_errors.append("اسم ولي الأمر إلزامي.")
 
             g_rel = row.get('guardian_relation', '').strip()
+            norm_rel = cls._normalize_arabic(g_rel)
             if not g_rel:
                 row['guardian_relation'] = 'أب' # افتراضي
+                row['guardian_relation_code'] = 'father'
             else:
-                rel_map = {'أب': 'father', 'أم': 'mother', 'ولي أمر': 'guardian', 'كفيل': 'sponsor', 'شقيق': 'sibling'}
-                normalized_rel = rel_map.get(g_rel, 'guardian')
-                row['guardian_relation_code'] = normalized_rel
+                if norm_rel in ['اب', 'والد', 'father']:
+                    row['guardian_relation_code'] = 'father'
+                elif norm_rel in ['ام', 'والده', 'mother']:
+                    row['guardian_relation_code'] = 'mother'
+                elif norm_rel in ['ولي امر', 'وصي', 'كفيل', 'guardian', 'sponsor']:
+                    row['guardian_relation_code'] = 'guardian'
+                elif norm_rel in ['اخ', 'شقيق', 'brother', 'sibling']:
+                    row['guardian_relation_code'] = 'sibling'
+                else:
+                    row['guardian_relation_code'] = 'guardian'
 
             # 6. فحص هاتف ولي الأمر (سياق سوداني)
             g_phone = row.get('guardian_phone', '').strip().replace(' ', '').replace('-', '')
@@ -463,14 +622,12 @@ class StudentBulkImportService:
                     row_warnings.append(f"رقم الهاتف «{g_phone}» قد لا يطابق شبكات الاتصال السودانية (09/01).")
                 row['guardian_phone'] = clean_phone
 
-            # 7. فحص الصف الدراسي
+            # 7. فحص ومطابقة الصف الدراسي بذكاء
             grade_name = row.get('grade_name', '').strip()
-            if grade_name and existing_grades:
-                matching_grade = None
-                for eg_name, eg_obj in existing_grades.items():
-                    if grade_name.lower() == eg_name.lower() or grade_name in eg_name or eg_name in grade_name:
-                        matching_grade = eg_obj
-                        break
+            if not grade_name:
+                row_errors.append("الصف الدراسي إلزامي لتسكين الطالب.")
+            elif existing_grades:
+                matching_grade = cls._match_grade(grade_name, existing_grades)
                 if matching_grade:
                     row['matched_grade_id'] = str(matching_grade.id)
                     row['matched_grade_name'] = matching_grade.name
@@ -627,8 +784,8 @@ class StudentBulkImportService:
                     matched_gid = row_data.get('matched_grade_id')
                     if matched_gid and matched_gid in grades_map:
                         grade_obj = grades_map[matched_gid]
-                    elif row_data.get('grade_name') and row_data['grade_name'].strip() in grades_by_name:
-                        grade_obj = grades_by_name[row_data['grade_name'].strip()]
+                    elif row_data.get('grade_name'):
+                        grade_obj = cls._match_grade(row_data['grade_name'], grades_by_name)
 
                     section_obj = None
                     sec_name = row_data.get('section_name', '').strip()
