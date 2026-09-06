@@ -143,8 +143,8 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
             from apps.tenants.models import Tenant
             tenant = Tenant.objects.first()
 
-        tenant_name_ar = (tenant.name_ar or tenant.name) if tenant else 'مدارس المودة النموذجية الخاصة'
-        tenant_name_en = (tenant.name_en) if (tenant and tenant.name_en) else 'Al-Mawadda Model Private Schools'
+        tenant_name_ar = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد النموذجية الخاصة'
+        tenant_name_en = (tenant.name_en or tenant.name) if (tenant and tenant.name_en) else 'Al-Mawred Model Private Schools'
 
         tenant_info = {
             'id': str(tenant.id) if tenant else str(tenant_id),
@@ -154,7 +154,7 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
             'logo_url': request.build_absolute_uri(tenant.logo.url) if (tenant and getattr(tenant, 'logo', None)) else '/assets/branding/al_mawadda_logo.jpg',
             'stamp_url': request.build_absolute_uri(tenant.stamp.url) if (tenant and getattr(tenant, 'stamp', None)) else '',
             'phone': getattr(tenant, 'phone_number', '') or '09123456789',
-            'email': getattr(tenant, 'email', '') or 'accounts@almawadda.edu.sd',
+            'email': getattr(tenant, 'email', '') or 'accounts@almawred.edu.sd',
             'address': getattr(tenant, 'address', '') or 'الخرطوم - العمارات - شارع 15، السودان',
             'affiliation': 'المرحلة الابتدائية والمتوسطة والثانوية • ولاية الخرطوم',
         }

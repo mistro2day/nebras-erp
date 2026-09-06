@@ -60,8 +60,8 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                      (error)="onLogoError($event)" />
               </div>
               <div class="school-names">
-                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'مدارس المودة النموذجية الخاصة' }}</h1>
-                <span class="school-name-en">{{ statement()?.tenant?.name_en || 'Al-Mawadda Model Private Schools' }}</span>
+                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'مدارس المورد النموذجية الخاصة' }}</h1>
+                <span class="school-name-en">{{ statement()?.tenant?.name_en || 'Al-Mawred Model Private Schools' }}</span>
                 <span class="school-affiliation">{{ statement()?.tenant?.affiliation || 'المرحلة الابتدائية والمتوسطة والثانوية • ولاية الخرطوم' }}</span>
               </div>
             </div>
