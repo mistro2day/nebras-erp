@@ -206,3 +206,59 @@ export async function exportPdf(meta: ExportMeta, columns: ExportColumn[], rows:
     document.body.removeChild(holder);
   }
 }
+
+/**
+ * تصدير عنصر DOM حيّ (كشف حساب، عقد، سند) مباشرة إلى ملف PDF رسمي
+ * مع الحفاظ على الخطوط، الألوان، الشعارات، وتنسيقات RTL كاملة.
+ */
+export async function exportElementToPdf(
+  elementOrId: HTMLElement | string,
+  filename: string,
+  options?: { scale?: number; orientation?: 'p' | 'l' }
+): Promise<void> {
+  const element = typeof elementOrId === 'string'
+    ? document.getElementById(elementOrId)
+    : elementOrId;
+  if (!element) return;
+
+  const [jspdfMod, html2canvasMod]: any[] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  const JsPDF = jspdfMod.jsPDF ?? jspdfMod.default;
+  const html2canvas = html2canvasMod.default ?? html2canvasMod;
+
+  const scale = options?.scale ?? 2.5;
+  const orientation = options?.orientation ?? 'p';
+
+  const canvas = await html2canvas(element, {
+    scale,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    logging: false,
+  });
+
+  const pdf = new JsPDF(orientation, 'mm', 'a4');
+  const pageW = orientation === 'p' ? 210 : 297;
+  const pageH = orientation === 'p' ? 297 : 210;
+  const imgW = pageW;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  const img = canvas.toDataURL('image/png');
+
+  let heightLeft = imgH;
+  let position = 0;
+
+  pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+  heightLeft -= pageH;
+
+  while (heightLeft > 5) {
+    position -= pageH;
+    pdf.addPage();
+    pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+    heightLeft -= pageH;
+  }
+
+  const finalName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  pdf.save(finalName);
+}
+

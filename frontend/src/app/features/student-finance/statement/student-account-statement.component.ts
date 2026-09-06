@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { StudentFinanceService } from '../student-finance.service';
-import { exportExcel, exportPdf } from '../../../shared/export';
-import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
+import { exportElementToPdf } from '../../../shared/export';
 
 @Component({
   selector: 'app-student-account-statement',
@@ -26,11 +25,11 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
           <button class="tb-btn primary" (click)="printStatement()">
             <span>🖨️</span> طباعة كشف الحساب
           </button>
-          <button class="tb-btn export-pdf" (click)="onExportPdf()">
-            <span>📄</span> تصدير PDF
+          <button class="tb-btn export-pdf" (click)="onExportPdf()" [disabled]="exporting()">
+            <span>📄</span> {{ exporting() ? 'جارٍ التصدير…' : 'تصدير PDF' }}
           </button>
-          <button class="tb-btn export-excel" (click)="onExportExcel()">
-            <span>📊</span> تصدير Excel
+          <button class="tb-btn export-excel" (click)="onExportExcel()" [disabled]="exporting()">
+            <span>📊</span> {{ exporting() ? 'جارٍ التصدير…' : 'تصدير Excel' }}
           </button>
         </div>
       </header>
@@ -1064,6 +1063,7 @@ export class StudentAccountStatementComponent implements OnInit {
 
   accountId = signal<string>('');
   loading = signal<boolean>(true);
+  exporting = signal<boolean>(false);
   error = signal<string | null>(null);
   statement = signal<any | null>(null);
 
@@ -1105,44 +1105,339 @@ export class StudentAccountStatementComponent implements OnInit {
     window.print();
   }
 
+  /**
+   * تصدير كشف الحساب كملف PDF رسمي عالي الدقة (مطابق 100% للشاشة)
+   */
   async onExportPdf() {
     const s = this.statement();
-    if (!s) return;
-    const meta: ExportMeta = {
-      title: `كشف حساب مالي - ${s.student?.student_name || 'طالب'}`,
-      filename: `كشف-حساب-${s.student?.student_number || s.account?.account_number}`
-    };
-    const columns: ExportColumn[] = [
-      { key: 'date', label: 'التاريخ' },
-      { key: 'type_label', label: 'النوع' },
-      { key: 'description', label: 'البيان' },
-      { key: 'reference_number', label: 'المرجع' },
-      { key: 'debit', label: 'مدين (ج.س)' },
-      { key: 'credit', label: 'دائن (ج.س)' },
-      { key: 'running_balance', label: 'الرصيد التراكمي (ج.س)' },
-      { key: 'payment_method', label: 'طريقة الدفع' },
-    ];
-    await exportPdf(meta, columns, s.transactions || []);
+    if (!s || this.exporting()) return;
+    this.exporting.set(true);
+
+    try {
+      const stName = s.student?.student_name ? s.student.student_name.replace(/\s+/g, '-') : 'طالب';
+      const acNum = s.account?.account_number || s.student?.student_number || 'STMT';
+      const filename = `كشف-حساب-مالي-${stName}-${acNum}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportElementToPdf('statement-print-area', filename, { scale: 2.5, orientation: 'p' });
+    } catch (e) {
+      console.error('فشل تصدير كشف الحساب إلى PDF:', e);
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
+  /**
+   * تصدير كشف الحساب كملف Excel (.xlsx) احترافي متكامل
+   * يشمل: الترويسة الرسمية، بيانات الطالب وولي الأمر، ملخص الأرصدة، سجل الحركات، وجدول الأقساط
+   */
   async onExportExcel() {
     const s = this.statement();
-    if (!s) return;
-    const meta: ExportMeta = {
-      title: `كشف حساب مالي - ${s.student?.student_name || 'طالب'}`,
-      filename: `كشف-حساب-${s.student?.student_number || s.account?.account_number}`
-    };
-    const columns: ExportColumn[] = [
-      { key: 'date', label: 'التاريخ' },
-      { key: 'type_label', label: 'النوع' },
-      { key: 'description', label: 'البيان' },
-      { key: 'reference_number', label: 'المرجع' },
-      { key: 'debit', label: 'مدين (ج.س)' },
-      { key: 'credit', label: 'دائن (ج.س)' },
-      { key: 'running_balance', label: 'الرصيد التراكمي (ج.س)' },
-      { key: 'payment_method', label: 'طريقة الدفع' },
-    ];
-    await exportExcel(meta, columns, s.transactions || []);
+    if (!s || this.exporting()) return;
+    this.exporting.set(true);
+
+    try {
+      const mod: any = await import('exceljs');
+      const ExcelJS = mod.default ?? mod;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'نظام نبراس — إدارة الحسابات المالية';
+      wb.created = new Date();
+
+      // ورقة عمل رئيسية باتجاه اليمين إلى اليسار (RTL)
+      const ws = wb.addWorksheet('كشف الحساب المالي', {
+        views: [{ rightToLeft: true }]
+      });
+
+      // تحديد قياسات الأعمدة لتناسب المحتوى بالكامل
+      ws.columns = [
+        { width: 8 },   // A: #
+        { width: 14 },  // B: التاريخ
+        { width: 34 },  // C: البيان والوصف
+        { width: 18 },  // D: رقم المرجع
+        { width: 18 },  // E: مدين (+) ج.س
+        { width: 18 },  // F: دائن (-) ج.س
+        { width: 20 },  // G: الرصيد التراكمي ج.س
+        { width: 22 },  // H: طريقة السداد / الملاحظات
+      ];
+
+      const BRAND_BLUE = '1E3A8A';
+      const BORDER_COLOR = 'CBD5E1';
+
+      // 1. ترويسة المدرسة الرسمية
+      ws.mergeCells('A1:H1');
+      const schoolCell = ws.getCell('A1');
+      schoolCell.value = s.tenant?.name_ar || s.tenant?.name || 'مدارس المورد النموذجية الخاصة';
+      schoolCell.font = { bold: true, size: 15, color: { argb: 'FFFFFFFF' } };
+      schoolCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND_BLUE } };
+      schoolCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 30;
+
+      ws.mergeCells('A2:H2');
+      const titleCell = ws.getCell('A2');
+      titleCell.value = `كشف حساب مالي تفصيلي — العام الدراسي: ${s.meta?.academic_year || '2026 / 2027'}`;
+      titleCell.font = { bold: true, size: 12, color: { argb: 'FF0F172A' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(2).height = 24;
+
+      // سطر بيانات الكشف الفوقية
+      ws.mergeCells('A3:H3');
+      const metaCell = ws.getCell('A3');
+      metaCell.value = `رقم الكشف: ${s.meta?.statement_number || ''}   •   تاريخ الإصدار: ${s.meta?.generated_at || ''}   •   العملة المعتمدة: ${s.meta?.currency || 'SDG'} (جنيه سوداني)   •   الهاتف: ${s.tenant?.phone || '0912345678'}`;
+      metaCell.font = { size: 9.5, color: { argb: 'FF64748B' } };
+      metaCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(3).height = 20;
+
+      // سطر فارغ
+      ws.addRow([]);
+
+      // 2. بطاقة معلومات الطالب وولي الأمر
+      ws.mergeCells('A5:D5');
+      const stHead = ws.getCell('A5');
+      stHead.value = 'بيانات الطالب الأكاديمية';
+      stHead.font = { bold: true, size: 11, color: { argb: 'FF1D4ED8' } };
+      stHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      stHead.alignment = { horizontal: 'right', vertical: 'middle' };
+
+      ws.mergeCells('E5:H5');
+      const acHead = ws.getCell('E5');
+      acHead.value = 'بيانات الحساب وولي الأمر';
+      acHead.font = { bold: true, size: 11, color: { argb: 'FF1D4ED8' } };
+      acHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      acHead.alignment = { horizontal: 'right', vertical: 'middle' };
+      ws.getRow(5).height = 22;
+
+      // الصف 6
+      ws.getCell('A6').value = 'اسم الطالب:';
+      ws.getCell('A6').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('B6').value = s.student?.student_name || 'منه ابوبكر تاج السر عثمان';
+      ws.getCell('B6').font = { bold: true, size: 11, color: { argb: 'FF0F172A' } };
+      ws.mergeCells('B6:D6');
+
+      ws.getCell('E6').value = 'رقم الحساب المالي:';
+      ws.getCell('E6').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('F6').value = s.account?.account_number || '';
+      ws.getCell('F6').font = { bold: true, size: 10 };
+      ws.mergeCells('F6:H6');
+
+      // الصف 7
+      ws.getCell('A7').value = 'الرقم المدرسي:';
+      ws.getCell('A7').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('B7').value = s.student?.student_number || '';
+      ws.mergeCells('B7:D7');
+
+      ws.getCell('E7').value = 'ولي أمر الطالب:';
+      ws.getCell('E7').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('F7').value = s.student?.guardian_name || 'أبوبكر تاج السر عثمان';
+      ws.mergeCells('F7:H7');
+
+      // الصف 8
+      ws.getCell('A8').value = 'الصف الدراسي:';
+      ws.getCell('A8').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('B8').value = (s.student?.grade_name || 'الصف السادس الابتدائي') + (s.student?.section_name ? (' - شعبة ' + s.student.section_name) : ' - شعبة أ');
+      ws.mergeCells('B8:D8');
+
+      ws.getCell('E8').value = 'هاتف ولي الأمر:';
+      ws.getCell('E8').font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+      ws.getCell('F8').value = s.student?.guardian_phone || '0912345678';
+      ws.mergeCells('F8:H8');
+
+      // سطر فارغ
+      ws.addRow([]);
+
+      // 3. ملخص الأرصدة (KPIs)
+      ws.mergeCells('A10:H10');
+      const kpiHead = ws.getCell('A10');
+      kpiHead.value = 'ملخص الأرصدة والموقف المالي الإجمالي';
+      kpiHead.font = { bold: true, size: 11, color: { argb: 'FF1E293B' } };
+      kpiHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      ws.getRow(10).height = 20;
+
+      ws.mergeCells('A11:B11');
+      ws.getCell('A11').value = 'إجمالي الرسوم الصادرة';
+      ws.getCell('A11').font = { bold: true, size: 10 };
+      ws.getCell('A11').alignment = { horizontal: 'center' };
+
+      ws.mergeCells('C11:D11');
+      ws.getCell('C11').value = 'إجمالي المنح والخصومات';
+      ws.getCell('C11').font = { bold: true, size: 10 };
+      ws.getCell('C11').alignment = { horizontal: 'center' };
+
+      ws.mergeCells('E11:F11');
+      ws.getCell('E11').value = 'إجمالي المسدد (التحصيلات)';
+      ws.getCell('E11').font = { bold: true, size: 10 };
+      ws.getCell('E11').alignment = { horizontal: 'center' };
+
+      ws.mergeCells('G11:H11');
+      ws.getCell('G11').value = 'صافي الرصيد المستحق (المديونية)';
+      ws.getCell('G11').font = { bold: true, size: 10 };
+      ws.getCell('G11').alignment = { horizontal: 'center' };
+
+      ws.mergeCells('A12:B12');
+      const k1 = ws.getCell('A12');
+      k1.value = `${this.fmt(s.summary?.total_invoiced)} ج.س`;
+      k1.font = { bold: true, size: 12, color: { argb: 'FF0F172A' } };
+      k1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws.mergeCells('C12:D12');
+      const k2 = ws.getCell('C12');
+      k2.value = `${this.fmt(s.summary?.total_discounted)} ج.س`;
+      k2.font = { bold: true, size: 12, color: { argb: 'FFD97706' } };
+      k2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws.mergeCells('E12:F12');
+      const k3 = ws.getCell('E12');
+      k3.value = `${this.fmt(s.summary?.total_paid)} ج.س`;
+      k3.font = { bold: true, size: 12, color: { argb: 'FF16A34A' } };
+      k3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws.mergeCells('G12:H12');
+      const k4 = ws.getCell('G12');
+      k4.value = `${this.fmt(s.summary?.net_outstanding)} ج.س`;
+      k4.font = { bold: true, size: 12, color: { argb: 'FFDC2626' } };
+      k4.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(12).height = 24;
+
+      // سطر فارغ
+      ws.addRow([]);
+
+      // 4. جدول حركات كشف الحساب ودفتر الأستاذ
+      ws.mergeCells('A14:H14');
+      const txHead = ws.getCell('A14');
+      txHead.value = 'سجل القيود والعمليات المالية التفصيلي (Running Balance)';
+      txHead.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      txHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND_BLUE } };
+      ws.getRow(14).height = 22;
+
+      const txHeaders = ['#', 'التاريخ', 'البيان والوصف', 'رقم المرجع', 'مدين (+) ج.س', 'دائن (-) ج.س', 'الرصيد التراكمي ج.س', 'طريقة السداد / الملاحظات'];
+      const hRow = ws.addRow(txHeaders);
+      hRow.font = { bold: true, size: 10, color: { argb: 'FF1E293B' } };
+      hRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      hRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      hRow.height = 22;
+
+      let curRowIdx = 16;
+      (s.transactions || []).forEach((t: any, idx: number) => {
+        const r = ws.addRow([
+          idx + 1,
+          t.date,
+          `${t.type_label} - ${t.description || ''}`,
+          t.reference_number,
+          t.debit > 0 ? Number(t.debit) : '-',
+          t.credit > 0 ? Number(t.credit) : '-',
+          Number(t.running_balance || 0),
+          t.payment_method || '-'
+        ]);
+        r.alignment = { vertical: 'middle' };
+        r.getCell(1).alignment = { horizontal: 'center' };
+        r.getCell(2).alignment = { horizontal: 'center' };
+        r.getCell(4).alignment = { horizontal: 'center' };
+        r.getCell(5).alignment = { horizontal: 'right' };
+        r.getCell(6).alignment = { horizontal: 'right' };
+        r.getCell(7).alignment = { horizontal: 'right' };
+        r.getCell(8).alignment = { horizontal: 'center' };
+        curRowIdx++;
+      });
+
+      // صف الإجماليات للحركات
+      const txTotalRow = ws.addRow([
+        'الإجمالي العام للحركات', '', '', '',
+        Number(s.summary?.total_invoiced || 0),
+        Number((s.summary?.total_paid || 0) + (s.summary?.total_discounted || 0)),
+        Number(s.summary?.net_outstanding || 0),
+        ''
+      ]);
+      ws.mergeCells(`A${curRowIdx}:D${curRowIdx}`);
+      txTotalRow.font = { bold: true, size: 10.5 };
+      txTotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      txTotalRow.height = 22;
+      curRowIdx++;
+
+      // سطر فارغ
+      ws.addRow([]);
+      curRowIdx++;
+
+      // 5. جدول استحقاق الأقساط الدراسية
+      if (s.installments?.length) {
+        ws.mergeCells(`A${curRowIdx}:H${curRowIdx}`);
+        const insHead = ws.getCell(`A${curRowIdx}`);
+        insHead.value = 'جدول استحقاق الأقساط الدراسية المعتمدة للعام الدراسي';
+        insHead.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+        insHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' } };
+        ws.getRow(curRowIdx).height = 22;
+        curRowIdx++;
+
+        const insCols = ['القسط / الخطة', 'تاريخ الاستحقاق', 'مبلغ القسط ج.س', 'المسدد ج.س', 'المتبقي المطلوب ج.س', 'حالة السداد'];
+        const insHeaderRow = ws.addRow([insCols[0], '', insCols[1], insCols[2], insCols[3], insCols[4], insCols[5], '']);
+        ws.mergeCells(`A${curRowIdx}:B${curRowIdx}`);
+        ws.mergeCells(`G${curRowIdx}:H${curRowIdx}`);
+        insHeaderRow.font = { bold: true, size: 10 };
+        insHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+        insHeaderRow.alignment = { horizontal: 'center', vertical: 'middle' };
+        curRowIdx++;
+
+        s.installments.forEach((ins: any) => {
+          const row = ws.addRow([
+            ins.plan_name || 'قسط دراسي',
+            '',
+            ins.due_date,
+            Number(ins.amount || 0),
+            Number(ins.paid_amount || 0),
+            Number(ins.remaining_amount || 0),
+            ins.status_label || 'مجدول',
+            ''
+          ]);
+          ws.mergeCells(`A${curRowIdx}:B${curRowIdx}`);
+          ws.mergeCells(`G${curRowIdx}:H${curRowIdx}`);
+          row.alignment = { vertical: 'middle' };
+          row.getCell(3).alignment = { horizontal: 'center' };
+          row.getCell(4).alignment = { horizontal: 'right' };
+          row.getCell(5).alignment = { horizontal: 'right' };
+          row.getCell(6).alignment = { horizontal: 'right' };
+          row.getCell(7).alignment = { horizontal: 'center' };
+          curRowIdx++;
+        });
+
+        // إجمالي الأقساط
+        const insTotalRow = ws.addRow([
+          'إجمالي خطة الأقساط المعتمدة للطالب', '', '',
+          Number(s.summary?.installments_total || s.summary?.total_invoiced || 0),
+          Number(s.summary?.installments_paid || 0),
+          Number(s.summary?.installments_remaining || s.summary?.net_outstanding || 0),
+          '', ''
+        ]);
+        ws.mergeCells(`A${curRowIdx}:C${curRowIdx}`);
+        ws.mergeCells(`G${curRowIdx}:H${curRowIdx}`);
+        insTotalRow.font = { bold: true, size: 10.5 };
+        insTotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+        curRowIdx++;
+      }
+
+      // سطر فارغ وتذييل
+      ws.addRow([]);
+      curRowIdx++;
+      ws.mergeCells(`A${curRowIdx}:H${curRowIdx}`);
+      const footerCell = ws.getCell(`A${curRowIdx}`);
+      footerCell.value = `• يعتبر هذا الكشف وثيقة مالية رسمية صادرة ومعتمدة لدى إدارة الحسابات في ${s.tenant?.name_ar || s.tenant?.name || 'المدرسة'}.`;
+      footerCell.font = { size: 9.5, italic: true, color: { argb: 'FF64748B' } };
+      footerCell.alignment = { horizontal: 'right' };
+
+      // كتابة ملف Excel وتنزيله للمستخدم
+      const buf = await wb.xlsx.writeBuffer();
+      const stName = s.student?.student_name ? s.student.student_name.replace(/\s+/g, '-') : 'طالب';
+      const acNum = s.account?.account_number || s.student?.student_number || 'STMT';
+      const filename = `كشف-حساب-مالي-${stName}-${acNum}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error('فشل تصدير كشف الحساب إلى Excel:', e);
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   onLogoError(event: any) {
@@ -1150,7 +1445,6 @@ export class StudentAccountStatementComponent implements OnInit {
   }
 
   goBack() {
-    // العودة للتقويم أو لحسابات الطلاب
     window.history.back();
   }
 
