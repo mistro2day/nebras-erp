@@ -264,22 +264,46 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
             if t['type'] == 'scholarship':
                 total_discounted += credit
 
-        # جدول الأقساط
-        installments_qs = Installment.objects.filter(
+        # جدول الأقساط الحقيقية للطالب
+        installments_qs = list(Installment.objects.filter(
             student_billing_account=account, tenant_id=tenant_id
-        ).order_by('due_date')
+        ).order_by('due_date'))
+
+        total_inst = len(installments_qs)
+        ordinal_ar = {1: 'الأول', 2: 'الثاني', 3: 'الثالث', 4: 'الرابع', 5: 'الخامس', 6: 'السادس'}
 
         installments_data = []
-        for ins in installments_qs:
+        for idx, ins in enumerate(installments_qs, start=1):
+            amt = float(ins.amount or 0.0)
+            paid = float(ins.paid_amount or 0.0)
+            rem = float(max(0.0, amt - paid))
+
+            seq = ordinal_ar.get(idx, f"رقم {idx}")
+            if total_inst == 1:
+                label = "الدفعة الكاملة (100%)"
+            elif total_inst == 2:
+                label = f"القسط {seq} (50%)"
+            elif total_inst == 3:
+                pct = "40%" if idx == 1 else "30%"
+                label = f"القسط {seq} ({pct})"
+            elif total_inst == 4:
+                label = f"القسط {seq} (25%)"
+            else:
+                label = f"القسط {seq} من {total_inst}"
+
+            plan_name = ins.installment_plan.name if ins.installment_plan else 'خطة السداد بالأقساط'
+            full_title = f"{label} — {plan_name}"
+
             installments_data.append({
                 'id': str(ins.id),
                 'due_date': str(ins.due_date),
-                'amount': float(ins.amount or 0.0),
-                'paid_amount': float(ins.paid_amount or 0.0),
-                'remaining_amount': float(max(0.0, float(ins.amount or 0.0) - float(ins.paid_amount or 0.0))),
+                'amount': amt,
+                'paid_amount': paid,
+                'remaining_amount': rem,
                 'status': ins.status,
                 'status_label': 'مسدد بالكامل' if ins.status == 'paid' else ('متأخر' if str(ins.due_date) < str(timezone.localdate()) else 'مجدول'),
-                'plan_name': ins.installment_plan.name if ins.installment_plan else '',
+                'plan_name': full_title,
+                'installment_label': label,
             })
 
         import uuid
@@ -302,6 +326,9 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
                 'net_outstanding': float(account.outstanding_balance or running_bal),
                 'credit_balance': float(account.credit_balance or 0.0),
                 'installments_count': len(installments_data),
+                'installments_total': sum(i['amount'] for i in installments_data),
+                'installments_paid': sum(i['paid_amount'] for i in installments_data),
+                'installments_remaining': sum(i['remaining_amount'] for i in installments_data),
             },
             'transactions': transactions,
             'installments': installments_data,

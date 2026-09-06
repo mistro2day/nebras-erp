@@ -249,7 +249,9 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                 <tbody>
                   @for (ins of statement()?.installments; track ins.id) {
                     <tr>
-                      <td>{{ ins.plan_name || 'قسط دراسي' }}</td>
+                      <td>
+                        <strong>{{ ins.plan_name || 'قسط دراسي' }}</strong>
+                      </td>
                       <td class="mono">{{ ins.due_date }}</td>
                       <td class="end mono">{{ fmt(ins.amount) }} ج.س</td>
                       <td class="end mono success">{{ fmt(ins.paid_amount) }} ج.س</td>
@@ -262,6 +264,15 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                     </tr>
                   }
                 </tbody>
+                <tfoot>
+                  <tr class="totals-row">
+                    <th colspan="2" class="start">إجمالي خطة الأقساط المعتمدة للطالب</th>
+                    <th class="end mono">{{ fmt(statement()?.summary?.installments_total || statement()?.summary?.total_invoiced) }} ج.س</th>
+                    <th class="end mono success">{{ fmt(statement()?.summary?.installments_paid || 0) }} ج.س</th>
+                    <th class="end mono danger-bal">{{ fmt(statement()?.summary?.installments_remaining || statement()?.summary?.net_outstanding) }} ج.س</th>
+                    <th></th>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           }
