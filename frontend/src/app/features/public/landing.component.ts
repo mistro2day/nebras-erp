@@ -20,7 +20,7 @@ import { AdmissionsService } from '../admissions/admissions.service';
 
       <header class="top">
         <div class="brand">
-          <div class="logo-mark">ن</div>
+          <div class="logo-mark"><img src="assets/branding/logo-icon-light.png" alt="شعار نبراس" class="brand-logo-img" /></div>
           <span class="brand-name">{{ tenantName() || 'نبراس' }} <b>OS</b></span>
         </div>
         <a routerLink="/accounts/login" class="top-login">دخول الإدارة</a>
@@ -94,7 +94,8 @@ import { AdmissionsService } from '../admissions/admissions.service';
 
     .top { position: relative; z-index: 1; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
     .brand { display: flex; align-items: center; gap: 10px; }
-    .logo-mark { width: 34px; height: 34px; background: var(--nb-primary-600); border-radius: var(--nb-radius); display: flex; align-items: center; justify-content: center; color: var(--nb-on-primary); font-weight: 700; font-size: 16px; }
+    .logo-mark { width: 34px; height: 34px; background: transparent; border-radius: var(--nb-radius); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .brand-logo-img { width: 100%; height: 100%; object-fit: contain; }
     .brand-name { font-size: 16px; font-weight: 700; color: var(--nb-text); }
     .brand-name b { color: var(--nb-primary-600); }
     .top-login { font-size: 13px; font-weight: 600; color: var(--nb-primary-600); text-decoration: none; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 8px 18px; background: var(--nb-surface); transition: background 150ms ease, box-shadow 150ms ease; }

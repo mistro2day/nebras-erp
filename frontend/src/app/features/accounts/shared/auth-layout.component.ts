@@ -21,7 +21,9 @@ import { RouterLink } from '@angular/router';
       <div class="auth-card">
         <div class="auth-head">
           @if (brand) {
-            <a class="auth-brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">ن</a>
+            <a class="auth-brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
+              <img src="assets/branding/logo-light.png" alt="شعار نبراس" class="auth-logo-img" />
+            </a>
           }
           <h2 class="auth-title">{{ title }}</h2>
           @if (subtitle) {
@@ -54,15 +56,14 @@ import { RouterLink } from '@angular/router';
     }
     .auth-head { text-align: center; margin-bottom: 24px; }
     .auth-brand {
-      width: 48px; height: 48px; margin: 0 auto 14px;
-      background: var(--nb-primary-600); color: var(--nb-on-primary);
-      border-radius: var(--nb-radius);
+      width: 76px; height: 76px; margin: 0 auto 12px;
+      background: transparent;
       display: flex; align-items: center; justify-content: center;
-      font-size: 24px; font-weight: 700;
       text-decoration: none; cursor: pointer;
-      transition: transform 150ms ease, box-shadow 150ms ease;
+      transition: transform 150ms ease;
     }
-    .auth-brand:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(16,24,40,0.18); }
+    .auth-brand:hover { transform: scale(1.04); }
+    .auth-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .auth-title { font-size: 18px; font-weight: 700; color: var(--nb-text); margin: 0 0 6px; }
     .auth-subtitle { font-size: 13px; color: var(--nb-text-muted); margin: 0; line-height: 1.6; }
 

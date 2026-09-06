@@ -50,7 +50,7 @@ import { FormsModule } from '@angular/forms';
       <!-- الشريط الجانبي (يمين في RTL) -->
       <aside class="sidebar">
         <a class="sidebar-logo" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
-          <div class="logo-mark">ن</div>
+          <div class="logo-mark"><img src="assets/branding/logo-icon-dark.png" alt="شعار نبراس" class="sidebar-logo-img" /></div>
           <div class="logo-title">نبراس <span>OS</span></div>
         </a>
 
@@ -328,16 +328,21 @@ import { FormsModule } from '@angular/forms';
       .sidebar-logo:hover { background: var(--nb-bg); }
 
       .logo-mark {
-        width: 26px;
-        height: 26px;
-        background: var(--nb-primary-600);
+        width: 30px;
+        height: 30px;
+        background: rgba(1, 33, 71, 0.9);
         border-radius: var(--nb-radius);
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--nb-on-primary);
-        font-weight: 700;
-        font-size: 13px;
+        overflow: hidden;
+        border: 1px solid rgba(0, 184, 135, 0.4);
+
+        .sidebar-logo-img {
+          width: 24px;
+          height: 24px;
+          object-fit: contain;
+        }
       }
 
       .logo-title {

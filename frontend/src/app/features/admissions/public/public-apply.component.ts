@@ -96,7 +96,7 @@ interface ExtendedGuardianForm {
     <div class="portal" dir="rtl">
       <header class="portal-top">
         <a class="brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
-          <div class="logo-mark">ن</div>
+          <div class="logo-mark"><img src="assets/branding/logo-icon-light.png" alt="شعار نبراس" class="brand-logo-img" /></div>
           <div class="brand-title">{{ tenantName() || 'المورد الجديدة للتعليم الخاص' }} <span>· بوابة القبول والتسجيل</span></div>
         </a>
         <a routerLink="/apply/track" class="track-link">تتبّع طلب سابق ←</a>
@@ -647,7 +647,8 @@ interface ExtendedGuardianForm {
     .portal { min-height: 100vh; display: flex; flex-direction: column; font-family: var(--nb-font-family, system-ui, sans-serif); }
     .portal-top { height: 64px; background: var(--nb-surface, #fff); border-bottom: 1px solid var(--nb-border, #e2e8f0); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .logo-mark { width: 34px; height: 34px; background: var(--nb-primary-600, #2563eb); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 16px; }
+    .logo-mark { width: 34px; height: 34px; background: transparent; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .brand-logo-img { width: 100%; height: 100%; object-fit: contain; }
     .brand-title { font-size: 16px; font-weight: 800; color: var(--nb-text, #0f172a); }
     .brand-title span { color: var(--nb-primary-600, #2563eb); font-weight: 600; font-size: 14px; }
     .track-link { font-size: 13.5px; color: var(--nb-primary-600, #2563eb); text-decoration: none; font-weight: 700; background: var(--nb-primary-50, #eff6ff); padding: 6px 14px; border-radius: 6px; }
