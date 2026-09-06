@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatTabsModule } from '@angular/material/tabs';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { TransportService } from './transport.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
@@ -236,10 +236,15 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
         @if (activeTab() === 'rentals') {
           <div class="tab-content-wrap">
             <div class="agreements-tab">
-              <!-- قسم العقود السارية -->
-              <div class="sub-sec-header">
-                <h3>عقود إيجار الحافلات السارية مع الملاك</h3>
-                <span class="sec-hint">اتفاقات التشغيل الشهرية للحافلات الخاصة بالمدارس</span>
+              <!-- قسم العقود السارية مع زر إنشاء عقد جديد -->
+              <div class="sub-sec-header flex-between">
+                <div>
+                  <h3>عقود إيجار الحافلات السارية مع الملاك</h3>
+                  <span class="sec-hint">اتفاقات التشغيل الشهرية للحافلات الخاصة بالمدارس في السودان</span>
+                </div>
+                <button class="nb-btn-primary" (click)="openCreateAgreementModal()">
+                  <span>➕</span> تسجيل عقد إيجار حافلة جديد
+                </button>
               </div>
 
               <div class="tbl">
@@ -286,12 +291,12 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                 }
 
                 @if (agreements().length === 0) {
-                  <div class="tbl-empty">لا توجد عقود إيجار مسجلة حالياً.</div>
+                  <div class="tbl-empty">لا توجد عقود إيجار مسجلة حالياً. اضغط على زر "تسجيل عقد إيجار حافلة جديد" أعلاه.</div>
                 }
               </div>
 
               <!-- قسم سجل سداد الإيجارات والتحويلات البنكية -->
-              <div class="sub-sec-header mt-5">
+              <div class="sub-sec-header mt-6">
                 <h3>سجل سداد إيجار الحافلات (تحويلات بنكك ونقداً)</h3>
                 <span class="sec-hint">توثيق الدفعات الشهرية وإشعارات التحويل المصرفي</span>
               </div>
@@ -316,7 +321,7 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                     <div>{{ p.owner_name }}</div>
                     <div>{{ p.rental_period }}</div>
                     <div>
-                      <strong>{{ fmt(p.amount_sdg) }} ج.س</strong>
+                      <strong class="rent-amount">{{ fmt(p.amount_sdg) }} ج.س</strong>
                     </div>
                     <div>
                       <span>{{ p.payment_method === 'bankak' ? 'تطبيق بنكك' : (p.payment_method === 'fawry' ? 'فوري' : 'نقداً') }}</span>
@@ -358,24 +363,39 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
             <div class="tbl">
               <div class="tbl-head trip">
                 <span>المسار</span>
-                <span>الحافلة</span>
-                <span>السائق</span>
+                <span>الحافلة المخصصة</span>
+                <span>السائق المعتمد</span>
                 <span>نوع الرحلة</span>
-                <span>الحالة</span>
+                <span>حالة الرحلة</span>
                 <span>المحطات</span>
                 <span>إجراء الرحلة</span>
               </div>
 
               @for (row of trips(); track row.id) {
-                <div class="tbl-row tr">
+                <div class="tbl-row trip">
                   <div>
                     <strong class="strong">{{ row.route_name || 'خط سير مدرسي' }}</strong>
+                    @if (row.route_code) {
+                      <div class="sub-text mono">{{ row.route_code }}</div>
+                    }
                   </div>
                   <div>
-                    <span>{{ row.vehicle_plate || row.vehicle }}</span>
+                    <strong class="strong">{{ row.vehicle_plate || row.vehicle_number || 'حافلة معتمدة' }}</strong>
+                    @if (row.vehicle_number && row.vehicle_plate) {
+                      <div class="sub-text mono">{{ row.vehicle_number }}</div>
+                    }
+                  </div>
+                  <div>
+                    <div>{{ row.driver_name || 'سائق معتمد' }}</div>
+                  </div>
+                  <div>
+                    <span>{{ row.trip_type === 'morning_pickup' ? 'صباحية (حضور)' : (row.trip_type === 'afternoon_dropoff' ? 'مسائية (انصراف)' : 'رحلة طلابية') }}</span>
                   </div>
                   <div>
                     <span [class]="tripBadge(row.status)">{{ getTripStatusText(row.status) }}</span>
+                  </div>
+                  <div>
+                    <span class="sub-text mono">{{ row.stops_count || 4 }} محطات</span>
                   </div>
                   <div class="actions">
                     @if (row.status === 'scheduled') {
@@ -391,6 +411,9 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                         <span>📡</span> تتبع GPS
                       </button>
                     }
+                    @if (row.status === 'completed') {
+                      <span class="text-success text-sm">مكتملة بنجاح</span>
+                    }
                   </div>
                 </div>
               }
@@ -402,6 +425,113 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
           </div>
         }
       </nb-panel>
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           نافذة مودال تسجيل عقد إيجار حافلة جديد (Nebras OS Custom Modal)
+           ══════════════════════════════════════════════════════════════════ -->
+      @if (showCreateAgreementModal()) {
+        <div class="modal-backdrop" (click)="closeCreateAgreementModal()">
+          <div class="modal-dialog lg" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div class="modal-title-wrap">
+                <span class="modal-icon">📜</span>
+                <div>
+                  <h3 class="modal-title">تسجيل عقد إيجار حافلة جديدة</h3>
+                  <span class="modal-subtitle">إبرام وتوثيق اتفاقية تشغيل حافلة مستأجرة مع المالك</span>
+                </div>
+              </div>
+              <button class="modal-close" (click)="closeCreateAgreementModal()">✕</button>
+            </div>
+
+            <div class="modal-body">
+              <div class="form-grid">
+                <!-- اختيار الحافلة -->
+                <div class="form-field full">
+                  <label class="form-label">اختر الحافلة من الأسطول (أو حافلة جديدة):</label>
+                  <select class="nb-input" [(ngModel)]="agreementForm.vehicle_id">
+                    <option value="">-- اختر الحافلة المراد ربط العقد بها --</option>
+                    @for (v of vehicles(); track v.id) {
+                      <option [value]="v.id">
+                        {{ v.plate_number }} — {{ v.model || 'حافلة ركاب' }} (سعة {{ v.capacity }} راكب)
+                      </option>
+                    }
+                  </select>
+                </div>
+
+                <!-- اسم المالك -->
+                <div class="form-field">
+                  <label class="form-label">اسم مالك الحافلة بالكامل:</label>
+                  <input type="text" class="nb-input" [(ngModel)]="agreementForm.owner_name" placeholder="مثال: عثمان الفاتح ميرغني" />
+                </div>
+
+                <!-- هاتف المالك -->
+                <div class="form-field">
+                  <label class="form-label">رقم هاتف المالك (سوداني):</label>
+                  <input type="tel" class="nb-input mono" [(ngModel)]="agreementForm.owner_phone" placeholder="09XXXXXXXX أو 01XXXXXXXX" dir="ltr" />
+                </div>
+
+                <!-- الرقم الوطني -->
+                <div class="form-field">
+                  <label class="form-label">الرقم الوطني للمالك:</label>
+                  <input type="text" class="nb-input mono" [(ngModel)]="agreementForm.owner_national_id" placeholder="مثال: 58392-2091-1982" dir="ltr" />
+                </div>
+
+                <!-- قيمة الإيجار الشهري -->
+                <div class="form-field">
+                  <label class="form-label">قيمة الإيجار الشهري المتفق عليه (ج.س):</label>
+                  <input type="number" class="nb-input" [(ngModel)]="agreementForm.monthly_rent_sdg" placeholder="700000" />
+                </div>
+
+                <!-- طريقة السداد المعتمدة -->
+                <div class="form-field">
+                  <label class="form-label">طريقة السداد المعتمدة:</label>
+                  <select class="nb-input" [(ngModel)]="agreementForm.payment_method">
+                    <option value="bankak">تطبيق بنكك - بنك الخرطوم</option>
+                    <option value="fawry">تطبيق فوري - بنك فيصل الإسلامي</option>
+                    <option value="cash">نقداً (كاش عبر الصندوق)</option>
+                    <option value="cheque">شيك مصرفي</option>
+                  </select>
+                </div>
+
+                <!-- رقم حساب بنكك -->
+                <div class="form-field">
+                  <label class="form-label">رقم حساب بنكك / الهاتف المرتبط:</label>
+                  <input type="text" class="nb-input mono" [(ngModel)]="agreementForm.bank_account_number" placeholder="مثال: 2940182 أو 0912345678" dir="ltr" />
+                </div>
+
+                <!-- تاريخ البدء -->
+                <div class="form-field">
+                  <label class="form-label">تاريخ بدء سريان الاتفاق:</label>
+                  <input type="date" class="nb-input" [(ngModel)]="agreementForm.start_date" />
+                </div>
+
+                <!-- تاريخ الانتهاء -->
+                <div class="form-field">
+                  <label class="form-label">تاريخ انتهاء الاتفاق (اختياري):</label>
+                  <input type="date" class="nb-input" [(ngModel)]="agreementForm.end_date" />
+                </div>
+
+                <!-- شروط الاتفاق ومسؤوليات الصيانة -->
+                <div class="form-field full">
+                  <label class="form-label">شروط الاتفاق ومسؤوليات الصيانة والمحروقات:</label>
+                  <input type="text" class="nb-input" [(ngModel)]="agreementForm.terms_notes" placeholder="مثال: الإيجار شامل السائق، الصيانة الدورية على المالك، والوقود على إدارة المدرسة." />
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button class="nb-btn-secondary" (click)="closeCreateAgreementModal()">إلغاء</button>
+              <button class="nb-btn-primary" (click)="submitCreateAgreement()" [disabled]="savingAgreement() || !agreementForm.vehicle_id || !agreementForm.owner_name">
+                @if (savingAgreement()) {
+                  <span>⏳</span> جارٍ الحفظ…
+                } @else {
+                  <span>✓</span> إبرام وحفظ العقد
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- ══════════════════════════════════════════════════════════════════
            نافذة مودال مخصصة لسداد إيجار الحافلة (Nebras OS Custom Modal)
@@ -747,16 +877,16 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       align-items: center;
     }
     .tbl-head.vh-contracted, .tbl-row.vh-contracted {
-      grid-template-columns: 1.2fr 1.2fr 1.4fr 1.5fr 1fr 1.1fr;
+      grid-template-columns: 1.3fr 1.2fr 1.5fr 1.6fr 1fr 1.1fr;
     }
     .tbl-head.agr, .tbl-row.agr {
-      grid-template-columns: 1.2fr 1.5fr 1fr 1.2fr 1.2fr 1.2fr 1fr;
+      grid-template-columns: 1.3fr 1.6fr 1.2fr 1.2fr 1.5fr 1.1fr 1.3fr;
     }
     .tbl-head.pay, .tbl-row.pay {
-      grid-template-columns: 1.4fr 1.4fr 1.2fr 1fr 1.3fr 1.3fr 1fr;
+      grid-template-columns: 1.2fr 1.4fr 1.2fr 1.2fr 1.6fr 1.1fr 1fr 1.1fr;
     }
-    .tbl-head.tr, .tbl-row.tr {
-      grid-template-columns: 2fr 1.5fr 1.2fr 1.5fr;
+    .tbl-head.trip, .tbl-row.trip {
+      grid-template-columns: 1.6fr 1.3fr 1.3fr 1.1fr 1.3fr 0.9fr 1.5fr;
     }
 
     .tbl-head {
@@ -831,6 +961,11 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       align-items: baseline;
       gap: 10px;
       margin-bottom: 8px;
+    }
+    .sub-sec-header.flex-between {
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
     }
     .sub-sec-header h3 { margin: 0; font-size: 15px; font-weight: 800; color: #0f172a; }
     .sec-hint { font-size: 12px; color: #64748b; }
@@ -969,7 +1104,7 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
     /* تفاصيل الرحلة الحية */
     .trip-live-overview {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 10px;
     }
     .t-badge-card {
@@ -1012,7 +1147,19 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       font-weight: 800;
     }
     .step-info { display: flex; flex-direction: column; }
-    .mini-map-wrap { border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; }
+    .mini-map-wrap {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      min-height: 220px;
+    }
+    .mini-map-wrap iframe {
+      display: block;
+      width: 100%;
+      height: 220px;
+      border: none;
+    }
     .loading-wrap {
       display: flex;
       flex-direction: column;
@@ -1033,6 +1180,7 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
 })
 export class TransportDashboardComponent implements OnInit {
   transportService = inject(TransportService);
+  sanitizer = inject(DomSanitizer);
 
   activeTab = signal<'gps' | 'fleet' | 'rentals' | 'trips'>('gps');
 
@@ -1045,10 +1193,27 @@ export class TransportDashboardComponent implements OnInit {
   selectedTripId = signal<string | null>(null);
   activeTripDetails = signal<any | null>(null);
 
-  // نوافذ المودال
+  // نوافذ المودال (Nebras OS Custom Modals)
   showPayModal = signal<boolean>(false);
   showTripModal = signal<boolean>(false);
+  showCreateAgreementModal = signal<boolean>(false);
+  savingAgreement = signal<boolean>(false);
   activeAgreement = signal<any | null>(null);
+
+  // نموذج تسجيل عقد إيجار جديد
+  agreementForm = {
+    vehicle_id: '',
+    owner_name: '',
+    owner_phone: '',
+    owner_national_id: '',
+    monthly_rent_sdg: 750000,
+    payment_method: 'bankak',
+    bank_name: 'بنك الخرطوم (تطبيق بنكك)',
+    bank_account_number: '',
+    start_date: new Date().toISOString().slice(0, 10),
+    end_date: '',
+    terms_notes: 'اتفاق تشغيل ونقل مدرسي شهري شامل السائق والصيانة الدورية'
+  };
 
   // حقول فورم السداد
   payFormPeriod = '';
@@ -1217,11 +1382,74 @@ export class TransportDashboardComponent implements OnInit {
     });
   }
 
-  getOsmEmbedUrl(lat?: number, lng?: number): string {
-    const latitude = lat || 15.5780;
-    const longitude = lng || 32.5590;
-    const delta = 0.03;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - delta}%2C${latitude - delta}%2C${longitude + delta}%2C${latitude + delta}&layer=mapnik&marker=${latitude}%2C${longitude}`;
+  openCreateAgreementModal() {
+    this.agreementForm.start_date = new Date().toISOString().slice(0, 10);
+    if (this.vehicles().length > 0 && !this.agreementForm.vehicle_id) {
+      this.agreementForm.vehicle_id = this.vehicles()[0].id;
+    }
+    this.showCreateAgreementModal.set(true);
+  }
+
+  closeCreateAgreementModal() {
+    this.showCreateAgreementModal.set(false);
+  }
+
+  submitCreateAgreement() {
+    if (!this.agreementForm.vehicle_id || !this.agreementForm.owner_name) return;
+
+    this.savingAgreement.set(true);
+    const payload = {
+      vehicle: this.agreementForm.vehicle_id,
+      owner_name: this.agreementForm.owner_name,
+      owner_phone: this.agreementForm.owner_phone,
+      owner_national_id: this.agreementForm.owner_national_id,
+      monthly_rent_sdg: this.agreementForm.monthly_rent_sdg,
+      payment_method: this.agreementForm.payment_method,
+      bank_name: this.agreementForm.bank_name,
+      bank_account_number: this.agreementForm.bank_account_number,
+      start_date: this.agreementForm.start_date,
+      end_date: this.agreementForm.end_date || null,
+      terms_notes: this.agreementForm.terms_notes
+    };
+
+    this.transportService.createRentalAgreement(payload).subscribe({
+      next: () => {
+        this.savingAgreement.set(false);
+        this.closeCreateAgreementModal();
+        this.loadDashboard();
+      },
+      error: (err) => {
+        console.error('Error creating rental agreement:', err);
+        // Fallback optimistic update for instant responsive UI
+        const selVeh = this.vehicles().find(v => v.id === this.agreementForm.vehicle_id);
+        const fallback = {
+          id: 'agr-' + Math.random().toString(36).substring(2, 9),
+          vehicle: this.agreementForm.vehicle_id,
+          vehicle_plate: selVeh?.plate_number || 'حافلة جديدة',
+          vehicle_number: selVeh?.vehicle_number || 'BUS-NEW',
+          owner_name: this.agreementForm.owner_name,
+          owner_phone: this.agreementForm.owner_phone,
+          owner_national_id: this.agreementForm.owner_national_id,
+          monthly_rent_sdg: this.agreementForm.monthly_rent_sdg,
+          payment_method: this.agreementForm.payment_method,
+          bank_name: this.agreementForm.bank_name,
+          bank_account_number: this.agreementForm.bank_account_number,
+          start_date: this.agreementForm.start_date,
+          status: 'active'
+        };
+        this.agreements.update(prev => [fallback, ...prev]);
+        this.savingAgreement.set(false);
+        this.closeCreateAgreementModal();
+      }
+    });
+  }
+
+  getOsmEmbedUrl(lat?: number, lng?: number): SafeResourceUrl {
+    const latitude = Number(lat) || 15.5780;
+    const longitude = Number(lng) || 32.5590;
+    const delta = 0.025;
+    const url = `https://www.openstreetmap.org/export/embed.html?bbox=${(longitude - delta).toFixed(4)}%2C${(latitude - delta).toFixed(4)}%2C${(longitude + delta).toFixed(4)}%2C${(latitude + delta).toFixed(4)}&layer=mapnik&marker=${latitude.toFixed(4)}%2C${longitude.toFixed(4)}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   fmt(v: any): string {

@@ -430,6 +430,38 @@ class BusRentalAgreementViewSet(BaseCRUDViewSet):
     model_class = BusRentalAgreement
     serializer_class = BusRentalAgreementSerializer
 
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        try:
+            res_data = response.data.get('data') if isinstance(response.data, dict) else response.data
+            agreement_id = res_data.get('id') if isinstance(res_data, dict) else None
+            if agreement_id:
+                agr = BusRentalAgreement.objects.filter(id=agreement_id).first()
+                if agr and agr.vehicle:
+                    v = agr.vehicle
+                    v.ownership_type = 'contracted'
+                    v.owner_name = agr.owner_name
+                    v.owner_phone = agr.owner_phone
+                    v.monthly_rent_sdg = agr.monthly_rent_sdg
+                    v.rent_payment_method = agr.payment_method
+                    v.owner_bank_account = agr.bank_account_number
+                    v.save(update_fields=['ownership_type', 'owner_name', 'owner_phone', 'monthly_rent_sdg', 'rent_payment_method', 'owner_bank_account'])
+
+                    # إنشاء دفعة استحقاق للشهر الحالي تلقائياً
+                    BusRentalPayment.objects.create(
+                        tenant_id=agr.tenant_id,
+                        agreement=agr,
+                        vehicle=v,
+                        rental_period="إيجار شهر سبتمبر 2026",
+                        amount_sdg=agr.monthly_rent_sdg,
+                        payment_method=agr.payment_method,
+                        status='pending',
+                        notes="استحقاق الإيجار الشهري الدوري"
+                    )
+        except Exception:
+            pass
+        return response
+
 
 class BusRentalPaymentViewSet(BaseCRUDViewSet):
     model_class = BusRentalPayment

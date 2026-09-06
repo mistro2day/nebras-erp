@@ -66,6 +66,29 @@ class RouteStopSerializer(BaseTransportSerializer):
         fields = '__all__'
 
 class TripSerializer(BaseTransportSerializer):
+    route_name = serializers.CharField(source='route.name_ar', read_only=True)
+    route_code = serializers.CharField(source='route.code', read_only=True)
+    vehicle_plate = serializers.CharField(source='vehicle.plate_number', read_only=True)
+    vehicle_number = serializers.CharField(source='vehicle.vehicle_number', read_only=True)
+    stops_count = serializers.SerializerMethodField()
+
+    def get_stops_count(self, obj):
+        if obj.route:
+            return obj.route.stops.count()
+        return 0
+
+    def get_driver_name(self, obj):
+        if not obj.driver:
+            return "سائق معتمد"
+        try:
+            from apps.hr.domain.models import Employee
+            emp = Employee.objects.filter(id=obj.driver.employee_id).first()
+            if emp:
+                return emp.full_name_ar or emp.full_name_en
+        except Exception:
+            pass
+        return f"سائق ({obj.driver.license_number})"
+
     class Meta(BaseTransportSerializer.Meta):
         model = Trip
         fields = '__all__'

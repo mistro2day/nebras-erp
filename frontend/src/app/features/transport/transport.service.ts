@@ -95,6 +95,10 @@ export class TransportService {
     return this.http.get<any[]>(`${this.apiUrl}/rental-agreements/`);
   }
 
+  createRentalAgreement(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rental-agreements/`, payload);
+  }
+
   getRentalPayments(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/rental-payments/`);
   }
