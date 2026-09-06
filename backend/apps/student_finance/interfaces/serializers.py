@@ -84,10 +84,17 @@ def _extract_student_finance_metadata(billing_account):
                 data['student_name'] = student.profile.arabic_name or student.profile.english_name or ''
             
             enrollment = student.enrollments.filter(status='active').first() or student.enrollments.first()
-            if enrollment and enrollment.grade:
-                data['grade_name'] = getattr(enrollment.grade, 'name_ar', '') or getattr(enrollment.grade, 'name', '') or ''
-            if enrollment and enrollment.section:
-                data['section_name'] = getattr(enrollment.section, 'name_ar', '') or getattr(enrollment.section, 'name', '') or ''
+            if enrollment:
+                if getattr(enrollment, 'grade_id', None):
+                    from apps.academics.domain.models import Grade
+                    g = Grade.objects.filter(id=enrollment.grade_id).first()
+                    if g:
+                        data['grade_name'] = getattr(g, 'name_ar', '') or getattr(g, 'name', '') or ''
+                if getattr(enrollment, 'section_id', None):
+                    from apps.academics.domain.models import Section
+                    sec = Section.objects.filter(id=enrollment.section_id).first()
+                    if sec:
+                        data['section_name'] = getattr(sec, 'name_ar', '') or getattr(sec, 'name', '') or ''
             
             family = student.family_relations.first()
             if family:

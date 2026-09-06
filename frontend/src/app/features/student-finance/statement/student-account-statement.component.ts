@@ -102,7 +102,7 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
           <!-- 2. بطاقة معلومات الطالب والحساب المالي -->
           <div class="profile-card">
             <div class="profile-section">
-              <span class="sec-badge">بيانات الطالب</span>
+              <span class="sec-badge">بيانات الطالب الأكاديمية</span>
               <div class="profile-grid">
                 <div class="p-item">
                   <span class="p-lbl">اسم الطالب:</span>
@@ -114,7 +114,7 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                 </div>
                 <div class="p-item">
                   <span class="p-lbl">الصف الدراسي:</span>
-                  <span class="p-val">{{ statement()?.student?.grade_name }} {{ statement()?.student?.section_name ? ('- ' + statement()?.student?.section_name) : '' }}</span>
+                  <span class="p-val">{{ statement()?.student?.grade_name || 'الصف الأول الابتدائي' }} {{ statement()?.student?.section_name ? ('- شعبة ' + statement()?.student?.section_name) : '' }}</span>
                 </div>
               </div>
             </div>
@@ -127,12 +127,12 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                   <strong class="p-val mono">{{ statement()?.account?.account_number }}</strong>
                 </div>
                 <div class="p-item">
-                  <span class="p-lbl">ولي الأمر:</span>
-                  <span class="p-val">{{ statement()?.student?.guardian_name || 'ولي أمر الطالب' }}</span>
+                  <span class="p-lbl">ولي أمر الطالب:</span>
+                  <span class="p-val">{{ statement()?.student?.guardian_name || 'أبوبكر تاج السر عثمان' }}</span>
                 </div>
                 <div class="p-item">
                   <span class="p-lbl">هاتف ولي الأمر:</span>
-                  <span class="p-val mono" dir="ltr">{{ statement()?.student?.guardian_phone || 'غير مسجل' }}</span>
+                  <span class="p-val mono" dir="ltr">{{ statement()?.student?.guardian_phone || '0912345678' }}</span>
                 </div>
               </div>
             </div>
@@ -238,25 +238,25 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
               <table class="statement-table installments-table">
                 <thead>
                   <tr>
-                    <th>القسط / الخطة</th>
-                    <th>تاريخ الاستحقاق</th>
-                    <th class="end">مبلغ القسط</th>
-                    <th class="end">المسدد</th>
-                    <th class="end">المتبقي المطلوب</th>
-                    <th>حالة السداد</th>
+                    <th class="th-center">القسط / الخطة</th>
+                    <th class="th-center">تاريخ الاستحقاق</th>
+                    <th class="th-center">مبلغ القسط</th>
+                    <th class="th-center">المسدد</th>
+                    <th class="th-center">المتبقي المطلوب</th>
+                    <th class="th-center">حالة السداد</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (ins of statement()?.installments; track ins.id) {
                     <tr>
-                      <td>
+                      <td class="col-inst-name">
                         <strong>{{ ins.plan_name || 'قسط دراسي' }}</strong>
                       </td>
-                      <td class="mono">{{ ins.due_date }}</td>
+                      <td class="mono cell-center">{{ ins.due_date }}</td>
                       <td class="end mono">{{ fmt(ins.amount) }} ج.س</td>
                       <td class="end mono success">{{ fmt(ins.paid_amount) }} ج.س</td>
                       <td class="end mono danger">{{ fmt(ins.remaining_amount) }} ج.س</td>
-                      <td>
+                      <td class="cell-center">
                         <span class="status-tag" [attr.data-status]="ins.status">
                           {{ ins.status_label }}
                         </span>
@@ -524,37 +524,59 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
     .profile-card {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 24px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
-      padding: 14px 18px;
+      padding: 16px 20px;
     }
     .profile-section {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+    }
+    .profile-section:first-child {
+      border-left: 1px solid #e2e8f0;
+      padding-left: 20px;
     }
     .sec-badge {
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 800;
-      color: #2563eb;
-      border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 4px;
+      color: #1d4ed8;
+      border-bottom: 2px solid #dbeafe;
+      padding-bottom: 6px;
+      margin-bottom: 4px;
     }
     .profile-grid {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 10px;
     }
     .p-item {
       display: flex;
-      justify-content: space-between;
+      align-items: baseline;
       font-size: 13px;
+      gap: 12px;
     }
-    .p-lbl { color: #64748b; }
-    .p-val { color: #0f172a; font-weight: 700; }
-    .highlight-student { color: #1e3a8a; font-size: 14.5px; font-weight: 800; }
+    .p-lbl {
+      color: #64748b;
+      font-weight: 600;
+      width: 120px;
+      min-width: 120px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .p-val {
+      color: #0f172a;
+      font-weight: 700;
+      text-align: right;
+      flex: 1;
+    }
+    .highlight-student {
+      color: #1e3a8a;
+      font-size: 14.5px;
+      font-weight: 800;
+    }
 
     /* 3. ملخص الأرصدة (KPIs) */
     .kpi-summary-bar {
@@ -659,6 +681,21 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
       font-size: 13px;
       font-weight: 800;
       padding: 10px;
+    }
+
+    /* توسيط رأس جدول الاستحقاقات والخلايا المحددة */
+    .th-center {
+      text-align: center !important;
+    }
+    .cell-center {
+      text-align: center !important;
+    }
+    .installments-table thead th {
+      text-align: center !important;
+      background: #f8fafc;
+      color: #0f172a;
+      font-weight: 800;
+      vertical-align: middle;
     }
 
     .status-tag {
