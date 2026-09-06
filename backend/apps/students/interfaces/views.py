@@ -512,7 +512,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         else:
             raise ValidationError("يجب إرفاق ملف إكسل أو إرسال السجلات المعتمدة للاستيراد.")
 
-        return StandardResponse(result, message=f"تم استيراد وتسجيل {result['imported_count']} طالب بنجاح.")
+        imported_count = result.get('imported_count', 0) if isinstance(result, dict) else 0
+        return StandardResponse(result, message=f"تم استيراد وتسجيل {imported_count} طالب بنجاح.")
 
     @action(detail=False, methods=['get'], url_path='bulk-export')
     def bulk_export(self, request):

@@ -119,6 +119,9 @@ class StudentBulkImportService:
         
         # --- الورقة الأولى: كشف الطلاب ---
         ws = wb.active
+        if ws is None:
+            ws = wb.create_sheet('كشف الطلاب')
+        assert ws is not None
         ws.title = 'كشف الطلاب'
         ws.sheet_view.rightToLeft = True
 
@@ -165,7 +168,8 @@ class StudentBulkImportService:
         # تعبئة الأسطر النموذجية التوضيحية (الصفوف 5 و 6 و 7)
         for row_idx, sample in enumerate(cls.SAMPLE_ROWS, start=5):
             for col_idx, col_def in enumerate(cls.TEMPLATE_COLUMNS, start=1):
-                val = sample.get(col_def['id'], '')
+                col_key = str(col_def.get('id', ''))
+                val = sample.get(col_key, '')
                 cell = ws.cell(row=row_idx, column=col_idx, value=val)
                 cell.font = Font(name='Arial', size=10, color='334155', italic=True)
                 cell.fill = sample_fill if row_idx % 2 == 1 else alt_sample_fill
@@ -255,6 +259,10 @@ class StudentBulkImportService:
             from openpyxl import load_workbook
             wb = load_workbook(uploaded_file, data_only=True)
             ws = wb.active
+            if ws is None and wb.worksheets:
+                ws = wb.worksheets[0]
+            if ws is None:
+                raise BusinessException("لا توجد ورقة عمل صالحة داخل ملف الإكسل المرفوع.")
 
             header_row_idx = None
             headers = []
@@ -493,8 +501,7 @@ class StudentBulkImportService:
         }
 
     @classmethod
-    @transaction.atomic
-    def execute_bulk_import(cls, rows_data: list, tenant_id: uuid.UUID, user_id: uuid.UUID, academic_year_id: uuid.UUID = None) -> dict:
+    def execute_bulk_import(cls, rows_data: list, tenant_id: uuid.UUID, user_id: uuid.UUID, academic_year_id: uuid.UUID | None = None) -> dict:
         """
         تنفيذ استيراد الطلاب الفعلي وحفظهم في قاعدة البيانات داخل معاملة ذرية.
         يتم التحقق من حدود خطة الاشتراك وحفظ الكيانات المتصلة وتسكين الطلاب.
@@ -502,173 +509,175 @@ class StudentBulkImportService:
         if not rows_data:
             raise BusinessException("لا توجد بيانات طلاب صالحة للاستيراد.")
 
-        # 1. فحص حد الطلاب المتاح لخطة اشتراك المستأجر
-        cls._enforce_plan_limit_for_batch(tenant_id, len(rows_data))
+        with transaction.atomic():
+            # 1. فحص حد الطلاب المتاح لخطة اشتراك المستأجر
+            cls._enforce_plan_limit_for_batch(tenant_id, len(rows_data))
 
-        # 2. تحديد العام الأكاديمي الحالي إن لم يتم تمريره
-        if not academic_year_id:
-            active_year = AcademicYear.objects.filter(
-                tenant_id=tenant_id, current_flag=True, deleted_at__isnull=True
-            ).first() or AcademicYear.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).first()
-            if active_year:
-                academic_year_id = active_year.id
+            # 2. تحديد العام الأكاديمي الحالي إن لم يتم تمريره
+            if not academic_year_id:
+                active_year = AcademicYear.objects.filter(
+                    tenant_id=tenant_id, current_flag=True, deleted_at__isnull=True
+                ).first() or AcademicYear.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).first()
+                if active_year:
+                    academic_year_id = active_year.id
 
-        # كاش الفصول والصفوف لتقليل الاستعلامات
-        grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
-        grades_by_name = {g.name.strip(): g for g in grades_map.values()}
-        sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
-        sections_by_name = {s.name.strip(): s for s in sections_map.values()}
+            # كاش الفصول والصفوف لتقليل الاستعلامات
+            grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+            grades_by_name = {g.name.strip(): g for g in grades_map.values()}
+            sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+            sections_by_name = {s.name.strip(): s for s in sections_map.values()}
 
-        imported_students = []
-        skipped_count = 0
-        errors = []
+            imported_students = []
+            skipped_count = 0
+            errors = []
 
-        current_student_count = Student.objects.filter(tenant_id=tenant_id).count()
+            current_student_count = Student.objects.filter(tenant_id=tenant_id).count()
 
-        for idx, row in enumerate(rows_data, start=1):
-            try:
-                row_data = row.get('data', row)
-                arabic_name = row_data.get('arabic_name', '').strip()
-                if not arabic_name:
-                    skipped_count += 1
-                    continue
+            for idx, row in enumerate(rows_data, start=1):
+                try:
+                    row_data = row.get('data', row)
+                    arabic_name = row_data.get('arabic_name', '').strip()
+                    if not arabic_name:
+                        skipped_count += 1
+                        continue
 
-                gender = row_data.get('gender', 'male')
-                if gender not in ['male', 'female']:
-                    gender = 'male'
+                    gender = row_data.get('gender', 'male')
+                    if gender not in ['male', 'female']:
+                        gender = 'male'
 
-                dob = row_data.get('date_of_birth') or '2014-01-01'
+                    dob = row_data.get('date_of_birth') or '2014-01-01'
 
-                # توليد الرقم الأكاديمي الموحد للطالب
-                current_student_count += 1
-                student_number = StudentNumberGenerator.generate(
-                    tenant_id=tenant_id,
-                    branch_code="BR",
-                    academic_year_code="2026",
-                    sequence_num=current_student_count
-                )
-
-                # إنشاء الكيان الجذري للطالب
-                student = Student.objects.create(
-                    student_number=student_number,
-                    status='active',
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-
-                # إنشاء الملف الشخصي
-                StudentProfile.objects.create(
-                    student=student,
-                    arabic_name=arabic_name,
-                    english_name=row_data.get('english_name', ''),
-                    gender=gender,
-                    date_of_birth=dob,
-                    nationality=row_data.get('nationality') or 'سوداني',
-                    national_id=row_data.get('national_id') or None,
-                    religion=row_data.get('religion') or 'مسلم',
-                    blood_group=row_data.get('blood_group') or '',
-                    notes=row_data.get('address') or '',
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-
-                # إنشاء الملف الطبي وملف العيادة
-                StudentMedicalProfile.objects.create(
-                    student=student,
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-                if row_data.get('medical_notes'):
-                    clinic_profiles.write_intake(
+                    # توليد الرقم الأكاديمي الموحد للطالب
+                    current_student_count += 1
+                    student_number = StudentNumberGenerator.generate(
                         tenant_id=tenant_id,
-                        person_type='student',
-                        person_id=student.id,
-                        data={
-                            'medical_notes': row_data.get('medical_notes'),
-                            'blood_group': row_data.get('blood_group'),
-                        },
-                        user_id=user_id
+                        branch_code="BR",
+                        academic_year_code="2026",
+                        sequence_num=current_student_count
                     )
 
-                # إنشاء علاقة ولي الأمر
-                g_name = row_data.get('guardian_name') or f"ولي أمر {arabic_name}"
-                g_phone = row_data.get('guardian_phone') or ''
-                g_rel = row_data.get('guardian_relation_code') or 'father'
-
-                StudentFamilyRelation.objects.create(
-                    student=student,
-                    relationship=g_rel,
-                    full_name=g_name,
-                    phone=g_phone,
-                    email=row_data.get('guardian_email') or None,
-                    occupation=row_data.get('guardian_job') or None,
-                    emergency_contact=True,
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-
-                # التسكين الأكاديمي بالصف والشعبة إن وجدا
-                grade_obj = None
-                matched_gid = row_data.get('matched_grade_id')
-                if matched_gid and matched_gid in grades_map:
-                    grade_obj = grades_map[matched_gid]
-                elif row_data.get('grade_name') and row_data['grade_name'].strip() in grades_by_name:
-                    grade_obj = grades_by_name[row_data['grade_name'].strip()]
-
-                section_obj = None
-                sec_name = row_data.get('section_name', '').strip()
-                if sec_name and sec_name in sections_by_name:
-                    section_obj = sections_by_name[sec_name]
-
-                if grade_obj and academic_year_id:
-                    branch = resolve_branch_for_gender(tenant_id, gender)
-                    StudentEnrollment.objects.create(
-                        tenant_id=tenant_id,
-                        student=student,
-                        academic_year_id=academic_year_id,
-                        grade_id=grade_obj.id,
-                        section_id=section_obj.id if section_obj else None,
-                        branch_id=branch.id if branch else None,
-                        enrollment_date=datetime.date.today(),
-                        enrollment_type='new',
+                    # إنشاء الكيان الجذري للطالب
+                    student = Student.objects.create(
+                        student_number=student_number,
                         status='active',
+                        tenant_id=tenant_id,
                         created_by=user_id
                     )
 
-                # نشر حدث النظام
-                DomainEventPublisher.publish("StudentCreated", {
-                    "student_id": str(student.id),
-                    "student_number": student_number,
-                    "tenant_id": str(tenant_id)
-                })
+                    # إنشاء الملف الشخصي
+                    StudentProfile.objects.create(
+                        student=student,
+                        arabic_name=arabic_name,
+                        english_name=row_data.get('english_name', ''),
+                        gender=gender,
+                        date_of_birth=dob,
+                        nationality=row_data.get('nationality') or 'سوداني',
+                        national_id=row_data.get('national_id') or None,
+                        religion=row_data.get('religion') or 'مسلم',
+                        blood_group=row_data.get('blood_group') or '',
+                        notes=row_data.get('address') or '',
+                        tenant_id=tenant_id,
+                        created_by=user_id
+                    )
 
-                imported_students.append({
-                    'id': str(student.id),
-                    'student_number': student_number,
-                    'name': arabic_name,
-                    'grade': grade_obj.name if grade_obj else '—'
-                })
+                    # إنشاء الملف الطبي وملف العيادة
+                    StudentMedicalProfile.objects.create(
+                        student=student,
+                        tenant_id=tenant_id,
+                        created_by=user_id
+                    )
+                    if row_data.get('medical_notes'):
+                        try:
+                            intake_fn = getattr(clinic_profiles, 'write_intake', None)
+                            if callable(intake_fn):
+                                intake_fn(
+                                    tenant_id=tenant_id,
+                                    person_type='student',
+                                    person_id=student.id,
+                                    data={
+                                        'medical_notes': row_data.get('medical_notes'),
+                                        'blood_group': row_data.get('blood_group'),
+                                    },
+                                    user_id=user_id
+                                )
+                        except Exception:
+                            pass
 
-            except Exception as e:
-                errors.append(f"السطر {idx}: {str(e)}")
+                    # إنشاء علاقة ولي الأمر
+                    g_name = row_data.get('guardian_name') or f"ولي أمر {arabic_name}"
+                    g_phone = row_data.get('guardian_phone') or ''
+                    g_rel = row_data.get('guardian_relation_code') or 'father'
 
-        return {
-            'imported_count': len(imported_students),
-            'skipped_count': skipped_count,
-            'students': imported_students,
-            'errors': errors
-        }
+                    StudentFamilyRelation.objects.create(
+                        student=student,
+                        relationship=g_rel,
+                        full_name=g_name,
+                        phone=g_phone,
+                        email=row_data.get('guardian_email') or None,
+                        occupation=row_data.get('guardian_job') or None,
+                        emergency_contact=True,
+                        tenant_id=tenant_id,
+                        created_by=user_id
+                    )
+
+                    # التسكين الأكاديمي بالصف والشعبة إن وجدا
+                    grade_obj = None
+                    matched_gid = row_data.get('matched_grade_id')
+                    if matched_gid and matched_gid in grades_map:
+                        grade_obj = grades_map[matched_gid]
+                    elif row_data.get('grade_name') and row_data['grade_name'].strip() in grades_by_name:
+                        grade_obj = grades_by_name[row_data['grade_name'].strip()]
+
+                    section_obj = None
+                    sec_name = row_data.get('section_name', '').strip()
+                    if sec_name and sec_name in sections_by_name:
+                        section_obj = sections_by_name[sec_name]
+
+                    if grade_obj and academic_year_id:
+                        branch = resolve_branch_for_gender(tenant_id, gender)
+                        StudentEnrollment.objects.create(
+                            tenant_id=tenant_id,
+                            student=student,
+                            academic_year_id=academic_year_id,
+                            grade_id=grade_obj.id,
+                            section_id=section_obj.id if section_obj else None,
+                            branch_id=branch.id if branch else None,
+                            enrollment_date=datetime.date.today(),
+                            enrollment_type='new',
+                            status='active',
+                            created_by=user_id
+                        )
+
+                    # نشر حدث النظام
+                    DomainEventPublisher.publish("StudentCreated", {
+                        "student_id": str(student.id),
+                        "student_number": student_number,
+                        "tenant_id": str(tenant_id)
+                    })
+
+                    imported_students.append({
+                        'id': str(student.id),
+                        'student_number': student_number,
+                        'name': arabic_name,
+                        'grade': grade_obj.name if grade_obj else '—'
+                    })
+
+                except Exception as e:
+                    errors.append(f"السطر {idx}: {str(e)}")
+
+            return {
+                'imported_count': len(imported_students),
+                'skipped_count': skipped_count,
+                'students': imported_students,
+                'errors': errors
+            }
 
     @staticmethod
     def _enforce_plan_limit_for_batch(tenant_id: uuid.UUID, new_count: int):
         """فحص سقف خطة الاشتراك للمستأجر قبل استيراد الدفعة كاملة"""
         from apps.saas_billing.application.limits import ensure_can_add, PlanLimitExceeded
         try:
-            # التحقق مما إذا كانت الخطة تسمح بإضافة هذا العدد من الطلاب
-            ensure_can_add(tenant_id, 'students', count=new_count)
-        except TypeError:
-            # في حال لم تكن دالة ensure_can_add تدعم وسيط count
-            ensure_can_add(tenant_id, 'students')
+            ensure_can_add(tenant_id, 'students', adding=new_count)
         except PlanLimitExceeded as exc:
             raise BusinessException(
                 f"لا يمكن استيراد {new_count} طالب: ستتجاوز الحد الأقصى المسموح به في خطة اشتراك مدرستك. ({str(exc)})",
