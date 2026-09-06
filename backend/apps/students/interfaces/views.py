@@ -467,7 +467,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='download-template')
     def download_template(self, request):
         """تنزيل نموذج إكسل (.xlsx) الرسمي لكشوفات الطلاب بتنسيق نبراس المعتمد"""
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        tenant_id = self._get_request_tenant_id(request)
         template_stream = StudentBulkImportService.generate_excel_template(tenant_id=tenant_id)
         
         response = HttpResponse(
@@ -478,6 +478,20 @@ class StudentViewSet(viewsets.ModelViewSet):
         response['Access-Control-Expose-Headers'] = 'Content-Disposition'
         return response
 
+    def _get_request_tenant_id(self, request):
+        """استخراج معرف المستأجر بشكل آمن مع اعتماد المدرسة الافتراضية عند غياب الترويسة"""
+        if hasattr(request, 'tenant') and request.tenant and hasattr(request.tenant, 'id'):
+            return request.tenant.id
+        if hasattr(request, 'tenant_id') and request.tenant_id:
+            return request.tenant_id
+        if request.user and getattr(request.user, 'tenant_id', None):
+            return request.user.tenant_id
+        from apps.tenants.domain.models import Tenant
+        active = list(Tenant.objects.filter(is_active=True)[:2])
+        if len(active) == 1:
+            return active[0].id
+        return uuid.uuid4()
+
     @action(detail=False, methods=['post'], url_path='validate-import')
     def validate_import(self, request):
         """معاينة وفحص ملف كشف الطلاب بالذاكرة قبل اعتماده وإرجاع تقرير بالأخطاء والتحذيرات"""
@@ -485,14 +499,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not file:
             raise ValidationError("يجب إرفاق ملف إكسل أو CSV للمعالجة.")
             
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        tenant_id = self._get_request_tenant_id(request)
         preview_report = StudentBulkImportService.validate_and_preview(file, tenant_id=tenant_id)
         return StandardResponse(preview_report, message="تم فحص كشف الطلاب وإعداد المعاينة بنجاح.")
 
     @action(detail=False, methods=['post'], url_path='bulk-import')
     def bulk_import(self, request):
         """استيراد جماعي للطلاب مع التسكين والتحقق الشامل من حدود الخطة وفق الهوية السودانية"""
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        tenant_id = self._get_request_tenant_id(request)
         user_id = request.user.id if request.user else uuid.uuid4()
         
         file = request.FILES.get('file')

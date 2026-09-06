@@ -93,14 +93,14 @@ export interface RowPreview {
               <div class="step-circle">
                 @if (currentStep() > 2) { <span>✓</span> } @else { <span>2</span> }
               </div>
-              <span class="step-label">رفع الملف</span>
+              <span class="step-label">رفع الكشف</span>
             </div>
 
             <div class="step-item" [class.active]="currentStep() === 3" [class.completed]="currentStep() > 3" (click)="canJumpToStep(3) ? currentStep.set(3) : null">
               <div class="step-circle">
                 @if (currentStep() > 3) { <span>✓</span> } @else { <span>3</span> }
               </div>
-              <span class="step-label">المعاينة والتحقق</span>
+              <span class="step-label">المعاينة والتدقيق</span>
             </div>
 
             <div class="step-item" [class.active]="currentStep() === 4" [class.completed]="currentStep() === 4">
@@ -110,6 +110,30 @@ export interface RowPreview {
               <span class="step-label">اكتمال الاستيراد</span>
             </div>
           </nav>
+
+          <!-- نافذة تأكيد الخروج دون اعتماد (Nebras OS Custom Confirmation Modal) -->
+          @if (showExitConfirm()) {
+            <div class="confirm-overlay" @backdropFade>
+              <div class="confirm-box" @modalZoom>
+                <div class="confirm-icon-warn">⚠️</div>
+                <h4 class="confirm-title">تنبيه: لم تقم باعتماد حفظ الطلاب بعد!</h4>
+                <p class="confirm-desc">
+                  أنت حالياً في خطوة المعاينة، ولديك <strong>({{ validRowCount() }})</strong> طالب جاهز للتسجيل. إذا أغلقت النافذة الآن، فلن يُحفظ الطلاب ولن ينزلوا في قائمة المدرسة.
+                </p>
+                <div class="confirm-actions">
+                  <button class="nb-btn-success" (click)="showExitConfirm.set(false); executeFinalImport()">
+                    ✓ حفظ واعتماد الطلاب الآن
+                  </button>
+                  <button class="nb-btn-secondary" (click)="showExitConfirm.set(false)">
+                    متابعة التدقيق
+                  </button>
+                  <button class="nb-btn-danger-ghost" (click)="closeModal(true)">
+                    خروج دون حفظ
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
 
           <!-- Modal Body Content -->
           <div class="modal-body-content">
@@ -257,6 +281,28 @@ export interface RowPreview {
             @if (currentStep() === 3) {
               <div class="step-pane preview-pane" @stepTransition>
                 
+                <!-- شريط التوجيه والتأكيد البارز (للتوضيح بأن الحفظ لم يكتمل بعد) -->
+                <div class="preview-action-banner">
+                  <div class="banner-content-side">
+                    <div class="banner-pulse-dot"></div>
+                    <div>
+                      <h4 class="banner-title">مرحلة المعاينة والتدقيق (لم يتم حفظ الطلاب في النظام بعد)</h4>
+                      <p class="banner-sub">تم فحص الكشف بنجاح! راجع السجلات والمبالغ المالية أدناه، ثم اضغط على زر الاعتماد لتسجيلهم رسمياً في النظام.</p>
+                    </div>
+                  </div>
+                  <button 
+                    class="nb-btn-success-prominent" 
+                    [disabled]="validRowCount() === 0 || importing()" 
+                    (click)="executeFinalImport()"
+                  >
+                    @if (importing()) {
+                      <span class="spinner-sm"></span> جارٍ الحفظ في النظام…
+                    } @else {
+                      ✓ اعتماد وتسكين ({{ validRowCount() }}) طالب الآن
+                    }
+                  </button>
+                </div>
+
                 <!-- إحصائيات المعاينة السريعة والفلترة -->
                 <div class="preview-metrics-bar">
                   <div class="metric-chip total">
@@ -438,14 +484,14 @@ export interface RowPreview {
                 <div class="step-footer">
                   <button class="nb-btn-secondary" (click)="goToStep(2)" [disabled]="importing()">→ تغيير الملف</button>
                   <button 
-                    class="nb-btn-success" 
+                    class="nb-btn-success-prominent lg" 
                     [disabled]="validRowCount() === 0 || importing()" 
                     (click)="executeFinalImport()"
                   >
                     @if (importing()) {
-                      <span class="spinner-sm"></span> جارٍ الاستيراد…
+                      <span class="spinner-sm"></span> جارٍ تسجيل الطلاب في قاعدة البيانات والربط المالي…
                     } @else {
-                      ✓ اعتماد واستيراد ({{ validRowCount() }}) طالب
+                      ✓ تأكيد واعتماد ({{ validRowCount() }}) طالب وحفظهم رسمياً في النظام ←
                     }
                   </button>
                 </div>
@@ -1288,6 +1334,141 @@ export interface RowPreview {
       animation: spin 0.6s linear infinite;
     }
 
+    /* شريط التوجيه والاعتماد الفوري أعلى شاشة المعاينة */
+    .preview-action-banner {
+      background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+      border: 1.5px solid #6EE7B7;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.08);
+    }
+    .banner-content-side {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .banner-pulse-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #059669;
+      box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.7);
+      animation: pulseGreen 1.8s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulseGreen {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(5, 150, 105, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+    }
+    .banner-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 800;
+      color: #065F46;
+    }
+    .banner-sub {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #047857;
+      line-height: 1.4;
+    }
+
+    .nb-btn-success-prominent {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .nb-btn-success-prominent:hover:not(:disabled) {
+      background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4);
+    }
+    .nb-btn-success-prominent:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .nb-btn-success-prominent.lg {
+      padding: 12px 28px;
+      font-size: 14.5px;
+    }
+
+    /* نافذة التأكيد المخصصة داخل المودال (Nebras OS Custom Confirmation Modal) */
+    .confirm-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 2200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .confirm-box {
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+    .confirm-icon-warn {
+      font-size: 42px;
+      margin-bottom: 12px;
+    }
+    .confirm-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0F172A;
+      margin: 0 0 8px;
+    }
+    .confirm-desc {
+      font-size: 13.5px;
+      color: #475569;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
+    .confirm-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .nb-btn-danger-ghost {
+      background: transparent;
+      border: 1px solid #FECDD3;
+      color: #E11D48;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nb-btn-danger-ghost:hover {
+      background: #FFF1F2;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes popIn { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
   `]
@@ -1317,6 +1498,7 @@ export class StudentBulkImportModalComponent {
   previewRows = signal<RowPreview[]>([]);
   filterMode = signal<'all' | 'valid' | 'error'>('all');
   finalReport = signal<any | null>(null);
+  showExitConfirm = signal<boolean>(false);
 
   readonly stepProgressPercent = computed(() => {
     return ((this.currentStep() - 1) / 3) * 100;
@@ -1390,7 +1572,12 @@ export class StudentBulkImportModalComponent {
     }
   }
 
-  closeModal(): void {
+  closeModal(force = false): void {
+    if (!force && this.currentStep() === 3 && this.validRowCount() > 0 && !this.importing()) {
+      this.showExitConfirm.set(true);
+      return;
+    }
+    this.showExitConfirm.set(false);
     this.resetState();
     this.closed.emit();
   }
@@ -1404,6 +1591,7 @@ export class StudentBulkImportModalComponent {
     this.finalReport.set(null);
     this.progressPercent.set(0);
     this.importProgressPercent.set(0);
+    this.showExitConfirm.set(false);
   }
 
   downloadTemplate(): void {
@@ -1559,6 +1747,8 @@ export class StudentBulkImportModalComponent {
   }
 
   finishAndClose(): void {
-    this.closeModal();
+    const count = this.finalReport()?.imported_count || this.validRowCount() || 0;
+    this.importedSuccess.emit(count);
+    this.closeModal(true);
   }
 }

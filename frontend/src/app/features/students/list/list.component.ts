@@ -252,7 +252,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
 
       <app-student-bulk-import-modal
         [open]="showBulkImportModal()"
-        (closed)="showBulkImportModal.set(false)"
+        (closed)="onBulkImportClosed()"
         (importedSuccess)="onBulkImportSuccess($event)"
       ></app-student-bulk-import-modal>
     </div>
@@ -584,10 +584,16 @@ export class StudentsListComponent implements OnInit {
 
   showMsgModal = false;
   selectedStudent = signal<any | null>(null);
-
   showBulkImportModal = signal<boolean>(false);
 
   onBulkImportSuccess(count: number): void {
+    this.showBulkImportModal.set(false);
+    this.page.set(1);
+    this.loadStudents();
+  }
+
+  onBulkImportClosed(): void {
+    this.showBulkImportModal.set(false);
     this.loadStudents();
   }
 
