@@ -1,0 +1,970 @@
+<div class="nebras-landing" dir="rtl">
+  <!-- Top Navigation Header -->
+  <header class="top-header">
+    <div class="header-container">
+      <div class="brand-group" (click)="scrollTo('hero')">
+        <div class="brand-logo-wrap">
+          <div class="logo-mark">ن</div>
+        </div>
+        <div class="brand-titles">
+          <div class="brand-main">
+            نبراس <span class="brand-os">OS</span>
+          </div>
+          <span class="brand-sub">NEBRAS ACADEMIC ERP</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <a (click)="scrollTo('hero')" class="nav-link">الرئيسية</a>
+        <a (click)="scrollTo('why-nebras')" class="nav-link">لماذا نبراس؟</a>
+        <a (click)="scrollTo('modules')" class="nav-link">المنظومة الـ 16</a>
+        <a (click)="scrollTo('pricing')" class="nav-link">الأسعار</a>
+        <a (click)="scrollTo('faq')" class="nav-link">الأسئلة الشائعة</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="btn-ghost" (click)="goToLogin()">
+          <span class="material-symbols-outlined icon-sm">key</span>
+          <span>دخول الإدارة</span>
+        </button>
+        <button type="button" class="btn-primary" (click)="scrollTo('free-trial')">
+          <span>ابدأ تجربة مجانية (7 أيام)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- 1. HERO SECTION -->
+    <section class="hero-section" id="hero">
+      <div class="ambient-glow glow-top-right"></div>
+      <div class="ambient-glow glow-bottom-left"></div>
+
+      <div class="hero-container">
+        <!-- Trust Badge -->
+        <div class="trust-badge">
+          <span class="pulse-dot">
+            <span class="pulse-ring"></span>
+            <span class="pulse-core"></span>
+          </span>
+          <span class="badge-text">🇸🇩 النظام المدرسي الأول المتكامل والمصمم خصيصاً للواقع والتعليم السوداني</span>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="hero-headline">
+          منظومة <span class="text-accent">نبراس OS</span> لإدارة المدارس الذكية في السودان
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="hero-subtitle">
+          منصة سحابية متكاملة تدير القبول، المالية ورسوم الطلاب عبر بنكك وفوري، الحضور والغياب، والنتائج الأكاديمية مع دعم متقدم وفريد للعمل دون إنترنت <span class="highlight-pill">(Offline-First Engine)</span> لتجاوز تحديات الاتصال والكهرباء.
+        </p>
+
+        <!-- CTA Group -->
+        <div class="hero-cta-group">
+          <button type="button" class="btn-hero-primary" (click)="scrollTo('free-trial')">
+            <span>طلب تجربة مجانية لمدة أسبوع (7 أيام)</span>
+            <span class="material-symbols-outlined">arrow_left</span>
+          </button>
+          <button type="button" class="btn-hero-secondary" (click)="scrollTo('modules')">
+            <span class="material-symbols-outlined icon-accent">play_circle</span>
+            <span>استعراض الوحدات الـ 16</span>
+          </button>
+        </div>
+
+        <!-- Quick Trust Micro-Highlights -->
+        <div class="highlights-grid">
+          <div class="highlight-item">
+            <span class="material-symbols-outlined icon-teal">bolt</span>
+            <span>جاهز للعمل مع شبكة ضعيفة أو منعدمة</span>
+          </div>
+          <div class="highlight-item">
+            <span class="material-symbols-outlined icon-teal">account_balance_wallet</span>
+            <span>ربط فوري مع تطبيق بنكك وفوري</span>
+          </div>
+          <div class="highlight-item">
+            <span class="material-symbols-outlined icon-teal">shield</span>
+            <span>عزل تام وتشفير لبيانات كل مدرسة</span>
+          </div>
+        </div>
+
+        <!-- High-Fidelity Enterprise Dashboard Mockup -->
+        <div class="dashboard-mockup">
+          <div class="mockup-window-bar">
+            <div class="window-controls">
+              <span class="w-dot dot-red"></span>
+              <span class="w-dot dot-yellow"></span>
+              <span class="w-dot dot-green"></span>
+              <span class="window-url">alnoor.nebras.sd/admin/dashboard</span>
+            </div>
+            <div class="window-info">
+              <span class="school-tag">مدرسة النور النموذجية — الخرطوم</span>
+              <span class="status-sync">
+                <span class="sync-dot"></span>
+                مزامنة فورية (أوفلاين مدعوم)
+              </span>
+            </div>
+          </div>
+
+          <div class="mockup-body">
+            <!-- KPI Metrics -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-header">
+                  <span>إجمالي الطلاب المسجلين</span>
+                  <span class="material-symbols-outlined kpi-icon">school</span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-num">840</span>
+                  <span class="kpi-badge">+12% هذا الفصل</span>
+                </div>
+                <span class="kpi-sub">موزعون على 24 فصلاً وقاعة</span>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-header">
+                  <span>متحصلات بنكك وفوري اليوم</span>
+                  <span class="material-symbols-outlined kpi-icon">payments</span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-num">18.45M</span>
+                  <span class="kpi-curr">ج.س</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: 94%;"></div>
+                </div>
+                <span class="kpi-sub highlight">معدل تحصيل 94% للدفعة الثانية</span>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-header">
+                  <span>نسبة الحضور الصباحي اليوم</span>
+                  <span class="material-symbols-outlined kpi-icon">co_present</span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-num">96.4%</span>
+                  <span class="kpi-badge">منتظم</span>
+                </div>
+                <span class="kpi-sub">تم إرسال تنبيهات لـ 28 ولي أمر آلياً</span>
+              </div>
+
+              <div class="kpi-card">
+                <div class="kpi-header">
+                  <span>حالة خادم المدرسة المحلي</span>
+                  <span class="material-symbols-outlined kpi-icon">dns</span>
+                </div>
+                <div class="server-status-wrap">
+                  <span class="material-symbols-outlined server-icon">cloud_done</span>
+                  <div class="server-status-text">
+                    <span class="server-status-title">متصل بالسحابة</span>
+                    <span class="server-status-sub">0 معاملات معلقة للمزامنة</span>
+                  </div>
+                </div>
+                <span class="kpi-sub">النسخة الاحتياطية قبل 14 دقيقة</span>
+              </div>
+            </div>
+
+            <!-- Chart + Feed Area -->
+            <div class="dashboard-split">
+              <!-- Revenue Chart -->
+              <div class="chart-panel">
+                <div class="panel-header">
+                  <div>
+                    <h3 class="panel-title">تدفقات تحصيل الرسوم (بالمليون جنيه سوداني)</h3>
+                    <p class="panel-desc">مطابقة آلية لعمليات بنكك، فوري، والنقد المالي</p>
+                  </div>
+                  <div class="legend-group">
+                    <span class="legend-item"><span class="leg-dot bg-teal"></span> بنكك</span>
+                    <span class="legend-item"><span class="leg-dot bg-mint"></span> فوري / كاش</span>
+                  </div>
+                </div>
+
+                <div class="chart-visual">
+                  <svg class="chart-svg" preserveAspectRatio="none" viewBox="0 0 600 180">
+                    <defs>
+                      <linearGradient id="emeraldGrad" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="#00B887" stop-opacity="0.45"></stop>
+                        <stop offset="100%" stop-color="#081B33" stop-opacity="0.0"></stop>
+                      </linearGradient>
+                    </defs>
+                    <line stroke="#273647" stroke-dasharray="4" stroke-width="1" x1="0" x2="600" y1="40" y2="40"></line>
+                    <line stroke="#273647" stroke-dasharray="4" stroke-width="1" x1="0" x2="600" y1="90" y2="90"></line>
+                    <line stroke="#273647" stroke-dasharray="4" stroke-width="1" x1="0" x2="600" y1="140" y2="140"></line>
+                    <path d="M 0 150 Q 100 120 180 80 T 350 70 T 480 30 T 600 15 L 600 180 L 0 180 Z" fill="url(#emeraldGrad)"></path>
+                    <path d="M 0 150 Q 100 120 180 80 T 350 70 T 480 30 T 600 15" fill="none" stroke="#05D59E" stroke-width="3"></path>
+                    <circle cx="180" cy="80" fill="#05D59E" r="5"></circle>
+                    <circle cx="350" cy="70" fill="#05D59E" r="5"></circle>
+                    <circle cx="480" cy="30" fill="#05D59E" r="5"></circle>
+                    <circle cx="600" cy="15" fill="#05D59E" r="5"></circle>
+                  </svg>
+                </div>
+
+                <div class="days-row">
+                  <span>السبت</span>
+                  <span>الأحد</span>
+                  <span>الإثنين</span>
+                  <span>الثلاثاء</span>
+                  <span>الأربعاء</span>
+                  <span class="day-active">الخميس (اليوم)</span>
+                </div>
+              </div>
+
+              <!-- Live Automated Feed -->
+              <div class="feed-panel">
+                <div class="panel-header">
+                  <span class="panel-title">آخر عمليات الدفع الآلية</span>
+                  <span class="material-symbols-outlined icon-teal animate-spin-slow">sync</span>
+                </div>
+
+                <div class="feed-list">
+                  <div class="feed-item">
+                    <div class="feed-info">
+                      <span class="feed-name">محمد عثمان إبراهيم</span>
+                      <span class="feed-ref text-teal">بنكك #BNK-88231</span>
+                    </div>
+                    <div class="feed-amount">
+                      <span class="amount-val">450,000 ج.س</span>
+                      <span class="amount-status">تم التأكيد آلياً ✓</span>
+                    </div>
+                  </div>
+
+                  <div class="feed-item">
+                    <div class="feed-info">
+                      <span class="feed-name">سارة عبد الرحمن</span>
+                      <span class="feed-ref text-slate">فوري #FW-40911</span>
+                    </div>
+                    <div class="feed-amount">
+                      <span class="amount-val">320,000 ج.س</span>
+                      <span class="amount-status">تم التأكيد آلياً ✓</span>
+                    </div>
+                  </div>
+
+                  <div class="feed-item">
+                    <div class="feed-info">
+                      <span class="feed-name">أمجد الطيب البشير</span>
+                      <span class="feed-ref text-teal">بنكك #BNK-88219</span>
+                    </div>
+                    <div class="feed-amount">
+                      <span class="amount-val">600,000 ج.س</span>
+                      <span class="amount-status">تم التأكيد آلياً ✓</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="feed-footer">
+                  <span>يتم مطابقة الإشعارات فور وصولها دون تدخل بشري</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOCIAL PROOF TICKER -->
+    <section class="ticker-section">
+      <div class="ticker-container">
+        <div class="ticker-badge">
+          <div class="ticker-icon">
+            <span class="material-symbols-outlined">verified</span>
+          </div>
+          <div class="ticker-text">
+            <span class="ticker-title">تعتمد أكثر من 45 مدرسة خاصة رائدة في السودان</span>
+            <span class="ticker-sub">في الخرطوم، بورتسودان، عطبرة، وكسلا لإدارة التعليم والمالية بكل مرونة وموثوقية</span>
+          </div>
+        </div>
+
+        <div class="ticker-stats">
+          <div class="stat-box">
+            <span class="stat-num">99.8%</span>
+            <span class="stat-label">جاهزية تشغيل مستمرة</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">100%</span>
+            <span class="stat-label">مطابقة بنكك وفوري</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">+28,000</span>
+            <span class="stat-label">طالب مدار عبر النظام</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. WHY NEBRAS IN SUDAN? (3 FEATURE PILLARS) -->
+    <section class="pillars-section" id="why-nebras">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-category">خصوصية البيئة التعليمية</span>
+          <h2 class="section-title">لماذا صُمم نبراس خصيصاً للمدارس في السودان؟</h2>
+          <p class="section-desc">
+            لم نقم بتعريب نظام غربي غير ملائم، بل بنينا المنظومة من الصفر لتتجاوز التحديات التقنية واللوجستية للبنية التحتية السودانية.
+          </p>
+        </div>
+
+        <div class="pillars-grid">
+          <!-- Card 1: Offline-First -->
+          <div class="pillar-card">
+            <div>
+              <div class="pillar-card-top">
+                <div class="pillar-icon-box">
+                  <span class="material-symbols-outlined">wifi_off</span>
+                </div>
+                <span class="pillar-badge">صمود 100% أمام انقطاع الشبكة</span>
+              </div>
+              <h3 class="pillar-title">العمل التام دون إنترنت (Offline-First)</h3>
+              <p class="pillar-text">
+                صُمم النظام بحرفية ليعمل محلياً في خادم المدرسة أو أجهزة الإدارة بكفاءة تامة أثناء انقطاعات الكهرباء والشبكة، مع مزامنة تشفيرية فائقة السرعة فور عودة الاتصال دون فقدان أي بايت من البيانات.
+              </p>
+            </div>
+            <div class="pillar-check">
+              <span class="material-symbols-outlined">check_circle</span>
+              <span>استمرار رصد الحضور وتسجيل المعاملات أوفلاين</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Local Fintech -->
+          <div class="pillar-card">
+            <div>
+              <div class="pillar-card-top">
+                <div class="pillar-icon-box">
+                  <span class="material-symbols-outlined">sync_alt</span>
+                </div>
+                <span class="pillar-badge">صفر أخطاء تحصيل مالي</span>
+              </div>
+              <h3 class="pillar-title">تكامل السداد الإلكتروني (بنكك وفوري)</h3>
+              <p class="pillar-text">
+                ربط مباشر مع حسابات المدارس في بنك الخرطوم (تطبيق بنكك) وبنك فيصل (فوري) وأوكاش، مع قراءة ومطابقة إشعارات التحويل آلياً عبر كود الطالب لتوفير مئات ساعات العمل المحاسبي الشاق وتفادي التزييف.
+              </p>
+            </div>
+            <div class="pillar-check">
+              <span class="material-symbols-outlined">check_circle</span>
+              <span>إصدار إيصالات قبض رسمية تلقائية لأولياء الأمور</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Multi-tenant Security -->
+          <div class="pillar-card">
+            <div>
+              <div class="pillar-card-top">
+                <div class="pillar-icon-box">
+                  <span class="material-symbols-outlined">lock</span>
+                </div>
+                <span class="pillar-badge">حماية مشفرة 256-bit</span>
+              </div>
+              <h3 class="pillar-title">عزل تام وأمان لكل مدرسة (Multi-Tenant)</h3>
+              <p class="pillar-text">
+                تحصل كل مدرسة على نطاق فرعي خاص بها (مثل: alnoor.nebras.sd) مع قاعدة بيانات مستقلة تماماً وتشفير بنكي يضمن السرية المطلقة لملفات الطلاب، مرتبات المعلمين، وسجلات الرسوم المدرسية.
+              </p>
+            </div>
+            <div class="pillar-check">
+              <span class="material-symbols-outlined">check_circle</span>
+              <span>صلاحيات إدارية متعددة المستويات وقفل حسابات الكنترول</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. THE 16 CORE MODULES SHOWCASE -->
+    <section class="modules-section" id="modules">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-category">نظام إداري موحد 360 درجة</span>
+          <h2 class="section-title">16 وحدة ذكية متكاملة تغطي أدق تفاصيل الحياة المدرسية</h2>
+          <p class="section-desc">
+            استبدل السجلات الورقية والملفات المشتتة بنظام مركزي موحد ومتناغم يربط الإدارة والمعلمين وأولياء الأمور في منصة واحدة.
+          </p>
+        </div>
+
+        <div class="modules-grid">
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">how_to_reg</span>
+              <h4 class="module-title">القبول والتسجيل الذكي</h4>
+            </div>
+            <p class="module-desc">استمارات تسجيل إلكترونية، إدارة ملفات المتقدمين وفحص الوثائق واستخراج كود الطالب.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">request_quote</span>
+              <h4 class="module-title">الحسابات والرسوم المدرسية</h4>
+            </div>
+            <p class="module-desc">إدارة الأقساط بالجنيه السوداني، الخصومات والإعفاءات، وتتبع المتأخرات وإيصالات القبض الرسمية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">folder_shared</span>
+              <h4 class="module-title">شؤون الطلاب والملف الأكاديمي</h4>
+            </div>
+            <p class="module-desc">السجل الشامل لكل طالب، الإنذارات، والتاريخ الصحي والتربوي ومتابعة السلوك والانضباط.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">workspace_premium</span>
+              <h4 class="module-title">الامتحانات والكنترول والشهادات</h4>
+            </div>
+            <p class="module-desc">رصد درجات الفترات والشهادة النهائية وتوليد الشهادات والتقارير الأكاديمية بنقرة واحدة.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">badge</span>
+              <h4 class="module-title">الحضور والغياب الذكي</h4>
+            </div>
+            <p class="module-desc">تسجيل الغياب بالبصمة أو عبر هاتف المعلم وإشعار ولي الأمر فوراً برسائل هاتفية آلية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">calendar_month</span>
+              <h4 class="module-title">الجدول المدرسي والحصص</h4>
+            </div>
+            <p class="module-desc">خوارزمية ذكية لمنع تضارب المعلمين والقاعات وتوزيع الحصص والاحتياط بطريقة انسيابية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">directions_bus</span>
+              <h4 class="module-title">النقل وتتبع الترحيل المدرسي</h4>
+            </div>
+            <p class="module-desc">إدارة خطوط الحافلات، بيانات السائقين، وتوزيع الطلاب حسب الأحياء ومسارات العاصمة.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">badge</span>
+              <h4 class="module-title">الموارد البشرية والمرتبات</h4>
+            </div>
+            <p class="module-desc">ملفات المعلمين والموظفين، حساب المرتبات والبدلات والسلفيات بحسب قانون العمل والمحاسبة.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">medical_services</span>
+              <h4 class="module-title">العيادة والصحة المدرسية</h4>
+            </div>
+            <p class="module-desc">توثيق الحالات الصحية الطارئة، الحساسيات، الإسعافات الأولية وتاريخ الزيارات المدرسية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">point_of_sale</span>
+              <h4 class="module-title">السداد الإلكتروني (بنكك وفوري)</h4>
+            </div>
+            <p class="module-desc">معالجة إيصالات الدفع الإلكتروني والتحقق التلقائي الفوري من أرقام المعاملات والحسابات.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">family_restroom</span>
+              <h4 class="module-title">بوابة وتطبيق ولي الأمر</h4>
+            </div>
+            <p class="module-desc">تطبيق موبايل وبوابة متصفح لمتابعة التحصيل الدراسي، الرسوم المتبقية، والواجبات اليومية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">notifications_active</span>
+              <h4 class="module-title">الإشعارات والرسائل النصية</h4>
+            </div>
+            <p class="module-desc">تنبيهات مجدولة وفورية لأولياء الأمور بالغياب المفاجئ، مواعيد الرسوم، والتعاميم المدرسية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">local_library</span>
+              <h4 class="module-title">المكتبة المدرسية الإلكترونية</h4>
+            </div>
+            <p class="module-desc">فهرسة الكتب والمناهج، تتبع استعارة واسترجاع المراجع، ومستودع المستندات التعليمية.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">inventory_2</span>
+              <h4 class="module-title">الأصول والمخزون المدرسي</h4>
+            </div>
+            <p class="module-desc">مراقبة عهدة الأجهزة، مستلزمات المعامل والكتب، الزي المدرسي وجرد المستودع بشكل دوري.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">approval_delegation</span>
+              <h4 class="module-title">الأتمتة والموافقات الإدارية</h4>
+            </div>
+            <p class="module-desc">دورة مستندية رقمية لطلبات الإجازات، أذونات الشراء المالي، والمصادقة على القرارات.</p>
+          </div>
+
+          <div class="module-card">
+            <div class="module-header">
+              <span class="material-symbols-outlined module-icon">query_stats</span>
+              <h4 class="module-title">لوحة المدير والتقارير التنفيذية</h4>
+            </div>
+            <p class="module-desc">مؤشرات أداء فورية لمالك المدرسة ومجلس الإدارة لمتابعة الرسوم والتحصيل بنقرة واحدة.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. PRICING & PLANS -->
+    <section class="pricing-section" id="pricing">
+      <div class="section-container">
+        <div class="section-header">
+          <span class="section-category">باقات شفافة وعادلة</span>
+          <h2 class="section-title">استثمار مدروس ومناسب لجميع أحجام المدارس في السودان</h2>
+          <p class="section-desc">
+            أسعار ثابتة بالجنيه السوداني (ج.س) تشمل الخوادم المؤمنة والتدريب ودعم الفروع المتواصل.
+          </p>
+
+          <div class="pricing-toggle-wrap">
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="billingCycle() === 'annual'"
+              (click)="setBillingCycle('annual')">
+              سنوي (وفر 20%)
+            </button>
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="billingCycle() === 'monthly'"
+              (click)="setBillingCycle('monthly')">
+              شهري
+            </button>
+          </div>
+        </div>
+
+        <div class="pricing-grid">
+          <!-- Plan 1 -->
+          <div class="price-card">
+            <div>
+              <div class="price-card-header">
+                <span class="price-plan-name">باقة المدارس الأساسية</span>
+                <span class="price-plan-pill">Starting</span>
+              </div>
+              <div class="price-amount-row">
+                <span class="price-val">{{ billingCycle() === 'annual' ? '360,000' : '450,000' }}</span>
+                <span class="price-unit">ج.س / شهرياً</span>
+              </div>
+              <p class="price-desc">مثالية للمدارس التأسيسية ومراكز رياض الأطفال التي تبدأ رقمنة عملياتها.</p>
+              
+              <div class="features-list">
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>حتى 300 طالب مسجل</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>6 وحدات أساسية (القبول، الحسابات، الحضور، الشهادات)</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>تكامل سداد بنكك وفوري الأساسي</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>نظام النسخ الاحتياطي التلقائي الأسبوعي</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>دعم فني عبر واتساب خلال أوقات الدوام</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="price-cta-wrap">
+              <button type="button" class="btn-price-secondary" (click)="selectPlan('باقة المدارس الأساسية')">
+                طلب تجربة أسبوع مجاناً (7 أيام)
+              </button>
+            </div>
+          </div>
+
+          <!-- Plan 2: Featured -->
+          <div class="price-card featured">
+            <div class="popular-badge">
+              الأكثر طلباً بين المدارس النموذجية ⭐
+            </div>
+            <div>
+              <div class="price-card-header">
+                <span class="price-plan-name">باقة النمو والتوسع</span>
+                <span class="price-plan-pill active">Growing</span>
+              </div>
+              <div class="price-amount-row">
+                <span class="price-val">{{ billingCycle() === 'annual' ? '680,000' : '850,000' }}</span>
+                <span class="price-unit">ج.س / شهرياً</span>
+              </div>
+              <p class="price-desc">الخيار الأمثل للمدارس النموذجية والخاصة التي تحتاج السيطرة التامة وميزة الأوفلاين.</p>
+              
+              <div class="features-list">
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>حتى 900 طالب مسجل</span>
+                </div>
+                <div class="feature-item highlight-feat">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <strong>جميع الوحدات الـ 16 كاملة بدون استثناء</strong>
+                </div>
+                <div class="feature-item highlight-feat">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <strong>محرك العمل بدون إنترنت (Offline Engine)</strong>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>تطبيق ولي الأمر الإلكتروني بهوية المدرسة</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>جلسات تدريب شاملة لطاقم الإدارة والمعلمين</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>دعم فني ذو أولوية على مدار الساعة</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="price-cta-wrap">
+              <button type="button" class="btn-price-primary" (click)="selectPlan('باقة النمو والتوسع')">
+                طلب تجربة أسبوع مجاناً (7 أيام)
+              </button>
+            </div>
+          </div>
+
+          <!-- Plan 3 -->
+          <div class="price-card">
+            <div>
+              <div class="price-card-header">
+                <span class="price-plan-name">المجمعات والمؤسسات الكبرى</span>
+                <span class="price-plan-pill">Enterprise</span>
+              </div>
+              <div class="price-amount-row">
+                <span class="price-val text-lg">مخصص</span>
+                <span class="price-unit">بحسب الفروع والطلاب</span>
+              </div>
+              <p class="price-desc">لسلاسل المدارس والمجمعات المتعددة الفروع في مختلف ولايات السودان.</p>
+              
+              <div class="features-list">
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>فروع متعددة غير محدودة وطلاب غير محدودين</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>خادم مخصص معزول (Dedicated Cloud Server)</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>تخصيص كامل لقوالب الشهادات وأنظمة الدرجات</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>تكامل مصرفي مباشر (Direct Banking API)</span>
+                </div>
+                <div class="feature-item">
+                  <span class="material-symbols-outlined f-icon">check</span>
+                  <span>مدير حساب مخصص وزيارات ميدانية دورية</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="price-cta-wrap">
+              <button type="button" class="btn-price-secondary" (click)="selectPlan('المجمعات والمؤسسات الكبرى')">
+                تواصل مع مستشار الأنظمة
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. FREE TRIAL INTERACTIVE SECTION -->
+    <section class="trial-section" id="free-trial">
+      <div class="trial-card">
+        <div class="ambient-glow glow-trial"></div>
+
+        <div class="trial-grid">
+          <!-- Left info -->
+          <div class="trial-info-col">
+            <div>
+              <div class="trial-badge">
+                <span class="material-symbols-outlined icon-sm">rocket_launch</span>
+                <span>بدون أي التزام مالي</span>
+              </div>
+              <h2 class="trial-title">ابدأ أسبوعك التجريبي المجاني الآن بكامل الميزات</h2>
+              <p class="trial-desc">
+                اختر اسم مدرستك ورابطك المخصص، وسيقوم فريق المهندسين بتجهيز نسختك وبيئتك السحابية مع استيراد بيانات تجريبية لتبدأ الاختبار فوراً.
+              </p>
+
+              <div class="trial-reasons">
+                <div class="reason-item">
+                  <div class="reason-icon-box">
+                    <span class="material-symbols-outlined">credit_card_off</span>
+                  </div>
+                  <div>
+                    <h4 class="reason-title">لا يلزم بطاقة دفع أو شيك</h4>
+                    <p class="reason-desc">تجربة كاملة الصلاحيات لمدة 7 أيام دون أي متطلبات بنكية مسبقة.</p>
+                  </div>
+                </div>
+
+                <div class="reason-item">
+                  <div class="reason-icon-box">
+                    <span class="material-symbols-outlined">support_agent</span>
+                  </div>
+                  <div>
+                    <h4 class="reason-title">تدريب ومرافقة مجانية</h4>
+                    <p class="reason-desc">جلسة تدريب افتراضية أو هاتفية لشرح آليات بنكك والأوفلاين لإدارتك.</p>
+                  </div>
+                </div>
+
+                <div class="reason-item">
+                  <div class="reason-icon-box">
+                    <span class="material-symbols-outlined">security</span>
+                  </div>
+                  <div>
+                    <h4 class="reason-title">خصوصية وتشفير كامل</h4>
+                    <p class="reason-desc">بيانات مدرستك في أيدٍ أمينة مع خوادم احتياطية عالية الاعتمادية.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="trial-phone-box">
+              <span class="material-symbols-outlined icon-teal">call</span>
+              <span>هل تفضل التحدث هاتفياً؟ اتصل بالمبيعات: <strong dir="ltr">+249 912345678</strong></span>
+            </div>
+          </div>
+
+          <!-- Right form -->
+          <div class="trial-form-col">
+            @if (submitted()) {
+              <div class="success-message-box">
+                <span class="material-symbols-outlined success-big-icon">check_circle</span>
+                <h3 class="success-title">تم استلام طلب التجربة بنجاح!</h3>
+                <p class="success-desc">
+                  شكراً لك أ. <strong>{{ form.contact_name }}</strong>. تم تسجيل طلب إنشاء مدرسة <strong>{{ form.school_name }}</strong> بنطاق <strong>{{ form.subdomain }}.nebras.sd</strong>.
+                </p>
+                <p class="success-sub">
+                  يقوم فريق الدعم الفني وإدارة المنصة بمراجعة طلبك وتفعيل أسبوعك التجريبي فوراً، وسنتواصل معك عبر الواتساب على الرقم ({{ form.phone }}) خلال وقت وجيز.
+                </p>
+                <button type="button" class="btn-ghost-home" (click)="submitted.set(false)">
+                  تقديم طلب لمدرسة أخرى
+                </button>
+              </div>
+            } @else {
+              <form class="trial-form" (ngSubmit)="submitTrial()">
+                @if (errorMessage()) {
+                  <div class="form-error-alert">
+                    <span class="material-symbols-outlined">warning</span>
+                    <span>{{ errorMessage() }}</span>
+                  </div>
+                }
+
+                <!-- School Name -->
+                <div class="form-group">
+                  <label class="form-label">اسم المدرسة الكامل <span class="req">*</span></label>
+                  <input
+                    type="text"
+                    name="school_name"
+                    [(ngModel)]="form.school_name"
+                    class="form-input"
+                    placeholder="مثال: مدارس الرائد النموذجية الخاصة"
+                    required />
+                </div>
+
+                <!-- Subdomain Selector with Live Check -->
+                <div class="form-group">
+                  <div class="form-label-row">
+                    <label class="form-label">رابط النظام الخاص بمدرستك (Subdomain) <span class="req">*</span></label>
+                    @if (subdomainChecking()) {
+                      <span class="subdomain-status checking">جارٍ الفحص…</span>
+                    } @else if (subdomainStatus() === 'available') {
+                      <span class="subdomain-status ok">متاح للتسجيل ✓</span>
+                    } @else if (subdomainStatus() === 'taken') {
+                      <span class="subdomain-status err">محجوز مسبقاً ✗</span>
+                    }
+                  </div>
+                  <div class="subdomain-input-group">
+                    <input
+                      type="text"
+                      name="subdomain"
+                      [(ngModel)]="form.subdomain"
+                      (input)="onSubdomainInput()"
+                      class="form-input-subdomain"
+                      dir="ltr"
+                      placeholder="al-raed"
+                      required />
+                    <span class="subdomain-suffix" dir="ltr">.nebras.sd</span>
+                  </div>
+                </div>
+
+                <!-- State & Contact Row -->
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">الولاية / المدينة <span class="req">*</span></label>
+                    <select name="state" [(ngModel)]="form.state" class="form-select">
+                      @for (s of sudaneseStates; track s) {
+                        <option [value]="s">{{ s }}</option>
+                      }
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">اسم المدير أو المشرف الإداري <span class="req">*</span></label>
+                    <input
+                      type="text"
+                      name="contact_name"
+                      [(ngModel)]="form.contact_name"
+                      class="form-input"
+                      placeholder="مثال: أ. عثمان أحمد علي"
+                      required />
+                  </div>
+                </div>
+
+                <!-- Phone & Email Row -->
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">رقم الهاتف (واتساب) <span class="req">*</span></label>
+                    <div class="phone-input-group">
+                      <input
+                        type="tel"
+                        name="phone"
+                        [(ngModel)]="form.phone"
+                        class="form-input-phone"
+                        dir="ltr"
+                        placeholder="912345678"
+                        required />
+                      <span class="phone-prefix" dir="ltr">+249 🇸🇩</span>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">البريد الإلكتروني الرسمي <span class="req">*</span></label>
+                    <input
+                      type="email"
+                      name="email"
+                      [(ngModel)]="form.email"
+                      class="form-input"
+                      dir="ltr"
+                      placeholder="admin@school.com"
+                      required />
+                  </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit-trial" [disabled]="submitting()">
+                  @if (submitting()) {
+                    <span>جارٍ إرسال الطلب…</span>
+                  } @else {
+                    <span>إرسال طلب التجربة المجانية (7 أيام بدون أي التزام)</span>
+                    <span class="material-symbols-outlined">send</span>
+                  }
+                </button>
+              </form>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. FAQ ACCORDION -->
+    <section class="faq-section" id="faq">
+      <div class="faq-container">
+        <h3 class="faq-title">الأسئلة الأكثر شيوعاً عن النظام</h3>
+        <div class="faq-list">
+          <div class="faq-card">
+            <h4 class="faq-q">كيف يعمل النظام إذا انقطعت شبكة الإنترنت أو التيار الكهربائي؟</h4>
+            <p class="faq-a">
+              يثبت نبراس نسخة خادم مصغرة داخل جهاز حاسوب في المدرسة (Local Sync Node). يستمر المحاسب والمعلمون في رصد الدرجات وتسجيل الحضور والرسوم محلياً، وبمجرد عودة الإنترنت يتم رفع ومزامنة التغييرات تلقائياً للسحابة المشفرة.
+            </p>
+          </div>
+
+          <div class="faq-card">
+            <h4 class="faq-q">هل يمكننا استيراد بيانات الطلاب والمعلمين السابقة من ملفات Excel؟</h4>
+            <p class="faq-a">
+              نعم بالتأكيد. يوفر النظام معالج استيراد ذكي ينقل ملفات الطلاب، الأقساط، وسجلات الفصول السابقة من ملفات إكسل بضغطة زر واحدة دون الحاجة لإعادة كتابتها يدوياً.
+            </p>
+          </div>
+
+          <div class="faq-card">
+            <h4 class="faq-q">كيف تتم مطابقة إشعارات تطبيق بنكك وفوري آلياً؟</h4>
+            <p class="faq-a">
+              يحصل كل طالب على كود سداد مالي موحد. عندما يرسل ولي الأمر إشعار التحويل أو يرفعه عبر تطبيق الهاتف، يقوم محرك نبراس بمطابقة الرقم المرجعي للعملية وتحديث رصيد الطالب فوراً وإصدار إيصال إلكتروني.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <div class="footer-brand">
+            <span class="f-brand-title">نبراس OS</span>
+            <span class="f-country-tag">السودان</span>
+          </div>
+          <p class="f-desc">
+            منظومة نبراس لإدارة المدارس والتعليم الذكي في السودان. الحوكمة الأكاديمية الشاملة، الإدارة المالية، وتتبع شؤون الطلاب بأحدث تقنيات السحابة المشفرة.
+          </p>
+          <div class="f-certified">
+            <span class="material-symbols-outlined icon-teal">verified_user</span>
+            <span>نظام معتمد للمؤسسات التعليمية السودانية</span>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <span class="f-col-title">التواصل والدعم الفني</span>
+          <div class="f-links-list">
+            <div class="f-contact-item">
+              <span class="material-symbols-outlined icon-teal">location_on</span>
+              <span>الخرطوم - شارع الستين / بورتسودان - حي المطار</span>
+            </div>
+            <div class="f-contact-item">
+              <span class="material-symbols-outlined icon-teal">call</span>
+              <span dir="ltr">+249 912345678</span>
+            </div>
+            <div class="f-contact-item">
+              <span class="material-symbols-outlined icon-teal">mail</span>
+              <span dir="ltr">info@nebras.sd</span>
+            </div>
+            <div class="f-contact-item">
+              <span class="material-symbols-outlined icon-teal">support_agent</span>
+              <span>دعم طوارئ الفروع 24/7</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <span class="f-col-title">بوابات المنظومة</span>
+          <div class="f-links-list">
+            <a (click)="scrollTo('modules')">منظومة الامتحانات والتصحيح الآلي</a>
+            <a (click)="scrollTo('modules')">المالية والمصروفات المدرسية</a>
+            <a (click)="goToLogin()">بوابة المعلمين والكنترول</a>
+            <a (click)="goToLogin()">تطبيق ولي الأمر الإلكتروني</a>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <span class="f-col-title">شركاء الدفع الرقمي بالسودان</span>
+          <p class="f-desc">تكامل فوري وآمن لتحصيل الرسوم الدراسية عبر التطبيقات المعتمدة</p>
+          <div class="banking-tags">
+            <span class="b-tag">بنكك - بنك الخرطوم</span>
+            <span class="b-tag">فوري - بنك فيصل</span>
+            <span class="b-tag">أوكاش - O Cash</span>
+            <span class="b-tag">سداد إلكتروني EBS</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>جميع الحقوق محفوظة 2026 © نبراس لتكنولوجيا التعليم السوداني</span>
+        <div class="version-tag">إصدار المنظومة 2.4.0v Enterprise</div>
+      </div>
+    </div>
+  </footer>
+</div>
