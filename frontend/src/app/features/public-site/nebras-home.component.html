@@ -786,31 +786,21 @@
                       <span class="subdomain-status err">محجوز مسبقاً ✗</span>
                     }
                   </div>
-                  <div class="subdomain-input-group">
+                  <div class="subdomain-input-group" dir="ltr">
                     <input
                       type="text"
                       name="subdomain"
                       [(ngModel)]="form.subdomain"
                       (input)="onSubdomainInput()"
                       class="form-input-subdomain"
-                      dir="ltr"
                       placeholder="al-raed"
                       required />
-                    <span class="subdomain-suffix" dir="ltr">.nebras.sd</span>
+                    <span class="subdomain-suffix">.nebras.sd</span>
                   </div>
                 </div>
 
-                <!-- State & Contact Row -->
+                <!-- Contact & State Row -->
                 <div class="form-grid-2">
-                  <div class="form-group">
-                    <label class="form-label">الولاية / المدينة <span class="req">*</span></label>
-                    <select name="state" [(ngModel)]="form.state" class="form-select">
-                      @for (s of sudaneseStates; track s) {
-                        <option [value]="s">{{ s }}</option>
-                      }
-                    </select>
-                  </div>
-
                   <div class="form-group">
                     <label class="form-label">اسم المدير أو المشرف الإداري <span class="req">*</span></label>
                     <input
@@ -821,22 +811,30 @@
                       placeholder="مثال: أ. عثمان أحمد علي"
                       required />
                   </div>
+
+                  <div class="form-group">
+                    <label class="form-label">الولاية / المدينة <span class="req">*</span></label>
+                    <select name="state" [(ngModel)]="form.state" class="form-select">
+                      @for (s of sudaneseStates; track s) {
+                        <option [value]="s">{{ s }}</option>
+                      }
+                    </select>
+                  </div>
                 </div>
 
                 <!-- Phone & Email Row -->
                 <div class="form-grid-2">
                   <div class="form-group">
                     <label class="form-label">رقم الهاتف (واتساب) <span class="req">*</span></label>
-                    <div class="phone-input-group">
+                    <div class="phone-input-group" dir="ltr">
+                      <span class="phone-prefix">+249 🇸🇩</span>
                       <input
                         type="tel"
                         name="phone"
                         [(ngModel)]="form.phone"
                         class="form-input-phone"
-                        dir="ltr"
                         placeholder="912345678"
                         required />
-                      <span class="phone-prefix" dir="ltr">+249 🇸🇩</span>
                     </div>
                   </div>
 
