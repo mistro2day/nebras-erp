@@ -189,7 +189,7 @@ interface Lane {
 export class AutomationStudioComponent implements OnInit {
   private api = inject(AutomationService);
 
-  counts = signal<{ [key: string]: number }>({});
+  counts = signal<Record<string, number | undefined>>({});
   showAiModal = signal<boolean>(false);
   aiKind = 'workflow';
   aiPrompt = '';
