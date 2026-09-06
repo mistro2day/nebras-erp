@@ -173,10 +173,14 @@ class InstallmentSerializer(BaseStudentFinanceSerializer):
     invoice_number = serializers.SerializerMethodField()
     remaining_amount = serializers.SerializerMethodField()
     plan_name = serializers.SerializerMethodField()
+    account_id = serializers.SerializerMethodField()
 
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Installment
         fields = '__all__'
+
+    def get_account_id(self, obj):
+        return str(obj.student_billing_account_id) if obj.student_billing_account_id else ''
 
     def get_student_id(self, obj):
         return _extract_student_finance_metadata(obj.student_billing_account)['student_id']

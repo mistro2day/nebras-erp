@@ -98,6 +98,76 @@ export class StudentFinanceService {
     return this.api.get<any>(`student-finance/installments/${id}/reminder-info/`);
   }
 
+  // ---- كشف حساب الطالب المالي الشامل ----
+  getAccountStatement(accountId: string): Observable<{
+    success: boolean;
+    data: {
+      meta: { statement_number: string; generated_at: string; academic_year: string; currency: string };
+      tenant: {
+        id: string;
+        name: string;
+        name_ar: string;
+        name_en: string;
+        logo_url: string;
+        stamp_url?: string;
+        phone: string;
+        email: string;
+        address: string;
+      };
+      student: {
+        student_id: string;
+        student_number: string;
+        student_name: string;
+        grade_name: string;
+        section_name: string;
+        guardian_name: string;
+        guardian_phone: string;
+        account_number: string;
+      };
+      account: {
+        id: string;
+        account_number: string;
+        opening_balance: number;
+        current_balance: number;
+        outstanding_balance: number;
+        credit_balance: number;
+        financial_hold: boolean;
+        currency: string;
+      };
+      summary: {
+        total_invoiced: number;
+        total_paid: number;
+        total_discounted: number;
+        net_outstanding: number;
+        credit_balance: number;
+        installments_count: number;
+      };
+      transactions: Array<{
+        date: string;
+        type: string;
+        type_label: string;
+        reference_number: string;
+        description: string;
+        debit: number;
+        credit: number;
+        running_balance: number;
+        payment_method?: string;
+      }>;
+      installments: Array<{
+        id: string;
+        due_date: string;
+        amount: number;
+        paid_amount: number;
+        remaining_amount: number;
+        status: string;
+        status_label: string;
+        plan_name?: string;
+      }>;
+    };
+  }> {
+    return this.api.get<any>(`student-finance/billing-accounts/${accountId}/statement/`);
+  }
+
   // ---- طلبات السداد الأونلاين (مراجعة المحاسب) ----
   listOnlinePayments(params?: ListParams): Observable<PagedResponse<any>> {
     return this.api.get<PagedResponse<any>>('student-finance/online-payments/', params);

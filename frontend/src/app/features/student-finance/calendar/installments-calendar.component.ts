@@ -246,8 +246,8 @@ export interface CalendarDay {
                 @for (ins of filteredInstallments(); track ins.id) {
                   <tr [class.row-overdue]="ins.computed_status === 'overdue'" [class.row-today]="ins.computed_status === 'due_today'">
                     <td>
-                      <div class="student-cell">
-                        <strong class="stu-name">{{ ins.student_name || 'طالب مقيد' }}</strong>
+                      <div class="student-cell clickable-student" (click)="openStudentStatement(ins)" title="عرض كشف حساب الطالب المالي الشامل">
+                        <strong class="stu-name stu-link">{{ ins.student_name || 'طالب مقيد' }} <span class="stmt-icon">📄</span></strong>
                         <div class="stu-sub">
                           <span class="stu-no">{{ ins.student_number }}</span>
                           @if (ins.grade_name) {
@@ -303,6 +303,13 @@ export interface CalendarDay {
 
                     <td>
                       <div class="actions-cell">
+                        <button
+                          class="action-btn stmt-btn"
+                          title="عرض كشف الحساب المالي الشامل للطالب (طباعة وتصدير)"
+                          (click)="openStudentStatement(ins)">
+                          📄 كشف الحساب
+                        </button>
+
                         @if (ins.status !== 'paid') {
                           <button
                             class="action-btn pay-btn"
@@ -974,6 +981,13 @@ export interface CalendarDay {
     .pay-btn:hover { background: #15803d; }
     .wa-btn { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
     .wa-btn:hover { background: #dbeafe; }
+    .stmt-btn { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+    .stmt-btn:hover { background: #e2e8f0; color: #0f172a; }
+
+    .clickable-student { cursor: pointer; border-radius: 6px; padding: 2px 4px; transition: background 0.12s; }
+    .clickable-student:hover { background: #eff6ff; }
+    .clickable-student:hover .stu-link { color: #1d4ed8; text-decoration: underline; }
+    .stmt-icon { font-size: 11px; margin-inline-start: 4px; }
 
     /* النوافذ المنبثقة (Nebras OS Custom Modals) */
     .modal-backdrop {
@@ -1503,6 +1517,13 @@ export class SfInstallmentsCalendarComponent implements OnInit {
     const url = this.reminderData()?.whatsapp_url;
     if (url) {
       window.open(url, '_blank');
+    }
+  }
+
+  openStudentStatement(ins: any) {
+    const accId = ins.account_id || ins.student_billing_account;
+    if (accId) {
+      this.router.navigate(['/student-finance/accounts', accId, 'statement']);
     }
   }
 

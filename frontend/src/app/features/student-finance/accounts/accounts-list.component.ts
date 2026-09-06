@@ -132,6 +132,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
           <div class="quick">
             <button class="btn primary sm" [class.on]="pane()==='invoice'" (click)="setPane('invoice')">＋ إصدار فاتورة</button>
             <button class="btn primary sm" [class.on]="pane()==='pay'" (click)="setPane('pay')">💵 تحصيل دفعة</button>
+            <button class="btn ghost sm" (click)="openStatement(a.id)">📄 كشف الحساب</button>
             <button class="btn ghost sm" [class.on]="pane()==='scholarship'" (click)="setPane('scholarship')">🎓 منحة</button>
             <button class="btn ghost sm" [class.on]="pane()==='hold'" (click)="setPane('hold')">⛔ حظر مالي</button>
             <a class="btn ghost sm" (click)="openStudent(a.student_id)">👤 ملف الطالب</a>
@@ -539,6 +540,7 @@ export class SfAccountsListComponent implements OnInit {
     });
   }
   openStudent(studentId: string) { this.router.navigate(['/students/details', studentId]); }
+  openStatement(accountId: string) { this.router.navigate(['/student-finance/accounts', accountId, 'statement']); }
   goDashboard() { this.router.navigateByUrl('/student-finance/dashboard'); }
   holdLabel(t: string) { return ({ exam: 'حجب الامتحانات', registration: 'منع التسجيل', certificate: 'منع الشهادات', graduation: 'حظر التخرج', library: 'حظر المكتبة', custom: 'مخصص' } as any)[t] || t; }
 }

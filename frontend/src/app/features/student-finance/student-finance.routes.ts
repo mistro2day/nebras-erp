@@ -33,5 +33,13 @@ export const STUDENT_FINANCE_ROUTES: Routes = [
   {
     path: 'calendar',
     loadComponent: () => import('./calendar/installments-calendar.component').then(m => m.SfInstallmentsCalendarComponent)
+  },
+  {
+    path: 'accounts/:id/statement',
+    loadComponent: () => import('./statement/student-account-statement.component').then(m => m.StudentAccountStatementComponent)
+  },
+  {
+    path: 'statement/:id',
+    loadComponent: () => import('./statement/student-account-statement.component').then(m => m.StudentAccountStatementComponent)
   }
 ];

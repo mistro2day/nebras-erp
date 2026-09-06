@@ -124,6 +124,177 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
         }
         return Response(stats, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['get'], url_path='statement')
+    def statement(self, request, pk=None):
+        """كشف حساب مالي تفصيلي شامل للطالب مع تفاصيل وهوية المستأجر."""
+        account = self.get_object()
+        tenant = getattr(request, 'tenant', None)
+        tenant_id = request.tenant_id
+
+        from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+        student_meta = _extract_student_finance_metadata(account)
+
+        # 1. بيانات وهوية المستأجر (المدرسة)
+        tenant_info = {
+            'id': str(tenant.id) if tenant else str(tenant_id),
+            'name': getattr(tenant, 'name', '') or 'مدارس المورد النموذجية الخاصة',
+            'name_ar': getattr(tenant, 'name_ar', '') or getattr(tenant, 'name', '') or 'مدارس المورد النموذجية الخاصة',
+            'name_en': getattr(tenant, 'name_en', '') or 'Al-Mawred Model Private Schools',
+            'logo_url': request.build_absolute_uri(tenant.logo.url) if (tenant and getattr(tenant, 'logo', None)) else '/assets/images/branding/nebras_official_blue.png',
+            'stamp_url': request.build_absolute_uri(tenant.stamp.url) if (tenant and getattr(tenant, 'stamp', None)) else '',
+            'phone': getattr(tenant, 'phone_number', '') or '+249 183 770000',
+            'email': getattr(tenant, 'email', '') or 'accounts@almawred.edu.sd',
+            'address': getattr(tenant, 'address', '') or 'الخرطوم - العمارات - شارع 15، السودان',
+        }
+
+        # 2. بيانات الحساب
+        account_info = {
+            'id': str(account.id),
+            'account_number': account.account_number,
+            'opening_balance': float(account.opening_balance or 0.0),
+            'current_balance': float(account.current_balance or 0.0),
+            'outstanding_balance': float(account.outstanding_balance or 0.0),
+            'credit_balance': float(account.credit_balance or 0.0),
+            'financial_hold': account.financial_hold,
+            'currency': 'ج.س',
+        }
+
+        # 3. تجميع الحركات المالية وترتيبها زمنياً لحساب الرصيد التراكمي
+        transactions = []
+
+        # رصيد افتتاحي
+        if account.opening_balance and float(account.opening_balance) > 0:
+            transactions.append({
+                'date': str(account.created_at.date() if account.created_at else timezone.localdate()),
+                'type': 'opening_balance',
+                'type_label': 'رصيد افتتاحي سابق',
+                'reference_number': account.account_number,
+                'description': 'الرصيد الافتتاحي المقيد عند فتح الحساب المالي',
+                'debit': float(account.opening_balance),
+                'credit': 0.0,
+                'payment_method': '',
+            })
+
+        # فواتير الرسوم
+        invoices = StudentInvoice.objects.filter(
+            student_billing_account=account, tenant_id=tenant_id
+        ).order_by('issue_date', 'created_at')
+        
+        for inv in invoices:
+            transactions.append({
+                'date': str(inv.issue_date or inv.created_at.date()),
+                'type': 'invoice',
+                'type_label': 'فاتورة رسوم دراسية',
+                'reference_number': inv.invoice_number,
+                'description': f"فاتورة رسوم - تاريخ الاستحقاق: {inv.due_date}",
+                'debit': float(inv.total_amount or 0.0),
+                'credit': 0.0,
+                'payment_method': '',
+                'invoice_status': inv.status,
+            })
+
+        # سندات القبض والتحصيلات
+        receipts = Receipt.objects.filter(
+            student_billing_account=account, tenant_id=tenant_id
+        ).order_by('payment_date', 'created_at')
+
+        for rec in receipts:
+            transactions.append({
+                'date': str(rec.payment_date or rec.created_at.date()),
+                'type': 'receipt',
+                'type_label': 'سند قبض / تحصيل',
+                'reference_number': rec.receipt_number,
+                'description': rec.description or 'سداد رسوم دراسية',
+                'debit': 0.0,
+                'credit': float(rec.amount or 0.0),
+                'payment_method': rec.payment_method or 'نقداً',
+                'reference_trans': rec.reference_number or '',
+            })
+
+        # المنح والخصومات
+        scholarships = Scholarship.objects.filter(
+            student_billing_account=account, tenant_id=tenant_id
+        ).order_by('start_date', 'created_at')
+
+        for sch in scholarships:
+            val = float(sch.fixed_amount or 0.0)
+            if val > 0:
+                transactions.append({
+                    'date': str(sch.start_date or sch.created_at.date()),
+                    'type': 'scholarship',
+                    'type_label': f"منحة ({sch.name})",
+                    'reference_number': sch.code or 'SCH',
+                    'description': f"منحة دراسية معتمدة: {sch.name}",
+                    'debit': 0.0,
+                    'credit': val,
+                    'payment_method': '',
+                })
+
+        # فرز الحركات تصاعدياً بالتاريخ
+        transactions.sort(key=lambda x: x['date'])
+
+        # حساب الرصيد التراكمي (Running Balance)
+        running_bal = 0.0
+        total_invoiced = 0.0
+        total_paid = 0.0
+        total_discounted = 0.0
+
+        for t in transactions:
+            debit = t['debit']
+            credit = t['credit']
+            running_bal += (debit - credit)
+            t['running_balance'] = float(running_bal)
+            
+            if t['type'] in ('invoice', 'opening_balance'):
+                total_invoiced += debit
+            if t['type'] == 'receipt':
+                total_paid += credit
+            if t['type'] == 'scholarship':
+                total_discounted += credit
+
+        # جدول الأقساط
+        installments_qs = Installment.objects.filter(
+            student_billing_account=account, tenant_id=tenant_id
+        ).order_by('due_date')
+
+        installments_data = []
+        for ins in installments_qs:
+            installments_data.append({
+                'id': str(ins.id),
+                'due_date': str(ins.due_date),
+                'amount': float(ins.amount or 0.0),
+                'paid_amount': float(ins.paid_amount or 0.0),
+                'remaining_amount': float(max(0.0, float(ins.amount or 0.0) - float(ins.paid_amount or 0.0))),
+                'status': ins.status,
+                'status_label': 'مسدد بالكامل' if ins.status == 'paid' else ('متأخر' if str(ins.due_date) < str(timezone.localdate()) else 'مجدول'),
+                'plan_name': ins.installment_plan.name if ins.installment_plan else '',
+            })
+
+        import uuid
+        statement_number = f"STMT-{timezone.localdate().strftime('%Y%m%d')}-{account.account_number[-4:] if len(account.account_number) >= 4 else uuid.uuid4().hex[:4].upper()}"
+
+        return StandardResponse(data={
+            'meta': {
+                'statement_number': statement_number,
+                'generated_at': timezone.now().strftime('%Y-%m-%d %H:%M'),
+                'academic_year': '2026 / 2027',
+                'currency': 'ج.س',
+            },
+            'tenant': tenant_info,
+            'student': student_meta,
+            'account': account_info,
+            'summary': {
+                'total_invoiced': float(total_invoiced),
+                'total_paid': float(total_paid),
+                'total_discounted': float(total_discounted),
+                'net_outstanding': float(account.outstanding_balance or running_bal),
+                'credit_balance': float(account.credit_balance or 0.0),
+                'installments_count': len(installments_data),
+            },
+            'transactions': transactions,
+            'installments': installments_data,
+        })
+
 
 class StudentInvoiceViewSet(BaseCRUDViewSet):
     model_class = StudentInvoice
