@@ -253,11 +253,11 @@ export interface RowPreview {
               </div>
             }
 
-            <!-- STEP 3: المعاينة الذكية والتحقق المسبق -->
+            <!-- STEP 3: المعاينة الذكية والتحقق المسبق مع التعديل الحي للأقساط -->
             @if (currentStep() === 3) {
               <div class="step-pane preview-pane" @stepTransition>
                 
-                <!-- إحصائيات المعاينة السريعة -->
+                <!-- إحصائيات المعاينة السريعة والفلترة -->
                 <div class="preview-metrics-bar">
                   <div class="metric-chip total">
                     <span class="m-label">إجمالي السجلات:</span>
@@ -280,27 +280,53 @@ export interface RowPreview {
                   </div>
                 </div>
 
+                <!-- شريط المؤشرات المالية الحية (الرسوم، المدفوع، المتبقي) -->
+                <div class="finance-summary-bar">
+                  <div class="fin-kpi-card fees">
+                    <div class="kpi-icon">💳</div>
+                    <div class="kpi-body">
+                      <span class="kpi-title">إجمالي الرسوم المقررة</span>
+                      <span class="kpi-num mono">{{ totalFeesSum() | number:'1.0-2' }} <span class="cur">ج.س</span></span>
+                    </div>
+                  </div>
+                  <div class="fin-kpi-card paid">
+                    <div class="kpi-icon">💵</div>
+                    <div class="kpi-body">
+                      <span class="kpi-title">إجمالي المدفوع المحصل</span>
+                      <span class="kpi-num mono text-emerald">{{ totalPaidSum() | number:'1.0-2' }} <span class="cur">ج.س</span></span>
+                    </div>
+                  </div>
+                  <div class="fin-kpi-card rem">
+                    <div class="kpi-icon">⏳</div>
+                    <div class="kpi-body">
+                      <span class="kpi-title">إجمالي المتبقي المستحق</span>
+                      <span class="kpi-num mono text-amber">{{ totalRemainingSum() | number:'1.0-2' }} <span class="cur">ج.س</span></span>
+                    </div>
+                  </div>
+                </div>
+
                 @if (errorRowCount() > 0) {
                   <div class="notice-box warn">
                     <span class="icon">⚠️</span>
-                    <span>تم رصد ملاحظات في بعض الأسطر. يمكنك حذف الأسطر غير الصالحة بالضغط على (🗑️)، أو استيراد السجلات السليمة فقط وسيقوم النظام بتخطي الأسطر المعيبة.</span>
+                    <span>تم رصد ملاحظات في بعض الأسطر. يمكنك تعديل البيانات المالية أو حذف الأسطر غير الصالحة بالضغط على (🗑️).</span>
                   </div>
                 }
 
-                <!-- جدول المعاينة الذكي -->
+                <!-- جدول المعاينة الذكي القابل للتعديل الحي (Inline Editable) -->
                 <div class="preview-table-container">
                   <table class="preview-tbl">
                     <thead>
                       <tr>
-                        <th style="width: 50px;">السطر</th>
+                        <th style="width: 45px;">السطر</th>
                         <th>اسم الطالب رباعي</th>
-                        <th>الجنس</th>
-                        <th>الميلاد</th>
-                        <th>الصف الدراسي</th>
-                        <th>الشعبة</th>
-                        <th>ولي الأمر / الهاتف</th>
+                        <th>الصف</th>
+                        <th style="min-width: 105px;">الرسوم (ج.س)</th>
+                        <th style="min-width: 105px;">المدفوع (ج.س)</th>
+                        <th style="min-width: 95px;" class="center-cell">المتبقي</th>
+                        <th style="min-width: 95px;">رقم الإيصال</th>
+                        <th style="min-width: 140px;">الأقساط والملاحظات</th>
                         <th>حالة التدقيق</th>
-                        <th style="width: 50px;">إجراء</th>
+                        <th style="width: 45px;">إجراء</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -308,17 +334,54 @@ export interface RowPreview {
                         <tr [class.row-invalid]="!r.is_valid">
                           <td class="mono center-cell">{{ r.row_number }}</td>
                           <td class="strong">{{ r.data.arabic_name || '—' }}</td>
-                          <td>{{ r.data.gender === 'male' ? 'ذكر' : r.data.gender === 'female' ? 'أنثى' : (r.data.gender || '—') }}</td>
-                          <td class="mono">{{ r.data.date_of_birth || '—' }}</td>
                           <td>
                             <span class="badge-grade">{{ r.data.matched_grade_name || r.data.grade_name || '—' }}</span>
                           </td>
-                          <td>{{ r.data.section_name || '—' }}</td>
+                          <!-- الرسوم القابلة للتعديل المباشر -->
                           <td>
-                            <div class="guardian-info">
-                              <span>{{ r.data.guardian_name || '—' }}</span>
-                              <span class="phone mono" *ngIf="r.data.guardian_phone">📞 {{ r.data.guardian_phone }}</span>
-                            </div>
+                            <input 
+                              type="number" 
+                              class="table-inline-input mono" 
+                              [ngModel]="r.data.total_fees" 
+                              (ngModelChange)="onFeesChange(r, $event)"
+                              placeholder="0"
+                              min="0"
+                            />
+                          </td>
+                          <!-- المدفوع القابل للتعديل المباشر -->
+                          <td>
+                            <input 
+                              type="number" 
+                              class="table-inline-input mono paid-input" 
+                              [ngModel]="r.data.paid_amount" 
+                              (ngModelChange)="onPaidChange(r, $event)"
+                              placeholder="0"
+                              min="0"
+                            />
+                          </td>
+                          <!-- المتبقي المحسوب تلقائياً ولحظياً -->
+                          <td class="center-cell">
+                            <span class="remaining-chip mono" [class.zero]="(r.data.remaining_amount || 0) === 0">
+                              {{ (r.data.remaining_amount || 0) | number:'1.0-2' }}
+                            </span>
+                          </td>
+                          <!-- رقم الإيصال القابل للتعديل -->
+                          <td>
+                            <input 
+                              type="text" 
+                              class="table-inline-input mono" 
+                              [(ngModel)]="r.data.receipt_number" 
+                              placeholder="رقم السند"
+                            />
+                          </td>
+                          <!-- الأقساط والملاحظات القابلة للتعديل -->
+                          <td>
+                            <input 
+                              type="text" 
+                              class="table-inline-input" 
+                              [(ngModel)]="r.data.finance_notes" 
+                              placeholder="أقساط 9-10-11…"
+                            />
                           </td>
                           <td>
                             @if (r.is_valid) {
@@ -345,7 +408,7 @@ export interface RowPreview {
                       }
                       @if (filteredPreviewRows().length === 0) {
                         <tr>
-                          <td colspan="9" class="empty-cell">لا توجد سجلات تطابق الفلتر المحدد.</td>
+                          <td colspan="10" class="empty-cell">لا توجد سجلات تطابق الفلتر المحدد.</td>
                         </tr>
                       }
                     </tbody>
@@ -981,6 +1044,104 @@ export interface RowPreview {
       color: #94A3B8;
     }
 
+    /* Finance KPI Summary Bar */
+    .finance-summary-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 2px 0 6px;
+    }
+    .fin-kpi-card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .fin-kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .fin-kpi-card.fees { border-right: 4px solid #0F766E; background: #F0FDFA; }
+    .fin-kpi-card.paid { border-right: 4px solid #10B981; background: #ECFDF5; }
+    .fin-kpi-card.rem { border-right: 4px solid #F59E0B; background: #FFFBEB; }
+    .kpi-icon {
+      font-size: 24px;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    .kpi-body {
+      display: flex;
+      flex-direction: column;
+    }
+    .kpi-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748B;
+    }
+    .kpi-num {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .kpi-num .cur {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748B;
+    }
+    .text-emerald { color: #059669 !important; }
+    .text-amber { color: #D97706 !important; }
+
+    /* Inline Table Inputs */
+    .table-inline-input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      background: #F8FAFC;
+      color: #0F172A;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .table-inline-input:focus {
+      background: white;
+      border-color: #0F766E;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+    }
+    .table-inline-input.paid-input {
+      color: #047857;
+      font-weight: 700;
+    }
+
+    .remaining-chip {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 12px;
+      background: #FEF3C7;
+      color: #B45309;
+      border: 1px solid #FDE68A;
+    }
+    .remaining-chip.zero {
+      background: #DCFCE7;
+      color: #15803D;
+      border-color: #BBF7D0;
+    }
+
     /* Success Step */
     .success-pane {
       align-items: center;
@@ -1176,6 +1337,40 @@ export class StudentBulkImportModalComponent {
     if (mode === 'error') return rows.filter(r => !r.is_valid);
     return rows;
   });
+
+  readonly totalFeesSum = computed(() => {
+    return this.previewRows()
+      .filter(r => r.is_valid)
+      .reduce((sum, r) => sum + (Number(r.data?.total_fees) || 0), 0);
+  });
+
+  readonly totalPaidSum = computed(() => {
+    return this.previewRows()
+      .filter(r => r.is_valid)
+      .reduce((sum, r) => sum + (Number(r.data?.paid_amount) || 0), 0);
+  });
+
+  readonly totalRemainingSum = computed(() => {
+    return this.previewRows()
+      .filter(r => r.is_valid)
+      .reduce((sum, r) => sum + (Number(r.data?.remaining_amount) || 0), 0);
+  });
+
+  onFeesChange(row: RowPreview, value: any): void {
+    const fees = parseFloat(value) || 0;
+    row.data.total_fees = fees;
+    const paid = parseFloat(row.data.paid_amount) || 0;
+    row.data.remaining_amount = Math.max(0, fees - paid);
+    this.previewRows.update(rows => [...rows]);
+  }
+
+  onPaidChange(row: RowPreview, value: any): void {
+    const paid = parseFloat(value) || 0;
+    row.data.paid_amount = paid;
+    const fees = parseFloat(row.data.total_fees) || 0;
+    row.data.remaining_amount = Math.max(0, fees - paid);
+    this.previewRows.update(rows => [...rows]);
+  }
 
   canJumpToStep(target: number): boolean {
     if (target === 1) return true;

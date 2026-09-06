@@ -16,6 +16,8 @@ from apps.organization.domain.models import Branch
 from apps.students.domain.services import StudentNumberGenerator
 from apps.students.domain.events import DomainEventPublisher
 from apps.students.application.services import resolve_branch_for_gender, StudentApplicationService
+from decimal import Decimal
+from apps.student_finance.domain.models import StudentBillingAccount, StudentInvoice, Receipt
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -25,7 +27,7 @@ import openpyxl
 class StudentBulkImportService:
     """
     خدمة استيراد كشوفات الطلاب دفعة واحدة وتوليد قوالب الإكسل (.xlsx) الرسمية
-    المطابقة للهوية السودانية وأنظمة نبراس التعليمية.
+    المطابقة للهوية السودانية وأنظمة نبراس التعليمية والربط المالي الآلي.
     """
 
     TEMPLATE_COLUMNS = [
@@ -46,6 +48,13 @@ class StudentBulkImportService:
         {'id': 'guardian_job', 'label': 'مهنة ولي الأمر', 'required': False, 'width': 20, 'example': 'معلم / مهندس'},
         {'id': 'medical_notes', 'label': 'ملاحظات طبية أو حساسية', 'required': False, 'width': 25, 'example': 'سليم / لا توجد'},
         {'id': 'address', 'label': 'العنوان / السكن', 'required': False, 'width': 25, 'example': 'الخرطوم بحري - الصافية'},
+        {'id': 'total_fees', 'label': 'الرسوم المدرسية (ج.س)', 'required': False, 'width': 22, 'example': '1100'},
+        {'id': 'paid_amount', 'label': 'المدفوع (ج.س)', 'required': False, 'width': 20, 'example': '300'},
+        {'id': 'remaining_amount', 'label': 'المتبقي (ج.س)', 'required': False, 'width': 20, 'example': '800'},
+        {'id': 'receipt_number', 'label': 'رقم الإيصال / السند', 'required': False, 'width': 22, 'example': '284'},
+        {'id': 'enrollment_type', 'label': 'نوع القيد (جديد / تجديد تسجيل)', 'required': False, 'width': 26, 'example': 'جديد'},
+        {'id': 'documents_status', 'label': 'المستندات المستلمة', 'required': False, 'width': 26, 'example': 'وطني - نتائج'},
+        {'id': 'finance_notes', 'label': 'ملاحظات الأقساط والتسجيل', 'required': False, 'width': 28, 'example': 'مقابلة الطالب - أقساط 9-10-11'},
     ]
 
     SAMPLE_ROWS = [
@@ -67,6 +76,13 @@ class StudentBulkImportService:
             'guardian_job': 'مهندس معماري',
             'medical_notes': 'لا توجد',
             'address': 'الخرطوم - الرياض',
+            'total_fees': '1100',
+            'paid_amount': '300',
+            'remaining_amount': '800',
+            'receipt_number': '284',
+            'enrollment_type': 'جديد',
+            'documents_status': 'وطني - نتائج',
+            'finance_notes': 'مقابلة الطالب - أقساط 9-10-11',
         },
         {
             'arabic_name': 'إخلاص نزار المجذوب إبراهيم',
@@ -83,9 +99,16 @@ class StudentBulkImportService:
             'guardian_relation': 'أب',
             'guardian_phone': '0123456789',
             'guardian_email': '',
-            'guardian_job': 'طبيب بشري',
-            'medical_notes': 'حساسية خفيفة من البنسلين',
-            'address': 'أم درمان - المهندسين',
+            'guardian_job': 'محاسب مالي',
+            'medical_notes': 'حساسية صدرية خفيفة',
+            'address': 'أم درمان - الملازمين',
+            'total_fees': '1000',
+            'paid_amount': '250',
+            'remaining_amount': '750',
+            'receipt_number': '286',
+            'enrollment_type': 'تجديد تسجيل',
+            'documents_status': 'صور - وطني',
+            'finance_notes': 'أقساط 9-10-11',
         },
         {
             'arabic_name': 'مزمل الكباشي التاج محمد',
@@ -105,6 +128,13 @@ class StudentBulkImportService:
             'guardian_job': 'أستاذة جامعية',
             'medical_notes': 'ضعف نظر بسيط - يستخدم نظارات',
             'address': 'بحري - الشعبية',
+            'total_fees': '1300',
+            'paid_amount': '800',
+            'remaining_amount': '500',
+            'receipt_number': '292',
+            'enrollment_type': 'جديد',
+            'documents_status': 'صور - وطني - شهاده',
+            'finance_notes': 'مكتمل الملف ومسدد الدفعة الأولى',
         }
     ]
 
@@ -324,6 +354,19 @@ class StudentBulkImportService:
         ws.add_data_validation(dv_relation)
         dv_relation.add("L5:L1000")
 
+        # 7. نوع القيد والتسجيل (العمود V)
+        dv_enrollment = DataValidation(
+            type="list",
+            formula1='"جديد,تجديد تسجيل"',
+            allow_blank=True,
+            promptTitle="نوع القيد",
+            prompt="يرجى اختيار نوع قيد الطالب (جديد أو تجديد تسجيل).",
+            errorTitle="قيمة غير صالحة",
+            error="يرجى اختيار نوع القيد من القائمة المنسدلة."
+        )
+        ws.add_data_validation(dv_enrollment)
+        dv_enrollment.add("V5:V1000")
+
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
@@ -421,6 +464,13 @@ class StudentBulkImportService:
             'guardian_job': ['مهنة ولي الأمر', 'وظيفة ولي الأمر', 'guardian_job'],
             'medical_notes': ['ملاحظات طبية أو حساسية', 'الملاحظات الطبية', 'الحساسية', 'medical_notes'],
             'address': ['العنوان / السكن', 'العنوان', 'السكن', 'address'],
+            'total_fees': ['الرسوم المدرسية (ج.س)', 'الرسوم المدرسية', 'الرسوم', 'رسوم', 'المبلغ الإجمالي', 'total_fees', 'fees'],
+            'paid_amount': ['المدفوع (ج.س)', 'المبلغ المدفوع', 'المدفوع', 'المسدد', 'الدفعة الأولى', 'paid_amount', 'paid'],
+            'remaining_amount': ['المتبقي (ج.س)', 'المبلغ المتبقي', 'المتبقي', 'الباقي', 'remaining_amount', 'remaining'],
+            'receipt_number': ['رقم الإيصال / السند', 'رقم الإيصال', 'رقم الايصال', 'رقم السند', 'سند القبض', 'receipt_number', 'receipt_no'],
+            'enrollment_type': ['نوع القيد (جديد / تجديد تسجيل)', 'نوع القيد', 'القيد', 'نوع التسجيل', 'التسجيل', 'enrollment_type'],
+            'documents_status': ['المستندات المستلمة', 'المستندات', 'الأوراق', 'الملف', 'documents_status', 'documents'],
+            'finance_notes': ['ملاحظات الأقساط والتسجيل', 'ملاحظات الأقساط', 'الأقساط', 'ملاحظات التسجيل', 'finance_notes', 'notes'],
         }
 
         normalized = {'_row_number': raw_row.get('_row_number', 0)}
@@ -634,6 +684,41 @@ class StudentBulkImportService:
                 else:
                     row_warnings.append(f"لم يتم العثور على صف مطابق تماماً لـ «{grade_name}» في المدرسة.")
 
+            # 8. استخراج وتدقيق البيانات المالية والتسجيلية والأقساط
+            raw_fees = str(row.get('total_fees', '')).replace(',', '').strip()
+            try:
+                total_fees = float(raw_fees) if raw_fees else 0.0
+            except ValueError:
+                total_fees = 0.0
+            row['total_fees'] = total_fees
+
+            raw_paid = str(row.get('paid_amount', '')).replace(',', '').strip()
+            try:
+                paid_amount = float(raw_paid) if raw_paid else 0.0
+            except ValueError:
+                paid_amount = 0.0
+            row['paid_amount'] = paid_amount
+
+            raw_rem = str(row.get('remaining_amount', '')).replace(',', '').strip()
+            try:
+                remaining_amount = float(raw_rem) if raw_rem else max(0.0, total_fees - paid_amount)
+            except ValueError:
+                remaining_amount = max(0.0, total_fees - paid_amount)
+            row['remaining_amount'] = remaining_amount
+
+            row['receipt_number'] = str(row.get('receipt_number', '')).strip()
+
+            raw_enr_type = cls._normalize_arabic(str(row.get('enrollment_type', '')))
+            if 'تجديد' in raw_enr_type or 'returning' in raw_enr_type:
+                row['enrollment_type'] = 'returning'
+                row['enrollment_type_label'] = 'تجديد تسجيل'
+            else:
+                row['enrollment_type'] = 'new'
+                row['enrollment_type_label'] = 'جديد'
+
+            row['documents_status'] = str(row.get('documents_status', '')).strip()
+            row['finance_notes'] = str(row.get('finance_notes', '')).strip()
+
             # الجنسية الافتراضية
             if not row.get('nationality'):
                 row['nationality'] = 'سوداني'
@@ -723,6 +808,16 @@ class StudentBulkImportService:
                         created_by=user_id
                     )
 
+                    # دمج العناوين والمستندات وملاحظات الأقساط
+                    notes_parts = []
+                    if row_data.get('address'):
+                        notes_parts.append(f"العنوان: {row_data['address']}")
+                    if row_data.get('documents_status'):
+                        notes_parts.append(f"المستندات: {row_data['documents_status']}")
+                    if row_data.get('finance_notes'):
+                        notes_parts.append(f"ملاحظات الأقساط: {row_data['finance_notes']}")
+                    profile_notes = " | ".join(notes_parts)
+
                     # إنشاء الملف الشخصي
                     StudentProfile.objects.create(
                         student=student,
@@ -734,7 +829,7 @@ class StudentBulkImportService:
                         national_id=row_data.get('national_id') or None,
                         religion=row_data.get('religion') or 'مسلم',
                         blood_group=row_data.get('blood_group') or '',
-                        notes=row_data.get('address') or '',
+                        notes=profile_notes,
                         tenant_id=tenant_id,
                         created_by=user_id
                     )
@@ -792,6 +887,11 @@ class StudentBulkImportService:
                     if sec_name and sec_name in sections_by_name:
                         section_obj = sections_by_name[sec_name]
 
+                    # نوع القيد والتسجيل (جديد / تجديد تسجيل)
+                    enr_type = row_data.get('enrollment_type') or 'new'
+                    if enr_type not in ['new', 'returning', 'transfer']:
+                        enr_type = 'new'
+
                     if grade_obj and academic_year_id:
                         branch = resolve_branch_for_gender(tenant_id, gender)
                         StudentEnrollment.objects.create(
@@ -802,10 +902,70 @@ class StudentBulkImportService:
                             section_id=section_obj.id if section_obj else None,
                             branch_id=branch.id if branch else None,
                             enrollment_date=datetime.date.today(),
-                            enrollment_type='new',
+                            enrollment_type=enr_type,
                             status='active',
                             created_by=user_id
                         )
+
+                    # الربط المالي الآلي مع موديول مالية الطلاب (Student Finance)
+                    try:
+                        fees_val = Decimal(str(row_data.get('total_fees') or 0))
+                        paid_val = Decimal(str(row_data.get('paid_amount') or 0))
+                        rem_val = Decimal(str(row_data.get('remaining_amount') or max(0, fees_val - paid_val)))
+                        rcp_no = str(row_data.get('receipt_number') or '').strip()
+
+                        if fees_val > 0 or paid_val > 0 or rcp_no:
+                            # 1. فتح أو جلب حساب فوترة الطالب
+                            billing_acc, _ = StudentBillingAccount.objects.get_or_create(
+                                tenant_id=tenant_id,
+                                student_id=student.id,
+                                defaults={
+                                    'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M')}-{student_number}",
+                                    'opening_balance': Decimal('0.0'),
+                                    'current_balance': rem_val,
+                                    'outstanding_balance': rem_val,
+                                    'credit_balance': Decimal('0.0'),
+                                    'created_by': user_id
+                                }
+                            )
+
+                            # 2. إنشاء فاتورة الرسوم الدراسية
+                            if fees_val > 0:
+                                inv_no = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                                StudentInvoice.objects.create(
+                                    tenant_id=tenant_id,
+                                    student_billing_account=billing_acc,
+                                    invoice_number=inv_no,
+                                    issue_date=datetime.date.today(),
+                                    due_date=datetime.date.today() + datetime.timedelta(days=30),
+                                    status='posted',
+                                    total_amount=fees_val,
+                                    paid_amount=paid_val,
+                                    outstanding_amount=rem_val,
+                                    created_by=user_id
+                                )
+
+                            # 3. إنشاء إيصال التحصيل وسند القبض برقم الإيصال الوارد بالكشف
+                            if paid_val > 0:
+                                final_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                                Receipt.objects.create(
+                                    tenant_id=tenant_id,
+                                    student_billing_account=billing_acc,
+                                    receipt_number=final_rcp,
+                                    payment_date=datetime.date.today(),
+                                    amount=paid_val,
+                                    payment_method_id=uuid.uuid4(),
+                                    status='posted',
+                                    created_by=user_id
+                                )
+
+                            # تحديث رصيد حساب الفوترة
+                            billing_acc.outstanding_balance = rem_val
+                            billing_acc.current_balance = rem_val
+                            billing_acc.save(update_fields=['outstanding_balance', 'current_balance'])
+                    except Exception as fin_err:
+                        import logging
+                        logging.getLogger('nebras.students').warning(f"تعذر إتمام الربط المالي التلقائي للسطر {idx}: {fin_err}")
 
                     # نشر حدث النظام
                     DomainEventPublisher.publish("StudentCreated", {
