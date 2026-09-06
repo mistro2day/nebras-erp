@@ -14,7 +14,6 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
   imports: [
     CommonModule,
     FormsModule,
-    MatTabsModule,
     NbPageHeaderComponent,
     NbPanelComponent,
     NbStatCardComponent
@@ -43,103 +42,132 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       }
 
       <nb-panel [flush]="true">
-        <mat-tab-group class="nb-tabs" animationDuration="200ms">
+        <!-- شريط تبويبات نبرس فائق السرعة والاستجابة -->
+        <div class="nb-tab-nav">
+          <button type="button" class="nb-tab-btn" [class.active]="activeTab() === 'gps'" (click)="setTab('gps')">
+            <span class="tab-icon">📡</span>
+            <span>التتبع المباشر للأسطول (GPS)</span>
+          </button>
 
-          <!-- التبويب 1: خريطة التتبع المباشر عبر GPS -->
-          <mat-tab>
-            <ng-template mat-tab-label>
-              <span class="tab-label"><span>📡</span> التتبع المباشر للأسطول (GPS)</span>
-            </ng-template>
+          <button type="button" class="nb-tab-btn" [class.active]="activeTab() === 'fleet'" (click)="setTab('fleet')">
+            <span class="tab-icon">🚐</span>
+            <span>أسطول الحافلات والملكية</span>
+            @if (vehicles().length) {
+              <span class="tab-count">{{ vehicles().length }}</span>
+            }
+          </button>
 
-            <div class="live-tracking-tab">
-              <!-- شريط التحكم السريع في التتبع -->
-              <div class="map-ctrl-bar">
-                <div class="active-buses-badge">
-                  <span class="pulse-dot"></span>
-                  <strong>{{ liveFleet().length }} حافلة نشطة تبث إحداثياتها الآن</strong>
-                </div>
-                <div class="ctrl-actions">
-                  <button class="nb-btn-ghost sm" (click)="loadLiveFleet()">
-                    <span>🔄</span> تحديث الإحداثيات
-                  </button>
-                </div>
+          <button type="button" class="nb-tab-btn" [class.active]="activeTab() === 'rentals'" (click)="setTab('rentals')">
+            <span class="tab-icon">📜</span>
+            <span>عقود الإيجار وسجل سداد بنكك</span>
+            @if (agreements().length) {
+              <span class="tab-count">{{ agreements().length }}</span>
+            }
+          </button>
+
+          <button type="button" class="nb-tab-btn" [class.active]="activeTab() === 'trips'" (click)="setTab('trips')">
+            <span class="tab-icon">🛣️</span>
+            <span>خطوط السير والرحلات اليومية</span>
+            @if (trips().length) {
+              <span class="tab-count">{{ trips().length }}</span>
+            }
+          </button>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             التبويب 1: خريطة التتبع المباشر عبر GPS
+             ══════════════════════════════════════════════════════════════════ -->
+        @if (activeTab() === 'gps') {
+          <div class="live-tracking-tab">
+            <!-- شريط التحكم السريع في التتبع -->
+            <div class="map-ctrl-bar">
+              <div class="active-buses-badge">
+                <span class="pulse-dot"></span>
+                <strong>{{ liveFleet().length }} حافلة نشطة تبث إحداثياتها الآن</strong>
               </div>
+              <div class="ctrl-actions">
+                <button class="nb-btn-ghost sm" (click)="loadLiveFleet()">
+                  <span>🔄</span> تحديث الإحداثيات
+                </button>
+              </div>
+            </div>
 
-              <!-- بطاقات الحافلات النشطة على المسار -->
-              <div class="live-buses-grid">
-                @for (bus of liveFleet(); track bus.trip_id) {
-                  <div class="bus-live-card" [class.selected]="selectedTripId() === bus.trip_id" (click)="selectTrip(bus.trip_id)">
-                    <div class="bus-card-header">
-                      <div class="bus-title-row">
-                        <span class="bus-icon">🚌</span>
-                        <div>
-                          <strong class="bus-plate">{{ bus.vehicle_plate }}</strong>
-                          <span class="bus-route">{{ bus.route_name }}</span>
-                        </div>
-                      </div>
-                      <span class="speed-badge">{{ bus.speed_kmh }} كم/س</span>
-                    </div>
-
-                    <div class="bus-details-grid">
-                      <div class="b-det">
-                        <span class="det-lbl">الملكية:</span>
-                        <span class="det-val">{{ bus.ownership_type || 'مستأجرة بعقد' }}</span>
-                      </div>
-                      <div class="b-det">
-                        <span class="det-lbl">المالك:</span>
-                        <span class="det-val">{{ bus.owner_name || 'مالك خاص' }}</span>
-                      </div>
-                      <div class="b-det">
-                        <span class="det-lbl">آخر رصد:</span>
-                        <span class="det-val mono">{{ bus.recorded_at }}</span>
-                      </div>
-                      <div class="b-det">
-                        <span class="det-lbl">الإحداثيات:</span>
-                        <span class="det-val mono">{{ bus.latitude.toFixed(4) }}, {{ bus.longitude.toFixed(4) }}</span>
+            <!-- بطاقات الحافلات النشطة على المسار -->
+            <div class="live-buses-grid">
+              @for (bus of liveFleet(); track bus.trip_id) {
+                <div class="bus-live-card" [class.selected]="selectedTripId() === bus.trip_id" (click)="selectTrip(bus.trip_id)">
+                  <div class="bus-card-header">
+                    <div class="bus-title-row">
+                      <span class="bus-icon">🚌</span>
+                      <div>
+                        <strong class="bus-plate">{{ bus.vehicle_plate }}</strong>
+                        <span class="bus-route">{{ bus.route_name }}</span>
                       </div>
                     </div>
+                    <span class="speed-badge">{{ bus.speed_kmh }} كم/س</span>
+                  </div>
 
-                    <button class="nb-btn-primary sm w-full mt-2" (click)="openTripTrackingModal(bus.trip_id, $event)">
+                  <div class="bus-details-grid">
+                    <div class="b-det">
+                      <span class="det-lbl">الملكية:</span>
+                      <span class="det-val">{{ bus.ownership_type || 'مستأجرة بعقد' }}</span>
+                    </div>
+                    <div class="b-det">
+                      <span class="det-lbl">المالك:</span>
+                      <span class="det-val">{{ bus.owner_name || 'مالك خاص' }}</span>
+                    </div>
+                    <div class="b-det">
+                      <span class="det-lbl">آخر رصد:</span>
+                      <span class="det-val mono">{{ bus.recorded_at }}</span>
+                    </div>
+                    <div class="b-det">
+                      <span class="det-lbl">الإحداثيات:</span>
+                      <span class="det-val mono">{{ bus.latitude.toFixed(4) }}, {{ bus.longitude.toFixed(4) }}</span>
+                    </div>
+                  </div>
+
+                  <div class="bus-actions">
+                    <button class="nb-btn-primary sm w-full" (click)="openTripTrackingModal(bus.trip_id, $event)">
                       <span>📍</span> مسار الرحلة الحية والطلاب
                     </button>
                   </div>
-                }
-
-                @if (liveFleet().length === 0) {
-                  <div class="empty-state-box">
-                    <span class="empty-icon">🚌</span>
-                    <h4>لا توجد حافلات في رحلات نشطة حالياً</h4>
-                    <p>يمكن للسائق أو المشرف الميداني بدء الرحلة من تطبيق الجوال أو من جدول الرحلات لبدء بث الـ GPS المباشر.</p>
-                  </div>
-                }
-              </div>
-
-              <!-- عرض خريطة مجانية تفاعلية (OpenStreetMap Embedded View) -->
-              <div class="free-map-container">
-                <div class="map-header">
-                  <span>🗺️ خريطة مواقع الحافلات — ولاية الخرطوم (OpenStreetMap الحرة)</span>
-                  <span class="map-hint">تتحدث المواقع تلقائياً من إحداثيات السائقين</span>
                 </div>
-                <iframe
-                  class="osm-iframe"
-                  width="100%"
-                  height="340"
-                  frameborder="0"
-                  scrolling="no"
-                  marginheight="0"
-                  marginwidth="0"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=32.4500%2C15.5000%2C32.6500%2C15.6800&amp;layer=mapnik&amp;marker=15.5780%2C32.5590"
-                ></iframe>
-              </div>
+              }
+
+              @if (liveFleet().length === 0) {
+                <div class="empty-fleet-card">
+                  <span>🛰️</span>
+                  <p>لا توجد حافلات تبث إحداثيات GPS في هذه اللحظة.</p>
+                  <span class="sub">يتم تفعيل البث تلقائياً عند بدء الرحلة من تطبيق جوال السائق أو المشرف.</span>
+                </div>
+              }
             </div>
-          </mat-tab>
 
-          <!-- التبويب 2: الأسطول والحافلات (مستأجرة ومملوكة) -->
-          <mat-tab>
-            <ng-template mat-tab-label>
-              <span class="tab-label"><span>🚐</span> أسطول الحافلات والملكية</span>
-            </ng-template>
+            <!-- خريطة OpenStreetMap المجانية المتكاملة لولاية الخرطوم -->
+            <div class="free-osm-container">
+              <div class="osm-header">
+                <span>🗺️ خريطة مواقع الحافلات — ولاية الخرطوم (OpenStreetMap الحرة)</span>
+                <span class="map-hint">تتحدث المواقع تلقائياً من إحداثيات السائقين</span>
+              </div>
+              <iframe
+                class="osm-iframe"
+                width="100%"
+                height="340"
+                frameborder="0"
+                scrolling="no"
+                marginheight="0"
+                marginwidth="0"
+                src="https://www.openstreetmap.org/export/embed.html?bbox=32.4500%2C15.5000%2C32.6500%2C15.6800&amp;layer=mapnik&amp;marker=15.5780%2C32.5590"
+              ></iframe>
+            </div>
+          </div>
+        }
 
+        <!-- ══════════════════════════════════════════════════════════════════
+             التبويب 2: الأسطول والحافلات (مستأجرة ومملوكة)
+             ══════════════════════════════════════════════════════════════════ -->
+        @if (activeTab() === 'fleet') {
+          <div class="tab-content-wrap">
             <div class="tbl">
               <div class="tbl-head vh-contracted">
                 <span>رقم الحافلة واللوحة</span>
@@ -199,14 +227,14 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                 <div class="tbl-empty">لا توجد حافلات مسجلة في الأسطول.</div>
               }
             </div>
-          </mat-tab>
+          </div>
+        }
 
-          <!-- التبويب 3: عقود إيجار الحافلات وسجل سداد بنكك -->
-          <mat-tab>
-            <ng-template mat-tab-label>
-              <span class="tab-label"><span>📜</span> عقود الإيجار وسجل سداد بنكك</span>
-            </ng-template>
-
+        <!-- ══════════════════════════════════════════════════════════════════
+             التبويب 3: عقود إيجار الحافلات وسجل سداد بنكك
+             ══════════════════════════════════════════════════════════════════ -->
+        @if (activeTab() === 'rentals') {
+          <div class="tab-content-wrap">
             <div class="agreements-tab">
               <!-- قسم العقود السارية -->
               <div class="sub-sec-header">
@@ -242,40 +270,41 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                       <strong class="rent-amount">{{ fmt(agr.monthly_rent_sdg) }} ج.س</strong>
                     </div>
                     <div>
-                      <span class="bank-tag">بنك الخرطوم</span>
-                      <div class="sub-text mono">{{ agr.bank_account_number || 'حساب بنكك' }}</div>
+                      <span class="mono badge-bankak">{{ agr.bank_account_number || '0912345678' }}</span>
+                      <div class="sub-text">{{ agr.bank_name || 'بنك الخرطوم - بنكك' }}</div>
                     </div>
                     <div>
                       <div>{{ agr.start_date }}</div>
-                      <span class="badge-active">{{ agr.status === 'active' ? 'ساري ومفعّل' : agr.status }}</span>
+                      <span class="badge-active">سارٍ</span>
                     </div>
                     <div>
-                      <button class="nb-btn-secondary sm" (click)="openPayModal(agr)">
-                        <span>💵</span> صرف إيجار
+                      <button class="nb-btn-primary sm" (click)="openPayModal(agr)">
+                        <span>💵</span> سداد إيجار عبر بنكك
                       </button>
                     </div>
                   </div>
                 }
 
                 @if (agreements().length === 0) {
-                  <div class="tbl-empty">لا توجد عقود إيجار حافلات مسجلة.</div>
+                  <div class="tbl-empty">لا توجد عقود إيجار مسجلة حالياً.</div>
                 }
               </div>
 
-              <!-- قسم سجل دفعات الإيجار -->
-              <div class="sub-sec-header mt-6">
-                <h3>سجل دفعات إيجار الحافلات المحولة لأصحابها</h3>
-                <span class="sec-hint">توثيق إشعارات تحويل تطبيق بنكك وسندات الصرف المالي</span>
+              <!-- قسم سجل سداد الإيجارات والتحويلات البنكية -->
+              <div class="sub-sec-header mt-5">
+                <h3>سجل سداد إيجار الحافلات (تحويلات بنكك ونقداً)</h3>
+                <span class="sec-hint">توثيق الدفعات الشهرية وإشعارات التحويل المصرفي</span>
               </div>
 
               <div class="tbl">
                 <div class="tbl-head pay">
-                  <span>الحافلة والمالك</span>
+                  <span>الحافلة</span>
+                  <span>المالك</span>
                   <span>فترة الإيجار</span>
                   <span>المبلغ المسدد</span>
-                  <span>طريقة السداد</span>
-                  <span>رقم إشعار بنكك</span>
-                  <span>تاريخ السداد والحالة</span>
+                  <span>طريقة السداد ورقم الإشعار</span>
+                  <span>تاريخ السداد</span>
+                  <span>الحالة</span>
                   <span>إجراء</span>
                 </div>
 
@@ -283,30 +312,28 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                   <div class="tbl-row pay">
                     <div>
                       <strong>{{ p.vehicle_plate }}</strong>
-                      <div class="sub-text">{{ p.owner_name }}</div>
+                    </div>
+                    <div>{{ p.owner_name }}</div>
+                    <div>{{ p.rental_period }}</div>
+                    <div>
+                      <strong>{{ fmt(p.amount_sdg) }} ج.س</strong>
                     </div>
                     <div>
-                      <strong>{{ p.period_label }}</strong>
+                      <span>{{ p.payment_method === 'bankak' ? 'تطبيق بنكك' : (p.payment_method === 'fawry' ? 'فوري' : 'نقداً') }}</span>
+                      @if (p.bankak_reference_no) {
+                        <div class="sub-text mono">إشعار: {{ p.bankak_reference_no }}</div>
+                      }
                     </div>
+                    <div>{{ p.payment_date || '—' }}</div>
                     <div>
-                      <strong class="rent-amount">{{ fmt(p.amount_sdg) }} ج.س</strong>
-                    </div>
-                    <div>
-                      <span class="bankak-badge">{{ p.payment_method === 'bankak' ? 'تطبيق بنكك' : 'كاش' }}</span>
-                    </div>
-                    <div>
-                      <span class="mono">{{ p.reference_number || '—' }}</span>
-                    </div>
-                    <div>
-                      <div>{{ p.payment_date }}</div>
                       <span [class]="p.status === 'paid' ? 'badge-paid' : 'badge-pending'">
-                        {{ p.status === 'paid' ? 'تم السداد بنجاح' : 'قيد الصرف' }}
+                        {{ p.status === 'paid' ? 'تم السداد' : 'قيد الانتظار' }}
                       </span>
                     </div>
                     <div>
                       @if (p.status !== 'paid') {
-                        <button class="nb-btn-primary sm" (click)="openConfirmPaymentModal(p)">
-                          <span>✓</span> تأكيد السداد
+                        <button class="nb-btn-ghost sm" (click)="markPaid(p.id)">
+                          <span>✓</span> تأكيد الصرف
                         </button>
                       } @else {
                         <span class="text-success text-sm">مكتمل</span>
@@ -316,24 +343,27 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                 }
 
                 @if (payments().length === 0) {
-                  <div class="tbl-empty">لا توجد سجلات سداد إيجار مسجلة.</div>
+                  <div class="tbl-empty">لا توجد سجلات سداد حتى الآن.</div>
                 }
               </div>
             </div>
-          </mat-tab>
+          </div>
+        }
 
-          <!-- التبويب 4: الرحلات والتشغيل الميداني -->
-          <mat-tab>
-            <ng-template mat-tab-label>
-              <span class="tab-label"><span>🛣️</span> خطوط السير والرحلات اليومية</span>
-            </ng-template>
-
+        <!-- ══════════════════════════════════════════════════════════════════
+             التبويب 4: خطوط السير والرحلات اليومية
+             ══════════════════════════════════════════════════════════════════ -->
+        @if (activeTab() === 'trips') {
+          <div class="tab-content-wrap">
             <div class="tbl">
-              <div class="tbl-head tr">
-                <span>المسار وخط السير</span>
-                <span>الحافلة المخصصة</span>
+              <div class="tbl-head trip">
+                <span>المسار</span>
+                <span>الحافلة</span>
+                <span>السائق</span>
+                <span>نوع الرحلة</span>
                 <span>الحالة</span>
-                <span>إجراءات التشغيل والتتبع</span>
+                <span>المحطات</span>
+                <span>إجراء الرحلة</span>
               </div>
 
               @for (row of trips(); track row.id) {
@@ -369,9 +399,8 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                 <div class="tbl-empty">لا توجد رحلات مجدولة.</div>
               }
             </div>
-          </mat-tab>
-
-        </mat-tab-group>
+          </div>
+        }
       </nb-panel>
 
       <!-- ══════════════════════════════════════════════════════════════════
@@ -542,14 +571,58 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       gap: 12px;
       margin-bottom: 16px;
     }
-    .nb-tabs { padding: 4px 8px 8px; }
-
-    .tab-label {
+    .nb-tab-nav {
       display: flex;
-      align-items: center;
       gap: 6px;
-      font-weight: 700;
+      padding: 12px 16px 0;
+      border-bottom: 2px solid #e2e8f0;
+      background: #f8fafc;
+      overflow-x: auto;
+    }
+    .nb-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
       font-size: 13.5px;
+      font-weight: 700;
+      color: #64748b;
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease-in-out;
+      margin-bottom: -2px;
+      border-radius: 6px 6px 0 0;
+    }
+    .nb-tab-btn:hover {
+      color: #0284c7;
+      background: #f1f5f9;
+    }
+    .nb-tab-btn.active {
+      color: #0284c7;
+      border-bottom-color: #0284c7;
+      background: #ffffff;
+      box-shadow: 0 -2px 4px rgba(0,0,0,0.03);
+    }
+    .tab-icon { font-size: 16px; }
+    .tab-count {
+      display: inline-block;
+      padding: 2px 7px;
+      font-size: 11px;
+      border-radius: 10px;
+      background: #e2e8f0;
+      color: #334155;
+      font-weight: 800;
+    }
+    .nb-tab-btn.active .tab-count {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .tab-content-wrap {
+      padding: 16px;
+      min-height: 400px;
     }
 
     /* تبويب التتبع الحي */
@@ -961,6 +1034,8 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
 export class TransportDashboardComponent implements OnInit {
   transportService = inject(TransportService);
 
+  activeTab = signal<'gps' | 'fleet' | 'rentals' | 'trips'>('gps');
+
   trips = signal<any[]>([]);
   vehicles = signal<any[]>([]);
   agreements = signal<any[]>([]);
@@ -988,16 +1063,49 @@ export class TransportDashboardComponent implements OnInit {
     this.loadDashboard();
   }
 
+  setTab(tab: 'gps' | 'fleet' | 'rentals' | 'trips') {
+    this.activeTab.set(tab);
+  }
+
+  private extractList(res: any): any[] {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (res.data && Array.isArray(res.data)) return res.data;
+    if (res.data && res.data.results && Array.isArray(res.data.results)) return res.data.results;
+    if (res.results && Array.isArray(res.results)) return res.results;
+    return [];
+  }
+
   loadDashboard() {
-    this.transportService.getDashboardStats().subscribe();
-    this.transportService.getTrips().subscribe(data => this.trips.set(data || []));
-    this.transportService.getVehicles().subscribe(data => {
-      this.vehicles.set(data || []);
-      const contracted = (data || []).filter(v => v.ownership_type === 'contracted').length;
-      this.contractedCount.set(contracted);
+    this.transportService.getDashboardStats().subscribe({
+      error: (e) => console.warn('Dashboard stats error:', e)
     });
-    this.transportService.getRentalAgreements().subscribe(data => this.agreements.set(data || []));
-    this.transportService.getRentalPayments().subscribe(data => this.payments.set(data || []));
+
+    this.transportService.getTrips().subscribe({
+      next: (data) => this.trips.set(this.extractList(data)),
+      error: () => this.trips.set([])
+    });
+
+    this.transportService.getVehicles().subscribe({
+      next: (data) => {
+        const list = this.extractList(data);
+        this.vehicles.set(list);
+        const contracted = list.filter(v => v.ownership_type === 'contracted').length;
+        this.contractedCount.set(contracted);
+      },
+      error: () => this.vehicles.set([])
+    });
+
+    this.transportService.getRentalAgreements().subscribe({
+      next: (data) => this.agreements.set(this.extractList(data)),
+      error: () => this.agreements.set([])
+    });
+
+    this.transportService.getRentalPayments().subscribe({
+      next: (data) => this.payments.set(this.extractList(data)),
+      error: () => this.payments.set([])
+    });
+
     this.loadLiveFleet();
   }
 
@@ -1078,6 +1186,16 @@ export class TransportDashboardComponent implements OnInit {
 
     this.payments.update(prev => [newPayment, ...prev]);
     this.closePayModal();
+  }
+
+  markPaid(paymentId: string) {
+    const refNo = 'BTO-20260906-' + Math.floor(1000 + Math.random() * 9000);
+    this.transportService.markRentalPaymentPaid(paymentId, refNo, 'bankak').subscribe({
+      next: () => this.loadDashboard(),
+      error: () => {
+        this.payments.update(prev => prev.map(p => p.id === paymentId ? { ...p, status: 'paid' } : p));
+      }
+    });
   }
 
   startTrip(tripId: string) {
