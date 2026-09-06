@@ -60,9 +60,9 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                      (error)="onLogoError($event)" />
               </div>
               <div class="school-names">
-                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name }}</h1>
-                <span class="school-name-en">{{ statement()?.tenant?.name_en }}</span>
-                <span class="school-slogan">منظومة نبراس لإدارة المؤسسات التعليمية — السودان</span>
+                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'مدارس المودة النموذجية الخاصة' }}</h1>
+                <span class="school-name-en">{{ statement()?.tenant?.name_en || 'Al-Mawadda Model Private Schools' }}</span>
+                <span class="school-affiliation">{{ statement()?.tenant?.affiliation || 'المرحلة الابتدائية والمتوسطة والثانوية • ولاية الخرطوم' }}</span>
               </div>
             </div>
 
@@ -269,7 +269,7 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
           <!-- 6. إقرار التوثيق والتوقيعات والختم الرسمي -->
           <div class="doc-footer page-break-inside-avoid">
             <p class="legal-notice">
-              • يعتبر هذا الكشف وثيقة مالية رسمية صادرة من نظام نبراس لإدارة المؤسسات التعليمية ومعتمدة لدى إدارة الحسابات.<br>
+              • يعتبر هذا الكشف وثيقة مالية رسمية صادرة ومعتمدة لدى إدارة الحسابات في {{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'المؤسسة التعليمية' }}.<br>
               • لأي استفسار أو تسوية مالية، يرجى مراجعة الإدارة المالية مصطحبين إشعار التحويل البنكي أو سند القبض الأصلي.
             </p>
 
@@ -288,7 +288,7 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                   } @else {
                     <div class="stamp-placeholder">
                       <span>الختم المعتمد</span>
-                      <small>نبراس OS</small>
+                      <small>{{ statement()?.tenant?.name_ar || 'المؤسسة التعليمية' }}</small>
                     </div>
                   }
                 </div>
@@ -298,6 +298,21 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
                 <span class="sig-title">اعتماد الإدارة المالية / المدير العام</span>
                 <span class="sig-dots">...................................</span>
                 <span class="sig-date">التوقيع والاعتماد</span>
+              </div>
+            </div>
+
+            <!-- 7. تذييل المنصة الصغير (تذييل تقني رسمي في أسفل الصفحة) -->
+            <div class="platform-system-footer">
+              <div class="sys-footer-right">
+                <span class="sys-brand">منظومة نبراس لإدارة المؤسسات التعليمية — السودان</span>
+              </div>
+              <div class="sys-footer-center">
+                <span>رقم المرجع المحاسبي: <strong class="mono">{{ statement()?.meta?.statement_number }}</strong></span>
+              </div>
+              <div class="sys-footer-left">
+                <span>تاريخ التوليد: {{ statement()?.meta?.generated_at }}</span>
+                <span class="sep">•</span>
+                <span>صفحة 1 من 1</span>
               </div>
             </div>
           </div>
@@ -427,10 +442,10 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
       color: #64748b;
       font-family: sans-serif;
     }
-    .school-slogan {
-      font-size: 11px;
-      color: #2563eb;
-      font-weight: 700;
+    .school-affiliation {
+      font-size: 11.5px;
+      color: #64748b;
+      font-weight: 600;
     }
 
     .doc-title-box {
@@ -714,7 +729,24 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
     }
     .stamp-placeholder small { font-size: 9px; }
 
-    /* الحالات الفارغة والتحميل */
+    /* تذييل المنصة الصغير أسفل الصفحة */
+    .platform-system-footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px dashed #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .platform-system-footer .sys-brand {
+      font-weight: 700;
+      color: #475569;
+    }
+    .platform-system-footer .sep {
+      margin: 0 6px;
+    }
     .loading-state, .error-state {
       max-width: 500px;
       margin: 60px auto;
@@ -871,7 +903,7 @@ export class StudentAccountStatementComponent implements OnInit {
   }
 
   onLogoError(event: any) {
-    event.target.src = '/assets/images/branding/nebras_official_blue.png';
+    event.target.src = '/assets/branding/al_mawadda_logo.jpg';
   }
 
   goBack() {

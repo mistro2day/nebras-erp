@@ -161,8 +161,8 @@ export class TenantService {
         if (!d?.id) return;
         const tenant: TenantInfo = {
           id: d.id,
-          name: d.name || d.name_en || d.name_ar || 'Nebras',
-          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس النبراس النموذجية الأهلية',
+          name: d.name || d.name_en || d.name_ar || 'Al-Mawadda',
+          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المودة النموذجية الخاصة',
           primaryColor: d.primary_color || '#3F51B5',
           secondaryColor: d.secondary_color || '#7A8093',
           logoUrl: d.logo_url,
