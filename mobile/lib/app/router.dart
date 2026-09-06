@@ -17,6 +17,8 @@ import '../features/admissions/presentation/admissions_list_page.dart';
 import '../features/admissions/presentation/applicant_detail_page.dart';
 import '../features/admissions/presentation/new_applicant_form_page.dart';
 import '../features/common/role_placeholder_page.dart';
+import '../features/transport/presentation/driver_trip_live_page.dart';
+import '../features/parent/presentation/child_bus_tracker_page.dart';
 
 String _homePathFor(UserRole role) {
   switch (role) {
@@ -79,6 +81,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/parent/child/:id',
         builder: (c, s) => ChildDetailPage(studentId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/parent/child/:id/bus',
+        builder: (c, s) => ChildBusTrackerPage(
+          studentId: s.pathParameters['id']!,
+          studentName: (s.extra as String?) ?? 'الطالب',
+        ),
+      ),
+      GoRoute(
+        path: '/transport/driver-trip/:id',
+        builder: (c, s) => DriverTripLivePage(tripId: s.pathParameters['id']!),
       ),
       GoRoute(
         path: '/parent/pay',

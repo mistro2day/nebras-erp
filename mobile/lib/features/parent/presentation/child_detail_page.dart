@@ -7,6 +7,7 @@ import '../../../core/ui/format.dart';
 import '../application/parent_providers.dart';
 import '../domain/models.dart';
 import 'child_finance_page.dart';
+import 'child_bus_tracker_page.dart';
 
 /// الملف التعريفي الكامل للطالب (كصفحة تفاصيل الطالب في لوحة الإدارة):
 /// البيانات الشخصية، الأكاديمية، صلات القرابة، ورابط الوضع المالي.
@@ -42,6 +43,8 @@ class ChildDetailPage extends ConsumerWidget {
                 _header(child),
                 const SizedBox(height: 16),
                 _financeButton(context, child),
+                const SizedBox(height: 12),
+                _transportTrackerButton(context, child),
                 const SizedBox(height: 16),
                 _sectionTitle('البيانات الشخصية'),
                 _infoCard([
@@ -162,6 +165,76 @@ class ChildDetailPage extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _transportTrackerButton(BuildContext context, ChildDetail c) {
+    return Material(
+      color: const Color(0xFF0284C7).withAlpha(20),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ChildBusTrackerPage(
+            studentId: c.studentId,
+            studentName: c.name,
+          ),
+        )),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.directions_bus, color: Color(0xFF0284C7), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'تتبع الحافلة المدرسية',
+                          style: GoogleFonts.tajawal(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'GPS مباشر',
+                            style: GoogleFonts.tajawal(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF10B981),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'خريطة مسار الحافلة ومحطات الصعود والنزول',
+                      style: GoogleFonts.tajawal(fontSize: 12, color: NebrasTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_left, color: NebrasTheme.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _sectionTitle(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),

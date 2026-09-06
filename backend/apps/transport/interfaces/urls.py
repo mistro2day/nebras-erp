@@ -8,7 +8,8 @@ from apps.transport.interfaces.views import (
     TripAttendanceViewSet, VehicleInspectionViewSet, FuelStationViewSet, FuelTransactionViewSet,
     OdometerReadingViewSet, VehicleAccidentViewSet, TransportIncidentViewSet,
     VehicleInsuranceViewSet, VehicleRegistrationViewSet, VehiclePermitViewSet,
-    TransportVendorViewSet, FleetStatisticsViewSet, TransportSettingsViewSet, TransportAuditViewSet
+    TransportVendorViewSet, FleetStatisticsViewSet, TransportSettingsViewSet, TransportAuditViewSet,
+    BusRentalAgreementViewSet, BusRentalPaymentViewSet
 )
 
 router = DefaultRouter()
@@ -42,7 +43,10 @@ router.register('vendors', TransportVendorViewSet, basename='vendor')
 router.register('statistics', FleetStatisticsViewSet, basename='statistics')
 router.register('settings', TransportSettingsViewSet, basename='settings')
 router.register('audits', TransportAuditViewSet, basename='audit')
+router.register('rental-agreements', BusRentalAgreementViewSet, basename='rental-agreement')
+router.register('rental-payments', BusRentalPaymentViewSet, basename='rental-payment')
 
 urlpatterns = [
     path('', include(router.urls)),
 ]
+

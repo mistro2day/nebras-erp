@@ -6,8 +6,10 @@ from apps.transport.domain.models import (
     StudentDropPoint, TripAttendance, VehicleInspection, FuelStation,
     FuelTransaction, OdometerReading, VehicleAccident, TransportIncident,
     VehicleInsurance, VehicleRegistration, VehiclePermit, TransportVendor,
-    FleetStatistics, TransportSettings, TransportAudit
+    FleetStatistics, TransportSettings, TransportAudit,
+    BusRentalAgreement, BusRentalPayment, VehicleGPSLocation
 )
+
 
 class BaseTransportSerializer(serializers.ModelSerializer):
     class Meta:
@@ -162,3 +164,31 @@ class TransportAuditSerializer(BaseTransportSerializer):
     class Meta(BaseTransportSerializer.Meta):
         model = TransportAudit
         fields = '__all__'
+
+
+class BusRentalAgreementSerializer(BaseTransportSerializer):
+    vehicle_plate = serializers.CharField(source='vehicle.plate_number', read_only=True)
+    vehicle_number = serializers.CharField(source='vehicle.vehicle_number', read_only=True)
+
+    class Meta(BaseTransportSerializer.Meta):
+        model = BusRentalAgreement
+        fields = '__all__'
+
+
+class BusRentalPaymentSerializer(BaseTransportSerializer):
+    vehicle_plate = serializers.CharField(source='vehicle.plate_number', read_only=True)
+    owner_name = serializers.CharField(source='agreement.owner_name', read_only=True)
+
+    class Meta(BaseTransportSerializer.Meta):
+        model = BusRentalPayment
+        fields = '__all__'
+
+
+class VehicleGPSLocationSerializer(BaseTransportSerializer):
+    vehicle_plate = serializers.CharField(source='vehicle.plate_number', read_only=True)
+    vehicle_number = serializers.CharField(source='vehicle.vehicle_number', read_only=True)
+
+    class Meta(BaseTransportSerializer.Meta):
+        model = VehicleGPSLocation
+        fields = '__all__'
+

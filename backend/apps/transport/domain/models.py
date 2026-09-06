@@ -44,7 +44,7 @@ class Fleet(CombinedSharedModel):
         verbose_name_plural = "أساطيل النقل والسيارات"
 
 
-# 4. Vehicle (المركبة وتفاصيلها الفنية)
+# 4. Vehicle (المركبة وتفاصيلها الفنية وملكية الحافلة)
 class Vehicle(CombinedSharedModel):
     STATUS_CHOICES = (
         ('available', 'جاهزة ومتاحة للتشغيل'),
@@ -52,14 +52,38 @@ class Vehicle(CombinedSharedModel):
         ('maintenance', 'في مركز الصيانة والإصلاح'),
         ('out_of_service', 'خارج الخدمة مؤقتاً/تالفة'),
     )
-    asset = models.OneToOneField(Asset, on_delete=models.CASCADE, related_name='vehicle_details', verbose_name="الأصل المقابل")
+    OWNERSHIP_CHOICES = (
+        ('contracted', 'مستأجرة بعقد اتفاق مع المالك'),
+        ('owned', 'مملوكة للمدرسة بالكامل'),
+    )
+    RENT_PAYMENT_CHOICES = (
+        ('bankak', 'تطبيق بنكك - بنك الخرطوم'),
+        ('fawry', 'تطبيق فوري - بنك فيصل'),
+        ('cash', 'نقداً (كاش)'),
+        ('cheque', 'شيك مصرفي'),
+    )
+
+    asset = models.OneToOneField(
+        Asset, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='vehicle_details', verbose_name="الأصل المقابل (للمركبات المملوكة)"
+    )
     vehicle_number = models.CharField(max_length=50, db_index=True, verbose_name="رقم الحافلة/المركبة الداخلي")
-    plate_number = models.CharField(max_length=50, verbose_name="رقم لوحة المركبة")
+    plate_number = models.CharField(max_length=50, verbose_name="رقم لوحة المركبة (مثال: خ 5 / 12345)")
     vin = models.CharField(max_length=100, blank=True, null=True, verbose_name="رقم الشاصيه (VIN)")
     capacity = models.IntegerField(default=30, verbose_name="السعة المقعدية القصوى")
     fuel_type = models.CharField(max_length=50, default='diesel', verbose_name="نوع الوقود (ديزل، بنزين)")
     odometer_value = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="قراءة العداد الحالية (كم)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='available', verbose_name="حالة المركبة")
+
+    # بيانات الملكية وعقود الإيجار (خاصة بالحافلات المستأجرة بسياق السودان)
+    ownership_type = models.CharField(max_length=20, choices=OWNERSHIP_CHOICES, default='contracted', verbose_name="نوع الملكية")
+    owner_name = models.CharField(max_length=150, blank=True, null=True, verbose_name="اسم صاحب/مالك الحافلة")
+    owner_phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="هاتف مالك الحافلة")
+    owner_national_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="الرقم الوطني للمالك")
+    owner_bank_name = models.CharField(max_length=100, default='بنك الخرطوم (تطبيق بنكك)', blank=True, null=True, verbose_name="البنك المعتمد للسداد")
+    owner_bank_account = models.CharField(max_length=100, blank=True, null=True, verbose_name="رقم حساب بنكك / الهاتف المسجل")
+    monthly_rent_sdg = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="قيمة الإيجار الشهري (ج.س)")
+    rent_payment_method = models.CharField(max_length=50, choices=RENT_PAYMENT_CHOICES, default='bankak', verbose_name="طريقة سداد الإيجار")
 
     class Meta:
         db_table = 'nebras_transport_vehicles'
@@ -68,7 +92,8 @@ class Vehicle(CombinedSharedModel):
         verbose_name_plural = "أسطول المركبات والحافلات"
 
     def __str__(self):
-        return f"{self.vehicle_number} - {self.plate_number}"
+        return f"{self.vehicle_number} - {self.plate_number} ({self.get_ownership_type_display()})"
+
 
 
 # 5. Driver (سائقي الحافلات)
@@ -136,17 +161,21 @@ class Route(CombinedSharedModel):
         return self.name_ar
 
 
-# 10. RouteStop (المحطات ونقاط التجمع التابعة للمسار)
+# 10. RouteStop (المحطات ونقاط التجمع التابعة للمسار وإحداثياتها الجغرافية)
 class RouteStop(CombinedSharedModel):
     route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name='stops', verbose_name="المسار")
     stop_name_ar = models.CharField(max_length=150, verbose_name="اسم المحطة بالعربي")
     stop_name_en = models.CharField(max_length=150, verbose_name="اسم المحطة بالإنجليزي")
     sequence_number = models.IntegerField(default=1, verbose_name="ترتيب المحطة بالمسار")
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, default=15.5007, blank=True, null=True, verbose_name="خط العرض (Latitude)")
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, default=32.5599, blank=True, null=True, verbose_name="خط الطول (Longitude)")
+    geofence_radius_meters = models.IntegerField(default=100, verbose_name="نطاق الاستشعار الجغرافي (متر)")
 
     class Meta:
         db_table = 'nebras_transport_route_stops'
         verbose_name = "محطة مسار"
         verbose_name_plural = "محطات نقاط التجمع بالمسارات"
+
 
 
 # 11. Trip (الرحلات والتشغيل الفعلي)
@@ -406,3 +435,93 @@ class TransportAudit(CombinedSharedModel):
         db_table = 'nebras_transport_audits'
         verbose_name = "سجل تدقيق النقل"
         verbose_name_plural = "سجلات تدقيق عمليات النقل والأسطول"
+
+
+# 31. BusRentalAgreement (عقود اتفاقات الحافلات المستأجرة مع الملاك في السودان)
+class BusRentalAgreement(CombinedSharedModel):
+    STATUS_CHOICES = (
+        ('active', 'ساري ومفعّل'),
+        ('expired', 'منتهي الصلاحية'),
+        ('terminated', 'ملغى / مفسوخ'),
+    )
+    PAYMENT_METHOD_CHOICES = (
+        ('bankak', 'تطبيق بنكك - بنك الخرطوم'),
+        ('fawry', 'تطبيق فوري - بنك فيصل'),
+        ('cash', 'نقداً (كاش)'),
+        ('cheque', 'شيك مصرفي'),
+    )
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='rental_agreements', verbose_name="الحافلة")
+    owner_name = models.CharField(max_length=150, verbose_name="اسم صاحب/مالك الحافلة")
+    owner_phone = models.CharField(max_length=50, verbose_name="هاتف المالك")
+    owner_national_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="الرقم الوطني للمالك")
+    monthly_rent_sdg = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="قيمة الإيجار الشهري (ج.س)")
+    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, default='bankak', verbose_name="طريقة السداد المعتمدة")
+    bank_name = models.CharField(max_length=100, default='بنك الخرطوم (تطبيق بنكك)', verbose_name="اسم البنك")
+    bank_account_number = models.CharField(max_length=100, blank=True, null=True, verbose_name="رقم حساب بنكك / الهاتف المسجل")
+    start_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ بدء الاتفاق")
+    end_date = models.DateField(blank=True, null=True, verbose_name="تاريخ انتهاء الاتفاق")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="حالة العقد")
+    terms_notes = models.TextField(blank=True, null=True, verbose_name="شروط الاتفاق والمسؤوليات والصيانة")
+
+    class Meta:
+        db_table = 'nebras_transport_bus_agreements'
+        verbose_name = "عقد اتفاق حافلة مستأجرة"
+        verbose_name_plural = "عقود اتفاقات الحافلات المستأجرة"
+
+    def __str__(self):
+        return f"عقد حافلة {self.vehicle.plate_number} - {self.owner_name}"
+
+
+# 32. BusRentalPayment (سجلات دفعات ومستحقات إيجار الحافلات لأصحابها)
+class BusRentalPayment(CombinedSharedModel):
+    STATUS_CHOICES = (
+        ('paid', 'تم السداد بنجاح'),
+        ('pending', 'قيد الصرف والاعتماد'),
+    )
+    PAYMENT_METHOD_CHOICES = (
+        ('bankak', 'تطبيق بنكك - بنك الخرطوم'),
+        ('fawry', 'تطبيق فوري - بنك فيصل'),
+        ('cash', 'نقداً (كاش)'),
+        ('cheque', 'شيك مصرفي'),
+    )
+
+    agreement = models.ForeignKey(BusRentalAgreement, on_delete=models.CASCADE, related_name='payments', verbose_name="عقد الاتفاق")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='rental_payments', verbose_name="الحافلة")
+    period_label = models.CharField(max_length=100, verbose_name="الفترة / الشهر (مثال: إيجار شهر سبتمبر 2026)")
+    amount_sdg = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="المبلغ المسدد (ج.س)")
+    payment_date = models.DateField(default=timezone.localdate, verbose_name="تاريخ السداد")
+    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, default='bankak', verbose_name="طريقة السداد")
+    reference_number = models.CharField(max_length=100, blank=True, null=True, verbose_name="رقم إشعار تحويل بنكك / السند")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='paid', verbose_name="حالة الدفعة")
+    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات الصرف")
+    journal_entry_id = models.UUIDField(null=True, blank=True, verbose_name="قيد اليومية المحاسبي المقابل بالمالية")
+
+    class Meta:
+        db_table = 'nebras_transport_bus_rental_payments'
+        verbose_name = "سداد إيجار حافلة"
+        verbose_name_plural = "سجلات سداد إيجارات الحافلات المستأجرة"
+
+    def __str__(self):
+        return f"{self.period_label} - {self.vehicle.plate_number} ({self.amount_sdg} ج.س)"
+
+
+# 33. VehicleGPSLocation (تتبع إحداثيات GPS المباشرة للرحلات والأسطول)
+class VehicleGPSLocation(CombinedSharedModel):
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='gps_breadcrumbs', verbose_name="الرحلة")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='gps_locations', verbose_name="الحافلة")
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, verbose_name="خط العرض (Latitude)")
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, verbose_name="خط الطول (Longitude)")
+    speed_kmh = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, verbose_name="السرعة (كم/س)")
+    heading = models.DecimalField(max_digits=6, decimal_places=2, default=0.00, verbose_name="زاوية الاتجاه")
+    battery_level = models.IntegerField(default=100, blank=True, null=True, verbose_name="شحنة بطارية جهاز السائق %")
+    recorded_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="وقت التسجيل الميداني")
+
+    class Meta:
+        db_table = 'nebras_transport_vehicle_gps_locations'
+        verbose_name = "إحداثية GPS"
+        verbose_name_plural = "إحداثيات وسجل تتبع GPS الحافلات"
+        ordering = ['-recorded_at']
+
+    def __str__(self):
+        return f"{self.vehicle.plate_number} @ ({self.latitude}, {self.longitude}) - {self.recorded_at}"

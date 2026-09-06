@@ -74,8 +74,35 @@ export class TransportService {
 
   recordInspection(vehicleId: string, status: string, notes?: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/vehicles/${vehicleId}/inspect/`, {
-      status: status,
-      notes: notes
+      status,
+      notes
+    });
+  }
+
+  getLiveFleet(): Observable<{ active_count: number; fleet: any[] }> {
+    return this.http.get<{ active_count: number; fleet: any[] }>(`${this.apiUrl}/trips/live-fleet/`);
+  }
+
+  getTripLiveTracking(tripId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/trips/${tripId}/live-tracking/`);
+  }
+
+  sendGpsTelemetry(tripId: string, coords: { latitude: number; longitude: number; speed_kmh?: number; heading?: number; battery_level?: number }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/trips/${tripId}/telemetry/`, coords);
+  }
+
+  getRentalAgreements(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/rental-agreements/`);
+  }
+
+  getRentalPayments(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/rental-payments/`);
+  }
+
+  markRentalPaymentPaid(paymentId: string, referenceNumber: string, paymentMethod = 'bankak'): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/rental-payments/${paymentId}/mark-paid/`, {
+      reference_number: referenceNumber,
+      payment_method: paymentMethod
     });
   }
 }
