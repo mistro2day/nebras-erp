@@ -193,10 +193,32 @@ export class StudentsService {
     );
   }
 
-  bulkImport(file: File): Observable<any> {
+  /** تنزيل نموذج إكسل (.xlsx) الرسمي لكشوفات الطلاب */
+  downloadImportTemplate(): Observable<Blob> {
+    return this.http.get(`${environment.apiUrl}students/students/download-template/`, {
+      responseType: 'blob'
+    });
+  }
+
+  /** فحص ملف كشف الطلاب ومعاينته مسبقاً قبل الحفظ الفعلي */
+  validateBulkImport(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.apiClient.post('students/students/bulk-import/', formData);
+    return this.apiClient.post('students/students/validate-import/', formData);
+  }
+
+  /** تنفيذ الاستيراد الدفعي المعتمد */
+  executeBulkImport(payload: { file?: File; rows?: any[] }): Observable<any> {
+    if (payload.file) {
+      const formData = new FormData();
+      formData.append('file', payload.file);
+      return this.apiClient.post('students/students/bulk-import/', formData);
+    }
+    return this.apiClient.post('students/students/bulk-import/', { rows: payload.rows });
+  }
+
+  bulkImport(file: File): Observable<any> {
+    return this.executeBulkImport({ file });
   }
 
   createStudent(studentData: any): Observable<any> {

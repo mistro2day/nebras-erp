@@ -18,10 +18,13 @@ from apps.students.interfaces.serializers import (
     StudentTagSerializer, StudentTransferSerializer
 )
 from apps.students.application.services import StudentApplicationService
+from apps.students.application.bulk_import import StudentBulkImportService
 from apps.students.interfaces.permissions import StudentPermission
+from django.http import HttpResponse
 import uuid
 import csv
 import io
+import json
 
 class StudentViewSet(viewsets.ModelViewSet):
     """
@@ -461,63 +464,55 @@ class StudentViewSet(viewsets.ModelViewSet):
         }
         return StandardResponse(widgets, message="تم جلب مؤشرات لوحة التحكم بنجاح.")
 
-    @action(detail=False, methods=['post'], url_path='bulk-import')
-    def bulk_import(self, request):
-        """استيراد جماعي للطلاب من ملف CSV"""
+    @action(detail=False, methods=['get'], url_path='download-template')
+    def download_template(self, request):
+        """تنزيل نموذج إكسل (.xlsx) الرسمي لكشوفات الطلاب بتنسيق نبراس المعتمد"""
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        template_stream = StudentBulkImportService.generate_excel_template(tenant_id=tenant_id)
+        
+        response = HttpResponse(
+            template_stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="students_roster_template_nebras.xlsx"'
+        response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return response
+
+    @action(detail=False, methods=['post'], url_path='validate-import')
+    def validate_import(self, request):
+        """معاينة وفحص ملف كشف الطلاب بالذاكرة قبل اعتماده وإرجاع تقرير بالأخطاء والتحذيرات"""
         file = request.FILES.get('file')
         if not file:
-            raise ValidationError("يجب إرفاق ملف CSV للاستيراد.")
+            raise ValidationError("يجب إرفاق ملف إكسل أو CSV للمعالجة.")
             
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        preview_report = StudentBulkImportService.validate_and_preview(file, tenant_id=tenant_id)
+        return StandardResponse(preview_report, message="تم فحص كشف الطلاب وإعداد المعاينة بنجاح.")
+
+    @action(detail=False, methods=['post'], url_path='bulk-import')
+    def bulk_import(self, request):
+        """استيراد جماعي للطلاب مع التسكين والتحقق الشامل من حدود الخطة وفق الهوية السودانية"""
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
         user_id = request.user.id if request.user else uuid.uuid4()
         
-        csv_file = io.TextIOWrapper(file.file, encoding='utf-8')
-        reader = csv.DictReader(csv_file)
-        
-        created_count = 0
-        errors = []
-        
-        for idx, row in enumerate(reader):
-            try:
-                # محاكاة الاستيراد البسيط
-                arabic_name = row.get('arabic_name')
-                gender = row.get('gender', 'male')
-                date_of_birth = row.get('date_of_birth', '2015-01-01')
-                nationality = row.get('nationality', 'سعودي')
-                
-                # توليد رقم طالب
-                student_number = StudentNumberGenerator.generate(
-                    tenant_id=tenant_id,
-                    branch_code="BR",
-                    academic_year_code="2026",
-                    sequence_num=Student.objects.filter(tenant_id=tenant_id).count() + 1
-                )
-                
-                student = Student.objects.create(
-                    student_number=student_number,
-                    status='registered',
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-                
-                StudentProfile.objects.create(
-                    student=student,
-                    arabic_name=arabic_name,
-                    gender=gender,
-                    date_of_birth=date_of_birth,
-                    nationality=nationality,
-                    tenant_id=tenant_id,
-                    created_by=user_id
-                )
-                
-                created_count += 1
-            except Exception as e:
-                errors.append(f"السطر {idx + 2}: {str(e)}")
-                
-        return StandardResponse({
-            'imported': created_count,
-            'errors': errors
-        }, message=f"تم استيراد {created_count} طالب بنجاح.")
+        file = request.FILES.get('file')
+        confirmed_rows = request.data.get('rows')
+
+        if file:
+            preview = StudentBulkImportService.validate_and_preview(file, tenant_id=tenant_id)
+            valid_rows = [r['data'] for r in preview['rows'] if r['is_valid']]
+            result = StudentBulkImportService.execute_bulk_import(valid_rows, tenant_id=tenant_id, user_id=user_id)
+        elif confirmed_rows:
+            if isinstance(confirmed_rows, str):
+                try:
+                    confirmed_rows = json.loads(confirmed_rows)
+                except Exception:
+                    raise ValidationError("صيغة بيانات الأسطر غير صالحة.")
+            result = StudentBulkImportService.execute_bulk_import(confirmed_rows, tenant_id=tenant_id, user_id=user_id)
+        else:
+            raise ValidationError("يجب إرفاق ملف إكسل أو إرسال السجلات المعتمدة للاستيراد.")
+
+        return StandardResponse(result, message=f"تم استيراد وتسجيل {result['imported_count']} طالب بنجاح.")
 
     @action(detail=False, methods=['get'], url_path='bulk-export')
     def bulk_export(self, request):

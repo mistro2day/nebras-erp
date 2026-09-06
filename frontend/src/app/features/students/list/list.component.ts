@@ -15,12 +15,17 @@ import { pickList } from '../../admissions/shared/admissions.shared';
 
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
+import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-modal.component';
 
 @Component({
   selector: 'app-students-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent, SendMessageModalComponent],
+  imports: [
+    CommonModule, FormsModule, MatDialogModule, NbPageHeaderComponent,
+    NbPanelComponent, NbLoadingComponent, SendMessageModalComponent,
+    StudentBulkImportModalComponent
+  ],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -46,6 +51,9 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         subtitle="البحث المتقدم والتوزيع الأكاديمي للطلاب مع ميزات العرض الشبكي وجدول البيانات."
       >
         <div class="header-actions">
+          <button class="nb-btn-secondary" (click)="showBulkImportModal.set(true)">
+            📥 استيراد كشف إكسل
+          </button>
           <button class="nb-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
             {{ exporting() ? 'جارٍ التصدير…' : 'تصدير CSV' }}
           </button>
@@ -241,6 +249,12 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         }"
         [allowedCategories]="['attendance']"
       ></app-send-message-modal>
+
+      <app-student-bulk-import-modal
+        [open]="showBulkImportModal()"
+        (closed)="showBulkImportModal.set(false)"
+        (importedSuccess)="onBulkImportSuccess($event)"
+      ></app-student-bulk-import-modal>
     </div>
   `,
   styles: [
@@ -570,6 +584,12 @@ export class StudentsListComponent implements OnInit {
 
   showMsgModal = false;
   selectedStudent = signal<any | null>(null);
+
+  showBulkImportModal = signal<boolean>(false);
+
+  onBulkImportSuccess(count: number): void {
+    this.loadStudents();
+  }
 
   openMessageModal(student: any) {
     this.selectedStudent.set(student);
