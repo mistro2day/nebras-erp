@@ -822,13 +822,23 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
     .mono { font-family: monospace; }
 
     /* ══════════════════════════════════════════════════════════════════
-       إعدادات الطباعة الاحترافية الرسمية (@media print)
+       إعدادات الطباعة الاحترافية الرسمية في صفحة واحدة A4 (@media print)
        ══════════════════════════════════════════════════════════════════ */
     @media print {
+      @page {
+        size: A4 portrait;
+        margin: 6mm 8mm;
+      }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body, html {
         background: #ffffff !important;
         margin: 0 !important;
         padding: 0 !important;
+        font-size: 11px !important;
+        -webkit-font-smoothing: antialiased;
       }
       .no-print {
         display: none !important;
@@ -836,28 +846,213 @@ import { ExportColumn, ExportMeta } from '../../../shared/export/export.types';
       .statement-page {
         background: #ffffff !important;
         padding: 0 !important;
+        margin: 0 !important;
         min-height: auto !important;
       }
       .printable-document {
         box-shadow: none !important;
         border: none !important;
         margin: 0 !important;
-        padding: 10mm 12mm !important;
+        padding: 0 !important;
         max-width: 100% !important;
         width: 100% !important;
+        gap: 8px !important;
       }
-      .page-break-inside-avoid {
-        page-break-inside: avoid;
-        break-inside: avoid;
+
+      /* 1. الترويسة في الطباعة */
+      .doc-header {
+        gap: 10px !important;
       }
-      .statement-table th {
-        background-color: #f1f5f9 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+      .school-logo-wrap {
+        width: 52px !important;
+        height: 52px !important;
+      }
+      .school-names {
+        gap: 1px !important;
+      }
+      .school-name-ar {
+        font-size: 15px !important;
+      }
+      .school-name-en {
+        font-size: 9.5px !important;
+      }
+      .school-affiliation {
+        font-size: 9px !important;
+      }
+      .doc-title-box {
+        gap: 1px !important;
+      }
+      .doc-badge {
+        font-size: 9px !important;
+        padding: 1px 6px !important;
+      }
+      .doc-main-title {
+        font-size: 15px !important;
+        margin: 1px 0 0 !important;
+      }
+      .doc-sub-title {
+        font-size: 9px !important;
+      }
+      .doc-academic-year {
+        font-size: 10px !important;
+        margin-top: 1px !important;
+      }
+      .doc-metadata {
+        padding: 5px 8px !important;
+        font-size: 10px !important;
+        gap: 2px !important;
+      }
+      .meta-row {
+        gap: 4px !important;
+      }
+      .divider-line {
+        height: 1.5px !important;
+      }
+
+      /* 2. بطاقة الطالب والحساب */
+      .profile-card {
+        padding: 8px 12px !important;
+        gap: 16px !important;
+        border-radius: 6px !important;
+      }
+      .profile-section {
+        gap: 3px !important;
+      }
+      .profile-section:first-child {
+        padding-left: 12px !important;
+      }
+      .sec-badge {
+        font-size: 10px !important;
+        padding-bottom: 2px !important;
+        margin-bottom: 2px !important;
+      }
+      .profile-grid {
+        gap: 3px !important;
+      }
+      .p-item {
+        font-size: 10.5px !important;
+        gap: 6px !important;
+      }
+      .p-lbl {
+        width: 90px !important;
+        min-width: 90px !important;
+      }
+      .highlight-student {
+        font-size: 12px !important;
+      }
+
+      /* 3. ملخص الأرصدة (KPIs) */
+      .kpi-summary-bar {
+        gap: 6px !important;
       }
       .kpi-box {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+        padding: 5px 7px !important;
+        gap: 1px !important;
+        border-radius: 6px !important;
+      }
+      .kb-lbl {
+        font-size: 9px !important;
+      }
+      .kb-val {
+        font-size: 13.5px !important;
+      }
+      .kb-val small {
+        font-size: 9px !important;
+      }
+
+      /* 4. جداول الكشف */
+      .doc-section {
+        gap: 3px !important;
+      }
+      .doc-section-title {
+        font-size: 11.5px !important;
+      }
+      .sec-note {
+        font-size: 9px !important;
+      }
+      .statement-table {
+        font-size: 10px !important;
+      }
+      .statement-table th {
+        padding: 4px 5px !important;
+        font-size: 10px !important;
+        background-color: #f1f5f9 !important;
+      }
+      .statement-table td {
+        padding: 3.5px 5px !important;
+      }
+      .col-ref {
+        white-space: nowrap !important;
+      }
+      .col-date {
+        white-space: nowrap !important;
+      }
+      .totals-row th {
+        padding: 4px 5px !important;
+        font-size: 10.5px !important;
+      }
+      .t-label {
+        font-size: 10px !important;
+      }
+      .t-sub {
+        font-size: 8.5px !important;
+      }
+      .status-tag {
+        padding: 1px 5px !important;
+        font-size: 9px !important;
+      }
+
+      /* 5. التذييل والتوقيعات والختم */
+      .doc-footer {
+        padding-top: 6px !important;
+        gap: 6px !important;
+      }
+      .legal-notice {
+        font-size: 8.5px !important;
+        line-height: 1.35 !important;
+        margin: 0 !important;
+      }
+      .signatures-grid {
+        margin-top: 2px !important;
+        gap: 10px !important;
+      }
+      .sig-title {
+        font-size: 10px !important;
+      }
+      .sig-dots {
+        font-size: 10px !important;
+        margin-top: 4px !important;
+      }
+      .sig-date {
+        font-size: 8.5px !important;
+      }
+      .stamp-box {
+        width: 54px !important;
+        height: 54px !important;
+        margin: 1px 0 !important;
+      }
+      .stamp-placeholder {
+        font-size: 8px !important;
+      }
+      .stamp-placeholder small {
+        font-size: 7px !important;
+      }
+      .platform-system-footer {
+        margin-top: 4px !important;
+        padding-top: 3px !important;
+        font-size: 8.5px !important;
+      }
+
+      /* منع فواصل الصفحات تماماً */
+      .printable-document,
+      .doc-header,
+      .profile-card,
+      .kpi-summary-bar,
+      .doc-section,
+      .doc-footer,
+      .page-break-inside-avoid {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
       }
     }
   `]
