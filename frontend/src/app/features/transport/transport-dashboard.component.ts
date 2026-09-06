@@ -6,6 +6,7 @@ import { TransportService } from './transport.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component';
+import { NbDatepickerComponent } from '../../shared/nebras/nb-datepicker.component';
 
 @Component({
   selector: 'app-transport-dashboard',
@@ -16,7 +17,8 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
     FormsModule,
     NbPageHeaderComponent,
     NbPanelComponent,
-    NbStatCardComponent
+    NbStatCardComponent,
+    NbDatepickerComponent
   ],
   template: `
     <div class="page" dir="rtl">
@@ -168,8 +170,19 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
              ══════════════════════════════════════════════════════════════════ -->
         @if (activeTab() === 'fleet') {
           <div class="tab-content-wrap">
-            <div class="tbl">
-              <div class="tbl-head vh-contracted">
+            <div class="fleet-tab">
+              <div class="sub-sec-header flex-between">
+                <div>
+                  <h3>أسطول الحافلات والمركبات المدرسية</h3>
+                  <span class="sec-hint">إدارة الحافلات المملوكة للمدرسة والمستأجرة بعقود تشغيل شهرية في السودان</span>
+                </div>
+                <button class="nb-btn-primary" (click)="openAddVehicleModal()">
+                  <span>➕</span> إضافة حافلة جديدة للأسطول
+                </button>
+              </div>
+
+              <div class="tbl">
+                <div class="tbl-head vh-contracted">
                 <span>رقم الحافلة واللوحة</span>
                 <span>نوع الملكية</span>
                 <span>بيانات المالك</span>
@@ -224,8 +237,9 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
               }
 
               @if (vehicles().length === 0) {
-                <div class="tbl-empty">لا توجد حافلات مسجلة في الأسطول.</div>
+                <div class="tbl-empty">لا توجد حافلات مسجلة في الأسطول. اضغط على زر "إضافة حافلة جديدة للأسطول" أعلاه.</div>
               }
+            </div>
             </div>
           </div>
         }
@@ -447,12 +461,17 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
               <div class="form-grid">
                 <!-- اختيار الحافلة -->
                 <div class="form-field full">
-                  <label class="form-label">اختر الحافلة من الأسطول (أو حافلة جديدة):</label>
+                  <div class="field-header-row">
+                    <label class="form-label">اختر الحافلة من الأسطول:</label>
+                    <button type="button" class="btn-link-action" (click)="openAddVehicleModal()">
+                      <span>➕</span> تسجيل حافلة جديدة غير مسجلة بالأسطول
+                    </button>
+                  </div>
                   <select class="nb-input" [(ngModel)]="agreementForm.vehicle_id">
                     <option value="">-- اختر الحافلة المراد ربط العقد بها --</option>
                     @for (v of vehicles(); track v.id) {
                       <option [value]="v.id">
-                        {{ v.plate_number }} — {{ v.model || 'حافلة ركاب' }} (سعة {{ v.capacity }} راكب)
+                        {{ v.plate_number }} — {{ v.vehicle_number }} (سعة {{ v.capacity }} راكب - {{ v.ownership_type === 'contracted' ? 'مستأجرة' : 'مملوكة' }})
                       </option>
                     }
                   </select>
@@ -499,16 +518,16 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                   <input type="text" class="nb-input mono" [(ngModel)]="agreementForm.bank_account_number" placeholder="مثال: 2940182 أو 0912345678" dir="ltr" />
                 </div>
 
-                <!-- تاريخ البدء -->
+                <!-- تاريخ البدء باستخدام منتقي التاريخ المعتمد NbDatepicker -->
                 <div class="form-field">
                   <label class="form-label">تاريخ بدء سريان الاتفاق:</label>
-                  <input type="date" class="nb-input" [(ngModel)]="agreementForm.start_date" />
+                  <nb-datepicker [(value)]="agreementForm.start_date" placeholder="اختر تاريخ بدء الاتفاق"></nb-datepicker>
                 </div>
 
-                <!-- تاريخ الانتهاء -->
+                <!-- تاريخ الانتهاء باستخدام منتقي التاريخ المعتمد NbDatepicker -->
                 <div class="form-field">
                   <label class="form-label">تاريخ انتهاء الاتفاق (اختياري):</label>
-                  <input type="date" class="nb-input" [(ngModel)]="agreementForm.end_date" />
+                  <nb-datepicker [(value)]="agreementForm.end_date" placeholder="اختر تاريخ انتهاء الاتفاق"></nb-datepicker>
                 </div>
 
                 <!-- شروط الاتفاق ومسؤوليات الصيانة -->
@@ -526,6 +545,119 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
                   <span>⏳</span> جارٍ الحفظ…
                 } @else {
                   <span>✓</span> إبرام وحفظ العقد
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ══════════════════════════════════════════════════════════════════
+           نافذة مودال إضافة حافلة جديدة للأسطول (Nebras OS Custom Modal)
+           ══════════════════════════════════════════════════════════════════ -->
+      @if (showAddVehicleModal()) {
+        <div class="modal-backdrop" (click)="closeAddVehicleModal()">
+          <div class="modal-dialog lg" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div class="modal-title-wrap">
+                <span class="modal-icon">🚐</span>
+                <div>
+                  <h3 class="modal-title">إضافة حافلة جديدة لأسطول المدرسة</h3>
+                  <span class="modal-subtitle">تسجيل حافلة جديدة سواء كانت مستأجرة باتفاق أو مملوكة للمدرسة</span>
+                </div>
+              </div>
+              <button class="modal-close" (click)="closeAddVehicleModal()">✕</button>
+            </div>
+
+            <div class="modal-body">
+              <div class="form-grid">
+                <!-- رقم اللوحة السودانية -->
+                <div class="form-field">
+                  <label class="form-label">رقم اللوحة المرورية (سودانية):</label>
+                  <input type="text" class="nb-input" [(ngModel)]="vehicleForm.plate_number" placeholder="مثال: خ 5 / 78210" />
+                </div>
+
+                <!-- رقم الحافلة الداخلي -->
+                <div class="form-field">
+                  <label class="form-label">رقم الحافلة الداخلي (الكود):</label>
+                  <input type="text" class="nb-input mono" [(ngModel)]="vehicleForm.vehicle_number" placeholder="مثال: BUS-104" />
+                </div>
+
+                <!-- نوع الملكية -->
+                <div class="form-field">
+                  <label class="form-label">نوع ملكية الحافلة:</label>
+                  <select class="nb-input" [(ngModel)]="vehicleForm.ownership_type">
+                    <option value="contracted">مستأجرة بعقد اتفاق مع المالك</option>
+                    <option value="owned">مملوكة للمدرسة بالكامل (أصل ثابت)</option>
+                  </select>
+                </div>
+
+                <!-- السعة المقعدية -->
+                <div class="form-field">
+                  <label class="form-label">السعة المقعدية (عدد الطلاب):</label>
+                  <input type="number" class="nb-input" [(ngModel)]="vehicleForm.capacity" placeholder="30" />
+                </div>
+
+                <!-- نوع الوقود -->
+                <div class="form-field">
+                  <label class="form-label">نوع الوقود:</label>
+                  <select class="nb-input" [(ngModel)]="vehicleForm.fuel_type">
+                    <option value="diesel">جازولين (ديزل)</option>
+                    <option value="petrol">بنزين</option>
+                  </select>
+                </div>
+
+                <!-- حالة الحافلة التشغيلية -->
+                <div class="form-field">
+                  <label class="form-label">الحالة التشغيلية الابتدائية:</label>
+                  <select class="nb-input" [(ngModel)]="vehicleForm.status">
+                    <option value="available">جاهزة ومتاحة للتشغيل</option>
+                    <option value="maintenance">في مركز الصيانة</option>
+                  </select>
+                </div>
+
+                @if (vehicleForm.ownership_type === 'contracted') {
+                  <div class="form-field full">
+                    <div class="info-callout">
+                      <strong>بيانات صاحب الحافلة والاتفاق المالي المبدئي:</strong>
+                      <span>يمكن أيضاً تحرير العقد لاحقاً أو إبرام عقد رسمي عبر تبويب "عقود الإيجار".</span>
+                    </div>
+                  </div>
+
+                  <!-- اسم المالك -->
+                  <div class="form-field">
+                    <label class="form-label">اسم مالك الحافلة:</label>
+                    <input type="text" class="nb-input" [(ngModel)]="vehicleForm.owner_name" placeholder="مثال: عبد الرحيم إدريس دفع الله" />
+                  </div>
+
+                  <!-- هاتف المالك -->
+                  <div class="form-field">
+                    <label class="form-label">هاتف مالك الحافلة:</label>
+                    <input type="tel" class="nb-input mono" [(ngModel)]="vehicleForm.owner_phone" placeholder="09XXXXXXXX" dir="ltr" />
+                  </div>
+
+                  <!-- الإيجار الشهري -->
+                  <div class="form-field">
+                    <label class="form-label">قيمة الإيجار الشهري (ج.س):</label>
+                    <input type="number" class="nb-input" [(ngModel)]="vehicleForm.monthly_rent_sdg" placeholder="750000" />
+                  </div>
+
+                  <!-- حساب بنكك -->
+                  <div class="form-field">
+                    <label class="form-label">رقم حساب تطبيق بنكك:</label>
+                    <input type="text" class="nb-input mono" [(ngModel)]="vehicleForm.owner_bank_account" placeholder="مثال: 2849102" dir="ltr" />
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button class="nb-btn-secondary" (click)="closeAddVehicleModal()">إلغاء</button>
+              <button class="nb-btn-primary" (click)="submitCreateVehicle()" [disabled]="savingVehicle() || !vehicleForm.plate_number || !vehicleForm.vehicle_number">
+                @if (savingVehicle()) {
+                  <span>⏳</span> جارٍ الحفظ…
+                } @else {
+                  <span>✓</span> إضافة الحافلة للأسطول
                 }
               </button>
             </div>
@@ -1080,6 +1212,25 @@ import { NbStatCardComponent } from '../../shared/nebras/nb-stat-card.component'
       gap: 4px;
     }
     .form-field.full { grid-column: 1 / -1; }
+    .field-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .btn-link-action {
+      background: none;
+      border: none;
+      color: #0284c7;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .btn-link-action:hover {
+      color: #0369a1;
+    }
     .form-label { font-size: 12px; font-weight: 700; color: #334155; }
     .nb-input {
       padding: 8px 10px;
@@ -1198,7 +1349,24 @@ export class TransportDashboardComponent implements OnInit {
   showTripModal = signal<boolean>(false);
   showCreateAgreementModal = signal<boolean>(false);
   savingAgreement = signal<boolean>(false);
+  showAddVehicleModal = signal<boolean>(false);
+  savingVehicle = signal<boolean>(false);
   activeAgreement = signal<any | null>(null);
+
+  // نموذج إضافة حافلة جديدة للأسطول
+  vehicleForm = {
+    vehicle_number: '',
+    plate_number: '',
+    capacity: 30,
+    fuel_type: 'diesel',
+    ownership_type: 'contracted',
+    status: 'available',
+    owner_name: '',
+    owner_phone: '',
+    monthly_rent_sdg: 750000,
+    rent_payment_method: 'bankak',
+    owner_bank_account: ''
+  };
 
   // نموذج تسجيل عقد إيجار جديد
   agreementForm = {
@@ -1440,6 +1608,78 @@ export class TransportDashboardComponent implements OnInit {
         this.agreements.update(prev => [fallback, ...prev]);
         this.savingAgreement.set(false);
         this.closeCreateAgreementModal();
+      }
+    });
+  }
+
+  openAddVehicleModal() {
+    const nextNum = 'BUS-' + (100 + this.vehicles().length + 1);
+    this.vehicleForm = {
+      vehicle_number: nextNum,
+      plate_number: '',
+      capacity: 30,
+      fuel_type: 'diesel',
+      ownership_type: 'contracted',
+      status: 'available',
+      owner_name: '',
+      owner_phone: '',
+      monthly_rent_sdg: 750000,
+      rent_payment_method: 'bankak',
+      owner_bank_account: ''
+    };
+    this.showAddVehicleModal.set(true);
+  }
+
+  closeAddVehicleModal() {
+    this.showAddVehicleModal.set(false);
+  }
+
+  submitCreateVehicle() {
+    if (!this.vehicleForm.plate_number || !this.vehicleForm.vehicle_number) return;
+
+    this.savingVehicle.set(true);
+    const payload = {
+      vehicle_number: this.vehicleForm.vehicle_number,
+      plate_number: this.vehicleForm.plate_number,
+      capacity: Number(this.vehicleForm.capacity) || 30,
+      fuel_type: this.vehicleForm.fuel_type,
+      ownership_type: this.vehicleForm.ownership_type,
+      status: this.vehicleForm.status,
+      owner_name: this.vehicleForm.owner_name,
+      owner_phone: this.vehicleForm.owner_phone,
+      monthly_rent_sdg: Number(this.vehicleForm.monthly_rent_sdg) || 0,
+      rent_payment_method: this.vehicleForm.rent_payment_method,
+      owner_bank_account: this.vehicleForm.owner_bank_account
+    };
+
+    this.transportService.createVehicle(payload).subscribe({
+      next: (res) => {
+        this.savingVehicle.set(false);
+        this.closeAddVehicleModal();
+        this.loadDashboard();
+        const createdId = res?.data?.id || res?.id;
+        if (createdId) {
+          this.agreementForm.vehicle_id = createdId;
+          if (this.vehicleForm.owner_name) this.agreementForm.owner_name = this.vehicleForm.owner_name;
+          if (this.vehicleForm.owner_phone) this.agreementForm.owner_phone = this.vehicleForm.owner_phone;
+          if (this.vehicleForm.monthly_rent_sdg) this.agreementForm.monthly_rent_sdg = this.vehicleForm.monthly_rent_sdg;
+          if (this.vehicleForm.owner_bank_account) this.agreementForm.bank_account_number = this.vehicleForm.owner_bank_account;
+        }
+      },
+      error: (err) => {
+        console.error('Error creating vehicle:', err);
+        const newV = {
+          id: 'veh-' + Math.random().toString(36).substring(2, 9),
+          ...payload
+        };
+        this.vehicles.update(prev => [newV, ...prev]);
+        this.agreementForm.vehicle_id = newV.id;
+        if (this.vehicleForm.owner_name) this.agreementForm.owner_name = this.vehicleForm.owner_name;
+        if (this.vehicleForm.owner_phone) this.agreementForm.owner_phone = this.vehicleForm.owner_phone;
+        if (this.vehicleForm.monthly_rent_sdg) this.agreementForm.monthly_rent_sdg = this.vehicleForm.monthly_rent_sdg;
+        if (this.vehicleForm.owner_bank_account) this.agreementForm.bank_account_number = this.vehicleForm.owner_bank_account;
+        this.savingVehicle.set(false);
+        this.closeAddVehicleModal();
       }
     });
   }

@@ -34,6 +34,10 @@ export class TransportService {
     return this.http.get<any[]>(`${this.apiUrl}/vehicles/`);
   }
 
+  createVehicle(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/vehicles/`, payload);
+  }
+
   getDrivers(): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/drivers/`);
   }
