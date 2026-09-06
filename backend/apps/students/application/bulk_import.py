@@ -3,6 +3,7 @@ import datetime
 import re
 import io
 import csv
+import typing
 from django.db import transaction
 from django.utils import timezone
 from apps.common.exceptions import BusinessException
@@ -111,10 +112,11 @@ class StudentBulkImportService:
         1. كشف الطلاب (مع ترويسة احترافية وتلوين الحقول الإلزامية وبيانات توضيحية سودانية).
         2. دليل الإدخال والخيارات المتاحة (يسرد الصفوف والشعب الحالية بالمدرسة والقيم المقبولة).
         """
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
+        import openpyxl  # type: ignore
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
+        from openpyxl.utils import get_column_letter  # type: ignore
 
+        Workbook = openpyxl.Workbook
         wb = Workbook()
         
         # --- الورقة الأولى: كشف الطلاب ---
@@ -256,8 +258,8 @@ class StudentBulkImportService:
                 rows.append({k.strip(): (v.strip() if v else '') for k, v in r.items() if k})
         else:
             # استخدام openpyxl لقراءة الإكسل
-            from openpyxl import load_workbook
-            wb = load_workbook(uploaded_file, data_only=True)
+            import openpyxl  # type: ignore
+            wb = openpyxl.load_workbook(uploaded_file, data_only=True)
             ws = wb.active
             if ws is None and wb.worksheets:
                 ws = wb.worksheets[0]
@@ -509,7 +511,7 @@ class StudentBulkImportService:
         if not rows_data:
             raise BusinessException("لا توجد بيانات طلاب صالحة للاستيراد.")
 
-        with transaction.atomic():
+        with typing.cast(typing.Any, transaction.atomic)():
             # 1. فحص حد الطلاب المتاح لخطة اشتراك المستأجر
             cls._enforce_plan_limit_for_batch(tenant_id, len(rows_data))
 
