@@ -29,5 +29,9 @@ export const STUDENT_FINANCE_ROUTES: Routes = [
   {
     path: 'online-payments',
     loadComponent: () => import('./online-payments/online-payments-review.component').then(m => m.OnlinePaymentsReviewComponent)
+  },
+  {
+    path: 'calendar',
+    loadComponent: () => import('./calendar/installments-calendar.component').then(m => m.SfInstallmentsCalendarComponent)
   }
 ];

@@ -55,6 +55,49 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/receivables/', params);
   }
 
+  // ---- تقويم الدفعات والأقساط الذكي ----
+  getInstallmentsCalendar(params?: {
+    month?: number;
+    year?: number;
+    account_id?: string;
+    status?: string;
+    range?: string;
+    search?: string;
+  }): Observable<{
+    success: boolean;
+    data: {
+      meta: { year: number; month: number; today: string };
+      summary: {
+        overdue_count: number;
+        overdue_amount: number;
+        due_today_count: number;
+        due_today_amount: number;
+        due_week_count: number;
+        due_week_amount: number;
+        paid_month_count: number;
+        paid_month_amount: number;
+        month_total_due: number;
+      };
+      days_summary: Record<string, { total_amount: number; count: number; overdue_count: number; due_today_count: number; paid_count: number }>;
+      installments: any[];
+    };
+  }> {
+    return this.api.get<any>('student-finance/installments/calendar/', params as any);
+  }
+
+  quickPayInstallment(id: string, body: {
+    amount: number;
+    payment_method?: string;
+    reference_number?: string;
+    notes?: string;
+  }): Observable<any> {
+    return this.api.post<any>(`student-finance/installments/${id}/quick-pay/`, body);
+  }
+
+  getInstallmentReminderInfo(id: string): Observable<any> {
+    return this.api.get<any>(`student-finance/installments/${id}/reminder-info/`);
+  }
+
   // ---- طلبات السداد الأونلاين (مراجعة المحاسب) ----
   listOnlinePayments(params?: ListParams): Observable<PagedResponse<any>> {
     return this.api.get<PagedResponse<any>>('student-finance/online-payments/', params);

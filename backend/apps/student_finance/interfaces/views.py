@@ -235,6 +235,271 @@ class InstallmentPlanViewSet(BaseCRUDViewSet):
 class InstallmentViewSet(BaseCRUDViewSet):
     model_class = Installment
     serializer_class = InstallmentSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['invoice__invoice_number', 'student_billing_account__account_number']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        account = self.request.query_params.get('student_billing_account')
+        status_param = self.request.query_params.get('status')
+        month = self.request.query_params.get('month')
+        year = self.request.query_params.get('year')
+        range_param = self.request.query_params.get('range')
+        
+        today = timezone.localdate()
+        if account:
+            qs = qs.filter(student_billing_account_id=account)
+        if status_param and status_param != 'all':
+            if status_param == 'overdue':
+                qs = qs.filter(due_date__lt=today).exclude(status='paid')
+            else:
+                qs = qs.filter(status=status_param)
+        if year and month:
+            try:
+                qs = qs.filter(due_date__year=int(year), due_date__month=int(month))
+            except ValueError:
+                pass
+        if range_param == 'today':
+            qs = qs.filter(due_date=today)
+        elif range_param == 'this_week':
+            week_end = today + timezone.timedelta(days=7)
+            qs = qs.filter(due_date__range=(today, week_end))
+        elif range_param == 'overdue':
+            qs = qs.filter(due_date__lt=today).exclude(status='paid')
+
+        return qs.order_by('due_date', 'amount')
+
+    @action(detail=False, methods=['get'], url_path='calendar')
+    def calendar(self, request):
+        """عرض تقويم استحقاق الأقساط والدفعات للطلاب مع مؤشرات ذكية وتصنيف زمني."""
+        tenant_id = request.tenant_id
+        today = timezone.localdate()
+        
+        # قراءة معايير التاريخ
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except (ValueError, TypeError):
+            year, month = today.year, today.month
+
+        status_param = request.query_params.get('status', 'all')
+        range_param = request.query_params.get('range', 'all')
+        search_query = request.query_params.get('search', '').strip()
+
+        # استعلام الأساس
+        base_qs = Installment.objects.filter(tenant_id=tenant_id)
+        
+        # مؤشرات عامة سريعة (KPI Counters)
+        total_overdue_qs = base_qs.filter(due_date__lt=today).exclude(status='paid')
+        overdue_count = total_overdue_qs.count()
+        overdue_amount = float(total_overdue_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+
+        due_today_qs = base_qs.filter(due_date=today).exclude(status='paid')
+        due_today_count = due_today_qs.count()
+        due_today_amount = float(due_today_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+
+        next_7_days = today + timezone.timedelta(days=7)
+        due_week_qs = base_qs.filter(due_date__range=(today, next_7_days)).exclude(status='paid')
+        due_week_count = due_week_qs.count()
+        due_week_amount = float(due_week_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+
+        paid_month_qs = base_qs.filter(due_date__year=year, due_date__month=month, status='paid')
+        paid_month_count = paid_month_qs.count()
+        paid_month_amount = float(paid_month_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+
+        # التصفية حسب نطاق الشهر المطلوب للتقويم
+        month_qs = base_qs.filter(due_date__year=year, due_date__month=month)
+        
+        # التجميع اليومي للشهر المختار (Calendar Matrix)
+        days_summary = {}
+        for item in month_qs.values('due_date', 'status').annotate(total_amount=Sum('amount')):
+            d_str = str(item['due_date'])
+            if d_str not in days_summary:
+                days_summary[d_str] = {
+                    'date': d_str,
+                    'count': 0,
+                    'total_amount': 0.0,
+                    'pending_count': 0,
+                    'paid_count': 0,
+                    'overdue_count': 0,
+                    'has_overdue': False,
+                    'is_today': (item['due_date'] == today)
+                }
+            st = item['status']
+            amt = float(item['total_amount'] or 0.0)
+            days_summary[d_str]['count'] += 1
+            days_summary[d_str]['total_amount'] += amt
+            if st == 'paid':
+                days_summary[d_str]['paid_count'] += 1
+            elif item['due_date'] < today and st != 'paid':
+                days_summary[d_str]['overdue_count'] += 1
+                days_summary[d_str]['has_overdue'] = True
+            else:
+                days_summary[d_str]['pending_count'] += 1
+
+        # قائمة الأقساط المعروضة حسب الفلتر
+        filtered_qs = base_qs
+        if range_param == 'today':
+            filtered_qs = filtered_qs.filter(due_date=today)
+        elif range_param == 'this_week':
+            filtered_qs = filtered_qs.filter(due_date__range=(today, next_7_days))
+        elif range_param == 'overdue':
+            filtered_qs = filtered_qs.filter(due_date__lt=today).exclude(status='paid')
+        elif range_param == 'this_month':
+            filtered_qs = filtered_qs.filter(due_date__year=year, due_date__month=month)
+        else:
+            filtered_qs = filtered_qs.filter(due_date__year=year, due_date__month=month)
+
+        if status_param and status_param != 'all':
+            if status_param == 'overdue':
+                filtered_qs = filtered_qs.filter(due_date__lt=today).exclude(status='paid')
+            else:
+                filtered_qs = filtered_qs.filter(status=status_param)
+
+        filtered_qs = filtered_qs.select_related('student_billing_account', 'invoice', 'installment_plan').order_by('due_date', 'status')
+        
+        serialized_data = InstallmentSerializer(filtered_qs[:200], many=True).data
+
+        if search_query:
+            q_lower = search_query.lower()
+            serialized_data = [
+                d for d in serialized_data
+                if q_lower in (d.get('student_name') or '').lower()
+                or q_lower in (d.get('student_number') or '').lower()
+                or q_lower in (d.get('invoice_number') or '').lower()
+                or q_lower in (d.get('guardian_phone') or '').lower()
+            ]
+
+        for d in serialized_data:
+            due_d = d.get('due_date')
+            if due_d and d.get('status') != 'paid' and str(due_d) < str(today):
+                d['computed_status'] = 'overdue'
+                d['computed_status_label'] = 'متأخر السداد'
+            elif due_d and str(due_d) == str(today) and d.get('status') != 'paid':
+                d['computed_status'] = 'due_today'
+                d['computed_status_label'] = 'يستحق اليوم'
+            elif d.get('status') == 'paid':
+                d['computed_status'] = 'paid'
+                d['computed_status_label'] = 'مسدد بالكامل'
+            else:
+                d['computed_status'] = 'pending'
+                d['computed_status_label'] = 'مجدول'
+
+        return StandardResponse(data={
+            'meta': {
+                'year': year,
+                'month': month,
+                'today': str(today),
+            },
+            'summary': {
+                'overdue_count': overdue_count,
+                'overdue_amount': overdue_amount,
+                'due_today_count': due_today_count,
+                'due_today_amount': due_today_amount,
+                'due_week_count': due_week_count,
+                'due_week_amount': due_week_amount,
+                'paid_month_count': paid_month_count,
+                'paid_month_amount': paid_month_amount,
+                'month_total_due': float(month_qs.exclude(status='paid').aggregate(s=Sum('amount'))['s'] or 0.0),
+            },
+            'days_summary': days_summary,
+            'installments': serialized_data
+        })
+
+    @action(detail=True, methods=['post'], url_path='quick-pay')
+    def quick_pay(self, request, pk=None):
+        """تسجيل سداد فوري لقسط مجدول وتحديث الفاتورة وإصدار سند قبض."""
+        tenant_id = request.tenant_id
+        installment = self.get_object()
+        
+        remaining = float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+        amount_to_pay = float(request.data.get('amount') or remaining)
+        if amount_to_pay <= 0:
+            return StandardResponse(message="مبلغ السداد يجب أن يكون أكبر من الصفر.", success=False, status=status.HTTP_400_BAD_REQUEST)
+        
+        reference_number = request.data.get('reference_number', '')
+        payment_method_name = request.data.get('payment_method', 'تطبيق بنكك (بنك الخرطوم)')
+        notes = request.data.get('notes', 'سداد قسط دراسي عبر تقويم الدفعات')
+        
+        new_paid = float(installment.paid_amount) + amount_to_pay
+        installment.paid_amount = min(new_paid, float(installment.amount))
+        if installment.paid_amount >= float(installment.amount):
+            installment.status = 'paid'
+        installment.save()
+
+        if installment.invoice:
+            inv = installment.invoice
+            inv.paid_amount = float(inv.paid_amount or 0.0) + amount_to_pay
+            inv.outstanding_amount = max(0.0, float(inv.total_amount) - float(inv.paid_amount))
+            inv.save()
+
+        import uuid
+        receipt_no = f"REC-{timezone.localdate().strftime('%Y%m%d')}-{uuid.uuid4().hex[:5].upper()}"
+        receipt = Receipt.objects.create(
+            tenant_id=tenant_id,
+            student_billing_account=installment.student_billing_account,
+            receipt_number=receipt_no,
+            payment_date=timezone.localdate(),
+            amount=amount_to_pay,
+            payment_method=payment_method_name,
+            reference_number=reference_number,
+            description=f"سداد قسط مستحق بتاريخ {installment.due_date} - {notes}",
+            status='posted'
+        )
+
+        return StandardResponse(data={
+            'message': 'تم تسجيل السداد بنجاح وإصدار سند القبض.',
+            'receipt_number': receipt.receipt_number,
+            'installment_id': str(installment.id),
+            'installment_status': installment.status,
+            'paid_amount': float(installment.paid_amount),
+            'remaining_amount': float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+        })
+
+    @action(detail=True, methods=['get'], url_path='reminder-info')
+    def reminder_info(self, request, pk=None):
+        """تجهيز نص إشعار تذكير بالسداد مناسب للواتساب متوافق مع السياق السوداني."""
+        from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+        installment = self.get_object()
+        meta = _extract_student_finance_metadata(installment.student_billing_account)
+        student_name = meta.get('student_name') or 'الطالب'
+        guardian_phone = meta.get('guardian_phone') or ''
+        remaining = float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+        formatted_amount = f"{remaining:,.0f} ج.س"
+        
+        clean_phone = guardian_phone.replace(' ', '').replace('-', '').replace('+', '')
+        if clean_phone.startswith('0'):
+            clean_phone = '249' + clean_phone[1:]
+        elif not clean_phone.startswith('249') and len(clean_phone) == 9:
+            clean_phone = '249' + clean_phone
+
+        text = (
+            f"السلام عليكم ورحمة الله وبركاته،\n"
+            f"الأخ/الأخت ولي أمر الطالب: {student_name}\n"
+            f"نود تذكيركم بموعد استحقاق القسط المدرسي بمبلغ ({formatted_amount}) والمستحق بتاريخ {installment.due_date}.\n\n"
+            f"طرق السداد المعتمدة لدى المدرسة:\n"
+            f"• تطبيق بنكك (بنك الخرطوم)\n"
+            f"• تطبيق فوري (بنك فيصل الإسلامي)\n"
+            f"• أوكاش (بنك أمدرمان الوطني)\n\n"
+            f"الرجاء إرسال إشعار التحويل البنكي مع ذكر اسم الطالب لتحديث السجل المالي فوراً.\n"
+            f"شاكرين لكم حسن تعاونكم الدائم.\n"
+            f"إدارة الحسابات المدرسية — منظومة نبراس التعليمية"
+        )
+
+        import urllib.parse
+        encoded_text = urllib.parse.quote(text)
+        whatsapp_url = f"https://wa.me/{clean_phone}?text={encoded_text}" if clean_phone else ""
+
+        return StandardResponse(data={
+            'student_name': student_name,
+            'guardian_phone': guardian_phone,
+            'clean_phone': clean_phone,
+            'amount': remaining,
+            'formatted_amount': formatted_amount,
+            'due_date': str(installment.due_date),
+            'reminder_text': text,
+            'whatsapp_url': whatsapp_url
+        })
 
 
 class StudentReceivableViewSet(BaseCRUDViewSet):

@@ -162,9 +162,54 @@ class InstallmentPlanSerializer(BaseStudentFinanceSerializer):
         fields = '__all__'
 
 class InstallmentSerializer(BaseStudentFinanceSerializer):
+    student_id = serializers.SerializerMethodField()
+    student_number = serializers.SerializerMethodField()
+    student_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+    account_number = serializers.SerializerMethodField()
+    invoice_number = serializers.SerializerMethodField()
+    remaining_amount = serializers.SerializerMethodField()
+    plan_name = serializers.SerializerMethodField()
+
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Installment
         fields = '__all__'
+
+    def get_student_id(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_id']
+
+    def get_student_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_number']
+
+    def get_student_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['student_name']
+
+    def get_grade_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['grade_name']
+
+    def get_section_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['section_name']
+
+    def get_guardian_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_name']
+
+    def get_guardian_phone(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['guardian_phone']
+
+    def get_account_number(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account)['account_number']
+
+    def get_invoice_number(self, obj):
+        return obj.invoice.invoice_number if obj.invoice else ''
+
+    def get_remaining_amount(self, obj):
+        return float(max(0, (obj.amount or 0) - (obj.paid_amount or 0)))
+
+    def get_plan_name(self, obj):
+        return obj.installment_plan.name if obj.installment_plan else ''
 
 class StudentReceivableSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
