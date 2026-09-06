@@ -536,6 +536,17 @@ export interface RowPreview {
                   </div>
                 }
 
+                @if (finalReport()?.errors?.length > 0) {
+                  <div class="import-errors-notice">
+                    <span class="notice-title">⚠️ ملاحظات وتنبيهات منع التكرار:</span>
+                    <ul>
+                      @for (err of finalReport()?.errors?.slice(0, 5); track err) {
+                        <li>{{ err }}</li>
+                      }
+                    </ul>
+                  </div>
+                }
+
                 <div class="step-footer center-footer">
                   <button class="nb-btn-primary lg" (click)="finishAndClose()">
                     إغلاق والعودة لقائمة الطلاب
@@ -1274,6 +1285,29 @@ export interface RowPreview {
     .sample-chip .std-num { color: #0F766E; font-weight: 600; }
     .sample-chip .std-grd { background: #F1F5F9; color: #475569; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
     .sample-chip.more { background: #F1F5F9; color: #64748B; font-weight: 600; }
+
+    .import-errors-notice {
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 14px;
+      text-align: right;
+    }
+    .import-errors-notice .notice-title {
+      font-weight: 700;
+      color: #92400E;
+      font-size: 12.5px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .import-errors-notice ul {
+      margin: 0;
+      padding-right: 18px;
+      font-size: 12px;
+      color: #B45309;
+      line-height: 1.6;
+    }
 
     /* Step Footer Actions */
     .step-footer {

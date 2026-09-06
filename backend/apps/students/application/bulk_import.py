@@ -565,18 +565,27 @@ class StudentBulkImportService:
                 'errors_summary': ['الملف المرفوع فارغ ولا يحتوي على أي بيانات للطلاب.']
             }
 
-        # جلب الصفوف والشعب المتاحة للتحقق السريع
+        # جلب الطلاب والصفوف والشعب المتاحة للتحقق السريع ومنع التكرار
         existing_grades = {g.name.strip(): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
-        existing_national_ids = set(
-            StudentProfile.objects.filter(
-                tenant_id=tenant_id, national_id__isnull=False
-            ).exclude(national_id='').values_list('national_id', flat=True)
-        )
+        
+        existing_profiles = StudentProfile.objects.filter(
+            tenant_id=tenant_id, student__deleted_at__isnull=True
+        ).values('arabic_name', 'national_id', 'student__student_number')
+
+        existing_national_ids = {
+            str(p['national_id']).strip(): p['student__student_number']
+            for p in existing_profiles if p.get('national_id')
+        }
+        existing_names = {
+            cls._normalize_arabic(p['arabic_name']): (p['arabic_name'], p['student__student_number'])
+            for p in existing_profiles if p.get('arabic_name')
+        }
 
         analyzed_rows = []
         valid_count = 0
         error_count = 0
         file_national_ids = set()
+        file_names = set()
 
         # أرقام الهواتف السودانية تبدأ بـ 09 أو 01 وتتكون من 10 أرقام (أو 9 بدون الصفر)
         sudan_phone_regex = re.compile(r'^(0?(9|1)[0-9]{8})$')
@@ -587,12 +596,22 @@ class StudentBulkImportService:
             row_errors = []
             row_warnings = []
 
-            # 1. فحص الاسم العربي
+            # 1. فحص الاسم العربي ومنع التكرار بالاسم
             name = row.get('arabic_name', '')
             if not name:
                 row_errors.append("اسم الطالب رباعي إلزامي.")
-            elif len(name.split()) < 2:
-                row_warnings.append("يُفضل كتابة الاسم كاملاً (ثلاثي أو رباعي).")
+            else:
+                norm_name = cls._normalize_arabic(name)
+                if norm_name in existing_names:
+                    orig_name, std_num = existing_names[norm_name]
+                    row_errors.append(f"الطالب «{orig_name}» مسجل مسبقاً في النظام بالرقم الأكاديمي ({std_num}). تم الرفض لتفادي التكرار.")
+                elif norm_name in file_names:
+                    row_errors.append(f"اسم الطالب «{name}» مكرر أكثر من مرة في نفس ملف الكشف.")
+                else:
+                    file_names.add(norm_name)
+
+                if len(name.split()) < 2:
+                    row_warnings.append("يُفضل كتابة الاسم كاملاً (ثلاثي أو رباعي).")
 
             # 2. فحص الجنس مع التطبيع الذكي (يقبل أنثى، انثى، أنثي، ذكر، ولد، إلخ)
             gender_raw = row.get('gender', '').strip()
@@ -621,19 +640,20 @@ class StudentBulkImportService:
                         break
                     except (ValueError, IndexError):
                         continue
-                if not parsed_dob:
-                    row_errors.append(f"صيغة تاريخ الميلاد «{dob_str}» غير صالحة (الصيغة المطلوبة: YYYY-MM-DD).")
-                else:
-                    age_years = (datetime.date.today() - parsed_dob).days // 365
-                    if age_years < 3 or age_years > 25:
-                        row_warnings.append(f"عمر الطالب المقدر ({age_years} سنة) قد يكون خارج النطاق المدرسي المعتاد.")
-                    row['date_of_birth'] = parsed_dob.strftime('%Y-%m-%d')
+            if not parsed_dob:
+                row_errors.append(f"صيغة تاريخ الميلاد «{dob_str}» غير صالحة (الصيغة المطلوبة: YYYY-MM-DD).")
+            else:
+                age_years = (datetime.date.today() - parsed_dob).days // 365
+                if age_years < 3 or age_years > 25:
+                    row_warnings.append(f"عمر الطالب المقدر ({age_years} سنة) قد يكون خارج النطاق المدرسي المعتاد.")
+                row['date_of_birth'] = parsed_dob.strftime('%Y-%m-%d')
 
-            # 4. فحص الرقم الوطني
-            nat_id = row.get('national_id', '').strip()
+            # 4. فحص الرقم الوطني ومنع التكرار بالرقم الوطني
+            nat_id = str(row.get('national_id', '')).strip()
             if nat_id:
                 if nat_id in existing_national_ids:
-                    row_errors.append(f"الرقم الوطني «{nat_id}» مسجل مسبقاً لطالب آخر في النظام.")
+                    std_num = existing_national_ids[nat_id]
+                    row_errors.append(f"الرقم الوطني «{nat_id}» مسجل مسبقاً لطالب آخر ({std_num}) في النظام.")
                 elif nat_id in file_national_ids:
                     row_errors.append(f"الرقم الوطني «{nat_id}» مكرر أكثر من مرة في نفس الملف.")
                 else:
@@ -753,35 +773,56 @@ class StudentBulkImportService:
         if not rows_data:
             raise BusinessException("لا توجد بيانات طلاب صالحة للاستيراد.")
 
-        with typing.cast(typing.Any, transaction.atomic)():
-            # 1. فحص حد الطلاب المتاح لخطة اشتراك المستأجر
-            cls._enforce_plan_limit_for_batch(tenant_id, len(rows_data))
+        # 1. فحص حد الطلاب المتاح لخطة اشتراك المستأجر
+        cls._enforce_plan_limit_for_batch(tenant_id, len(rows_data))
 
-            # 2. تحديد العام الأكاديمي الحالي إن لم يتم تمريره
-            if not academic_year_id:
-                active_year = AcademicYear.objects.filter(
-                    tenant_id=tenant_id, current_flag=True, deleted_at__isnull=True
-                ).first() or AcademicYear.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).first()
-                if active_year:
-                    academic_year_id = active_year.id
+        # 2. تحديد العام الأكاديمي الحالي إن لم يتم تمريره
+        if not academic_year_id:
+            active_year = AcademicYear.objects.filter(
+                tenant_id=tenant_id, current_flag=True, deleted_at__isnull=True
+            ).first() or AcademicYear.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).first()
+            if active_year:
+                academic_year_id = active_year.id
 
-            # كاش الفصول والصفوف لتقليل الاستعلامات
-            grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
-            grades_by_name = {g.name.strip(): g for g in grades_map.values()}
-            sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
-            sections_by_name = {s.name.strip(): s for s in sections_map.values()}
+        # كاش الفصول والصفوف لتقليل الاستعلامات
+        grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+        grades_by_name = {g.name.strip(): g for g in grades_map.values()}
+        sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+        sections_by_name = {s.name.strip(): s for s in sections_map.values()}
 
-            imported_students = []
-            skipped_count = 0
-            errors = []
+        # جلب الطلاب الحاليين لتفادي التكرار بالاسم والرقم الوطني
+        existing_profiles_qs = StudentProfile.objects.filter(
+            tenant_id=tenant_id, student__deleted_at__isnull=True
+        ).values('arabic_name', 'national_id')
+        existing_names_set = {cls._normalize_arabic(p['arabic_name']) for p in existing_profiles_qs if p.get('arabic_name')}
+        existing_nat_ids_set = {str(p['national_id']).strip() for p in existing_profiles_qs if p.get('national_id')}
 
-            current_student_count = Student.objects.filter(tenant_id=tenant_id).count()
+        imported_students = []
+        skipped_count = 0
+        errors = []
 
-            for idx, row in enumerate(rows_data, start=1):
-                try:
+        current_student_count = Student.objects.filter(tenant_id=tenant_id).count()
+
+        for idx, row in enumerate(rows_data, start=1):
+            try:
+                with typing.cast(typing.Any, transaction.atomic)():
                     row_data = row.get('data', row)
                     arabic_name = row_data.get('arabic_name', '').strip()
                     if not arabic_name:
+                        skipped_count += 1
+                        continue
+
+                    # فحص منع التكرار بالاسم
+                    norm_name = cls._normalize_arabic(arabic_name)
+                    if norm_name in existing_names_set:
+                        errors.append(f"السطر {idx}: الطالب «{arabic_name}» مسجل مسبقاً في المدرسة، تم تخطيه لمنع التكرار.")
+                        skipped_count += 1
+                        continue
+
+                    # فحص منع التكرار بالرقم الوطني
+                    nat_id_val = str(row_data.get('national_id') or '').strip()
+                    if nat_id_val and nat_id_val in existing_nat_ids_set:
+                        errors.append(f"السطر {idx}: الرقم الوطني «{nat_id_val}» مسجل مسبقاً لطالب آخر، تم تخطيه لمنع التكرار.")
                         skipped_count += 1
                         continue
 
@@ -833,6 +874,9 @@ class StudentBulkImportService:
                         tenant_id=tenant_id,
                         created_by=user_id
                     )
+                    existing_names_set.add(norm_name)
+                    if nat_id_val:
+                        existing_nat_ids_set.add(nat_id_val)
 
                     # إنشاء الملف الطبي وملف العيادة
                     StudentMedicalProfile.objects.create(
@@ -929,13 +973,19 @@ class StudentBulkImportService:
                                 }
                             )
 
-                            # 2. إنشاء فاتورة الرسوم الدراسية
+                            # 2. إنشاء فاتورة الرسوم الدراسية مع تفادي تكرار رقم الفاتورة
                             if fees_val > 0:
-                                inv_no = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                                base_inv = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                                candidate_inv = base_inv
+                                inv_counter = 1
+                                while StudentInvoice.objects.filter(tenant_id=tenant_id, invoice_number=candidate_inv).exists():
+                                    candidate_inv = f"{base_inv}-{inv_counter}"
+                                    inv_counter += 1
+
                                 StudentInvoice.objects.create(
                                     tenant_id=tenant_id,
                                     student_billing_account=billing_acc,
-                                    invoice_number=inv_no,
+                                    invoice_number=candidate_inv,
                                     issue_date=datetime.date.today(),
                                     due_date=datetime.date.today() + datetime.timedelta(days=30),
                                     status='posted',
@@ -945,13 +995,21 @@ class StudentBulkImportService:
                                     created_by=user_id
                                 )
 
-                            # 3. إنشاء إيصال التحصيل وسند القبض برقم الإيصال الوارد بالكشف
+                            # 3. إنشاء إيصال التحصيل مع تفادي تعارض وتكرار رقم الإيصال
                             if paid_val > 0:
-                                final_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                                base_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number[-4:]}"
+                                candidate_rcp = base_rcp
+                                rcp_counter = 1
+                                while Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
+                                    candidate_rcp = f"{base_rcp}-{student_number[-4:]}"
+                                    if Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
+                                        candidate_rcp = f"{base_rcp}-{rcp_counter}"
+                                        rcp_counter += 1
+
                                 Receipt.objects.create(
                                     tenant_id=tenant_id,
                                     student_billing_account=billing_acc,
-                                    receipt_number=final_rcp,
+                                    receipt_number=candidate_rcp,
                                     payment_date=datetime.date.today(),
                                     amount=paid_val,
                                     payment_method_id=uuid.uuid4(),
@@ -981,15 +1039,15 @@ class StudentBulkImportService:
                         'grade': grade_obj.name if grade_obj else '—'
                     })
 
-                except Exception as e:
-                    errors.append(f"السطر {idx}: {str(e)}")
+            except Exception as e:
+                errors.append(f"السطر {idx}: {str(e)}")
 
-            return {
-                'imported_count': len(imported_students),
-                'skipped_count': skipped_count,
-                'students': imported_students,
-                'errors': errors
-            }
+        return {
+            'imported_count': len(imported_students),
+            'skipped_count': skipped_count,
+            'students': imported_students,
+            'errors': errors
+        }
 
     @staticmethod
     def _enforce_plan_limit_for_batch(tenant_id: uuid.UUID, new_count: int):
