@@ -4,6 +4,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { TenantService } from '../../../core/services/tenant.service';
 import { FormsModule } from '@angular/forms';
 import { AuthLayoutComponent } from '../shared/auth-layout.component';
+import { environment } from '../../../../environments/environment';
 
 /**
  * تسجيل الدخول — لغة تصميم Nebras OS عبر الغلاف المشترك AuthLayoutComponent.
@@ -73,7 +74,11 @@ export class LoginComponent {
         // تمييز نوع الخطأ: انقطاع شبكة (status 0) ≠ بيانات خاطئة ≠ خطأ خادم
         const serverMsg = err?.error?.error?.message || err?.error?.message;
         if (err?.status === 0) {
-          this.errorMessage.set('تعذّر الوصول إلى الخادم — تأكد من تشغيل الخادم الخلفي وأن العنوان http://localhost:4200 (وليس 127.0.0.1).');
+          this.errorMessage.set(
+            environment.production
+              ? 'تعذّر الاتصال بالخادم الخلفي. يرجى التحقق من اتصال الإنترنت أو المحاولة بعد لحظات.'
+              : 'تعذّر الوصول إلى الخادم — تأكد من تشغيل الخادم الخلفي وأن العنوان http://localhost:4200 (وليس 127.0.0.1).'
+          );
         } else if (err?.status >= 500) {
           this.errorMessage.set(serverMsg || 'خطأ في الخادم. حاول لاحقًا أو راجع سجلات الخادم.');
         } else {

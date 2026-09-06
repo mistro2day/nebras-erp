@@ -21,4 +21,5 @@ backend/baileys_auth_info/
 
 # مجلدات العمل المؤقتة
 .claude/
+*.apk
 
