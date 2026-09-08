@@ -109,43 +109,43 @@ def _notify_finance_new_request(req):
         logger.warning(f"تعذّر إنشاء إشعار المالية لطلب السداد {req.id}: {e}")
 
 
-@transaction.atomic
 def approve_payment_request(tenant_id, request_id, reviewer_id=None):
     """اعتماد طلب سداد: توليد إيصال قبض مرحّل + خصم المستحقات + إشعار ولي الأمر."""
-    req = OnlinePaymentRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
-    if req.status != 'pending':
-        raise ValidationError("لا يمكن اعتماد طلب تمّت مراجعته مسبقاً.")
+    with transaction.atomic():
+        req = OnlinePaymentRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
+        if req.status != 'pending':
+            raise ValidationError("لا يمكن اعتماد طلب تمّت مراجعته مسبقاً.")
 
-    account = req.student_billing_account
-    receipt = _settle_payment(tenant_id, account, req.amount, reviewer_id, req)
+        account = req.student_billing_account
+        receipt = _settle_payment(tenant_id, account, req.amount, reviewer_id, req)
 
-    req.status = 'approved'
-    req.reviewed_by = reviewer_id
-    req.reviewed_at = timezone.now()
-    req.receipt_id = receipt.id
-    req.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'receipt_id', 'posted_to_gl'])
+        req.status = 'approved'
+        req.reviewed_by = reviewer_id
+        req.reviewed_at = timezone.now()
+        req.receipt_id = receipt.id
+        req.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'receipt_id', 'posted_to_gl'])
 
-    _notify_parent(req, approved=True)
-    return req
+        _notify_parent(req, approved=True)
+        return req
 
 
-@transaction.atomic
 def reject_payment_request(tenant_id, request_id, reviewer_id=None, reason=None):
     """رفض طلب سداد مع تسجيل السبب وإشعار ولي الأمر."""
-    req = OnlinePaymentRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
-    if req.status != 'pending':
-        raise ValidationError("لا يمكن رفض طلب تمّت مراجعته مسبقاً.")
-    if not reason:
-        raise ValidationError("يرجى إدخال سبب الرفض ليطّلع عليه ولي الأمر.")
+    with transaction.atomic():
+        req = OnlinePaymentRequest.objects.select_for_update().get(id=request_id, tenant_id=tenant_id)
+        if req.status != 'pending':
+            raise ValidationError("لا يمكن رفض طلب تمّت مراجعته مسبقاً.")
+        if not reason:
+            raise ValidationError("يرجى إدخال سبب الرفض ليطّلع عليه ولي الأمر.")
 
-    req.status = 'rejected'
-    req.reviewed_by = reviewer_id
-    req.reviewed_at = timezone.now()
-    req.rejection_reason = reason
-    req.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason'])
+        req.status = 'rejected'
+        req.reviewed_by = reviewer_id
+        req.reviewed_at = timezone.now()
+        req.rejection_reason = reason
+        req.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason'])
 
-    _notify_parent(req, approved=False)
-    return req
+        _notify_parent(req, approved=False)
+        return req
 
 
 def _resolve_bank_transfer_method(tenant_id):

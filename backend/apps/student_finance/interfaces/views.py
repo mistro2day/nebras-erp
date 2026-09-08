@@ -324,7 +324,7 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
         for idx, ins in enumerate(installments_qs, start=1):
             amt = float(ins.amount or 0.0)
             paid = float(ins.paid_amount or 0.0)
-            rem = float(max(0.0, amt - paid))
+            rem = max(0.0, amt - paid)
 
             seq = ordinal_ar.get(idx, f"رقم {idx}")
             if total_inst == 1:
@@ -691,7 +691,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
         tenant_id = request.tenant_id
         installment = self.get_object()
         
-        remaining = float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+        remaining = max(0.0, float(installment.amount) - float(installment.paid_amount))
         amount_to_pay = float(request.data.get('amount') or remaining)
         if amount_to_pay <= 0:
             return StandardResponse(message="مبلغ السداد يجب أن يكون أكبر من الصفر.", success=False, status=status.HTTP_400_BAD_REQUEST)
@@ -745,7 +745,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
             'installment_id': str(installment.id),
             'installment_status': installment.status,
             'paid_amount': float(installment.paid_amount),
-            'remaining_amount': float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+            'remaining_amount': max(0.0, float(installment.amount) - float(installment.paid_amount))
         })
 
     @action(detail=False, methods=['get'], url_path='export-monthly-dues')
@@ -807,6 +807,8 @@ class InstallmentViewSet(BaseCRUDViewSet):
         # إنشاء مصنف العمل
         wb = openpyxl.Workbook()
         ws = wb.active
+        if ws is None:
+            ws = wb.create_sheet()
         ws.title = f"مستحقي {month_name} {year}"
         ws.views.sheetView[0].rightToLeft = True
 
@@ -883,7 +885,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
 
             amt = float(ins.amount or 0.0)
             paid = float(ins.paid_amount or 0.0)
-            rem = float(max(0.0, amt - paid))
+            rem = max(0.0, amt - paid)
 
             tot_amount += amt
             tot_paid += paid
@@ -1011,7 +1013,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
         meta = _extract_student_finance_metadata(installment.student_billing_account)
         student_name = meta.get('student_name') or 'الطالب'
         guardian_phone = meta.get('guardian_phone') or ''
-        remaining = float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
+        remaining = max(0.0, float(installment.amount) - float(installment.paid_amount))
         formatted_amount = f"{remaining:,.0f} ج.س"
         
         clean_phone = guardian_phone.replace(' ', '').replace('-', '').replace('+', '')
@@ -1242,8 +1244,11 @@ class OnlinePaymentRequestViewSet(BaseCRUDViewSet):
                 submitted_by_user_id=request.user.id if request.user else None,
             )
         except DjangoValidationError as e:
-            return Response({'error': str(e.message if hasattr(e, 'message') else e)},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return StandardResponse(
+                message=str(e.message if hasattr(e, 'message') else e),
+                success=False,
+                status=status.HTTP_400_BAD_REQUEST
+            )
         serializer = self.get_serializer(req)
         return StandardResponse(serializer.data,
                                 message="تم استلام طلب السداد وهو الآن قيد مراجعة المحاسبة.",

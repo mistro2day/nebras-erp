@@ -1,6 +1,7 @@
 import logging
 from decimal import Decimal
 from datetime import date
+from functools import wraps
 from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -31,6 +32,15 @@ from apps.shared.application.numbering import generate_unique_number
 logger = logging.getLogger('nebras.student_finance')
 
 
+def db_atomic(func):
+    """ديكوريتور يحافظ على توقيع الدالة الأصلي ويشغلها داخل معاملة قاعدة بيانات ذرية."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with transaction.atomic():
+            return func(*args, **kwargs)
+    return wrapper
+
+
 # ============================================================
 # 1. Billing Service — خدمة فوترة الطلاب وإصدار الفواتير
 # ============================================================
@@ -41,7 +51,7 @@ class BillingService:
     """
 
     @classmethod
-    @transaction.atomic
+    @db_atomic
     def generate_student_invoice(cls, tenant_id, billing_account_id, fee_structures, due_date, user_id=None):
         """
         إنشاء فاتورة طالب لعدة هياكل رسوم مع احتساب الخصومات والمنح آلياً وترحيل قيد الاستحقاق.
@@ -300,7 +310,7 @@ class PaymentService:
     """
 
     @classmethod
-    @transaction.atomic
+    @db_atomic
     def receive_payment(cls, tenant_id, billing_account_id, amount, payment_method_id, bank_account_id=None, cash_box_id=None, user_id=None):
         """
         استلام دفعة سداد من طالب، وتخصيصها للمستحقات بنظام FIFO وتوليد سند القبض في موديول المالية.
@@ -454,7 +464,7 @@ class ScholarshipService:
     """
 
     @classmethod
-    @transaction.atomic
+    @db_atomic
     def apply_scholarship(cls, tenant_id, billing_account_id, name, scholarship_type, amount_percentage, fixed_amount, start_date, end_date=None, user_id=None):
         """
         إضافة منحة جديدة للطالب وتفعيلها بمجرد الاعتماد.
@@ -497,7 +507,7 @@ class HoldService:
     """
 
     @classmethod
-    @transaction.atomic
+    @db_atomic
     def apply_financial_hold(cls, tenant_id, billing_account_id, hold_type, reason, user_id=None):
         """
         فرض حظر مالي يدوي أو تلقائي على حساب الطالب بسبب تراكم المديونيات.
@@ -529,7 +539,7 @@ class HoldService:
         return hold
 
     @classmethod
-    @transaction.atomic
+    @db_atomic
     def auto_release_holds(cls, tenant_id, billing_account, user_id=None):
         """
         فك جميع حالات الحظر المالي التلقائية للطالب عند تصفية مديونيته.
