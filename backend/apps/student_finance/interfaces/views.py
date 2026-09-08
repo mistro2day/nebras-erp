@@ -594,7 +594,15 @@ class InstallmentViewSet(BaseCRUDViewSet):
     @action(detail=False, methods=['get'], url_path='calendar')
     def calendar(self, request):
         """عرض تقويم استحقاق الأقساط والدفعات للطلاب مع مؤشرات ذكية وتصنيف زمني."""
-        tenant_id = request.tenant_id
+        tenant_id = getattr(request, 'tenant_id', None)
+        if not tenant_id and hasattr(request, 'tenant') and request.tenant:
+            tenant_id = request.tenant.id
+        if not tenant_id:
+            from apps.tenants.domain.models import Tenant
+            t_obj = Tenant.objects.filter(is_active=True).first()
+            if t_obj:
+                tenant_id = t_obj.id
+
         today = timezone.localdate()
         if tenant_id:
             _sync_invoices_to_installments(tenant_id)
@@ -636,7 +644,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
         
         # التجميع اليومي للشهر المختار (Calendar Matrix)
         days_summary = {}
-        for item in month_qs.values('due_date', 'status').annotate(total_amount=Sum('amount')):
+        for item in month_qs.values('due_date', 'status').annotate(total_amount=Sum('amount'), count=Count('id')):
             d_str = str(item['due_date'])
             if d_str not in days_summary:
                 days_summary[d_str] = {
@@ -651,15 +659,16 @@ class InstallmentViewSet(BaseCRUDViewSet):
                 }
             st = item['status']
             amt = float(item['total_amount'] or 0.0)
-            days_summary[d_str]['count'] += 1
+            c = int(item['count'] or 1)
+            days_summary[d_str]['count'] += c
             days_summary[d_str]['total_amount'] += amt
             if st == 'paid':
-                days_summary[d_str]['paid_count'] += 1
+                days_summary[d_str]['paid_count'] += c
             elif item['due_date'] < today and st != 'paid':
-                days_summary[d_str]['overdue_count'] += 1
+                days_summary[d_str]['overdue_count'] += c
                 days_summary[d_str]['has_overdue'] = True
             else:
-                days_summary[d_str]['pending_count'] += 1
+                days_summary[d_str]['pending_count'] += c
 
         # قائمة الأقساط المعروضة حسب الفلتر
         filtered_qs = base_qs

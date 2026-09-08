@@ -95,12 +95,33 @@ export interface CalendarDay {
       <!-- شريط التحكم: اختيار الشهر + تبديل العرض + البحث والتصفية -->
       <div class="controls-card">
         <div class="month-navigator">
-          <button class="nav-arrow-btn" (click)="prevMonth()" title="الشهر السابق">‹</button>
-          <div class="current-month-display">
-            <span class="month-name">{{ monthNames[currentMonth() - 1] }}</span>
-            <span class="year-num">{{ currentYear() }}</span>
+          <button class="nav-arrow-btn" (click)="prevMonth()" title="الشهر السابق">
+            <span class="arrow-sym">›</span>
+          </button>
+          
+          <div class="month-select-container">
+            <select
+              class="month-dropdown"
+              [ngModel]="currentMonth()"
+              (ngModelChange)="onMonthChange($event)">
+              @for (mName of monthNames; track $index) {
+                <option [value]="$index + 1">{{ mName }}</option>
+              }
+            </select>
+            <select
+              class="year-dropdown"
+              [ngModel]="currentYear()"
+              (ngModelChange)="onYearChange($event)">
+              <option [value]="2025">2025</option>
+              <option [value]="2026">2026</option>
+              <option [value]="2027">2027</option>
+              <option [value]="2028">2028</option>
+            </select>
           </div>
-          <button class="nav-arrow-btn" (click)="nextMonth()" title="الشهر التالي">›</button>
+
+          <button class="nav-arrow-btn" (click)="nextMonth()" title="الشهر التالي">
+            <span class="arrow-sym">‹</span>
+          </button>
           <button class="btn-today" (click)="goToCurrentMonth()">الشهر الحالي</button>
         </div>
 
@@ -677,24 +698,44 @@ export interface CalendarDay {
       transition: background 0.12s;
     }
     .nav-arrow-btn:hover { background: var(--nb-surface-raised, #f3f4f6); }
-    .current-month-display {
+    .month-select-container {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
-      min-width: 140px;
     }
-    .month-name { font-size: 18px; font-weight: 800; color: var(--nb-text, #111827); }
-    .year-num { font-size: 15px; font-weight: 700; color: var(--nb-text-muted, #6b7280); }
+    .month-dropdown, .year-dropdown {
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--nb-border, #d1d5db);
+      background: var(--nb-surface, #fff);
+      color: var(--nb-text, #111827);
+      font-family: inherit;
+      font-size: 14.5px;
+      font-weight: 800;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .month-dropdown:focus, .year-dropdown:focus {
+      border-color: var(--nb-primary-600, #2563eb);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .month-dropdown { min-width: 120px; }
+    .year-dropdown { min-width: 80px; }
+    .arrow-sym { font-size: 20px; line-height: 1; display: inline-block; }
     .btn-today {
       background: var(--nb-surface-raised, #f3f4f6);
       border: 1px solid var(--nb-border-soft, #e5e7eb);
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 700;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      font-weight: 800;
       color: var(--nb-primary-700, #1d4ed8);
       cursor: pointer;
+      transition: background 0.12s;
     }
+    .btn-today:hover { background: #e0e7ff; }
 
     .search-and-view {
       display: flex;
@@ -824,36 +865,40 @@ export interface CalendarDay {
       background: var(--nb-surface, #fff);
       border: 1px solid var(--nb-border, #e5e7eb);
       border-radius: var(--nb-radius-card, 12px);
-      overflow: hidden;
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     .weekdays-bar {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
+      min-width: 760px;
       background: var(--nb-surface-raised, #f9fafb);
       border-bottom: 1px solid var(--nb-border, #e5e7eb);
     }
     .weekday-cell {
-      padding: 10px 8px;
+      padding: 11px 8px;
       text-align: center;
-      font-size: 12.5px;
+      font-size: 13px;
       font-weight: 800;
       color: var(--nb-text-secondary, #4b5563);
     }
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
+      min-width: 760px;
       border-collapse: collapse;
     }
     .calendar-day-cell {
-      min-height: 96px;
-      padding: 8px;
+      min-height: 86px;
+      padding: 8px 10px;
       border-inline-end: 1px solid var(--nb-border-soft, #f3f4f6);
       border-bottom: 1px solid var(--nb-border-soft, #f3f4f6);
       cursor: pointer;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transition: background 0.12s;
+      transition: all 0.15s ease;
+      background: #ffffff;
     }
     .calendar-day-cell:hover { background: #f8fafc; }
     .calendar-day-cell.other-month { opacity: 0.35; background: #fafafa; }
@@ -1232,8 +1277,8 @@ export class SfInstallmentsCalendarComponent implements OnInit {
 
   // حساب الأيام للشبكة الشهرية
   calendarDays = computed(() => {
-    const year = this.currentYear();
-    const month = this.currentMonth(); // 1-indexed
+    const year = Number(this.currentYear()) || 2026;
+    const month = Number(this.currentMonth()) || 10; // 1-indexed
     const days: CalendarDay[] = [];
 
     const firstDayOfMonth = new Date(year, month - 1, 1);
@@ -1245,7 +1290,7 @@ export class SfInstallmentsCalendarComponent implements OnInit {
     // السبت(6) -> 0, الأحد(0) -> 1, الإثنين(1) -> 2, ..., الجمعة(5) -> 6
     const firstDayIndex = (firstDayOfMonth.getDay() + 1) % 7;
 
-    const daysSum = this.daysSummary();
+    const daysSum = this.daysSummary() || {};
     const selDayStr = this.selectedDay()?.dateStr;
 
     // أيام الشهر السابق لإكمال الصف الأول
@@ -1270,7 +1315,7 @@ export class SfInstallmentsCalendarComponent implements OnInit {
       });
     }
 
-    // أيام الشهر الحالي
+    // أيام الشهر الحالي كاملاً (من 1 إلى numDays)
     const today = new Date();
     const isThisYear = today.getFullYear() === year;
     const isThisMonth = today.getMonth() + 1 === month;
@@ -1289,15 +1334,15 @@ export class SfInstallmentsCalendarComponent implements OnInit {
         isCurrentMonth: true,
         isToday: isToday,
         isSelected: selDayStr === dStr,
-        totalAmount: dayData.total_amount || 0,
-        count: dayData.count || 0,
-        overdueCount: dayData.overdue_count || 0,
-        dueTodayCount: dayData.due_today_count || 0,
-        paidCount: dayData.paid_count || 0
+        totalAmount: Number(dayData.total_amount) || 0,
+        count: Number(dayData.count) || 0,
+        overdueCount: Number(dayData.overdue_count) || 0,
+        dueTodayCount: Number(dayData.due_today_count) || 0,
+        paidCount: Number(dayData.paid_count) || 0
       });
     }
 
-    // إكمال الصف الأخير من الشهر القادم
+    // إكمال الصف الأخير من الشهر القادم حتى اكتمال مضاعف الـ 7
     const remainingSlots = (7 - (days.length % 7)) % 7;
     for (let d = 1; d <= remainingSlots; d++) {
       const nextM = month === 12 ? 1 : month + 1;
@@ -1307,6 +1352,30 @@ export class SfInstallmentsCalendarComponent implements OnInit {
         date: new Date(nextY, nextM - 1, d),
         dateStr: dStr,
         dayNumber: d,
+        isCurrentMonth: false,
+        isToday: false,
+        isSelected: selDayStr === dStr,
+        totalAmount: 0,
+        count: 0,
+        overdueCount: 0,
+        dueTodayCount: 0,
+        paidCount: 0
+      });
+    }
+
+    // ضمان أن التقويم يحتوي دائماً على 5 أو 6 صفوف كاملة ومكتملة (35 أو 42 يوماً)
+    while (days.length < 35) {
+      const last = days[days.length - 1];
+      const nextDate = new Date(last.date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nY = nextDate.getFullYear();
+      const nM = nextDate.getMonth() + 1;
+      const nD = nextDate.getDate();
+      const dStr = `${nY}-${String(nM).padStart(2, '0')}-${String(nD).padStart(2, '0')}`;
+      days.push({
+        date: nextDate,
+        dateStr: dStr,
+        dayNumber: nD,
         isCurrentMonth: false,
         isToday: false,
         isSelected: selDayStr === dStr,
@@ -1361,10 +1430,21 @@ export class SfInstallmentsCalendarComponent implements OnInit {
   });
 
   ngOnInit() {
-    // تعيين التاريخ الافتراضي
-    const now = new Date();
-    this.currentYear.set(now.getFullYear());
-    this.currentMonth.set(now.getMonth() + 1);
+    // تعيين التاريخ الافتراضي: أكتوبر 2026 كشهر بدء الأقساط الأساسي
+    this.currentYear.set(2026);
+    this.currentMonth.set(10);
+    this.loadData();
+  }
+
+  onMonthChange(m: any) {
+    this.currentMonth.set(Number(m));
+    this.selectedDay.set(null);
+    this.loadData();
+  }
+
+  onYearChange(y: any) {
+    this.currentYear.set(Number(y));
+    this.selectedDay.set(null);
     this.loadData();
   }
 
@@ -1413,9 +1493,8 @@ export class SfInstallmentsCalendarComponent implements OnInit {
   }
 
   goToCurrentMonth() {
-    const now = new Date();
-    this.currentYear.set(now.getFullYear());
-    this.currentMonth.set(now.getMonth() + 1);
+    this.currentYear.set(2026);
+    this.currentMonth.set(10);
     this.selectedDay.set(null);
     this.loadData();
   }
