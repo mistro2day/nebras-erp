@@ -621,23 +621,26 @@ class InstallmentViewSet(BaseCRUDViewSet):
         # استعلام الأساس
         base_qs = Installment.objects.filter(tenant_id=tenant_id)
         
-        # مؤشرات عامة سريعة (KPI Counters)
-        total_overdue_qs = base_qs.filter(due_date__lt=today).exclude(status='paid')
-        overdue_count = total_overdue_qs.count()
-        overdue_amount = float(total_overdue_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
-
-        due_today_qs = base_qs.filter(due_date=today).exclude(status='paid')
-        due_today_count = due_today_qs.count()
-        due_today_amount = float(due_today_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
-
+        # مؤشرات عامة سريعة (KPI Counters) مدمجة في استعلام واحد فائق السرعة
         next_7_days = today + timezone.timedelta(days=7)
-        due_week_qs = base_qs.filter(due_date__range=(today, next_7_days)).exclude(status='paid')
-        due_week_count = due_week_qs.count()
-        due_week_amount = float(due_week_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
-
-        paid_month_qs = base_qs.filter(due_date__year=year, due_date__month=month, status='paid')
-        paid_month_count = paid_month_qs.count()
-        paid_month_amount = float(paid_month_qs.aggregate(s=Sum('amount'))['s'] or 0.0)
+        kpi = base_qs.aggregate(
+            overdue_count=Count('id', filter=Q(due_date__lt=today) & ~Q(status='paid')),
+            overdue_amount=Sum('amount', filter=Q(due_date__lt=today) & ~Q(status='paid')),
+            due_today_count=Count('id', filter=Q(due_date=today) & ~Q(status='paid')),
+            due_today_amount=Sum('amount', filter=Q(due_date=today) & ~Q(status='paid')),
+            due_week_count=Count('id', filter=Q(due_date__range=(today, next_7_days)) & ~Q(status='paid')),
+            due_week_amount=Sum('amount', filter=Q(due_date__range=(today, next_7_days)) & ~Q(status='paid')),
+            paid_month_count=Count('id', filter=Q(due_date__year=year, due_date__month=month, status='paid')),
+            paid_month_amount=Sum('amount', filter=Q(due_date__year=year, due_date__month=month, status='paid')),
+        )
+        overdue_count = kpi.get('overdue_count') or 0
+        overdue_amount = float(kpi.get('overdue_amount') or 0.0)
+        due_today_count = kpi.get('due_today_count') or 0
+        due_today_amount = float(kpi.get('due_today_amount') or 0.0)
+        due_week_count = kpi.get('due_week_count') or 0
+        due_week_amount = float(kpi.get('due_week_amount') or 0.0)
+        paid_month_count = kpi.get('paid_month_count') or 0
+        paid_month_amount = float(kpi.get('paid_month_amount') or 0.0)
 
         # التصفية حسب نطاق الشهر المطلوب للتقويم
         month_qs = base_qs.filter(due_date__year=year, due_date__month=month)

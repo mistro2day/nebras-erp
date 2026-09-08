@@ -114,9 +114,9 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF065F46).withOpacity(0.3),
+        color: const Color(0xFF065F46).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -170,7 +170,7 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
         border: Border.all(color: const Color(0xFF334155)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -210,9 +210,9 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.85),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -235,7 +235,7 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.2),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF10B981), width: 0.8),
                 ),
@@ -272,7 +272,7 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.9),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF334155)),
                 ),
@@ -410,8 +410,8 @@ class _ChildBusTrackerPageState extends ConsumerState<ChildBusTrackerPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isContracted
-                      ? const Color(0xFFF59E0B).withOpacity(0.15)
-                      : const Color(0xFF10B981).withOpacity(0.15),
+                      ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                      : const Color(0xFF10B981).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isContracted ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
@@ -641,7 +641,7 @@ class _RouteMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final gridPaint = Paint()
-      ..color = const Color(0xFF334155).withOpacity(0.3)
+      ..color = const Color(0xFF334155).withValues(alpha: 0.3)
       ..strokeWidth = 1.0;
 
     // رسم شبكة شوارع مجردة
@@ -654,7 +654,7 @@ class _RouteMapPainter extends CustomPainter {
 
     // رسم نهر النيل التجريدي في الخرطوم
     final riverPaint = Paint()
-      ..color = const Color(0xFF0284C7).withOpacity(0.2)
+      ..color = const Color(0xFF0284C7).withValues(alpha: 0.2)
       ..strokeWidth = 14
       ..style = PaintingStyle.stroke;
 
@@ -692,7 +692,7 @@ class _RouteMapPainter extends CustomPainter {
     final busPos = Offset(size.width * 0.50, size.height * 0.44);
 
     final pulsePaint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.3)
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(busPos, 22, pulsePaint);
 

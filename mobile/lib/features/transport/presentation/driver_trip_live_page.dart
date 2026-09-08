@@ -25,7 +25,7 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
   double _currentSpeed = 38.5;
   double _simLat = 15.5925;
   double _simLng = 32.5310;
-  int _batteryLevel = 92;
+  final int _batteryLevel = 92;
   String _lastBroadcastTime = '—';
   final Map<String, String> _localAttendanceState = {};
 
@@ -252,7 +252,7 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withOpacity(0.15),
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.directions_bus, color: Color(0xFF38BDF8), size: 28),
@@ -282,8 +282,8 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isContracted
-                      ? const Color(0xFFF59E0B).withOpacity(0.2)
-                      : const Color(0xFF10B981).withOpacity(0.2),
+                      ? const Color(0xFFF59E0B).withValues(alpha: 0.2)
+                      : const Color(0xFF10B981).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isContracted ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
@@ -355,7 +355,7 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
                       boxShadow: _isBroadcasting
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF10B981).withOpacity(0.8),
+                                color: const Color(0xFF10B981).withValues(alpha: 0.8),
                                 blurRadius: 8,
                                 spreadRadius: 2,
                               )
@@ -386,7 +386,7 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
             children: [
               _buildHudMetric(
                 icon: Icons.speed,
-                value: '${_currentSpeed.toStringAsFixed(1)}',
+                value: _currentSpeed.toStringAsFixed(1),
                 unit: 'كم/ساعة',
                 label: 'السرعة الحالية',
                 color: const Color(0xFF38BDF8),
@@ -482,7 +482,7 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
             children: [
               CircleAvatar(
                 radius: 14,
-                backgroundColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                backgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
                 child: Text(
                   '${stop.sequence}',
                   style: GoogleFonts.tajawal(
@@ -657,13 +657,14 @@ class _DriverTripLivePageState extends ConsumerState<DriverTripLivePage> {
                 _gpsBroadcastTimer?.cancel();
                 setState(() => _isBroadcasting = false);
                 try {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(context);
                   await ref.read(transportRepositoryProvider).completeTrip(widget.tripId);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم إنهاء الرحلة بنجاح')),
-                    );
-                    Navigator.pop(context);
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('تم إنهاء الرحلة بنجاح')),
+                  );
+                  navigator.pop();
                 } catch (_) {}
               },
               child: Text(

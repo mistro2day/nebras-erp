@@ -185,7 +185,7 @@ class ChildDetailPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withOpacity(0.15),
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.directions_bus, color: Color(0xFF0284C7), size: 22),
@@ -205,7 +205,7 @@ class ChildDetailPage extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
