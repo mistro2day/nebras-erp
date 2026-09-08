@@ -511,6 +511,45 @@ class InstallmentPlanViewSet(BaseCRUDViewSet):
     serializer_class = InstallmentPlanSerializer
 
 
+def _sync_invoices_to_installments(tenant_id):
+    """
+    مزامنة آلية لأي فواتير صادرة للطلاب بدون أقساط مجدولة، لضمان إدراجها
+    فورياً في تقويم الدفعات والأقساط وتصدير المستحقين الشهري.
+    """
+    if not tenant_id:
+        return
+    invoices = list(StudentInvoice.objects.filter(tenant_id=tenant_id, installments__isnull=True))
+    if not invoices:
+        return
+
+    plan = InstallmentPlan.objects.filter(tenant_id=tenant_id, is_active=True).first()
+    if not plan:
+        plan = InstallmentPlan.objects.create(
+            tenant_id=tenant_id,
+            name='خطة الأقساط المعتمدة',
+            number_of_installments=1,
+            grace_period_days=7,
+            is_active=True
+        )
+
+    for inv in invoices:
+        due = inv.due_date or inv.issue_date or timezone.localdate()
+        amt = inv.total_amount or 0
+        paid = inv.paid_amount or 0
+        is_paid = (paid >= amt and amt > 0)
+        Installment.objects.create(
+            tenant_id=tenant_id,
+            student_billing_account=inv.student_billing_account,
+            invoice=inv,
+            installment_plan=plan,
+            due_date=due,
+            amount=amt,
+            paid_amount=paid,
+            status='paid' if is_paid else 'pending',
+            created_by=inv.created_by
+        )
+
+
 class InstallmentViewSet(BaseCRUDViewSet):
     model_class = Installment
     serializer_class = InstallmentSerializer
@@ -518,6 +557,10 @@ class InstallmentViewSet(BaseCRUDViewSet):
     search_fields = ['invoice__invoice_number', 'student_billing_account__account_number']
 
     def get_queryset(self):
+        tenant_id = getattr(self.request, 'tenant_id', None)
+        if tenant_id:
+            _sync_invoices_to_installments(tenant_id)
+
         qs = super().get_queryset()
         account = self.request.query_params.get('student_billing_account')
         status_param = self.request.query_params.get('status')
@@ -553,6 +596,8 @@ class InstallmentViewSet(BaseCRUDViewSet):
         """عرض تقويم استحقاق الأقساط والدفعات للطلاب مع مؤشرات ذكية وتصنيف زمني."""
         tenant_id = request.tenant_id
         today = timezone.localdate()
+        if tenant_id:
+            _sync_invoices_to_installments(tenant_id)
         
         # قراءة معايير التاريخ
         try:
@@ -761,6 +806,8 @@ class InstallmentViewSet(BaseCRUDViewSet):
 
         tenant_id = request.tenant_id
         today = timezone.localdate()
+        if tenant_id:
+            _sync_invoices_to_installments(tenant_id)
 
         try:
             year = int(request.query_params.get('year', today.year))

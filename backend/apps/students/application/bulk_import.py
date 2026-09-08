@@ -17,7 +17,7 @@ from apps.students.domain.services import StudentNumberGenerator
 from apps.students.domain.events import DomainEventPublisher
 from apps.students.application.services import resolve_branch_for_gender, StudentApplicationService
 from decimal import Decimal
-from apps.student_finance.domain.models import StudentBillingAccount, StudentInvoice, Receipt
+from apps.student_finance.domain.models import StudentBillingAccount, StudentInvoice, Receipt, Installment, InstallmentPlan
 try:
     from apps.clinic.application import profile_service as clinic_profiles
 except ImportError:
@@ -1091,7 +1091,7 @@ class StudentBulkImportService:
                                 candidate_inv = f"{base_inv}-{inv_counter}"
                                 inv_counter += 1
 
-                            StudentInvoice.objects.create(
+                            invoice = StudentInvoice.objects.create(
                                 tenant_id=tenant_id,
                                 student_billing_account=billing_acc,
                                 invoice_number=candidate_inv,
@@ -1101,6 +1101,30 @@ class StudentBulkImportService:
                                 total_amount=fees_val,
                                 paid_amount=paid_val,
                                 outstanding_amount=rem_val,
+                                created_by=user_id
+                            )
+
+                            # إنشاء قسط مجدول متصل بالفاتورة لإدراجه فوراً في تقويم الدفعات
+                            default_plan = InstallmentPlan.objects.filter(tenant_id=tenant_id, is_active=True).first()
+                            if not default_plan:
+                                default_plan = InstallmentPlan.objects.create(
+                                    tenant_id=tenant_id,
+                                    name='خطة الأقساط المعتمدة',
+                                    number_of_installments=1,
+                                    grace_period_days=7,
+                                    is_active=True,
+                                    created_by=user_id
+                                )
+
+                            Installment.objects.create(
+                                tenant_id=tenant_id,
+                                student_billing_account=billing_acc,
+                                invoice=invoice,
+                                installment_plan=default_plan,
+                                due_date=invoice.due_date,
+                                amount=fees_val,
+                                paid_amount=paid_val,
+                                status='paid' if rem_val <= 0 else 'pending',
                                 created_by=user_id
                             )
 
