@@ -98,6 +98,20 @@ export class StudentFinanceService {
     return this.api.get<any>(`student-finance/installments/${id}/reminder-info/`);
   }
 
+  /**
+   * تصدير كشف الطلاب المستحقين في الأقساط والدفعات لشهر محدد كملف Excel (Blob)
+   */
+  exportMonthlyDues(year: number, month: number, status?: string): Observable<Blob> {
+    const params: any = { year, month };
+    if (status && status !== 'all') {
+      params.status = status;
+    }
+    return this.http.get('/api/student-finance/installments/export-monthly-dues/', {
+      params,
+      responseType: 'blob'
+    });
+  }
+
   // ---- كشف حساب الطالب المالي الشامل ----
   getAccountStatement(accountId: string): Observable<{
     success: boolean;

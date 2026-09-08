@@ -11,17 +11,21 @@ from apps.students.domain.models import (
     Student, StudentProfile, StudentMedicalProfile,
     StudentFamilyRelation, StudentEnrollment
 )
-from apps.academics.domain.models import Grade, Section, AcademicYear
+from apps.academics.domain.models import Grade, Section, AcademicYear, Stage
 from apps.organization.domain.models import Branch
 from apps.students.domain.services import StudentNumberGenerator
 from apps.students.domain.events import DomainEventPublisher
 from apps.students.application.services import resolve_branch_for_gender, StudentApplicationService
 from decimal import Decimal
 from apps.student_finance.domain.models import StudentBillingAccount, StudentInvoice, Receipt
-from openpyxl.worksheet.datavalidation import DataValidation
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-import openpyxl
+try:
+    from apps.clinic.application import profile_service as clinic_profiles
+except ImportError:
+    clinic_profiles = None
+from openpyxl.worksheet.datavalidation import DataValidation  # type: ignore
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
+from openpyxl.utils import get_column_letter  # type: ignore
+import openpyxl  # type: ignore
 
 
 class StudentBulkImportService:
@@ -39,6 +43,7 @@ class StudentBulkImportService:
         {'id': 'nationality', 'label': 'الجنسية', 'required': False, 'width': 16, 'example': 'سوداني'},
         {'id': 'religion', 'label': 'الديانة (مسلم / مسيحي)', 'required': False, 'width': 20, 'example': 'مسلم'},
         {'id': 'blood_group', 'label': 'فصيلة الدم', 'required': False, 'width': 14, 'example': 'O+'},
+        {'id': 'stage_name', 'label': 'المرحلة الدراسية', 'required': False, 'width': 22, 'example': 'مرحلة الأساس'},
         {'id': 'grade_name', 'label': 'الصف الدراسي *', 'required': True, 'width': 22, 'example': 'الصف الأول'},
         {'id': 'section_name', 'label': 'الفصل / الشعبة', 'required': False, 'width': 18, 'example': 'شعبة (أ)'},
         {'id': 'guardian_name', 'label': 'اسم ولي الأمر رباعي *', 'required': True, 'width': 30, 'example': 'دفع الله الفاتح بابكر عثمان'},
@@ -141,9 +146,9 @@ class StudentBulkImportService:
     @classmethod
     def generate_excel_template(cls, tenant_id: uuid.UUID) -> io.BytesIO:
         """
-        توليد مصنف إكسل رسمي (.xlsx) متكامل من ورقتين:
-        1. كشف الطلاب (مع ترويسة احترافية وتلوين الحقول الإلزامية وبيانات توضيحية سودانية).
-        2. دليل الإدخال والخيارات المتاحة (يسرد الصفوف والشعب الحالية بالمدرسة والقيم المقبولة).
+        توليد مصنف إكسل رسمي (.xlsx) متكامل ومحدث تلقائياً بمراحل وصفوف مدرستك:
+        1. كشف الطلاب: ترويسة احترافية، حقول إلزامية، أمثلة واقعية من صفوف المدرسة، وقوائم منسدلة مربوطة ديناميكياً.
+        2. دليل الخيارات والصفوف والمراحل المتاحة: يسرد كافة المراحل المعتمدة وصفوفها وشعبها بالمدرسة ونظام التقييم.
         """
         import openpyxl  # type: ignore
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side  # type: ignore
@@ -168,14 +173,18 @@ class StudentBulkImportService:
         )
         
         # الألوان
-        primary_teal = PatternFill('solid', fgColor='0F766E') # لون الترويسة الرئيسي
-        required_fill = PatternFill('solid', fgColor='134E4A') # ترويسة الحقول الإلزامية
-        optional_fill = PatternFill('solid', fgColor='0D9488') # ترويسة الحقول الاختيارية
+        primary_teal = PatternFill('solid', fgColor='0F766E')  # لون الترويسة الرئيسي
+        required_fill = PatternFill('solid', fgColor='134E4A')  # ترويسة الحقول الإلزامية
+        optional_fill = PatternFill('solid', fgColor='0D9488')  # ترويسة الحقول الاختيارية
         sample_fill = PatternFill('solid', fgColor='F8FAFC')
         alt_sample_fill = PatternFill('solid', fgColor='F1F5F9')
 
         center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
         right_align = Alignment(horizontal='right', vertical='center')
+
+        # جلب المراحل والصفوف الحالية للمستأجر
+        stages_qs = list(Stage.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).order_by('order'))
+        grades_qs = list(Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).select_related('stage').prefetch_related('sections').order_by('stage__order', 'order'))
 
         # عنوان ورئيسية النموذج
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(cls.TEMPLATE_COLUMNS))
@@ -186,7 +195,7 @@ class StudentBulkImportService:
         ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(cls.TEMPLATE_COLUMNS))
         sub_cell = ws.cell(
             row=2, column=1,
-            value='تنبيه: الحقول التي تحتوي علامة (*) إلزامية. يرجى ملء البيانات أو حذف الأسطر التوضيحية الثلاثة الأولى قبل الرفع.'
+            value='تنبيه: الحقول التي تحتوي علامة (*) إلزامية. يتم تحديث خيارات المراحل والصفوف تلقائياً من نظام مدرستك. يرجى حذف الأسطر التوضيحية قبل الرفع.'
         )
         sub_cell.font = Font(name='Arial', size=10, bold=False, color='64748B')
         sub_cell.alignment = center_align
@@ -200,8 +209,25 @@ class StudentBulkImportService:
             cell.border = thin_border
             ws.column_dimensions[get_column_letter(col_idx)].width = col_def['width']
 
+        # تجهيز أسطر العينات التوضيحية مع تكييفها ديناميكياً مع المراحل والصفوف المسجلة
+        dynamic_samples = []
+        base_samples = list(cls.SAMPLE_ROWS)
+        for i, s_row in enumerate(base_samples):
+            row_copy = dict(s_row)
+            if grades_qs:
+                target_grade = grades_qs[i % len(grades_qs)]
+                row_copy['grade_name'] = target_grade.name
+                row_copy['stage_name'] = target_grade.stage.name if target_grade.stage else (stages_qs[0].name if stages_qs else 'مرحلة الأساس')
+                sec_list = [s.name for s in target_grade.sections.filter(deleted_at__isnull=True)]
+                row_copy['section_name'] = sec_list[0] if sec_list else 'شعبة (أ)'
+            else:
+                row_copy['stage_name'] = stages_qs[0].name if stages_qs else 'المرحلة الابتدائية'
+                row_copy['grade_name'] = 'الصف الأول'
+                row_copy['section_name'] = 'شعبة (أ)'
+            dynamic_samples.append(row_copy)
+
         # تعبئة الأسطر النموذجية التوضيحية (الصفوف 5 و 6 و 7)
-        for row_idx, sample in enumerate(cls.SAMPLE_ROWS, start=5):
+        for row_idx, sample in enumerate(dynamic_samples, start=5):
             for col_idx, col_def in enumerate(cls.TEMPLATE_COLUMNS, start=1):
                 col_key = str(col_def.get('id', ''))
                 val = sample.get(col_key, '')
@@ -211,29 +237,44 @@ class StudentBulkImportService:
                 cell.alignment = right_align if isinstance(val, str) and not val.startswith('20') else center_align
                 cell.border = thin_border
 
-        # --- الورقة الثانية: دليل الإدخال والخيارات المتاحة بالمستأجر ---
+        # --- الورقة الثانية: دليل الخيارات والصفوف والمراحل المتاحة بالمستأجر ---
         ws_guide = wb.create_sheet(title='دليل الخيارات والصفوف المتاحة')
         ws_guide.sheet_view.rightToLeft = True
 
+        # ترويسة جدول الصفوف المتاحة (A إلى D)
         ws_guide.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
         g_title = ws_guide.cell(row=1, column=1, value='دليل خيارات الصفوف والشعب المعتمدة في مدرستك')
-        g_title.font = Font(name='Arial', size=13, bold=True, color='134E4A')
+        g_title.font = Font(name='Arial', size=12, bold=True, color='134E4A')
         g_title.alignment = center_align
 
-        guide_headers = ['الصف الدراسي المتاح', 'رمز الصف', 'الشعب والفصول التابعة', 'المرحلة الدراسية']
+        guide_headers = ['الصف الدراسي المتاح', 'رمز الصف', 'الشعب والفصول التابعة', 'المرحلة التابع لها']
         for c_idx, h in enumerate(guide_headers, start=1):
             c = ws_guide.cell(row=3, column=c_idx, value=h)
-            c.font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+            c.font = Font(name='Arial', size=10.5, bold=True, color='FFFFFF')
             c.fill = primary_teal
             c.alignment = center_align
             c.border = thin_border
             ws_guide.column_dimensions[get_column_letter(c_idx)].width = 24
 
-        # جلب الصفوف والشعب الحالية للمستأجر
-        grades_qs = Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).prefetch_related('sections', 'stage')
+        # ترويسة جدول المراحل الدراسية المعتمدة (F إلى H)
+        ws_guide.merge_cells(start_row=1, start_column=6, end_row=1, end_column=8)
+        s_title = ws_guide.cell(row=1, column=6, value='دليل المراحل الدراسية المعتمدة في مدرستك')
+        s_title.font = Font(name='Arial', size=12, bold=True, color='134E4A')
+        s_title.alignment = center_align
+
+        stage_headers = ['المرحلة الدراسية المعتمدة', 'رمز المرحلة', 'نظام التقييم ونسبة النجاح']
+        for s_idx, sh in enumerate(stage_headers, start=6):
+            c = ws_guide.cell(row=3, column=s_idx, value=sh)
+            c.font = Font(name='Arial', size=10.5, bold=True, color='FFFFFF')
+            c.fill = primary_teal
+            c.alignment = center_align
+            c.border = thin_border
+            ws_guide.column_dimensions[get_column_letter(s_idx)].width = 25
+
+        # تعبئة الصفوف والشعب الحالية للمستأجر
         r_counter = 4
         grades_count = 0
-        if grades_qs.exists():
+        if grades_qs:
             for g in grades_qs:
                 sections_list = [s.name for s in g.sections.filter(deleted_at__isnull=True)]
                 sections_str = '، '.join(sections_list) if sections_list else 'عام'
@@ -250,28 +291,52 @@ class StudentBulkImportService:
                 r_counter += 1
                 grades_count += 1
         else:
-            ws_guide.cell(row=4, column=1, value='لم يتم تعريف صفوف بعد، يرجى تهيئة المرحلة الدراسية أو كتابة الصف في الكشف.').alignment = right_align
+            ws_guide.cell(row=4, column=1, value='لم يتم تعريف صفوف بعد، يرجى تهيئة المراحل والصفوف.').alignment = right_align
+
+        # تعبئة المراحل الدراسية الحالية للمستأجر
+        stg_counter = 4
+        stages_count = 0
+        if stages_qs:
+            for stg in stages_qs:
+                is_kg = bool(stg.name and 'روض' in stg.name)
+                if is_kg:
+                    eval_system = 'مرحلة رياض أطفال (تقييم وصفي)'
+                else:
+                    eval_system = f'سن القبول: {stg.minimum_age} - {stg.maximum_age} سنة'
+
+                ws_guide.cell(row=stg_counter, column=6, value=stg.name).alignment = right_align
+                ws_guide.cell(row=stg_counter, column=7, value=stg.code).alignment = center_align
+                ws_guide.cell(row=stg_counter, column=8, value=eval_system).alignment = center_align
+
+                for c_idx in range(6, 9):
+                    ws_guide.cell(row=stg_counter, column=c_idx).font = Font(name='Arial', size=10)
+                    ws_guide.cell(row=stg_counter, column=c_idx).border = thin_border
+                stg_counter += 1
+                stages_count += 1
 
         # إضافة جدول القيم المسموح بها في الأعمدة الحصرية
-        r_counter += 2
-        ws_guide.cell(row=r_counter, column=1, value='الحقل').font = Font(bold=True)
-        ws_guide.cell(row=r_counter, column=2, value='القيم المقبولة المدعومة').font = Font(bold=True)
+        tbl_row = max(r_counter, stg_counter) + 2
+        ws_guide.cell(row=tbl_row, column=1, value='الحقل').font = Font(bold=True)
+        ws_guide.cell(row=tbl_row, column=2, value='القيم المقبولة المدعومة').font = Font(bold=True)
         for ci in range(1, 3):
-            ws_guide.cell(row=r_counter, column=ci).fill = PatternFill('solid', fgColor='E2E8F0')
-            ws_guide.cell(row=r_counter, column=ci).border = thin_border
-        r_counter += 1
+            ws_guide.cell(row=tbl_row, column=ci).fill = PatternFill('solid', fgColor='E2E8F0')
+            ws_guide.cell(row=tbl_row, column=ci).border = thin_border
+        tbl_row += 1
 
         allowed_values = [
             ('الجنس', 'ذكر أو أنثى'),
             ('تاريخ الميلاد', 'صيغة تاريخ قياسية مثل: 2015-05-14 أو 14/05/2015'),
+            ('المرحلة الدراسية', 'المراحل المعتمدة بالمدرسة الموضحة في الجدول أعلاه'),
+            ('الصف الدراسي', 'الصفوف المعتمدة بالمدرسة الموضحة في الجدول أعلاه'),
             ('صلة القرابة', 'أب، أم، ولي أمر، كفيل، شقيق'),
             ('فصيلة الدم', 'O+, O-, A+, A-, B+, B-, AB+, AB-'),
             ('رقم هاتف ولي الأمر', 'رقم سوداني (يبدأ بـ 09 أو 01 ويتكون من 10 أرقام)'),
+            ('نوع القيد', 'جديد أو تجديد تسجيل'),
         ]
         for field, vals in allowed_values:
-            ws_guide.cell(row=r_counter, column=1, value=field).border = thin_border
-            ws_guide.cell(row=r_counter, column=2, value=vals).border = thin_border
-            r_counter += 1
+            ws_guide.cell(row=tbl_row, column=1, value=field).border = thin_border
+            ws_guide.cell(row=tbl_row, column=2, value=vals).border = thin_border
+            tbl_row += 1
 
         # --- تطبيق القوائم المنسدلة (Data Validation) لمنع الإدخال الخاطئ نهائياً ---
         # 1. الجنس (العمود C)
@@ -326,7 +391,22 @@ class StudentBulkImportService:
         ws.add_data_validation(dv_blood)
         dv_blood.add("H5:H1000")
 
-        # 5. الصف الدراسي (العمود I)
+        # 5. المرحلة الدراسية (العمود I)
+        if stages_count > 0:
+            stage_formula = f"='دليل الخيارات والصفوف المتاحة'!$F$4:$F${3 + stages_count}"
+            dv_stage = DataValidation(
+                type="list",
+                formula1=stage_formula,
+                allow_blank=True,
+                promptTitle="المرحلة الدراسية",
+                prompt="يرجى اختيار المرحلة الدراسية المعتمدة من القائمة المنسدلة.",
+                errorTitle="مرحلة غير معتمدة",
+                error="يرجى اختيار إحدى المراحل الدراسية المعتمدة بمدرستك من القائمة."
+            )
+            ws.add_data_validation(dv_stage)
+            dv_stage.add("I5:I1000")
+
+        # 6. الصف الدراسي (العمود J)
         if grades_count > 0:
             grade_formula = f"='دليل الخيارات والصفوف المتاحة'!$A$4:$A${3 + grades_count}"
             dv_grade = DataValidation(
@@ -339,9 +419,9 @@ class StudentBulkImportService:
                 error="يرجى اختيار أحد الصفوف الدراسية المعتمدة بالمدرسة من القائمة المنسدلة."
             )
             ws.add_data_validation(dv_grade)
-            dv_grade.add("I5:I1000")
+            dv_grade.add("J5:J1000")
 
-        # 6. صلة القرابة (العمود L)
+        # 7. صلة القرابة (العمود M)
         dv_relation = DataValidation(
             type="list",
             formula1='"أب,أم,ولي أمر,كفيل,شقيق"',
@@ -352,9 +432,9 @@ class StudentBulkImportService:
             error="يرجى اختيار صلة القرابة من القائمة المنسدلة."
         )
         ws.add_data_validation(dv_relation)
-        dv_relation.add("L5:L1000")
+        dv_relation.add("M5:M1000")
 
-        # 7. نوع القيد والتسجيل (العمود V)
+        # 8. نوع القيد والتسجيل (العمود W)
         dv_enrollment = DataValidation(
             type="list",
             formula1='"جديد,تجديد تسجيل"',
@@ -365,7 +445,7 @@ class StudentBulkImportService:
             error="يرجى اختيار نوع القيد من القائمة المنسدلة."
         )
         ws.add_data_validation(dv_enrollment)
-        dv_enrollment.add("V5:V1000")
+        dv_enrollment.add("W5:W1000")
 
         output = io.BytesIO()
         wb.save(output)
@@ -455,7 +535,8 @@ class StudentBulkImportService:
             'nationality': ['الجنسية', 'nationality'],
             'religion': ['الديانة', 'religion'],
             'blood_group': ['فصيلة الدم', 'الفصيلة', 'blood_group'],
-            'grade_name': ['الصف الدراسي', 'الصف', 'المرحلة', 'grade_name', 'grade'],
+            'stage_name': ['المرحلة الدراسية', 'المرحلة التعليمية', 'المرحلة', 'اسم المرحلة', 'stage_name', 'stage'],
+            'grade_name': ['الصف الدراسي', 'اسم الصف', 'الصف', 'grade_name', 'grade'],
             'section_name': ['الفصل', 'الشعبة', 'اسم الفصل', 'الفصل / الشعبة', 'section_name', 'section'],
             'guardian_name': ['اسم ولي الأمر رباعي', 'اسم ولي الأمر', 'ولي الأمر', 'guardian_name'],
             'guardian_relation': ['صلة القرابة', 'الصلة', 'القرابة', 'guardian_relation'],
@@ -495,7 +576,7 @@ class StudentBulkImportService:
         """
         if not text:
             return ""
-        t = str(text).strip().lower()
+        t = text.strip().lower()
         # إزالة التشكيل
         t = re.sub(r'[\u064B-\u065F\u0670]', '', t)
         # توحيد الألفات
@@ -509,15 +590,36 @@ class StudentBulkImportService:
         return t
 
     @classmethod
-    def _match_grade(cls, input_grade_name: str, grades_dict: dict):
+    def _match_grade(cls, input_grade_name: str, grades_dict: dict, input_stage_name: str = ''):
         """
         مطابقة ذكية للصف الدراسي بين ما أدخله المستخدم والصفوف المسجلة بالمستأجر.
-        يدعم المطابقة الدقيقة، التطبيع العربي، وتجاهل 'الـ' التعريفية، مثل مطابقة
-        «الصف الخامس ابتدائي» مع «الصف الخامس الابتدائي».
+        يدعم التصفية بالمرحلة الدراسية لتفادي تشابه أسماء الصفوف، المطابقة الدقيقة،
+        التطبيع العربي، وتجريد "الـ" التعريفية.
         """
         if not input_grade_name or not grades_dict:
             return None
 
+        # 1. إذا تم تحديد مرحلة، حاول أولاً البحث ضمن صفوف هذه المرحلة لتفادي تشابه الأسماء
+        if input_stage_name:
+            norm_stg = cls._normalize_arabic(input_stage_name)
+            stg_filtered_dict = {
+                k: g for k, g in grades_dict.items()
+                if g.stage and (
+                    cls._normalize_arabic(g.stage.name) == norm_stg or
+                    norm_stg in cls._normalize_arabic(g.stage.name) or
+                    cls._normalize_arabic(g.stage.name) in norm_stg
+                )
+            }
+            if stg_filtered_dict:
+                matched = cls._match_grade_internal(input_grade_name, stg_filtered_dict)
+                if matched:
+                    return matched
+
+        # 2. البحث في كافة الصفوف
+        return cls._match_grade_internal(input_grade_name, grades_dict)
+
+    @classmethod
+    def _match_grade_internal(cls, input_grade_name: str, grades_dict: dict):
         raw = input_grade_name.strip()
         if raw in grades_dict:
             return grades_dict[raw]
@@ -566,7 +668,7 @@ class StudentBulkImportService:
             }
 
         # جلب الطلاب والصفوف والشعب المتاحة للتحقق السريع ومنع التكرار
-        existing_grades = {g.name.strip(): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+        existing_grades = {g.name.strip(): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).select_related('stage')}
         
         existing_profiles = StudentProfile.objects.filter(
             tenant_id=tenant_id, student__deleted_at__isnull=True
@@ -692,15 +794,22 @@ class StudentBulkImportService:
                     row_warnings.append(f"رقم الهاتف «{g_phone}» قد لا يطابق شبكات الاتصال السودانية (09/01).")
                 row['guardian_phone'] = clean_phone
 
-            # 7. فحص ومطابقة الصف الدراسي بذكاء
+            # 7. فحص ومطابقة الصف الدراسي والمرحلة بذكاء
+            stage_name = row.get('stage_name', '').strip()
             grade_name = row.get('grade_name', '').strip()
             if not grade_name:
                 row_errors.append("الصف الدراسي إلزامي لتسكين الطالب.")
             elif existing_grades:
-                matching_grade = cls._match_grade(grade_name, existing_grades)
+                matching_grade = cls._match_grade(grade_name, existing_grades, input_stage_name=stage_name)
                 if matching_grade:
                     row['matched_grade_id'] = str(matching_grade.id)
                     row['matched_grade_name'] = matching_grade.name
+                    row['matched_stage_name'] = matching_grade.stage.name if matching_grade.stage else ''
+                    if stage_name and matching_grade.stage:
+                        norm_input_stg = cls._normalize_arabic(stage_name)
+                        norm_actual_stg = cls._normalize_arabic(matching_grade.stage.name)
+                        if norm_input_stg != norm_actual_stg and norm_input_stg not in norm_actual_stg and norm_actual_stg not in norm_input_stg:
+                            row_warnings.append(f"الصف «{matching_grade.name}» يتبع لمرحلة «{matching_grade.stage.name}» بينما تم تحديد «{stage_name}».")
                 else:
                     row_warnings.append(f"لم يتم العثور على صف مطابق تماماً لـ «{grade_name}» في المدرسة.")
 
@@ -785,7 +894,7 @@ class StudentBulkImportService:
                 academic_year_id = active_year.id
 
         # كاش الفصول والصفوف لتقليل الاستعلامات
-        grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
+        grades_map = {str(g.id): g for g in Grade.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True).select_related('stage')}
         grades_by_name = {g.name.strip(): g for g in grades_map.values()}
         sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
         sections_by_name = {s.name.strip(): s for s in sections_map.values()}
@@ -886,7 +995,7 @@ class StudentBulkImportService:
                     )
                     if row_data.get('medical_notes'):
                         try:
-                            intake_fn = getattr(clinic_profiles, 'write_intake', None)
+                            intake_fn = getattr(clinic_profiles, 'write_intake', None) if clinic_profiles else None
                             if callable(intake_fn):
                                 intake_fn(
                                     tenant_id=tenant_id,
@@ -924,7 +1033,8 @@ class StudentBulkImportService:
                     if matched_gid and matched_gid in grades_map:
                         grade_obj = grades_map[matched_gid]
                     elif row_data.get('grade_name'):
-                        grade_obj = cls._match_grade(row_data['grade_name'], grades_by_name)
+                        stg_input = row_data.get('stage_name', '')
+                        grade_obj = cls._match_grade(row_data['grade_name'], grades_by_name, input_stage_name=stg_input)
 
                     section_obj = None
                     sec_name = row_data.get('section_name', '').strip()
@@ -958,69 +1068,82 @@ class StudentBulkImportService:
                         rem_val = Decimal(str(row_data.get('remaining_amount') or max(0, fees_val - paid_val)))
                         rcp_no = str(row_data.get('receipt_number') or '').strip()
 
-                        if fees_val > 0 or paid_val > 0 or rcp_no:
-                            # 1. فتح أو جلب حساب فوترة الطالب
-                            billing_acc, _ = StudentBillingAccount.objects.get_or_create(
+                        # 1. فتح أو جلب حساب فوترة الطالب دائماً لضمان توفر كشف الحساب فور الاستيراد
+                        billing_acc, _ = StudentBillingAccount.objects.get_or_create(
+                            tenant_id=tenant_id,
+                            student_id=student.id,
+                            defaults={
+                                'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M')}-{student_number}",
+                                'opening_balance': Decimal('0.0'),
+                                'current_balance': rem_val,
+                                'outstanding_balance': rem_val,
+                                'credit_balance': Decimal('0.0'),
+                                'created_by': user_id
+                            }
+                        )
+
+                        # 2. إنشاء فاتورة الرسوم الدراسية إذا كان هناك رسوم مستحقة
+                        if fees_val > 0:
+                            base_inv = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
+                            candidate_inv = base_inv
+                            inv_counter = 1
+                            while StudentInvoice.objects.filter(tenant_id=tenant_id, invoice_number=candidate_inv).exists():
+                                candidate_inv = f"{base_inv}-{inv_counter}"
+                                inv_counter += 1
+
+                            StudentInvoice.objects.create(
                                 tenant_id=tenant_id,
-                                student_id=student.id,
-                                defaults={
-                                    'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M')}-{student_number}",
-                                    'opening_balance': Decimal('0.0'),
-                                    'current_balance': rem_val,
-                                    'outstanding_balance': rem_val,
-                                    'credit_balance': Decimal('0.0'),
-                                    'created_by': user_id
-                                }
+                                student_billing_account=billing_acc,
+                                invoice_number=candidate_inv,
+                                issue_date=datetime.date.today(),
+                                due_date=datetime.date.today() + datetime.timedelta(days=30),
+                                status='posted',
+                                total_amount=fees_val,
+                                paid_amount=paid_val,
+                                outstanding_amount=rem_val,
+                                created_by=user_id
                             )
 
-                            # 2. إنشاء فاتورة الرسوم الدراسية مع تفادي تكرار رقم الفاتورة
-                            if fees_val > 0:
-                                base_inv = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
-                                candidate_inv = base_inv
-                                inv_counter = 1
-                                while StudentInvoice.objects.filter(tenant_id=tenant_id, invoice_number=candidate_inv).exists():
-                                    candidate_inv = f"{base_inv}-{inv_counter}"
-                                    inv_counter += 1
+                        # 3. إنشاء إيصال التحصيل مع تفادي تعارض وتكرار رقم الإيصال
+                        if paid_val > 0:
+                            base_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number[-4:]}"
+                            candidate_rcp = base_rcp
+                            rcp_counter = 1
+                            while Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
+                                candidate_rcp = f"{base_rcp}-{student_number[-4:]}"
+                                if Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
+                                    candidate_rcp = f"{base_rcp}-{rcp_counter}"
+                                    rcp_counter += 1
 
-                                StudentInvoice.objects.create(
-                                    tenant_id=tenant_id,
-                                    student_billing_account=billing_acc,
-                                    invoice_number=candidate_inv,
-                                    issue_date=datetime.date.today(),
-                                    due_date=datetime.date.today() + datetime.timedelta(days=30),
-                                    status='posted',
-                                    total_amount=fees_val,
-                                    paid_amount=paid_val,
-                                    outstanding_amount=rem_val,
-                                    created_by=user_id
-                                )
+                            # البحث عن طريقة دفع بالاسم إن أمكن
+                            payment_method_id = None
+                            try:
+                                from apps.finance.domain.models import PaymentMethod
+                                pm = PaymentMethod.objects.filter(tenant_id=tenant_id, name_ar__icontains='بنكك').first()
+                                if not pm:
+                                    pm = PaymentMethod.objects.filter(tenant_id=tenant_id).first()
+                                if pm:
+                                    payment_method_id = pm.id
+                            except Exception:
+                                pass
+                            if not payment_method_id:
+                                payment_method_id = uuid.uuid4()
 
-                            # 3. إنشاء إيصال التحصيل مع تفادي تعارض وتكرار رقم الإيصال
-                            if paid_val > 0:
-                                base_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number[-4:]}"
-                                candidate_rcp = base_rcp
-                                rcp_counter = 1
-                                while Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
-                                    candidate_rcp = f"{base_rcp}-{student_number[-4:]}"
-                                    if Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
-                                        candidate_rcp = f"{base_rcp}-{rcp_counter}"
-                                        rcp_counter += 1
+                            Receipt.objects.create(
+                                tenant_id=tenant_id,
+                                student_billing_account=billing_acc,
+                                receipt_number=candidate_rcp,
+                                payment_date=datetime.date.today(),
+                                amount=paid_val,
+                                payment_method_id=payment_method_id,
+                                status='posted',
+                                created_by=user_id
+                            )
 
-                                Receipt.objects.create(
-                                    tenant_id=tenant_id,
-                                    student_billing_account=billing_acc,
-                                    receipt_number=candidate_rcp,
-                                    payment_date=datetime.date.today(),
-                                    amount=paid_val,
-                                    payment_method_id=uuid.uuid4(),
-                                    status='posted',
-                                    created_by=user_id
-                                )
-
-                            # تحديث رصيد حساب الفوترة
-                            billing_acc.outstanding_balance = rem_val
-                            billing_acc.current_balance = rem_val
-                            billing_acc.save(update_fields=['outstanding_balance', 'current_balance'])
+                        # تحديث رصيد حساب الفوترة
+                        billing_acc.outstanding_balance = rem_val
+                        billing_acc.current_balance = rem_val
+                        billing_acc.save(update_fields=['outstanding_balance', 'current_balance'])
                     except Exception as fin_err:
                         import logging
                         logging.getLogger('nebras.students').warning(f"تعذر إتمام الربط المالي التلقائي للسطر {idx}: {fin_err}")

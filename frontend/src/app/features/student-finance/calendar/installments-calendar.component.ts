@@ -32,6 +32,15 @@ export interface CalendarDay {
         subtitle="متابعة مواعيد استحقاق أقساط الطلاب، مؤشرات السداد اليومية والأسبوعية، وتسهيل التحصيل الفوري.">
         <div class="header-actions">
           <button class="btn secondary" (click)="goBack()">← العودة للوحة المالية</button>
+          <button class="btn success export-dues-btn" (click)="exportMonthlyDuesExcel()" [disabled]="exportingExcel()" title="تصدير كشف إكسل للطلاب المستحقين لهذا الشهر">
+            @if (exportingExcel()) {
+              <span class="spinner-sm"></span>
+              <span>جارِ التصدير...</span>
+            } @else {
+              <span class="btn-icon">📥</span>
+              <span>تصدير مستحقي الشهر (Excel)</span>
+            }
+          </button>
           <button class="btn primary" (click)="loadData()">🔄 تحديث البيانات</button>
         </div>
       </nb-page-header>
@@ -544,9 +553,35 @@ export interface CalendarDay {
     .btn.primary:hover { background: var(--nb-primary-700, #1d4ed8); }
     .btn.secondary { background: var(--nb-surface, #fff); border-color: var(--nb-border, #e5e7eb); color: var(--nb-text, #1f2937); }
     .btn.secondary:hover { background: var(--nb-surface-raised, #f3f4f6); }
+    .btn.success {
+      background: #059669;
+      color: #ffffff;
+      border-color: #047857;
+      box-shadow: 0 1px 2px rgba(5, 150, 105, 0.2);
+    }
+    .btn.success:hover:not(:disabled) {
+      background: #047857;
+      transform: translateY(-1px);
+    }
+    .btn.success:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
     .btn.ghost { background: transparent; color: var(--nb-text-secondary, #4b5563); }
     .btn.ghost:hover { background: var(--nb-surface-raised, #f3f4f6); }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .spinner-sm {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
 
     /* شبكة مؤشرات الأداء */
     .kpi-grid {
@@ -1525,6 +1560,38 @@ export class SfInstallmentsCalendarComponent implements OnInit {
     if (accId) {
       this.router.navigate(['/student-finance/accounts', accId, 'statement']);
     }
+  }
+
+  exportingExcel = signal<boolean>(false);
+
+  /**
+   * تصدير كشف الطلاب المستحقين في الأقساط والدفعات لشهر التقويم الحالي
+   */
+  exportMonthlyDuesExcel() {
+    if (this.exportingExcel()) return;
+    this.exportingExcel.set(true);
+
+    const year = this.currentYear();
+    const month = this.currentMonth();
+    const status = this.activeFilter() === 'overdue' ? 'overdue' : (this.activeFilter() === 'paid' ? 'paid' : 'all');
+
+    this.svc.exportMonthlyDues(year, month, status).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const monthPad = String(month).padStart(2, '0');
+        const monthTitle = this.monthNames[month - 1] || monthPad;
+        a.download = `كشف-مستحقي-الأقساط-${monthTitle}-${year}.xlsx`;
+        a.click();
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        this.exportingExcel.set(false);
+      },
+      error: (err) => {
+        console.error('فشل تصدير كشف مستحقي الأقساط:', err);
+        this.exportingExcel.set(false);
+      }
+    });
   }
 
   goBack() {

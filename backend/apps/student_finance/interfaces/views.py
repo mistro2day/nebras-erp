@@ -126,10 +126,48 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
 
     @action(detail=True, methods=['get'], url_path='statement')
     def statement(self, request, pk=None):
-        """كشف حساب مالي تفصيلي شامل للطالب مع تفاصيل وهوية المستأجر."""
-        account = self.get_object()
+        """كشف حساب مالي تفصيلي شامل للطالب مع تفاصيل وهوية المستأجر والبحث المرن."""
         tenant = getattr(request, 'tenant', None)
         tenant_id = request.tenant_id
+
+        # 0. البحث المرن عن الحساب المالي (بمعرف الحساب، أو معرف الطالب، أو رقم الحساب)
+        account = None
+        if pk:
+            # محاولة كـ UUID لحساب الفوترة
+            account = StudentBillingAccount.objects.filter(tenant_id=tenant_id, id=pk).first()
+            if not account:
+                # محاولة كـ student_id
+                account = StudentBillingAccount.objects.filter(tenant_id=tenant_id, student_id=pk).first()
+            if not account:
+                # محاولة كـ account_number
+                account = StudentBillingAccount.objects.filter(tenant_id=tenant_id, account_number=pk).first()
+
+        # إذا لم يوجد حساب فوترة، نبحث عن الطالب وننشئ له حساباً تلقائياً
+        if not account and pk:
+            from apps.students.domain.models import Student
+            student_obj = Student.objects.filter(tenant_id=tenant_id, id=pk).first()
+            if not student_obj:
+                student_obj = Student.objects.filter(tenant_id=tenant_id, student_number=pk).first()
+            
+            if student_obj:
+                from decimal import Decimal
+                account = StudentBillingAccount.objects.create(
+                    tenant_id=tenant_id,
+                    student_id=student_obj.id,
+                    account_number=f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M')}-{student_obj.student_number}",
+                    opening_balance=Decimal('0.0'),
+                    current_balance=Decimal('0.0'),
+                    outstanding_balance=Decimal('0.0'),
+                    credit_balance=Decimal('0.0'),
+                    created_by=request.user.id if (request.user and request.user.is_authenticated) else None
+                )
+
+        if not account:
+            return StandardResponse(
+                message="لم يتم العثور على حساب مالي أو طالب مطابق لهذا المعرف.",
+                success=False,
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
         student_meta = _extract_student_finance_metadata(account)
@@ -210,17 +248,27 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
             student_billing_account=account, tenant_id=tenant_id
         ).order_by('payment_date', 'created_at')
 
+        # جلب مسميات طرق الدفع المعتمدة
+        payment_methods_map = {}
+        try:
+            from apps.finance.domain.models import PaymentMethod
+            pms = PaymentMethod.objects.filter(tenant_id=tenant_id)
+            payment_methods_map = {pm.id: (pm.name_ar or pm.name) for pm in pms}
+        except Exception:
+            pass
+
         for rec in receipts:
+            pm_name = payment_methods_map.get(rec.payment_method_id, 'سداد نقدي / بنكك')
             transactions.append({
-                'date': str(rec.payment_date or rec.created_at.date()),
+                'date': str(rec.payment_date or (rec.created_at.date() if rec.created_at else timezone.localdate())),
                 'type': 'receipt',
                 'type_label': 'سند قبض / تحصيل',
                 'reference_number': rec.receipt_number,
-                'description': rec.description or 'سداد رسوم دراسية',
+                'description': f"سداد رسوم دراسية - إيصال رقم {rec.receipt_number}",
                 'debit': 0.0,
                 'credit': float(rec.amount or 0.0),
-                'payment_method': rec.payment_method or 'نقداً',
-                'reference_trans': rec.reference_number or '',
+                'payment_method': pm_name,
+                'reference_trans': str(rec.voucher_id or rec.receipt_number or ''),
             })
 
         # المنح والخصومات
@@ -305,6 +353,27 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
                 'plan_name': full_title,
                 'installment_label': label,
             })
+
+        # في حال عدم وجود أقساط مسجلة ولكن توجد فواتير برصيد متبقٍ أو مسددة
+        if total_inst == 0 and invoices.exists():
+            for inv in invoices:
+                tot = float(inv.total_amount or 0.0)
+                pd = float(inv.paid_amount or 0.0)
+                rem = float(inv.outstanding_amount if inv.outstanding_amount is not None else max(0.0, tot - pd))
+                due_d = str(inv.due_date or inv.issue_date or timezone.localdate())
+                is_paid = (rem <= 0)
+                is_overdue = (not is_paid and due_d < str(timezone.localdate()))
+                installments_data.append({
+                    'id': str(inv.id),
+                    'due_date': due_d,
+                    'amount': tot,
+                    'paid_amount': pd,
+                    'remaining_amount': rem,
+                    'status': 'paid' if is_paid else ('overdue' if is_overdue else 'pending'),
+                    'status_label': 'مسدد بالكامل' if is_paid else ('متأخر' if is_overdue else 'مجدول'),
+                    'plan_name': f"استحقاق فاتورة {inv.invoice_number}",
+                    'installment_label': f"فاتورة {inv.invoice_number}",
+                })
 
         import uuid
         statement_number = f"STMT-{timezone.localdate().strftime('%Y%m%d')}-{account.account_number[-4:] if len(account.account_number) >= 4 else uuid.uuid4().hex[:4].upper()}"
@@ -645,15 +714,28 @@ class InstallmentViewSet(BaseCRUDViewSet):
 
         import uuid
         receipt_no = f"REC-{timezone.localdate().strftime('%Y%m%d')}-{uuid.uuid4().hex[:5].upper()}"
+        
+        # البحث عن طريقة دفع بالاسم إن أمكن أو إنشاء معرف افتراضي
+        payment_method_id = None
+        try:
+            from apps.finance.domain.models import PaymentMethod
+            pm = PaymentMethod.objects.filter(tenant_id=tenant_id, name_ar__icontains='بنكك').first()
+            if not pm:
+                pm = PaymentMethod.objects.filter(tenant_id=tenant_id).first()
+            if pm:
+                payment_method_id = pm.id
+        except Exception:
+            pass
+        if not payment_method_id:
+            payment_method_id = uuid.uuid4()
+
         receipt = Receipt.objects.create(
             tenant_id=tenant_id,
             student_billing_account=installment.student_billing_account,
             receipt_number=receipt_no,
             payment_date=timezone.localdate(),
             amount=amount_to_pay,
-            payment_method=payment_method_name,
-            reference_number=reference_number,
-            description=f"سداد قسط مستحق بتاريخ {installment.due_date} - {notes}",
+            payment_method_id=payment_method_id,
             status='posted'
         )
 
@@ -665,6 +747,261 @@ class InstallmentViewSet(BaseCRUDViewSet):
             'paid_amount': float(installment.paid_amount),
             'remaining_amount': float(max(0.0, float(installment.amount) - float(installment.paid_amount)))
         })
+
+    @action(detail=False, methods=['get'], url_path='export-monthly-dues')
+    def export_monthly_dues(self, request):
+        """
+        تصدير كشف إكسل رسمي باللغة العربية (RTL) للطلاب المستحقين في الأقساط والدفعات لشهر محدد.
+        يدعم التصفية حسب السنة، الشهر، وحالة السداد (الكل، المتأخرات فقط، المستحقة، المسددة).
+        """
+        from django.http import HttpResponse
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        tenant_id = request.tenant_id
+        today = timezone.localdate()
+
+        try:
+            year = int(request.query_params.get('year', today.year))
+            month = int(request.query_params.get('month', today.month))
+        except (ValueError, TypeError):
+            year, month = today.year, today.month
+
+        status_param = request.query_params.get('status', 'all')
+
+        # الاستعلام الأساسي
+        qs = Installment.objects.filter(
+            tenant_id=tenant_id,
+            due_date__year=year,
+            due_date__month=month
+        ).select_related('student_billing_account', 'installment_plan', 'invoice')
+
+        if status_param == 'overdue':
+            qs = qs.filter(due_date__lt=today).exclude(status='paid')
+        elif status_param == 'pending':
+            qs = qs.exclude(status='paid')
+        elif status_param == 'paid':
+            qs = qs.filter(status='paid')
+
+        qs = qs.order_by('due_date', 'student_billing_account__student_id')
+
+        # جلب تفاصيل الطلاب وسريلاتهم
+        from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+
+        # اسم الشهر بالعربية
+        months_ar = {
+            1: 'يناير', 2: 'فبراير', 3: 'مارس', 4: 'أبريل',
+            5: 'مايو', 6: 'يونيو', 7: 'يوليو', 8: 'أغسطس',
+            9: 'سبتمبر', 10: 'أكتوبر', 11: 'نوفمبر', 12: 'ديسمبر'
+        }
+        month_name = months_ar.get(month, f"شهر {month}")
+
+        # معلومات المؤسسة
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            from apps.tenants.models import Tenant
+            tenant = Tenant.objects.filter(id=tenant_id).first() or Tenant.objects.first()
+        school_name = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد النموذجية الخاصة'
+
+        # إنشاء مصنف العمل
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"مستحقي {month_name} {year}"
+        ws.views.sheetView[0].rightToLeft = True
+
+        # أنماط التنسيق
+        font_title = Font(name='Calibri', size=16, bold=True, color='0F172A')
+        font_subtitle = Font(name='Calibri', size=11, bold=True, color='475569')
+        font_header = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        font_data = Font(name='Calibri', size=10, color='1E293B')
+        font_totals = Font(name='Calibri', size=11, bold=True, color='0F172A')
+
+        fill_header = PatternFill(start_color='1E3A8A', end_color='1E3A8A', fill_type='solid')
+        fill_totals = PatternFill(start_color='E2E8F0', end_color='E2E8F0', fill_type='solid')
+        fill_zebra = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+
+        thin_side = Side(border_style='thin', color='CBD5E1')
+        border_box = Border(top=thin_side, left=thin_side, right=thin_side, bottom=thin_side)
+
+        align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        align_right = Alignment(horizontal='right', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
+
+        # 1. الترويسة الرئيسية
+        ws.merge_cells('A1:K1')
+        cell_t1 = ws['A1']
+        cell_t1.value = school_name
+        cell_t1.font = font_title
+        cell_t1.alignment = align_center
+
+        ws.merge_cells('A2:K2')
+        cell_t2 = ws['A2']
+        status_label = 'كافة الأقساط' if status_param == 'all' else ('المتأخرات فقط' if status_param == 'overdue' else ('المستحقة غير المسددة' if status_param == 'pending' else 'المسددة'))
+        cell_t2.value = f"كشف استحقاق الأقساط والدفعات الشهرية — {month_name} {year} ({status_label})"
+        cell_t2.font = font_subtitle
+        cell_t2.alignment = align_center
+
+        ws.merge_cells('A3:K3')
+        cell_t3 = ws['A3']
+        cell_t3.value = f"تاريخ الاستخراج: {timezone.now().strftime('%Y-%m-%d %H:%M')} | العملة: الجنيه السوداني (ج.س) | إجمالي عدد السجلات: {qs.count()}"
+        cell_t3.font = Font(name='Calibri', size=9, italic=True, color='64748B')
+        cell_t3.alignment = align_center
+
+        ws.row_dimensions[1].height = 28
+        ws.row_dimensions[2].height = 22
+        ws.row_dimensions[3].height = 18
+
+        # 2. رؤوس الأعمدة (الصف 5)
+        headers = [
+            'م', 'الرقم المدرسي', 'اسم الطالب', 'الصف / المرحلة',
+            'ولي الأمر', 'هاتف ولي الأمر', 'تاريخ الاستحقاق',
+            'قيمة القسط (ج.س)', 'المسدد (ج.س)', 'المتبقي المستحق (ج.س)', 'حالة القسط'
+        ]
+        ws.row_dimensions[5].height = 26
+        for col_idx, h in enumerate(headers, start=1):
+            cell = ws.cell(row=5, column=col_idx, value=h)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_box
+
+        # 3. ملء البيانات
+        row_idx = 6
+        tot_amount = 0.0
+        tot_paid = 0.0
+        tot_rem = 0.0
+
+        for idx, ins in enumerate(qs, start=1):
+            ac = ins.student_billing_account
+            meta = _extract_student_finance_metadata(ac) if ac else {}
+            st_num = meta.get('student_number') or (ac.account_number if ac else '-')
+            st_name = meta.get('student_name') or 'طالب'
+            grade = (meta.get('grade_name') or '') + (' - ' + meta.get('section_name') if meta.get('section_name') else '')
+            g_name = meta.get('guardian_name') or '-'
+            g_phone = meta.get('guardian_phone') or '-'
+
+            amt = float(ins.amount or 0.0)
+            paid = float(ins.paid_amount or 0.0)
+            rem = float(max(0.0, amt - paid))
+
+            tot_amount += amt
+            tot_paid += paid
+            tot_rem += rem
+
+            due_str = str(ins.due_date)
+            if ins.status == 'paid':
+                st_label = 'مسدد بالكامل'
+            elif due_str < str(today):
+                st_label = 'متأخر السداد'
+            else:
+                st_label = 'مستحق / مجدول'
+
+            values = [
+                idx, st_num, st_name, grade or 'العام الحالي',
+                g_name, g_phone, due_str,
+                amt, paid, rem, st_label
+            ]
+
+            ws.row_dimensions[row_idx].height = 20
+            for c_idx, val in enumerate(values, start=1):
+                c = ws.cell(row=row_idx, column=c_idx, value=val)
+                c.font = font_data
+                c.border = border_box
+
+                if c_idx in (1, 2, 6, 7, 11):
+                    c.alignment = align_center
+                elif c_idx in (8, 9, 10):
+                    c.alignment = align_left
+                    c.number_format = '#,##0'
+                else:
+                    c.alignment = align_right
+
+                if idx % 2 == 0:
+                    c.fill = fill_zebra
+
+                # تلوين حالة القسط
+                if c_idx == 11:
+                    if st_label == 'متأخر السداد':
+                        c.font = Font(name='Calibri', size=10, bold=True, color='DC2626')
+                    elif st_label == 'مسدد بالكامل':
+                        c.font = Font(name='Calibri', size=10, bold=True, color='16A34A')
+                    else:
+                        c.font = Font(name='Calibri', size=10, bold=True, color='D97706')
+
+            row_idx += 1
+
+        # 4. صف الإجماليات
+        ws.row_dimensions[row_idx].height = 24
+        tot_label_cell = ws.cell(row=row_idx, column=1, value='الإجمالي الكلي المستحق')
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=7)
+        tot_label_cell.font = font_totals
+        tot_label_cell.alignment = align_center
+        tot_label_cell.fill = fill_totals
+        tot_label_cell.border = border_box
+
+        for c_idx in range(1, 8):
+            ws.cell(row=row_idx, column=c_idx).border = border_box
+            ws.cell(row=row_idx, column=c_idx).fill = fill_totals
+
+        # إجمالي المبالغ
+        c_tot_amt = ws.cell(row=row_idx, column=8, value=tot_amount)
+        c_tot_amt.font = font_totals
+        c_tot_amt.fill = fill_totals
+        c_tot_amt.border = border_box
+        c_tot_amt.alignment = align_left
+        c_tot_amt.number_format = '#,##0'
+
+        c_tot_pd = ws.cell(row=row_idx, column=9, value=tot_paid)
+        c_tot_pd.font = Font(name='Calibri', size=11, bold=True, color='16A34A')
+        c_tot_pd.fill = fill_totals
+        c_tot_pd.border = border_box
+        c_tot_pd.alignment = align_left
+        c_tot_pd.number_format = '#,##0'
+
+        c_tot_rem = ws.cell(row=row_idx, column=10, value=tot_rem)
+        c_tot_rem.font = Font(name='Calibri', size=11, bold=True, color='DC2626')
+        c_tot_rem.fill = fill_totals
+        c_tot_rem.border = border_box
+        c_tot_rem.alignment = align_left
+        c_tot_rem.number_format = '#,##0'
+
+        c_end = ws.cell(row=row_idx, column=11, value='ج.س')
+        c_end.font = font_totals
+        c_end.fill = fill_totals
+        c_end.border = border_box
+        c_end.alignment = align_center
+
+        # ضبط عروض الأعمدة تلقائياً
+        col_widths = {
+            1: 6,   # م
+            2: 15,  # الرقم المدرسي
+            3: 28,  # اسم الطالب
+            4: 22,  # الصف
+            5: 25,  # ولي الأمر
+            6: 16,  # هاتف ولي الأمر
+            7: 15,  # تاريخ الاستحقاق
+            8: 18,  # قيمة القسط
+            9: 18,  # المسدد
+            10: 18, # المتبقي
+            11: 15  # الحالة
+        }
+        for col_idx, width in col_widths.items():
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+        # تجهيز الاستجابة كملف Excel قابل للتنزيل
+        from io import BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"installments_dues_{year}_{month:02d}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=True, methods=['get'], url_path='reminder-info')
     def reminder_info(self, request, pk=None):
