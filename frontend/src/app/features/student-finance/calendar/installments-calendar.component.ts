@@ -143,15 +143,24 @@ export interface CalendarDay {
           <div class="view-mode-toggle">
             <button
               class="toggle-btn"
-              [class.active]="viewMode() === 'calendar'"
-              (click)="setViewMode('calendar')">
-              📅 التقويم الشهري
+              [class.active]="viewMode() === 'both'"
+              (click)="setViewMode('both')"
+              title="عرض التقويم الشهري وسجل الأقساط معاً">
+              📅 عرض متكامل
             </button>
             <button
               class="toggle-btn"
-              [class.active]="viewMode() === 'agenda'"
-              (click)="setViewMode('agenda')">
-              📋 قائمة الاستحقاق
+              [class.active]="viewMode() === 'calendar_only'"
+              (click)="setViewMode('calendar_only')"
+              title="عرض شبكة التقويم فقط">
+              🗓️ التقويم فقط
+            </button>
+            <button
+              class="toggle-btn"
+              [class.active]="viewMode() === 'agenda_only'"
+              (click)="setViewMode('agenda_only')"
+              title="عرض سجل استحقاق الأقساط فقط">
+              📋 السجل فقط
             </button>
           </div>
         </div>
@@ -183,7 +192,7 @@ export interface CalendarDay {
       </div>
 
       <!-- عرض التقويم الشبكي (Calendar View) -->
-      @if (viewMode() === 'calendar') {
+      @if (viewMode() === 'both' || viewMode() === 'calendar_only') {
         <div class="calendar-container">
           <div class="weekdays-bar">
             @for (dayName of weekDayNames; track dayName) {
@@ -236,12 +245,13 @@ export interface CalendarDay {
       }
 
       <!-- جدول تفاصيل الأقساط (Agenda / List View) -->
-      <div class="installments-section" [class.compact-table]="viewMode() === 'calendar'">
-        <div class="section-header">
-          <h3 class="section-title">
-            {{ viewMode() === 'calendar' && selectedDay() ? 'أقساط يوم ' + selectedDay()?.dateStr : 'سجل استحقاق الأقساط المجدولة' }}
-            <span class="items-count">({{ filteredInstallments().length }} قسط)</span>
-          </h3>
+      @if (viewMode() === 'both' || viewMode() === 'agenda_only') {
+        <div class="installments-section">
+          <div class="section-header">
+            <h3 class="section-title">
+              {{ selectedDay() ? 'أقساط يوم ' + selectedDay()?.dateStr : 'سجل استحقاق الأقساط المجدولة' }}
+              <span class="items-count">({{ filteredInstallments().length }} قسط)</span>
+            </h3>
           @if (selectedDay()) {
             <button class="btn ghost btn-sm" (click)="clearSelectedDay()">عرض كل أقساط الشهر</button>
           }
@@ -364,6 +374,7 @@ export interface CalendarDay {
           </div>
         }
       </div>
+      }
 
       <!-- نافذة مودال السداد الفوري (Nebras OS Custom Modal) -->
       @if (payModalOpen()) {
@@ -1238,7 +1249,7 @@ export class SfInstallmentsCalendarComponent implements OnInit {
   currentYear = signal<number>(2026);
   currentMonth = signal<number>(9);
   loading = signal<boolean>(false);
-  viewMode = signal<'calendar' | 'agenda'>('calendar');
+  viewMode = signal<'both' | 'calendar_only' | 'agenda_only'>('both');
   activeFilter = signal<'all' | 'today' | 'this_week' | 'overdue' | 'paid'>('all');
   searchQuery = signal<string>('');
   selectedDay = signal<CalendarDay | null>(null);
@@ -1499,7 +1510,7 @@ export class SfInstallmentsCalendarComponent implements OnInit {
     this.loadData();
   }
 
-  setViewMode(mode: 'calendar' | 'agenda') {
+  setViewMode(mode: 'both' | 'calendar_only' | 'agenda_only') {
     this.viewMode.set(mode);
   }
 
@@ -1511,7 +1522,9 @@ export class SfInstallmentsCalendarComponent implements OnInit {
   quickFilter(filter: 'today' | 'this_week' | 'overdue' | 'paid') {
     this.activeFilter.set(filter);
     this.selectedDay.set(null);
-    this.viewMode.set('agenda');
+    if (this.viewMode() === 'calendar_only') {
+      this.viewMode.set('both');
+    }
   }
 
   onSearchChange(q: string) {
@@ -1530,6 +1543,9 @@ export class SfInstallmentsCalendarComponent implements OnInit {
       this.selectedDay.set(null);
     } else {
       this.selectedDay.set(day);
+      if (this.viewMode() === 'calendar_only') {
+        this.viewMode.set('both');
+      }
     }
   }
 
