@@ -518,6 +518,9 @@ def _sync_invoices_to_installments(tenant_id):
     """
     if not tenant_id:
         return
+    # فحص سريع وخفيف أولاً دون تحميل كل السجلات لتفادي إبطاء الاستجابة
+    if not StudentInvoice.objects.filter(tenant_id=tenant_id, installments__isnull=True).exists():
+        return
     invoices = list(StudentInvoice.objects.filter(tenant_id=tenant_id, installments__isnull=True))
     if not invoices:
         return
@@ -693,8 +696,45 @@ class InstallmentViewSet(BaseCRUDViewSet):
                 filtered_qs = filtered_qs.filter(status=status_param)
 
         filtered_qs = filtered_qs.select_related('student_billing_account', 'invoice', 'installment_plan').order_by('due_date', 'status')
-        
-        serialized_data = InstallmentSerializer(filtered_qs[:200], many=True).data
+        installments_list = list(filtered_qs[:200])
+
+        # تحميل بيانات الطلاب المسبقة دفعة واحدة لمنع استعلامات N+1 وتسريع الاستجابة
+        student_ids = {
+            ins.student_billing_account.student_id
+            for ins in installments_list
+            if ins.student_billing_account and ins.student_billing_account.student_id
+        }
+        if student_ids:
+            from apps.students.domain.models import Student
+            from apps.academics.domain.models import Grade, Section
+            from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+            students_qs = Student.objects.filter(id__in=student_ids).select_related('profile').prefetch_related(
+                'enrollments', 'family_relations'
+            )
+            student_map = {s.id: s for s in students_qs}
+
+            grade_ids = set()
+            section_ids = set()
+            for s in students_qs:
+                for e in s.enrollments.all():
+                    if getattr(e, 'grade_id', None):
+                        grade_ids.add(e.grade_id)
+                    if getattr(e, 'section_id', None):
+                        section_ids.add(e.section_id)
+
+            grade_map = {g.id: (getattr(g, 'name_ar', '') or getattr(g, 'name', '')) for g in Grade.objects.filter(id__in=grade_ids)} if grade_ids else {}
+            section_map = {sec.id: (getattr(sec, 'name_ar', '') or getattr(sec, 'name', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
+
+            for ins in installments_list:
+                if ins.student_billing_account:
+                    _extract_student_finance_metadata(
+                        ins.student_billing_account,
+                        student_map=student_map,
+                        grade_map=grade_map,
+                        section_map=section_map
+                    )
+
+        serialized_data = InstallmentSerializer(installments_list, many=True).data
 
         if search_query:
             q_lower = search_query.lower()

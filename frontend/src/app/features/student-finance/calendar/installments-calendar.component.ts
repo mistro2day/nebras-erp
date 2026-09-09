@@ -1672,8 +1672,6 @@ export class SfInstallmentsCalendarComponent implements OnInit {
     const params = {
       year: this.currentYear(),
       month: this.currentMonth(),
-      range: this.activeFilter() === 'today' ? 'today' : (this.activeFilter() === 'this_week' ? 'this_week' : undefined),
-      status: this.activeFilter() === 'overdue' ? 'overdue' : (this.activeFilter() === 'paid' ? 'paid' : undefined),
     };
 
     this.svc.getInstallmentsCalendar(params).subscribe({

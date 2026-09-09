@@ -58,7 +58,16 @@ class InvoiceAdjustmentSerializer(BaseStudentFinanceSerializer):
         model = InvoiceAdjustment
         fields = '__all__'
 
-def _extract_student_finance_metadata(billing_account):
+def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None):
+    if not billing_account:
+        return {
+            'student_id': '', 'student_number': '', 'student_name': '',
+            'grade_name': '', 'section_name': '', 'guardian_name': '',
+            'guardian_phone': '', 'account_number': '',
+        }
+    if hasattr(billing_account, '_cached_finance_meta'):
+        return billing_account._cached_finance_meta
+
     data = {
         'student_id': '',
         'student_number': '',
@@ -67,41 +76,61 @@ def _extract_student_finance_metadata(billing_account):
         'section_name': '',
         'guardian_name': '',
         'guardian_phone': '',
-        'account_number': '',
+        'account_number': billing_account.account_number or '',
     }
-    if not billing_account:
+    st_id = billing_account.student_id
+    if not st_id:
+        billing_account._cached_finance_meta = data
         return data
-    data['account_number'] = billing_account.account_number or ''
-    if not billing_account.student_id:
-        return data
+
     try:
         from apps.students.domain.models import Student
-        student = Student.objects.filter(id=billing_account.student_id).first()
+        student = None
+        if student_map is not None:
+            student = student_map.get(st_id)
+        if not student:
+            student = Student.objects.filter(id=st_id).select_related('profile').prefetch_related(
+                'enrollments', 'family_relations'
+            ).first()
+
         if student:
             data['student_id'] = str(student.id)
             data['student_number'] = student.student_number or ''
-            if hasattr(student, 'profile') and student.profile:
-                data['student_name'] = student.profile.arabic_name or student.profile.english_name or ''
-            
-            enrollment = student.enrollments.filter(status='active').first() or student.enrollments.first()
+            prof = getattr(student, 'profile', None)
+            if prof:
+                data['student_name'] = prof.arabic_name or prof.english_name or ''
+
+            enrs = list(student.enrollments.all())
+            enrollment = next((e for e in enrs if e.status == 'active'), enrs[0] if enrs else None)
             if enrollment:
-                if getattr(enrollment, 'grade_id', None):
-                    from apps.academics.domain.models import Grade
-                    g = Grade.objects.filter(id=enrollment.grade_id).first()
-                    if g:
-                        data['grade_name'] = getattr(g, 'name_ar', '') or getattr(g, 'name', '') or ''
-                if getattr(enrollment, 'section_id', None):
-                    from apps.academics.domain.models import Section
-                    sec = Section.objects.filter(id=enrollment.section_id).first()
-                    if sec:
-                        data['section_name'] = getattr(sec, 'name_ar', '') or getattr(sec, 'name', '') or ''
-            
-            family = student.family_relations.first()
-            if family:
+                gid = getattr(enrollment, 'grade_id', None)
+                if gid:
+                    if grade_map is not None and gid in grade_map:
+                        data['grade_name'] = grade_map[gid]
+                    else:
+                        from apps.academics.domain.models import Grade
+                        g = Grade.objects.filter(id=gid).first()
+                        if g:
+                            data['grade_name'] = getattr(g, 'name_ar', '') or getattr(g, 'name', '') or ''
+                sid = getattr(enrollment, 'section_id', None)
+                if sid:
+                    if section_map is not None and sid in section_map:
+                        data['section_name'] = section_map[sid]
+                    else:
+                        from apps.academics.domain.models import Section
+                        sec = Section.objects.filter(id=sid).first()
+                        if sec:
+                            data['section_name'] = getattr(sec, 'name_ar', '') or getattr(sec, 'name', '') or ''
+
+            f_list = list(student.family_relations.all())
+            if f_list:
+                family = f_list[0]
                 data['guardian_name'] = family.full_name or ''
                 data['guardian_phone'] = family.phone or ''
     except Exception:
         pass
+
+    billing_account._cached_finance_meta = data
     return data
 
 
