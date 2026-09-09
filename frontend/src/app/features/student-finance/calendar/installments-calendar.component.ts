@@ -30,8 +30,12 @@ export interface CalendarDay {
       <nb-page-header
         title="تقويم الدفعات والأقساط الذكي"
         subtitle="متابعة مواعيد استحقاق أقساط الطلاب، مؤشرات السداد اليومية والأسبوعية، وتسهيل التحصيل الفوري.">
-        <div class="header-actions">
+        <div class="header-actions no-print">
           <button class="btn secondary" (click)="goBack()">← العودة للوحة المالية</button>
+          <button class="btn secondary print-btn" (click)="printTable()" title="طباعة كشف استحقاق الأقساط">
+            <span class="btn-icon">🖨️</span>
+            <span>طباعة الجدول</span>
+          </button>
           <button class="btn success export-dues-btn" (click)="exportMonthlyDuesExcel()" [disabled]="exportingExcel()" title="تصدير كشف إكسل للطلاب المستحقين لهذا الشهر">
             @if (exportingExcel()) {
               <span class="spinner-sm"></span>
@@ -252,10 +256,50 @@ export interface CalendarDay {
               {{ selectedDay() ? 'أقساط يوم ' + selectedDay()?.dateStr : 'سجل استحقاق الأقساط المجدولة' }}
               <span class="items-count">({{ filteredInstallments().length }} قسط)</span>
             </h3>
-          @if (selectedDay()) {
-            <button class="btn ghost btn-sm" (click)="clearSelectedDay()">عرض كل أقساط الشهر</button>
-          }
-        </div>
+            <div class="section-header-actions no-print">
+              @if (selectedDay()) {
+                <button class="btn ghost btn-sm" (click)="clearSelectedDay()">عرض كل أقساط الشهر</button>
+              }
+              <button class="btn secondary btn-sm" (click)="printTable()" title="طباعة كشف الأقساط المجدولة">
+                <span class="btn-icon">🖨️</span>
+                <span>طباعة الجدول</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ترويسة التقرير الرسمية للطباعة فقط -->
+          <div class="print-document-header print-only">
+            <div class="print-header-content">
+              <div class="print-org-info">
+                <h2>مدارس النبراس النموذجية الأهلية</h2>
+                <p>نظام نبراس ERP المتكامل · الإدارة المالية والحسابات المدرسية</p>
+                <div class="print-doc-title">
+                  {{ selectedDay() ? 'كشف استحقاق أقساط يوم: ' + selectedDay()?.dateStr : 'كشف استحقاق الأقساط المجدولة لشهر ' + monthNames[currentMonth() - 1] + ' ' + currentYear() }}
+                </div>
+              </div>
+              <div class="print-meta-box">
+                <div class="print-meta-item"><span>تاريخ وتوقيت الطباعة:</span> <strong>{{ printDateStr }}</strong></div>
+                <div class="print-meta-item"><span>الفلتر المعروض:</span> <strong>{{ getFilterLabel() }}</strong></div>
+                <div class="print-meta-item"><span>عدد الأقساط:</span> <strong>{{ filteredInstallments().length }} قسط</strong></div>
+              </div>
+            </div>
+
+            <!-- ملخص مالي علوي في الطباعة -->
+            <div class="print-summary-strip">
+              <div class="pss-box">
+                <span class="pss-label">إجمالي المطلوب:</span>
+                <strong class="pss-val">{{ fmt(totalRequiredAmount()) }} ج.س</strong>
+              </div>
+              <div class="pss-box">
+                <span class="pss-label">إجمالي المسدد:</span>
+                <strong class="pss-val success">{{ fmt(totalPaidAmount()) }} ج.س</strong>
+              </div>
+              <div class="pss-box">
+                <span class="pss-label">إجمالي المتبقي للتحصيل:</span>
+                <strong class="pss-val danger">{{ fmt(totalRemainingAmount()) }} ج.س</strong>
+              </div>
+            </div>
+          </div>
 
         @if (loading()) {
           <div class="loading-box">
@@ -279,7 +323,7 @@ export interface CalendarDay {
                   <th>المبلغ المطلوب</th>
                   <th>المسدد والمتبقي</th>
                   <th>الحالة</th>
-                  <th>الإجراءات السريعة</th>
+                  <th class="actions-col no-print">الإجراءات السريعة</th>
                 </tr>
               </thead>
               <tbody>
@@ -341,7 +385,7 @@ export interface CalendarDay {
                       </span>
                     </td>
 
-                    <td>
+                    <td class="actions-col no-print">
                       <div class="actions-cell">
                         <button
                           class="action-btn stmt-btn"
@@ -371,6 +415,22 @@ export interface CalendarDay {
                 }
               </tbody>
             </table>
+          </div>
+
+          <!-- توقيعات الاعتماد الرسمية في الطباعة -->
+          <div class="print-signatures print-only">
+            <div class="sig-block">
+              <span class="sig-title">المحاسب المالي المختص:</span>
+              <span class="sig-dots">...........................................</span>
+            </div>
+            <div class="sig-block">
+              <span class="sig-title">مدير الإدارة المالية والرقابة:</span>
+              <span class="sig-dots">...........................................</span>
+            </div>
+            <div class="sig-block">
+              <span class="sig-title">الختم المالي المعتمد:</span>
+              <div class="sig-seal-box">ختم المدرسة الرسمي</div>
+            </div>
           </div>
         }
       </div>
@@ -1230,6 +1290,154 @@ export interface CalendarDay {
     .empty-icon { font-size: 38px; display: block; margin-bottom: 10px; }
     .empty-title { font-size: 16px; font-weight: 800; color: var(--nb-text, #374151); margin: 0 0 6px; }
     .empty-sub { font-size: 13px; margin: 0; }
+
+    .section-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .print-only {
+      display: none;
+    }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 6mm 8mm;
+      }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .no-print,
+      .kpi-grid,
+      .controls-card,
+      .calendar-container,
+      .header-actions,
+      nb-page-header,
+      .actions-col,
+      .modal-backdrop,
+      .section-header-actions,
+      .items-count {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .calendar-page {
+        padding: 0 !important;
+        background: #fff !important;
+        gap: 0 !important;
+      }
+      .installments-section {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .section-header {
+        display: none !important;
+      }
+      .nebras-table {
+        width: 100% !important;
+        font-size: 11px !important;
+        border-collapse: collapse !important;
+      }
+      .nebras-table th {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        padding: 8px 6px !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      .nebras-table td {
+        padding: 7px 6px !important;
+        border: 1px solid #e2e8f0 !important;
+      }
+      .print-document-header {
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #0f172a;
+      }
+      .print-header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .print-org-info h2 {
+        font-size: 17px;
+        margin: 0 0 3px 0;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .print-org-info p {
+        font-size: 11px;
+        margin: 0 0 6px 0;
+        color: #475569;
+      }
+      .print-doc-title {
+        font-size: 13.5px;
+        font-weight: 800;
+        color: #1e40af;
+      }
+      .print-meta-box {
+        font-size: 10.5px;
+        text-align: left;
+        color: #334155;
+        direction: rtl;
+      }
+      .print-meta-item {
+        margin-bottom: 2px;
+      }
+      .print-summary-strip {
+        display: flex;
+        gap: 20px;
+        margin-top: 10px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+      }
+      .pss-box {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+      }
+      .pss-val {
+        font-weight: bold;
+      }
+      .pss-val.success { color: #166534; }
+      .pss-val.danger { color: #991b1b; }
+
+      .print-signatures {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 24px;
+        padding-top: 14px;
+        page-break-inside: avoid;
+      }
+      .sig-block {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 11px;
+        font-weight: bold;
+      }
+      .sig-dots {
+        color: #94a3b8;
+      }
+      .sig-seal-box {
+        width: 90px;
+        height: 55px;
+        border: 1px dashed #94a3b8;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-size: 10px;
+      }
+    }
   `]
 })
 export class SfInstallmentsCalendarComponent implements OnInit {
@@ -1547,6 +1755,37 @@ export class SfInstallmentsCalendarComponent implements OnInit {
         this.viewMode.set('both');
       }
     }
+  }
+
+  printTable() {
+    window.print();
+  }
+
+  totalRequiredAmount = computed(() => {
+    return this.filteredInstallments().reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  });
+
+  totalPaidAmount = computed(() => {
+    return this.filteredInstallments().reduce((sum, item) => sum + (Number(item.paid_amount) || 0), 0);
+  });
+
+  totalRemainingAmount = computed(() => {
+    return this.filteredInstallments().reduce((sum, item) => sum + (Number(item.remaining_amount) || 0), 0);
+  });
+
+  get printDateStr(): string {
+    const d = new Date();
+    return `${d.toLocaleDateString('ar-SD')} - ${d.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  getFilterLabel(): string {
+    const f = this.activeFilter();
+    if (f === 'today') return 'مستحق اليوم';
+    if (f === 'this_week') return 'مستحق خلال 7 أيام';
+    if (f === 'overdue') return 'متأخرات السداد';
+    if (f === 'paid') return 'مسدد بالكامل';
+    if (this.selectedDay()) return `أقساط يوم ${this.selectedDay()?.dateStr}`;
+    return 'جميع الأقساط (الشهر كاملاً)';
   }
 
   clearSelectedDay() {
