@@ -685,6 +685,7 @@ class StudentBulkImportService:
 
         analyzed_rows = []
         valid_count = 0
+        already_exists_count = 0
         error_count = 0
         file_national_ids = set()
         file_names = set()
@@ -697,8 +698,10 @@ class StudentBulkImportService:
             row_num = row['_row_number'] or (idx + 4)
             row_errors = []
             row_warnings = []
+            already_exists = False
+            existing_info = None
 
-            # 1. فحص الاسم العربي ومنع التكرار بالاسم
+            # 1. فحص الاسم العربي والتحقق مما إذا كان مسجلاً مسبقاً
             name = row.get('arabic_name', '')
             if not name:
                 row_errors.append("اسم الطالب رباعي إلزامي.")
@@ -706,7 +709,8 @@ class StudentBulkImportService:
                 norm_name = cls._normalize_arabic(name)
                 if norm_name in existing_names:
                     orig_name, std_num = existing_names[norm_name]
-                    row_errors.append(f"الطالب «{orig_name}» مسجل مسبقاً في النظام بالرقم الأكاديمي ({std_num}). تم الرفض لتفادي التكرار.")
+                    already_exists = True
+                    existing_info = {'student_number': std_num, 'name': orig_name}
                 elif norm_name in file_names:
                     row_errors.append(f"اسم الطالب «{name}» مكرر أكثر من مرة في نفس ملف الكشف.")
                 else:
@@ -755,7 +759,8 @@ class StudentBulkImportService:
             if nat_id:
                 if nat_id in existing_national_ids:
                     std_num = existing_national_ids[nat_id]
-                    row_errors.append(f"الرقم الوطني «{nat_id}» مسجل مسبقاً لطالب آخر ({std_num}) في النظام.")
+                    already_exists = True
+                    existing_info = {'student_number': std_num, 'national_id': nat_id}
                 elif nat_id in file_national_ids:
                     row_errors.append(f"الرقم الوطني «{nat_id}» مكرر أكثر من مرة في نفس الملف.")
                 else:
@@ -852,8 +857,12 @@ class StudentBulkImportService:
             if not row.get('nationality'):
                 row['nationality'] = 'سوداني'
 
-            is_valid = len(row_errors) == 0
-            if is_valid:
+            has_data_errors = len(row_errors) > 0
+            is_valid = not has_data_errors and not already_exists
+
+            if already_exists:
+                already_exists_count += 1
+            elif is_valid:
                 valid_count += 1
             else:
                 error_count += 1
@@ -862,6 +871,8 @@ class StudentBulkImportService:
                 'row_number': row_num,
                 'data': row,
                 'is_valid': is_valid,
+                'already_exists': already_exists,
+                'existing_student_info': existing_info,
                 'errors': row_errors,
                 'warnings': row_warnings,
             })
@@ -869,6 +880,7 @@ class StudentBulkImportService:
         return {
             'total_rows': len(analyzed_rows),
             'valid_count': valid_count,
+            'already_exists_count': already_exists_count,
             'error_count': error_count,
             'rows': analyzed_rows
         }

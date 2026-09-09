@@ -11,6 +11,8 @@ export interface RowPreview {
   row_number: number;
   data: any;
   is_valid: boolean;
+  already_exists?: boolean;
+  existing_student_info?: any;
   errors: string[];
   warnings: string[];
 }
@@ -286,8 +288,14 @@ export interface RowPreview {
                   <div class="banner-content-side">
                     <div class="banner-pulse-dot"></div>
                     <div>
-                      <h4 class="banner-title">مرحلة المعاينة والتدقيق (لم يتم حفظ الطلاب في النظام بعد)</h4>
-                      <p class="banner-sub">تم فحص الكشف بنجاح! راجع السجلات والمبالغ المالية أدناه، ثم اضغط على زر الاعتماد لتسجيلهم رسمياً في النظام.</p>
+                      <h4 class="banner-title">مرحلة المعاينة والتدقيق (لم يتم حفظ الطلاب الجدد في النظام بعد)</h4>
+                      <p class="banner-sub">
+                        @if (validRowCount() > 0) {
+                          تم فحص الكشف بنجاح! لديك <strong>({{ validRowCount() }})</strong> طالب جديد قابل للاستيراد@if (alreadyExistsCount() > 0) {، و <strong>({{ alreadyExistsCount() }})</strong> طالب مسجل مسبقاً سيتم تخطيهم تلقائياً}.
+                        } @else {
+                          تم فحص الكشف! جميع الطلاب في هذا الملف <strong>({{ previewRows().length }})</strong> مسجلون مسبقاً في النظام.
+                        }
+                      </p>
                     </div>
                   </div>
                   <button 
@@ -297,8 +305,10 @@ export interface RowPreview {
                   >
                     @if (importing()) {
                       <span class="spinner-sm"></span> جارٍ الحفظ في النظام…
+                    } @else if (validRowCount() > 0) {
+                      ✓ اعتماد وتسكين ({{ validRowCount() }}) طالب جديد الآن
                     } @else {
-                      ✓ اعتماد وتسكين ({{ validRowCount() }}) طالب الآن
+                      جميع الطلاب مسجلون مسبقاً
                     }
                   </button>
                 </div>
@@ -310,8 +320,12 @@ export interface RowPreview {
                     <span class="m-val mono">{{ previewRows().length }}</span>
                   </div>
                   <div class="metric-chip valid">
-                    <span class="m-label">جاهزة للاستيراد:</span>
+                    <span class="m-label">جديدة وقابلة للاستيراد:</span>
                     <span class="m-val mono">{{ validRowCount() }}</span>
+                  </div>
+                  <div class="metric-chip existing" *ngIf="alreadyExistsCount() > 0">
+                    <span class="m-label">مسجلة مسبقاً (تخطي):</span>
+                    <span class="m-val mono">{{ alreadyExistsCount() }}</span>
                   </div>
                   <div class="metric-chip error" *ngIf="errorRowCount() > 0">
                     <span class="m-label">تحتاج مراجعة:</span>
@@ -321,8 +335,9 @@ export interface RowPreview {
                   <!-- فلتر العرض -->
                   <div class="preview-filter-pills">
                     <button [class.active]="filterMode() === 'all'" (click)="filterMode.set('all')">الكل ({{ previewRows().length }})</button>
-                    <button [class.active]="filterMode() === 'valid'" (click)="filterMode.set('valid')">السليمة فقط ({{ validRowCount() }})</button>
-                    <button [class.active]="filterMode() === 'error'" (click)="filterMode.set('error')">الأخطاء ({{ errorRowCount() }})</button>
+                    <button [class.active]="filterMode() === 'valid'" (click)="filterMode.set('valid')">جديدة وقابلة للاستيراد ({{ validRowCount() }})</button>
+                    <button [class.active]="filterMode() === 'existing'" (click)="filterMode.set('existing')" *ngIf="alreadyExistsCount() > 0">مسجلة مسبقاً ({{ alreadyExistsCount() }})</button>
+                    <button [class.active]="filterMode() === 'error'" (click)="filterMode.set('error')" *ngIf="errorRowCount() > 0">الأخطاء ({{ errorRowCount() }})</button>
                   </div>
                 </div>
 
@@ -377,9 +392,14 @@ export interface RowPreview {
                     </thead>
                     <tbody>
                       @for (r of filteredPreviewRows(); track r.row_number) {
-                        <tr [class.row-invalid]="!r.is_valid">
+                        <tr [class.row-invalid]="!r.is_valid && !r.already_exists" [class.row-existing]="r.already_exists">
                           <td class="mono center-cell">{{ r.row_number }}</td>
-                          <td class="strong">{{ r.data.arabic_name || '—' }}</td>
+                          <td class="strong">
+                            {{ r.data.arabic_name || '—' }}
+                            @if (r.already_exists) {
+                              <span class="existing-subtext mono">({{ r.existing_student_info?.student_number || 'مسجل مسبقاً' }})</span>
+                            }
+                          </td>
                           <td>
                             <div class="grade-stage-cell">
                               <span class="badge-grade">{{ r.data.matched_grade_name || r.data.grade_name || '—' }}</span>
@@ -397,6 +417,7 @@ export interface RowPreview {
                               (ngModelChange)="onFeesChange(r, $event)"
                               placeholder="0"
                               min="0"
+                              [disabled]="!!r.already_exists"
                             />
                           </td>
                           <!-- المدفوع القابل للتعديل المباشر -->
@@ -408,6 +429,7 @@ export interface RowPreview {
                               (ngModelChange)="onPaidChange(r, $event)"
                               placeholder="0"
                               min="0"
+                              [disabled]="!!r.already_exists"
                             />
                           </td>
                           <!-- المتبقي المحسوب تلقائياً ولحظياً -->
@@ -423,6 +445,7 @@ export interface RowPreview {
                               class="table-inline-input mono" 
                               [(ngModel)]="r.data.receipt_number" 
                               placeholder="رقم السند"
+                              [disabled]="!!r.already_exists"
                             />
                           </td>
                           <!-- الأقساط والملاحظات القابلة للتعديل -->
@@ -432,12 +455,17 @@ export interface RowPreview {
                               class="table-inline-input" 
                               [(ngModel)]="r.data.finance_notes" 
                               placeholder="أقساط 9-10-11…"
+                              [disabled]="!!r.already_exists"
                             />
                           </td>
                           <td>
-                            @if (r.is_valid) {
+                            @if (r.already_exists) {
+                              <span class="status-tag existing" [title]="'الطالب مسجل مسبقاً بالرقم الأكاديمي (' + (r.existing_student_info?.student_number || 'مسجل') + '). سيتم تخطيه تلقائياً لتفادي التكرار.'">
+                                <span class="dot"></span> مسجل مسبقاً (تخطي)
+                              </span>
+                            } @else if (r.is_valid) {
                               <span class="status-tag valid">
-                                <span class="dot"></span> سليم وجاهز
+                                <span class="dot"></span> سليم وقابل للاستيراد
                               </span>
                             } @else {
                               <div class="status-tag invalid" [title]="r.errors.join('\n')">
@@ -984,6 +1012,7 @@ export interface RowPreview {
     }
     .metric-chip.total { background: #E2E8F0; color: #334155; }
     .metric-chip.valid { background: #ECFDF5; color: #059669; }
+    .metric-chip.existing { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
     .metric-chip.error { background: #FFE4E6; color: #E11D48; }
 
     .preview-filter-pills {
@@ -1055,6 +1084,16 @@ export interface RowPreview {
     .preview-tbl tr.row-invalid {
       background: #FFF1F2;
     }
+    .preview-tbl tr.row-existing {
+      background: #F8FAFC;
+      opacity: 0.9;
+    }
+    .existing-subtext {
+      font-size: 11.5px;
+      color: #2563EB;
+      margin-right: 6px;
+      font-weight: 600;
+    }
 
     .mono { font-family: monospace; }
     .center-cell { text-align: center; }
@@ -1101,6 +1140,7 @@ export interface RowPreview {
       border-radius: 6px;
     }
     .status-tag.valid { background: #ECFDF5; color: #059669; }
+    .status-tag.existing { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
     .status-tag.invalid { background: #FFE4E6; color: #E11D48; }
     .status-tag .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
@@ -1554,7 +1594,7 @@ export class StudentBulkImportModalComponent {
   importErrorMsg = signal<string>('');
 
   previewRows = signal<RowPreview[]>([]);
-  filterMode = signal<'all' | 'valid' | 'error'>('all');
+  filterMode = signal<'all' | 'valid' | 'existing' | 'error'>('all');
   finalReport = signal<any | null>(null);
   showExitConfirm = signal<boolean>(false);
 
@@ -1563,36 +1603,41 @@ export class StudentBulkImportModalComponent {
   });
 
   readonly validRowCount = computed(() => {
-    return this.previewRows().filter(r => r.is_valid).length;
+    return this.previewRows().filter(r => r.is_valid && !r.already_exists).length;
+  });
+
+  readonly alreadyExistsCount = computed(() => {
+    return this.previewRows().filter(r => r.already_exists).length;
   });
 
   readonly errorRowCount = computed(() => {
-    return this.previewRows().filter(r => !r.is_valid).length;
+    return this.previewRows().filter(r => !r.is_valid && !r.already_exists).length;
   });
 
   readonly filteredPreviewRows = computed(() => {
     const mode = this.filterMode();
     const rows = this.previewRows();
-    if (mode === 'valid') return rows.filter(r => r.is_valid);
-    if (mode === 'error') return rows.filter(r => !r.is_valid);
+    if (mode === 'valid') return rows.filter(r => r.is_valid && !r.already_exists);
+    if (mode === 'existing') return rows.filter(r => r.already_exists);
+    if (mode === 'error') return rows.filter(r => !r.is_valid && !r.already_exists);
     return rows;
   });
 
   readonly totalFeesSum = computed(() => {
     return this.previewRows()
-      .filter(r => r.is_valid)
+      .filter(r => r.is_valid && !r.already_exists)
       .reduce((sum, r) => sum + (Number(r.data?.total_fees) || 0), 0);
   });
 
   readonly totalPaidSum = computed(() => {
     return this.previewRows()
-      .filter(r => r.is_valid)
+      .filter(r => r.is_valid && !r.already_exists)
       .reduce((sum, r) => sum + (Number(r.data?.paid_amount) || 0), 0);
   });
 
   readonly totalRemainingSum = computed(() => {
     return this.previewRows()
-      .filter(r => r.is_valid)
+      .filter(r => r.is_valid && !r.already_exists)
       .reduce((sum, r) => sum + (Number(r.data?.remaining_amount) || 0), 0);
   });
 
@@ -1769,9 +1814,9 @@ export class StudentBulkImportModalComponent {
   }
 
   executeFinalImport(): void {
-    const validRows = this.previewRows().filter(r => r.is_valid).map(r => r.data);
+    const validRows = this.previewRows().filter(r => r.is_valid && !r.already_exists).map(r => r.data);
     if (validRows.length === 0) {
-      this.importErrorMsg.set('لا توجد سجلات صالحة للاستيراد.');
+      this.importErrorMsg.set('لا توجد سجلات جديدة صالحة للاستيراد (جميع طلاب هذا الملف مسجلون مسبقاً أو بهم أخطاء بيانات).');
       return;
     }
 
