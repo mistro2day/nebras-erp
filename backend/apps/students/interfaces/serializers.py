@@ -256,8 +256,15 @@ def _resolve_lookup(context, category, entity_id, model_loader, name_extractor=N
     if not entity_id:
         return None
     lookups = context.get('lookups') if context else None
-    if lookups and category in lookups and entity_id in lookups[category]:
-        return lookups[category][entity_id]
+    if lookups and category in lookups:
+        cat_dict = lookups[category]
+        if entity_id in cat_dict:
+            return cat_dict[entity_id]
+        str_id = str(entity_id)
+        if str_id in cat_dict:
+            return cat_dict[str_id]
+        # إذا تم تحميل قاموس هذه الفئة مسبقاً، لا ننفذ أي استعلام SQL إضافي لتفادي تأخير الشبكة
+        return None
     
     cache = context.setdefault(f'_{category}_cache', {}) if context else {}
     if entity_id in cache:

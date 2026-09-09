@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ApiClientService } from '../../core/services/api-client.service';
 import { environment } from '../../../environments/environment';
-import { Observable, tap, map } from 'rxjs';
+import { Observable, tap, map, of } from 'rxjs';
 
 export interface Student {
   id: string;
@@ -97,9 +97,20 @@ export class StudentsService {
   loading = signal<boolean>(false);
   refreshing = signal<boolean>(false);
   errorMessage = signal<string | null>(null);
+  private lastFetchTime = 0;
 
-  getStudents(params?: any): Observable<any> {
+  getStudents(params?: any, force = false): Observable<any> {
     const hasCachedData = this.students().length > 0;
+    const isFilterEmpty = !params || Object.keys(params).length === 0;
+    const now = Date.now();
+
+    // إذا كانت القائمة محملة وموجودة بالذاكرة والتنقل حديث (أقل من 20 ثانية) وبدون فلاتر مخصصة، نعرض الكاش فوراً (0ms)
+    if (hasCachedData && isFilterEmpty && !force && (now - this.lastFetchTime < 20000)) {
+      this.loading.set(false);
+      this.refreshing.set(false);
+      return of({ success: true, data: this.students() });
+    }
+
     if (hasCachedData) {
       this.refreshing.set(true);
     } else {
@@ -114,6 +125,7 @@ export class StudentsService {
         next: (res) => {
           if (res && res.success) {
             this.students.set(res.data);
+            this.lastFetchTime = Date.now();
           }
           this.loading.set(false);
           this.refreshing.set(false);
@@ -147,14 +159,21 @@ export class StudentsService {
   }
 
   deleteStudent(id: string): Observable<any> {
-    return this.apiClient.delete(`students/students/${id}/`);
+    return this.apiClient.delete(`students/students/${id}/`).pipe(
+      tap(() => {
+        // حذف فوري من قائمة الطلاب في الذاكرة لمنع الوميض
+        this.students.update(list => list.filter(s => s.id !== id));
+      })
+    );
   }
 
   updateStudent(id: string, data: any): Observable<any> {
     return this.apiClient.put<any>(`students/students/${id}/`, data).pipe(
       tap(res => {
         if (res && res.success) {
-          this.selectedStudent.set(normalizeStudent(res.data));
+          const updated = res.data;
+          this.selectedStudent.set(normalizeStudent(updated));
+          this.applyStudentInPlaceUpdate(id, data, updated);
         }
       })
     );
@@ -164,10 +183,33 @@ export class StudentsService {
     return this.apiClient.patch<any>(`students/students/${id}/`, data).pipe(
       tap(res => {
         if (res && res.success) {
-          this.selectedStudent.set(normalizeStudent(res.data));
+          const updated = res.data;
+          this.selectedStudent.set(normalizeStudent(updated));
+          this.applyStudentInPlaceUpdate(id, data, updated);
         }
       })
     );
+  }
+
+  private applyStudentInPlaceUpdate(id: string, payload: any, responseData?: any): void {
+    this.students.update(list => list.map(s => {
+      if (s.id !== id) return s;
+      const respProfile = responseData?.profile || {};
+      const payloadProfile = payload?.profile || {};
+      return {
+        ...s,
+        status: payload?.status || responseData?.status || s.status,
+        profile: {
+          ...s.profile,
+          ...respProfile,
+          arabic_name: payloadProfile.arabic_name || respProfile.arabic_name || s.profile?.arabic_name,
+          english_name: payloadProfile.english_name ?? respProfile.english_name ?? s.profile?.english_name,
+          gender: payloadProfile.gender || respProfile.gender || s.profile?.gender,
+          nationality: payloadProfile.nationality || respProfile.nationality || s.profile?.nationality,
+          national_id: payloadProfile.national_id ?? respProfile.national_id ?? s.profile?.national_id,
+        }
+      };
+    }));
   }
 
   enrollStudent(studentId: string, enrollmentData: any): Observable<any> {

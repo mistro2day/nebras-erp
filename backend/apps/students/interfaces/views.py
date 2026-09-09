@@ -73,27 +73,50 @@ class StudentViewSet(viewsets.ModelViewSet):
         return StudentSerializer
 
     def _build_academic_lookups(self, students):
+        from django.core.cache import cache
         from apps.academics.domain.models import Grade, Section, AcademicYear
         from apps.organization.domain.models import Branch
 
-        grade_ids = set()
-        section_ids = set()
-        branch_ids = set()
-        ay_ids = set()
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else 'global'
+        cache_key = f"academic_lookups_tenant_{tenant_id}"
+        cached_data = cache.get(cache_key)
 
-        for s in students:
-            for enr in s.enrollments.all():
-                if enr.grade_id: grade_ids.add(enr.grade_id)
-                if enr.section_id: section_ids.add(enr.section_id)
-                if enr.branch_id: branch_ids.add(enr.branch_id)
-                if enr.academic_year_id: ay_ids.add(enr.academic_year_id)
+        if not cached_data:
+            grade_mgr = getattr(Grade, 'all_objects', Grade.objects)
+            section_mgr = getattr(Section, 'all_objects', Section.objects)
+            branch_mgr = getattr(Branch, 'all_objects', Branch.objects)
+            ay_mgr = getattr(AcademicYear, 'all_objects', AcademicYear.objects)
 
-        return {
-            'grades': {g.id: g.name for g in Grade.objects.filter(id__in=grade_ids)} if grade_ids else {},
-            'sections': {s.id: s.name for s in Section.objects.filter(id__in=section_ids)} if section_ids else {},
-            'branches': {b.id: (b.name_ar or b.name) for b in Branch.objects.filter(id__in=branch_ids)} if branch_ids else {},
-            'academic_years': {a.id: a.name for a in AcademicYear.objects.filter(id__in=ay_ids)} if ay_ids else {},
-        }
+            grades = {}
+            for g in grade_mgr.filter(tenant_id=tenant_id):
+                grades[g.id] = g.name
+                grades[str(g.id)] = g.name
+
+            sections = {}
+            for s in section_mgr.filter(tenant_id=tenant_id):
+                sections[s.id] = s.name
+                sections[str(s.id)] = s.name
+
+            branches = {}
+            for b in branch_mgr.filter(tenant_id=tenant_id):
+                b_name = b.name_ar or b.name
+                branches[b.id] = b_name
+                branches[str(b.id)] = b_name
+
+            academic_years = {}
+            for a in ay_mgr.filter(tenant_id=tenant_id):
+                academic_years[a.id] = a.name
+                academic_years[str(a.id)] = a.name
+
+            cached_data = {
+                'grades': grades,
+                'sections': sections,
+                'branches': branches,
+                'academic_years': academic_years,
+            }
+            cache.set(cache_key, cached_data, timeout=900)
+
+        return cached_data
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
