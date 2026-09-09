@@ -18,8 +18,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   // 2. حقن معرف المستأجر الحالي (Tenant ID) لضمان عزل البيانات في الاستدعاء
-  if (tenant) {
-    headers = headers.set('X-Tenant-ID', tenant.id);
+  let tenantId = tenant?.id;
+  if (!tenantId) {
+    try {
+      const rawTenant = localStorage.getItem('nb_tenant');
+      if (rawTenant) {
+        const parsed = JSON.parse(rawTenant);
+        tenantId = parsed?.id;
+      }
+    } catch {}
+  }
+
+  if (tenantId) {
+    headers = headers.set('X-Tenant-ID', tenantId);
   }
 
   const authReq = req.clone({ headers });

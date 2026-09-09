@@ -529,6 +529,11 @@ class StudentViewSet(viewsets.ModelViewSet):
             return request.tenant_id
         if request.user and getattr(request.user, 'tenant_id', None):
             return request.user.tenant_id
+        if request.user and request.user.is_authenticated:
+            from apps.identity.domain.rbac import UserRole
+            ur = UserRole.objects.filter(user=request.user).first()
+            if ur and ur.tenant_id:
+                return ur.tenant_id
         from apps.tenants.domain.models import Tenant
         active = list(Tenant.objects.filter(is_active=True)[:2])
         if len(active) == 1:

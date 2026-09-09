@@ -136,15 +136,15 @@ export class TenantService {
    * بدون هذه التهيئة لا يُرسَل رأس X-Tenant-ID فيرفض الخادم الطلب (404).
    */
   private bootstrap(): void {
-    // الموقع العام ولوحة المالك لا يحتاجان مستأجراً محدّداً
-    if (this.surface() === 'public' || this.surface() === 'admin') {
-      return;
-    }
-
     const stored = this.readStored();
     if (stored) {
       this.currentTenant.set(stored);
       this.applyBranding(stored);
+    }
+
+    // الموقع العام ولوحة المالك لا يحتاجان مستأجراً محدّداً
+    if (this.surface() === 'public' || this.surface() === 'admin') {
+      return;
     }
 
     // جلب بيانات المستأجر الحقيقية والاسم الفعلي من الخادم لتحديث أي بيانات قديمة
