@@ -235,11 +235,21 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
         </div>
       }
 
-      @if (totalPages() > 1) {
+      @if (filteredStudents().length > 0) {
         <div class="pager">
-          <button class="nb-btn-ghost sm" [disabled]="page() === 1" (click)="prev()">السابق</button>
-          <span class="pager-info">صفحة {{ page() }} من {{ totalPages() }} · {{ filteredStudents().length }} طالب</span>
-          <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
+          <div class="page-size-selector">
+            <span>عرض:</span>
+            <select [ngModel]="pageSize()" (ngModelChange)="pageSize.set($event); page.set(1)">
+              <option [value]="25">25 طالب</option>
+              <option [value]="50">50 طالب</option>
+              <option [value]="100">100 طالب (الكل)</option>
+            </select>
+          </div>
+          <div class="pager-nav" *ngIf="totalPages() > 1">
+            <button class="nb-btn-ghost sm" [disabled]="page() === 1" (click)="prev()">السابق</button>
+            <span class="pager-info">صفحة {{ page() }} من {{ totalPages() }} · إجمالي {{ filteredStudents().length }} طالب</span>
+            <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
+          </div>
         </div>
       }
 
@@ -546,7 +556,10 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
       .tbl-empty, .grid-empty-state { padding: 40px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); width: 100%; grid-column: 1 / -1; }
       .nb-btn-ghost.sm, .nb-btn-secondary.sm, .nb-btn-danger.sm { height: 26px; padding: 0 10px; font-size: 12px; }
       
-      .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+      .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+      .pager-nav { display: flex; align-items: center; gap: 10px; }
+      .page-size-selector { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--nb-text-muted); }
+      .page-size-selector select { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--nb-border-soft); background: var(--nb-surface); font-size: 12px; color: var(--nb-text); }
       .pager-info { font-size: 12px; color: var(--nb-text-muted); }
       
       .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -581,12 +594,12 @@ export class StudentsListComponent implements OnInit {
       (s.enrollments || []).some((e: any) => e.branch_id === bf));
   });
 
-  private readonly pageSize = 12;
+  readonly pageSize = signal(25);
   readonly page = signal(1);
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredStudents().length / this.pageSize)));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredStudents().length / this.pageSize())));
   readonly paged = computed(() => {
-    const start = (this.page() - 1) * this.pageSize;
-    return this.filteredStudents().slice(start, start + this.pageSize);
+    const start = (this.page() - 1) * this.pageSize();
+    return this.filteredStudents().slice(start, start + this.pageSize());
   });
 
   ngOnInit(): void {

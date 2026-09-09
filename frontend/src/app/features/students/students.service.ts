@@ -107,7 +107,9 @@ export class StudentsService {
     }
     this.errorMessage.set(null);
 
-    return this.apiClient.get<any>('students/students/', params).pipe(
+    const mergedParams = { page_size: 500, ...(params || {}) };
+
+    return this.apiClient.get<any>('students/students/', mergedParams).pipe(
       tap({
         next: (res) => {
           if (res && res.success) {
