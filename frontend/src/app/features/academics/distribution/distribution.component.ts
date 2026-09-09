@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { AcademicsService } from '../academics.service';
+import { TenantService } from '../../../core/services/tenant.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -485,25 +486,32 @@ export interface DistSection {
             </div>
 
             <div class="print-roster-content" id="printable-roster">
+              <!-- الترويسة الرسمية للمدرسة والمستأجر -->
               <div class="roster-header">
-                <div class="rep-side">
-                  <h4>جمهورية السودان</h4>
-                  <h5>وزارة التربية والتعليم</h5>
-                  <p>إدارة التعليم الثانوي والأساس</p>
+                <div class="header-side rep-right">
+                  <h4 class="gov-country">جمهورية السودان</h4>
+                  <h5 class="gov-ministry">وزارة التربية والتعليم</h5>
+                  <p class="gov-dept">إدارة التعليم الخاص والنوعي</p>
+                  <h3 class="tenant-school-title">{{ tenantName() }}</h3>
                 </div>
-                <div class="rep-center">
-                  <div class="logo-mark">نظام نبراس لإدارة المدارس</div>
+
+                <div class="header-center">
+                  <div class="tenant-logo-wrap">
+                    <img [src]="tenantLogo()" class="tenant-brand-logo" alt="شعار المدرسة" (error)="onLogoError($event)" />
+                  </div>
                   <h2 class="roster-title">كشف طلاب الفصل الدراسي</h2>
-                  <div class="roster-meta">
-                    <span>الصف: <strong>{{ selectedGradeName() }}</strong></span>
-                    <span>الشعبة: <strong>{{ printSection()!.name }}</strong></span>
-                    <span>العام الدراسي: <strong>{{ selectedYearName() }}</strong></span>
+                  <div class="roster-meta-tags">
+                    <span class="meta-tag">الصف: <strong>{{ selectedGradeName() }}</strong></span>
+                    <span class="meta-tag">الشعبة: <strong>{{ printSection()!.name }}</strong></span>
+                    <span class="meta-tag">العام الدراسي: <strong>{{ selectedYearName() }}</strong></span>
                   </div>
                 </div>
-                <div class="rep-side end">
-                  <p>تاريخ الاستخراج: {{ todayFormatted() }}</p>
-                  <p>إجمالي الطلاب: {{ studentsInSection(printSection()!.id).length }}</p>
-                  <p>رائد الفصل: _______________</p>
+
+                <div class="header-side rep-left">
+                  <div class="meta-entry"><span class="lbl">تاريخ الاستخراج:</span> <span class="val mono">{{ todayFormatted() }}</span></div>
+                  <div class="meta-entry"><span class="lbl">إجمالي الطلاب:</span> <span class="val highlight">{{ studentsInSection(printSection()!.id).length }} طالب</span></div>
+                  <div class="meta-entry"><span class="lbl">حالة التسكين:</span> <span class="val status-ok">معتمد ورسمي</span></div>
+                  <div class="meta-entry"><span class="lbl">رائد الفصل:</span> <span class="val">........................</span></div>
                 </div>
               </div>
 
@@ -514,15 +522,15 @@ export interface DistSection {
                     <th style="width: 140px;">رقم القيد</th>
                     <th>اسم الطالب رباعياً</th>
                     <th style="width: 80px;">النوع</th>
-                    <th style="width: 120px;">ملاحظات</th>
+                    <th style="width: 130px;">ملاحظات</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (st of studentsInSection(printSection()!.id); track st.id; let i = $index) {
                     <tr>
-                      <td class="text-center">{{ i + 1 }}</td>
+                      <td class="text-center font-bold">{{ i + 1 }}</td>
                       <td class="mono text-center">{{ st.student_number || '—' }}</td>
-                      <td class="font-bold">{{ st.name }}</td>
+                      <td class="font-bold student-name-cell">{{ st.name }}</td>
                       <td class="text-center">{{ st.gender === 'female' ? 'أنثى' : 'ذكر' }}</td>
                       <td></td>
                     </tr>
@@ -537,16 +545,16 @@ export interface DistSection {
 
               <div class="roster-footer">
                 <div class="sig-block">
-                  <span>توقيع رائد الفصل:</span>
-                  <span class="dots">...................................</span>
+                  <span class="sig-title">توقيع رائد الفصل:</span>
+                  <span class="sig-line">...................................</span>
                 </div>
                 <div class="sig-block">
-                  <span>المرشد الطلابي:</span>
-                  <span class="dots">...................................</span>
+                  <span class="sig-title">المرشد الطلابي:</span>
+                  <span class="sig-line">...................................</span>
                 </div>
                 <div class="sig-block">
-                  <span>اعتماد مدير المدرسة:</span>
-                  <span class="dots">...................................</span>
+                  <span class="sig-title">اعتماد وختم مدير المدرسة:</span>
+                  <span class="sig-line">...................................</span>
                 </div>
               </div>
             </div>
@@ -1423,70 +1431,154 @@ export interface DistSection {
       gap: 10px;
     }
 
-    /* كشف طباعة الفصل الرسمي */
+    /* كشف طباعة الفصل الرسمي بالخطوط وهوية المستأجر المعتمدة */
     .print-roster-content {
-      padding: 24px;
+      padding: 24px 28px;
       background: #ffffff;
-      color: #000000;
-      font-family: 'Amiri', 'Traditional Arabic', serif, Tahoma;
+      color: #0f172a;
+      font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
+      direction: rtl;
     }
     .roster-header {
       display: flex;
       justify-content: space-between;
-      border-bottom: 2px double #000000;
-      padding-bottom: 12px;
+      align-items: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 14px;
       margin-bottom: 16px;
+      gap: 16px;
     }
-    .rep-side h4 { margin: 0; font-size: 13px; }
-    .rep-side h5 { margin: 2px 0; font-size: 12px; }
-    .rep-side p { margin: 2px 0; font-size: 11px; }
-    .rep-side.end { text-align: left; }
-    .rep-center {
+    .header-side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .rep-right {
+      text-align: right;
+    }
+    .gov-country { margin: 0; font-size: 13px; font-weight: 800; color: #0f172a; }
+    .gov-ministry { margin: 0; font-size: 12px; font-weight: 700; color: #334155; }
+    .gov-dept { margin: 0; font-size: 11px; color: #64748b; }
+    .tenant-school-title {
+      margin: 4px 0 0 0;
+      font-size: 14px;
+      font-weight: 800;
+      color: #1e3a8a;
+    }
+
+    .header-center {
+      flex: 1.4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       text-align: center;
     }
-    .logo-mark {
-      font-size: 11px;
-      font-weight: 600;
-      color: #475569;
+    .tenant-logo-wrap {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+    .tenant-brand-logo {
+      max-height: 56px;
+      max-width: 140px;
+      object-fit: contain;
     }
     .roster-title {
-      margin: 4px 0 8px 0;
-      font-size: 18px;
+      margin: 2px 0 6px 0;
+      font-size: 17px;
       font-weight: 800;
+      color: #0f172a;
     }
-    .roster-meta {
+    .roster-meta-tags {
       display: flex;
-      gap: 16px;
-      font-size: 13px;
+      gap: 8px;
       justify-content: center;
+      flex-wrap: wrap;
     }
+    .meta-tag {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #334155;
+    }
+    .meta-tag strong {
+      color: #0f172a;
+    }
+
+    .rep-left {
+      text-align: left;
+      align-items: flex-end;
+    }
+    .meta-entry {
+      display: flex;
+      gap: 6px;
+      font-size: 11px;
+      align-items: center;
+    }
+    .meta-entry .lbl { color: #64748b; font-weight: 600; }
+    .meta-entry .val { color: #0f172a; font-weight: 700; }
+    .meta-entry .val.mono { font-family: monospace; }
+    .meta-entry .val.highlight { color: #059669; }
+    .meta-entry .val.status-ok {
+      background: #dcfce7;
+      color: #166534;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
     .roster-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12px;
+      margin-top: 4px;
     }
     .roster-table th, .roster-table td {
-      border: 1px solid #000000;
-      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      padding: 7px 10px;
     }
     .roster-table th {
       background: #f1f5f9;
-      font-weight: 700;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #94a3b8;
     }
+    .student-name-cell {
+      font-size: 13px;
+      color: #0f172a;
+    }
+    .roster-table tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
     .roster-footer {
       display: flex;
       justify-content: space-between;
-      margin-top: 36px;
-      font-size: 13px;
+      margin-top: 28px;
+      padding-top: 14px;
+      font-size: 12px;
     }
     .sig-block {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
+    }
+    .sig-title {
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .sig-line {
+      color: #94a3b8;
     }
     .empty-td {
-      padding: 20px;
+      padding: 24px;
       color: #64748b;
+      text-align: center;
     }
 
     /* طباعة الورق عبر المتصفح */
@@ -1499,7 +1591,7 @@ export interface DistSection {
         top: 0;
         width: 100%;
         margin: 0;
-        padding: 20mm;
+        padding: 15mm;
       }
       .no-print { display: none !important; }
     }
@@ -1507,7 +1599,22 @@ export interface DistSection {
 })
 export class AcademicDistributionComponent implements OnInit {
   private readonly svc = inject(AcademicsService);
+  private readonly tenantService = inject(TenantService);
   private readonly notify = inject(NotificationService);
+
+  readonly tenantName = computed(() => {
+    const t = this.tenantService.currentTenant();
+    return t?.nameAr || t?.name || 'مدارس النبراس النموذجية الأهلية';
+  });
+
+  readonly tenantLogo = computed(() => {
+    const t = this.tenantService.currentTenant();
+    return t?.logoUrl || '/assets/branding/logo-light-transparent.png';
+  });
+
+  onLogoError(event: any): void {
+    (event.target as HTMLElement).style.display = 'none';
+  }
 
   // البيانات الأكاديمية الأساسية
   readonly years = signal<any[]>([]);
