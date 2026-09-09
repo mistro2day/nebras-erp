@@ -17,7 +17,9 @@ from apps.students.interfaces.serializers import (
     StudentPromotionHistorySerializer, StudentNoteSerializer,
     StudentTagSerializer, StudentTransferSerializer
 )
-from apps.students.application.services import StudentApplicationService
+import typing
+from apps.students.application.services import StudentApplicationService as _StudentApplicationService
+StudentApplicationService: typing.Any = _StudentApplicationService
 from apps.students.application.bulk_import import StudentBulkImportService
 from apps.students.interfaces.permissions import StudentPermission
 from django.http import HttpResponse
@@ -44,14 +46,18 @@ class StudentViewSet(viewsets.ModelViewSet):
         # البحث المتقدم والفلترة
         search_query = self.request.query_params.get('search', None)
         if search_query:
-            qs = qs.filter(
-                Q(student_number__icontains=search_query) |
-                Q(profile__arabic_name__icontains=search_query) |
-                Q(profile__english_name__icontains=search_query) |
-                Q(profile__national_id__icontains=search_query) |
-                Q(family_relations__full_name__icontains=search_query) |
-                Q(family_relations__phone__icontains=search_query)
-            ).distinct()
+            q_list = [
+                Q(student_number__icontains=search_query),
+                Q(profile__arabic_name__icontains=search_query),
+                Q(profile__english_name__icontains=search_query),
+                Q(profile__national_id__icontains=search_query),
+                Q(family_relations__full_name__icontains=search_query),
+                Q(family_relations__phone__icontains=search_query),
+            ]
+            search_filter = Q()
+            for q_item in q_list:
+                search_filter.add(q_item, Q.OR)
+            qs = qs.filter(search_filter).distinct()
             
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
@@ -82,10 +88,10 @@ class StudentViewSet(viewsets.ModelViewSet):
         cached_data = cache.get(cache_key)
 
         if not cached_data:
-            grade_mgr = getattr(Grade, 'all_objects', Grade.objects)
-            section_mgr = getattr(Section, 'all_objects', Section.objects)
-            branch_mgr = getattr(Branch, 'all_objects', Branch.objects)
-            ay_mgr = getattr(AcademicYear, 'all_objects', AcademicYear.objects)
+            grade_mgr: typing.Any = getattr(Grade, 'all_objects', None) or Grade.objects
+            section_mgr: typing.Any = getattr(Section, 'all_objects', None) or Section.objects
+            branch_mgr: typing.Any = getattr(Branch, 'all_objects', None) or Branch.objects
+            ay_mgr: typing.Any = getattr(AcademicYear, 'all_objects', None) or AcademicYear.objects
 
             grades = {}
             for g in grade_mgr.filter(tenant_id=tenant_id):
@@ -631,9 +637,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not relation_id:
             raise ValidationError("يجب توفير معرف ولي الأمر relation_id.")
             
-        try:
-            relation = student.family_relations.get(id=relation_id)
-        except StudentFamilyRelation.DoesNotExist:
+        relation = student.family_relations.filter(id=relation_id).first()
+        if not relation:
             raise ValidationError("ولي الأمر غير مرتبط بهذا الطالب.")
             
         if not relation.email:
@@ -866,9 +871,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not relation_id:
             raise ValidationError("يجب توفير معرف ولي الأمر relation_id.")
 
-        try:
-            relation = student.family_relations.get(id=relation_id)
-        except StudentFamilyRelation.DoesNotExist:
+        relation = student.family_relations.filter(id=relation_id).first()
+        if not relation:
             raise ValidationError("ولي الأمر غير مرتبط بهذا الطالب.")
         if not relation.email:
             raise ValidationError("لا يوجد بريد إلكتروني لولي الأمر.")
@@ -951,13 +955,12 @@ class StudentViewSet(viewsets.ModelViewSet):
         }
         
         if relation_id:
-            try:
-                relation = student.family_relations.get(id=relation_id)
-                for attr, val in data.items():
-                    setattr(relation, attr, val)
-                relation.save()
-            except StudentFamilyRelation.DoesNotExist:
+            relation = student.family_relations.filter(id=relation_id).first()
+            if not relation:
                 raise ValidationError("سجل ولي الأمر غير موجود.")
+            for attr, val in data.items():
+                setattr(relation, attr, val)
+            relation.save()
         else:
             relation = StudentFamilyRelation.objects.create(
                 student=student,
@@ -1141,9 +1144,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         if not relation_id:
             raise ValidationError("يجب توفير relation_id.")
             
-        try:
-            relation = student.family_relations.get(id=relation_id)
-            relation.delete()
-            return StandardResponse(None, message="تم حذف ولي الأمر بنجاح.")
-        except StudentFamilyRelation.DoesNotExist:
+        relation = student.family_relations.filter(id=relation_id).first()
+        if not relation:
             raise ValidationError("السجل غير موجود أو غير مرتبط بهذا الطالب.")
+        relation.delete()
+        return StandardResponse(None, message="تم حذف ولي الأمر بنجاح.")

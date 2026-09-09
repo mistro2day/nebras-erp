@@ -19,15 +19,13 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     def get_photo_url(self, obj):
         if obj.photo:
             from apps.platform.domain.models import AttachmentMetadata
-            try:
-                meta = AttachmentMetadata.objects.get(file_asset_id=obj.photo)
+            meta = AttachmentMetadata.objects.filter(file_asset_id=obj.photo).first()
+            if meta:
                 request = self.context.get('request')
                 url = f"/media/{meta.storage_path}"
                 if request:
                     return request.build_absolute_uri(url)
                 return url
-            except AttachmentMetadata.DoesNotExist:
-                return None
         return None
 
 
