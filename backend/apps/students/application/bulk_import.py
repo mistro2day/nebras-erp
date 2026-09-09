@@ -899,6 +899,28 @@ class StudentBulkImportService:
         sections_map = {str(s.id): s for s in Section.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)}
         sections_by_name = {s.name.strip(): s for s in sections_map.values()}
 
+        # كاش الفروع وطرق الدفع وخطط الأقساط مسبقاً لمنع استنزاف زمن الاتصال السحابي بـ Neon
+        from apps.finance.domain.models import PaymentMethod
+        default_plan = InstallmentPlan.objects.filter(tenant_id=tenant_id, is_active=True).first()
+        if not default_plan:
+            try:
+                default_plan = InstallmentPlan.objects.create(
+                    tenant_id=tenant_id,
+                    name='خطة الأقساط المعتمدة',
+                    number_of_installments=1,
+                    grace_period_days=7,
+                    is_active=True,
+                    created_by=user_id
+                )
+            except Exception:
+                default_plan = InstallmentPlan.objects.filter(tenant_id=tenant_id).first()
+
+        pm = PaymentMethod.objects.filter(tenant_id=tenant_id, name_ar__icontains='بنكك').first() or PaymentMethod.objects.filter(tenant_id=tenant_id).first()
+        cached_payment_method_id = pm.id if pm else uuid.uuid4()
+
+        branch_male = resolve_branch_for_gender(tenant_id, 'male')
+        branch_female = resolve_branch_for_gender(tenant_id, 'female')
+
         # جلب الطلاب الحاليين لتفادي التكرار بالاسم والرقم الوطني
         existing_profiles_qs = StudentProfile.objects.filter(
             tenant_id=tenant_id, student__deleted_at__isnull=True
@@ -911,6 +933,7 @@ class StudentBulkImportService:
         errors = []
 
         current_student_count = Student.objects.filter(tenant_id=tenant_id).count()
+        base_timestamp = timezone.now().strftime('%y%m%d%H%M')
 
         for idx, row in enumerate(rows_data, start=1):
             try:
@@ -993,22 +1016,6 @@ class StudentBulkImportService:
                         tenant_id=tenant_id,
                         created_by=user_id
                     )
-                    if row_data.get('medical_notes'):
-                        try:
-                            intake_fn = getattr(clinic_profiles, 'write_intake', None) if clinic_profiles else None
-                            if callable(intake_fn):
-                                intake_fn(
-                                    tenant_id=tenant_id,
-                                    person_type='student',
-                                    person_id=student.id,
-                                    data={
-                                        'medical_notes': row_data.get('medical_notes'),
-                                        'blood_group': row_data.get('blood_group'),
-                                    },
-                                    user_id=user_id
-                                )
-                        except Exception:
-                            pass
 
                     # إنشاء علاقة ولي الأمر
                     g_name = row_data.get('guardian_name') or f"ولي أمر {arabic_name}"
@@ -1047,7 +1054,7 @@ class StudentBulkImportService:
                         enr_type = 'new'
 
                     if grade_obj and academic_year_id:
-                        branch = resolve_branch_for_gender(tenant_id, gender)
+                        branch = branch_female if gender == 'female' else branch_male
                         StudentEnrollment.objects.create(
                             tenant_id=tenant_id,
                             student=student,
@@ -1063,8 +1070,10 @@ class StudentBulkImportService:
 
                     # الربط المالي الآلي مع موديول مالية الطلاب (Student Finance)
                     try:
-                        fees_val = Decimal(str(row_data.get('total_fees') or 0))
-                        paid_val = Decimal(str(row_data.get('paid_amount') or 0))
+                        raw_f = str(row_data.get('total_fees') or 0).replace('-', '0').replace('—', '0').strip()
+                        raw_p = str(row_data.get('paid_amount') or 0).replace('-', '0').replace('—', '0').strip()
+                        fees_val = Decimal(raw_f or '0')
+                        paid_val = Decimal(raw_p or '0')
                         rem_val = Decimal(str(row_data.get('remaining_amount') or max(0, fees_val - paid_val)))
                         rcp_no = str(row_data.get('receipt_number') or '').strip()
 
@@ -1073,7 +1082,7 @@ class StudentBulkImportService:
                             tenant_id=tenant_id,
                             student_id=student.id,
                             defaults={
-                                'account_number': f"ACC-ST-{timezone.now().strftime('%y%m%d%H%M')}-{student_number}",
+                                'account_number': f"ACC-ST-{base_timestamp}-{idx:03d}-{student_number[-4:]}",
                                 'opening_balance': Decimal('0.0'),
                                 'current_balance': rem_val,
                                 'outstanding_balance': rem_val,
@@ -1084,13 +1093,7 @@ class StudentBulkImportService:
 
                         # 2. إنشاء فاتورة الرسوم الدراسية إذا كان هناك رسوم مستحقة
                         if fees_val > 0:
-                            base_inv = f"INV-{timezone.now().strftime('%y%m%d')}-{student_number}"
-                            candidate_inv = base_inv
-                            inv_counter = 1
-                            while StudentInvoice.objects.filter(tenant_id=tenant_id, invoice_number=candidate_inv).exists():
-                                candidate_inv = f"{base_inv}-{inv_counter}"
-                                inv_counter += 1
-
+                            candidate_inv = f"INV-{base_timestamp}-{idx:03d}-{student_number[-4:]}"
                             invoice = StudentInvoice.objects.create(
                                 tenant_id=tenant_id,
                                 student_billing_account=billing_acc,
@@ -1104,62 +1107,29 @@ class StudentBulkImportService:
                                 created_by=user_id
                             )
 
-                            # إنشاء قسط مجدول متصل بالفاتورة لإدراجه فوراً في تقويم الدفعات
-                            default_plan = InstallmentPlan.objects.filter(tenant_id=tenant_id, is_active=True).first()
-                            if not default_plan:
-                                default_plan = InstallmentPlan.objects.create(
+                            if default_plan:
+                                Installment.objects.create(
                                     tenant_id=tenant_id,
-                                    name='خطة الأقساط المعتمدة',
-                                    number_of_installments=1,
-                                    grace_period_days=7,
-                                    is_active=True,
+                                    student_billing_account=billing_acc,
+                                    invoice=invoice,
+                                    installment_plan=default_plan,
+                                    due_date=invoice.due_date,
+                                    amount=fees_val,
+                                    paid_amount=paid_val,
+                                    status='paid' if rem_val <= 0 else 'pending',
                                     created_by=user_id
                                 )
 
-                            Installment.objects.create(
-                                tenant_id=tenant_id,
-                                student_billing_account=billing_acc,
-                                invoice=invoice,
-                                installment_plan=default_plan,
-                                due_date=invoice.due_date,
-                                amount=fees_val,
-                                paid_amount=paid_val,
-                                status='paid' if rem_val <= 0 else 'pending',
-                                created_by=user_id
-                            )
-
-                        # 3. إنشاء إيصال التحصيل مع تفادي تعارض وتكرار رقم الإيصال
+                        # 3. إنشاء إيصال التحصيل
                         if paid_val > 0:
-                            base_rcp = rcp_no if rcp_no else f"RCP-{timezone.now().strftime('%y%m%d')}-{student_number[-4:]}"
-                            candidate_rcp = base_rcp
-                            rcp_counter = 1
-                            while Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
-                                candidate_rcp = f"{base_rcp}-{student_number[-4:]}"
-                                if Receipt.objects.filter(tenant_id=tenant_id, receipt_number=candidate_rcp).exists():
-                                    candidate_rcp = f"{base_rcp}-{rcp_counter}"
-                                    rcp_counter += 1
-
-                            # البحث عن طريقة دفع بالاسم إن أمكن
-                            payment_method_id = None
-                            try:
-                                from apps.finance.domain.models import PaymentMethod
-                                pm = PaymentMethod.objects.filter(tenant_id=tenant_id, name_ar__icontains='بنكك').first()
-                                if not pm:
-                                    pm = PaymentMethod.objects.filter(tenant_id=tenant_id).first()
-                                if pm:
-                                    payment_method_id = pm.id
-                            except Exception:
-                                pass
-                            if not payment_method_id:
-                                payment_method_id = uuid.uuid4()
-
+                            candidate_rcp = rcp_no if rcp_no else f"RCP-{base_timestamp}-{idx:03d}-{student_number[-4:]}"
                             Receipt.objects.create(
                                 tenant_id=tenant_id,
                                 student_billing_account=billing_acc,
                                 receipt_number=candidate_rcp,
                                 payment_date=datetime.date.today(),
                                 amount=paid_val,
-                                payment_method_id=payment_method_id,
+                                payment_method_id=cached_payment_method_id,
                                 status='posted',
                                 created_by=user_id
                             )
@@ -1170,14 +1140,7 @@ class StudentBulkImportService:
                         billing_acc.save(update_fields=['outstanding_balance', 'current_balance'])
                     except Exception as fin_err:
                         import logging
-                        logging.getLogger('nebras.students').warning(f"تعذر إتمام الربط المالي التلقائي للسطر {idx}: {fin_err}")
-
-                    # نشر حدث النظام
-                    DomainEventPublisher.publish("StudentCreated", {
-                        "student_id": str(student.id),
-                        "student_number": student_number,
-                        "tenant_id": str(tenant_id)
-                    })
+                        logging.getLogger('nebras.students').warning(f"تعذر إتمام الربط المالي للسطر {idx}: {fin_err}")
 
                     imported_students.append({
                         'id': str(student.id),
@@ -1188,6 +1151,17 @@ class StudentBulkImportService:
 
             except Exception as e:
                 errors.append(f"السطر {idx}: {str(e)}")
+
+        # نشر حدث مجمع واحد للدفعة كاملة لتجنب استنزاف وقت الاستجابة
+        if imported_students:
+            try:
+                DomainEventPublisher.publish("StudentBulkImportCompleted", {
+                    "count": len(imported_students),
+                    "tenant_id": str(tenant_id),
+                    "user_id": str(user_id)
+                })
+            except Exception:
+                pass
 
         return {
             'imported_count': len(imported_students),

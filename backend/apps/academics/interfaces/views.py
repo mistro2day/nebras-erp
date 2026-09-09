@@ -1,3 +1,4 @@
+import uuid
 import typing
 from typing import Any
 from rest_framework import viewsets, permissions, status, filters
@@ -26,17 +27,47 @@ class AcademicsBaseViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
+    def _get_request_tenant_id(self, request=None):
+        """استخراج معرف المستأجر بشكل آمن مع اعتماد المدرسة الافتراضية لمنع null في tenant_id"""
+        req = request or getattr(self, 'request', None)
+        if not req:
+            from apps.tenants.domain.models import Tenant
+            t = Tenant.objects.filter(is_active=True).first()
+            return t.id if t else uuid.uuid4()
+            
+        if hasattr(req, 'tenant') and req.tenant and hasattr(req.tenant, 'id'):
+            return req.tenant.id
+        if hasattr(req, 'tenant_id') and req.tenant_id:
+            return req.tenant_id
+        if getattr(req, 'user', None) and getattr(req.user, 'tenant_id', None):
+            return req.user.tenant_id
+        if getattr(req, 'user', None) and req.user.is_authenticated:
+            from apps.identity.domain.rbac import UserRole
+            ur = UserRole.objects.filter(user=req.user).first()
+            if ur and ur.tenant_id:
+                return ur.tenant_id
+        from apps.tenants.domain.models import Tenant
+        active = list(Tenant.objects.filter(is_active=True)[:2])
+        if len(active) == 1:
+            return active[0].id
+        return uuid.uuid4()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['tenant_id'] = self._get_request_tenant_id()
+        return context
+
     def get_queryset(self):
         if self.model_class is None:
             return super().get_queryset()
         qs = self.model_class.objects.filter(deleted_at__isnull=True)
-        tenant_id = getattr(getattr(self.request, 'tenant', None), 'id', None)
+        tenant_id = self._get_request_tenant_id()
         if tenant_id and hasattr(self.model_class, 'tenant_id'):
             qs = qs.filter(tenant_id=tenant_id)
         return qs
 
     def perform_create(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        tenant_id = self._get_request_tenant_id()
         serializer.save(tenant_id=tenant_id)
 
     def destroy(self, request, *args, **kwargs):
@@ -59,14 +90,14 @@ class AcademicYearViewSet(AcademicsBaseViewSet):
     search_fields = ['name', 'code']
 
     def perform_create(self, serializer):
-        tenant_id = getattr(getattr(self.request, 'tenant', None), 'id', None)
+        tenant_id = self._get_request_tenant_id()
         if tenant_id is not None:
             AcademicValidationService.validate_year_no_overlap(
                 tenant_id,
                 self.request.data.get('start_date'),
                 self.request.data.get('end_date')
             )
-        super().perform_create(serializer)
+        serializer.save(tenant_id=tenant_id)
 
 
 class TermViewSet(AcademicsBaseViewSet):
@@ -90,21 +121,35 @@ class StageViewSet(AcademicsBaseViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        tenant_id = self._get_request_tenant_id()
+        code = serializer.validated_data.get('code')
         target_order = serializer.validated_data.get('order')
 
         if target_order is not None:
-            # إزاحة تلقائية: إذا كانت هناك مراحل بنفس الترتيب أو أعلى يتم زيادة ترتيبها بمقدار (+1)
             qs = Stage.objects.filter(deleted_at__isnull=True, order__gte=target_order)
             if tenant_id:
                 qs = qs.filter(tenant_id=tenant_id)
             qs.update(order=F('order') + 1)
 
+        # استعادة أي مرحلة محذوفة لطيفاً بنفس الرمز لمنع تعارض قيد الفرادة
+        if tenant_id and code:
+            soft_deleted = Stage.all_objects.filter(
+                tenant_id=tenant_id, code=code, deleted_at__isnull=False
+            ).first()
+            if soft_deleted:
+                for k, v in serializer.validated_data.items():
+                    setattr(soft_deleted, k, v)
+                soft_deleted.deleted_at = None
+                soft_deleted.tenant_id = tenant_id
+                soft_deleted.save()
+                serializer.instance = soft_deleted
+                return
+
         serializer.save(tenant_id=tenant_id)
 
     @transaction.atomic
     def perform_update(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        tenant_id = self._get_request_tenant_id()
         instance = self.get_object()
         old_order = instance.order
         new_order = serializer.validated_data.get('order', old_order)
@@ -115,10 +160,8 @@ class StageViewSet(AcademicsBaseViewSet):
                 qs = qs.filter(tenant_id=tenant_id)
 
             if new_order < old_order:
-                # عند تقديم المرحلة (ترتيب أقل عدداً)، إزاحة المراحل في المدى [new_order, old_order - 1] لأسفل (+1)
                 qs.filter(order__gte=new_order, order__lt=old_order).update(order=F('order') + 1)
             else:
-                # عند تأخير المرحلة (ترتيب أكبر عدداً)، إزاحة المراحل في المدى [old_order + 1, new_order] لأعلى (-1)
                 qs.filter(order__gt=old_order, order__lte=new_order).update(order=F('order') - 1)
 
         serializer.save()
@@ -140,7 +183,8 @@ class GradeViewSet(AcademicsBaseViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        tenant_id = self._get_request_tenant_id()
+        code = serializer.validated_data.get('code')
         target_order = serializer.validated_data.get('order')
         stage = serializer.validated_data.get('stage')
 
@@ -150,11 +194,25 @@ class GradeViewSet(AcademicsBaseViewSet):
                 qs = qs.filter(tenant_id=tenant_id)
             qs.update(order=F('order') + 1)
 
+        # استرجاع وتحديث أي صف محذوف لطيفاً بنفس الرمز لمنع تعارض قيد Unique
+        if tenant_id and code:
+            soft_deleted = Grade.all_objects.filter(
+                tenant_id=tenant_id, code=code, deleted_at__isnull=False
+            ).first()
+            if soft_deleted:
+                for k, v in serializer.validated_data.items():
+                    setattr(soft_deleted, k, v)
+                soft_deleted.deleted_at = None
+                soft_deleted.tenant_id = tenant_id
+                soft_deleted.save()
+                serializer.instance = soft_deleted
+                return
+
         serializer.save(tenant_id=tenant_id)
 
     @transaction.atomic
     def perform_update(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        tenant_id = self._get_request_tenant_id()
         instance = self.get_object()
         old_order = instance.order
         new_order = serializer.validated_data.get('order', old_order)
@@ -177,6 +235,26 @@ class SectionViewSet(AcademicsBaseViewSet):
     model_class = Section
     serializer_class = SectionSerializer
     search_fields = ['name', 'code']
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        tenant_id = self._get_request_tenant_id()
+        code = serializer.validated_data.get('code')
+
+        if tenant_id and code:
+            soft_deleted = Section.all_objects.filter(
+                tenant_id=tenant_id, code=code, deleted_at__isnull=False
+            ).first()
+            if soft_deleted:
+                for k, v in serializer.validated_data.items():
+                    setattr(soft_deleted, k, v)
+                soft_deleted.deleted_at = None
+                soft_deleted.tenant_id = tenant_id
+                soft_deleted.save()
+                serializer.instance = soft_deleted
+                return
+
+        serializer.save(tenant_id=tenant_id)
 
     def get_queryset(self):
         qs = super().get_queryset().select_related('grade')
@@ -231,7 +309,7 @@ class SubjectViewSet(AcademicsBaseViewSet):
         from apps.academics.interfaces.curriculum_seed import CURRICULUM_PLAN, WEEKLY_PERIODS
         import re
 
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        tenant_id = self._get_request_tenant_id(request)
 
         def slugify(text):
             return re.sub(r'[^A-Za-z0-9]+', '', text)[:8] or 'X'
@@ -317,10 +395,28 @@ class AcademicDashboardStatsView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    def _get_request_tenant_id(self, request):
+        if hasattr(request, 'tenant') and request.tenant and hasattr(request.tenant, 'id'):
+            return request.tenant.id
+        if hasattr(request, 'tenant_id') and request.tenant_id:
+            return request.tenant_id
+        if getattr(request, 'user', None) and getattr(request.user, 'tenant_id', None):
+            return request.user.tenant_id
+        if getattr(request, 'user', None) and request.user.is_authenticated:
+            from apps.identity.domain.rbac import UserRole
+            ur = UserRole.objects.filter(user=request.user).first()
+            if ur and ur.tenant_id:
+                return ur.tenant_id
+        from apps.tenants.domain.models import Tenant
+        active = list(Tenant.objects.filter(is_active=True)[:2])
+        if len(active) == 1:
+            return active[0].id
+        return uuid.uuid4()
+
     def get(self, request):
         from apps.students.domain.models import StudentEnrollment
 
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        tenant_id = self._get_request_tenant_id(request)
 
         def scope(qs):
             return qs.filter(tenant_id=tenant_id) if tenant_id else qs
