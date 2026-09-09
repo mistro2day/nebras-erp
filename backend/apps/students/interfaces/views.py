@@ -11,7 +11,7 @@ from apps.students.domain.models import (
     StudentPromotionHistory, StudentNote, StudentTag, StudentTransfer
 )
 from apps.students.interfaces.serializers import (
-    StudentSerializer, StudentProfileSerializer, StudentMedicalProfileSerializer,
+    StudentSerializer, StudentListSerializer, StudentProfileSerializer, StudentMedicalProfileSerializer,
     StudentAddressSerializer, StudentFamilyRelationSerializer,
     StudentAttachmentSerializer, StudentEnrollmentSerializer,
     StudentPromotionHistorySerializer, StudentNoteSerializer,
@@ -65,10 +65,53 @@ class StudentViewSet(viewsets.ModelViewSet):
         if branch_filter:
             qs = qs.filter(enrollments__branch_id=branch_filter, enrollments__status='active')
             
-        return qs
+        return qs.select_related('profile').prefetch_related('enrollments', 'family_relations').order_by('-created_at')
 
     def get_serializer_class(self):
+        if self.action == 'list':
+            return StudentListSerializer
         return StudentSerializer
+
+    def _build_academic_lookups(self, students):
+        from apps.academics.domain.models import Grade, Section, AcademicYear
+        from apps.organization.domain.models import Branch
+
+        grade_ids = set()
+        section_ids = set()
+        branch_ids = set()
+        ay_ids = set()
+
+        for s in students:
+            for enr in s.enrollments.all():
+                if enr.grade_id: grade_ids.add(enr.grade_id)
+                if enr.section_id: section_ids.add(enr.section_id)
+                if enr.branch_id: branch_ids.add(enr.branch_id)
+                if enr.academic_year_id: ay_ids.add(enr.academic_year_id)
+
+        return {
+            'grades': {g.id: g.name for g in Grade.objects.filter(id__in=grade_ids)} if grade_ids else {},
+            'sections': {s.id: s.name for s in Section.objects.filter(id__in=section_ids)} if section_ids else {},
+            'branches': {b.id: (b.name_ar or b.name) for b in Branch.objects.filter(id__in=branch_ids)} if branch_ids else {},
+            'academic_years': {a.id: a.name for a in AcademicYear.objects.filter(id__in=ay_ids)} if ay_ids else {},
+        }
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        target_list = list(page) if page is not None else list(queryset)
+
+        # تجميع أسماء الصفوف والفروع والشعب في الذاكرة لمنع استعلامات N+1
+        lookups = self._build_academic_lookups(target_list)
+        serializer_context = self.get_serializer_context()
+        serializer_context['lookups'] = lookups
+
+        if page is not None:
+            serializer = self.get_serializer(target_list, many=True, context=serializer_context)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(target_list, many=True, context=serializer_context)
+        return StandardResponse(serializer.data, message="تم جلب قائمة الطلاب بنجاح.")
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

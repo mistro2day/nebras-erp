@@ -122,7 +122,7 @@ class Grade(CombinedBaseModel):
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=50)
     order = models.IntegerField(default=1)
-    passing_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.0)
+    passing_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.0, null=True, blank=True)
     max_capacity = models.IntegerField(default=100)
 
     class Meta:

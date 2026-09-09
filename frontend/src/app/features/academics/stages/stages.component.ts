@@ -20,11 +20,11 @@ import { ACADEMIC_PAGE_STYLES, pickList } from '../shared/academics.shared';
     <div class="page" dir="rtl">
       <nb-page-header title="المراحل التعليمية" subtitle="مراحل النظام التعليمي السوداني: رياض الأطفال، الأساس، الثانوي.">
         <button class="nb-btn-secondary" (click)="load()">تحديث</button>
-        <button class="nb-btn-primary" (click)="adding.set(!adding())">{{ adding() ? 'إغلاق' : 'إضافة مرحلة' }}</button>
+        <button class="nb-btn-primary" (click)="adding() ? cancel() : openAdd()">{{ adding() ? 'إغلاق' : 'إضافة مرحلة' }}</button>
       </nb-page-header>
 
       @if (adding()) {
-        <nb-panel title="مرحلة جديدة" style="margin-bottom:16px">
+        <nb-panel [title]="editingId() ? 'تعديل المرحلة التعليمية: ' + f.name : 'مرحلة جديدة'" style="margin-bottom:16px">
           <div class="add-form">
             <div class="fld req"><label>اسم المرحلة</label><input [(ngModel)]="f.name" placeholder="مثال: مرحلة الأساس" /></div>
             <div class="fld req"><label>الرمز</label><input [(ngModel)]="f.code" placeholder="BASIC" /></div>
@@ -32,9 +32,13 @@ import { ACADEMIC_PAGE_STYLES, pickList } from '../shared/academics.shared';
             <div class="fld"><label>أدنى عمر</label><input type="number" min="0" [(ngModel)]="f.minimum_age" /></div>
             <div class="fld"><label>أقصى عمر</label><input type="number" min="0" [(ngModel)]="f.maximum_age" /></div>
             <div class="form-actions">
-              <button class="nb-btn-primary" (click)="save()" [disabled]="saving() || !valid()">{{ saving() ? 'جارٍ الحفظ…' : 'حفظ' }}</button>
+              <button class="nb-btn-primary" (click)="save()" [disabled]="saving() || !valid()">
+                {{ saving() ? 'جارٍ الحفظ…' : (editingId() ? 'حفظ التعديلات' : 'إضافة') }}
+              </button>
+              <button class="nb-btn-secondary" type="button" (click)="cancel()">إلغاء</button>
             </div>
           </div>
+          <p class="hint">💡 <strong>ملاحظة الترتيب:</strong> عند تحديد ترتيب مستخدم بالفعل، يتم إزاحة المراحل التالية تلقائياً بمقدار (+1).</p>
           <p class="hint">أمثلة سودانية: رياض الأطفال (4–6 سنوات)، الأساس (6–14)، الثانوي (14–17).</p>
           @if (error()) { <p class="hint" style="color:var(--nb-danger)">{{ error() }}</p> }
         </nb-panel>
@@ -44,19 +48,22 @@ import { ACADEMIC_PAGE_STYLES, pickList } from '../shared/academics.shared';
 
       <nb-panel [flush]="true">
         <div class="tbl">
-          <div class="tbl-head" style="grid-template-columns:0.6fr 1.6fr 1fr 1fr 1fr 0.8fr">
+          <div class="tbl-head" style="grid-template-columns:0.6fr 1.6fr 1fr 1fr 1fr 1.2fr">
             <span>الترتيب</span><span>المرحلة</span><span>الرمز</span><span>أدنى عمر</span><span>أقصى عمر</span><span>إجراءات</span>
           </div>
           @if (loading()) { <div class="tbl-empty">جارٍ التحميل…</div> }
           @else {
             @for (s of filtered(); track s.id) {
-              <div class="tbl-row" style="grid-template-columns:0.6fr 1.6fr 1fr 1fr 1fr 0.8fr">
+              <div class="tbl-row" style="grid-template-columns:0.6fr 1.6fr 1fr 1fr 1fr 1.2fr">
                 <span class="mono">{{ s.order }}</span>
                 <span class="strong">{{ s.name }}</span>
                 <span class="mono">{{ s.code }}</span>
                 <span class="mono">{{ s.minimum_age }}</span>
                 <span class="mono">{{ s.maximum_age }}</span>
-                <span class="row-actions"><button class="nb-btn-danger sm" (click)="remove(s)">حذف</button></span>
+                <span class="row-actions">
+                  <button class="nb-btn-secondary sm" (click)="edit(s)">تعديل</button>
+                  <button class="nb-btn-danger sm" (click)="remove(s)">حذف</button>
+                </span>
               </div>
             }
             @if (filtered().length === 0) { <div class="tbl-empty">لا توجد مراحل. أضِف مراحل النظام السوداني للبدء.</div> }
@@ -75,6 +82,7 @@ export class AcademicStagesComponent implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly adding = signal(false);
+  readonly editingId = signal<string | null>(null);
   readonly error = signal('');
   q = '';
 
@@ -95,14 +103,56 @@ export class AcademicStagesComponent implements OnInit {
     });
   }
 
-  valid(): boolean { return !!this.f['name'] && !!this.f['code']; }
+  valid(): boolean { return !!this.f['name']?.trim() && !!this.f['code']?.trim(); }
+
+  openAdd(): void {
+    const existing = this.rows();
+    const nextOrder = existing.length > 0 ? Math.max(...existing.map((s) => Number(s.order) || 0)) + 1 : 1;
+    this.f = { name: '', code: '', order: nextOrder, minimum_age: 6, maximum_age: 14 };
+    this.editingId.set(null);
+    this.error.set('');
+    this.adding.set(true);
+  }
+
+  edit(s: any): void {
+    this.editingId.set(s.id);
+    this.f = {
+      name: s.name,
+      code: s.code,
+      order: s.order,
+      minimum_age: s.minimum_age,
+      maximum_age: s.maximum_age,
+    };
+    this.error.set('');
+    this.adding.set(true);
+  }
+
+  cancel(): void {
+    this.adding.set(false);
+    this.editingId.set(null);
+    this.error.set('');
+  }
 
   save(): void {
     if (!this.valid() || this.saving()) return;
-    this.saving.set(true); this.error.set('');
-    this.svc.createStage(this.f).subscribe({
-      next: () => { this.saving.set(false); this.adding.set(false); this.f = { name: '', code: '', order: 1, minimum_age: 6, maximum_age: 14 }; this.load(); },
-      error: (e) => { this.saving.set(false); this.error.set(e?.error?.message || 'تعذّر الحفظ.'); },
+    this.saving.set(true);
+    this.error.set('');
+
+    const id = this.editingId();
+    const req$ = id
+      ? this.svc.updateStage(id, this.f)
+      : this.svc.createStage(this.f);
+
+    req$.subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.cancel();
+        this.load();
+      },
+      error: (e) => {
+        this.saving.set(false);
+        this.error.set(e?.error?.message || (typeof e?.error === 'string' ? e.error : 'تعذّر حفظ المرحلة.'));
+      },
     });
   }
 

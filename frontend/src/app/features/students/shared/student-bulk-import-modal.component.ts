@@ -145,7 +145,7 @@ export interface RowPreview {
                   <div class="banner-icon">💡</div>
                   <div class="banner-text">
                     <strong>إرشادات استيراد الكشوفات بنجاح:</strong>
-                    <p>قم بتنزيل النموذج الرسمي المعتمد، واملأ بيانات الطلاب وأولياء أمورهم. يحتوي النموذج على ورقة إضافية بأسماء الصفوف والشعب المعتمدة في مدرستكم لتفادي أخطاء الإدخال.</p>
+                    <p>قم بتنزيل النموذج الرسمي المعتمد، واملأ بيانات الطلاب وأولياء أمورهم. يتم تحديث النموذج تلقائياً ليتضمن دليلاً وقوائم منسدلة بجميع المراحل والصفوف والشعب المعتمدة في مدرستكم لتفادي أخطاء الإدخال.</p>
                   </div>
                 </div>
 
@@ -163,10 +163,10 @@ export interface RowPreview {
                   </div>
                   <div class="template-card-info">
                     <h4>نموذج كشف الطلاب الأكاديمي الموحد</h4>
-                    <p>ملف إكسل منسق وجاهز للتعبئة (RTL)، يدعم الهوية السودانية والحقول الإلزامية وأرقام الهواتف وبيانات الطوارئ.</p>
+                    <p>ملف إكسل منسق وجاهز للتعبئة (RTL)، يدعم الهوية السودانية والحقول الإلزامية وأرقام الهواتف وبيانات الطوارئ والمراحل الدراسية.</p>
                     <div class="template-specs">
                       <span class="spec-chip">✓ اتجاه عربي (RTL)</span>
-                      <span class="spec-chip">✓ قائمة صفوف وشعب مدرستك</span>
+                      <span class="spec-chip">✓ يتحدث تلقائياً بمراحل وصفوف مدرستك</span>
                       <span class="spec-chip">✓ أمثلة توضيحية واقعية</span>
                     </div>
                   </div>
@@ -381,7 +381,12 @@ export interface RowPreview {
                           <td class="mono center-cell">{{ r.row_number }}</td>
                           <td class="strong">{{ r.data.arabic_name || '—' }}</td>
                           <td>
-                            <span class="badge-grade">{{ r.data.matched_grade_name || r.data.grade_name || '—' }}</span>
+                            <div class="grade-stage-cell">
+                              <span class="badge-grade">{{ r.data.matched_grade_name || r.data.grade_name || '—' }}</span>
+                              @if (r.data.matched_stage_name || r.data.stage_name) {
+                                <span class="badge-stage">{{ r.data.matched_stage_name || r.data.stage_name }}</span>
+                              }
+                            </div>
                           </td>
                           <!-- الرسوم القابلة للتعديل المباشر -->
                           <td>
@@ -1055,6 +1060,13 @@ export interface RowPreview {
     .center-cell { text-align: center; }
     .strong { font-weight: 700; }
 
+    .grade-stage-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-start;
+    }
+
     .badge-grade {
       background: #F0FDFA;
       color: #0F766E;
@@ -1062,6 +1074,18 @@ export interface RowPreview {
       padding: 2px 8px;
       border-radius: 6px;
       font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .badge-stage {
+      background: #F1F5F9;
+      color: #475569;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      white-space: nowrap;
+      border: 1px solid #E2E8F0;
     }
 
     .guardian-info { display: flex; flex-direction: column; font-size: 12px; }

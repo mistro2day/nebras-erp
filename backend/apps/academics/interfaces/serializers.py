@@ -35,21 +35,43 @@ class StageSerializer(serializers.ModelSerializer):
 
 
 class GradeSerializer(serializers.ModelSerializer):
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+
     class Meta:
         model = Grade
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id']
 
+    def validate(self, attrs):
+        stage = attrs.get('stage') or getattr(self.instance, 'stage', None)
+        if stage:
+            stage_name = (getattr(stage, 'name', '') or '').lower()
+            stage_code = (getattr(stage, 'code', '') or '').lower()
+            # فحص ما إذا كانت المرحلة رياض أطفال
+            is_kindergarten = any(k in stage_name or k in stage_code for k in ['روض', 'رياض', 'kg', 'kindergarten'])
+            if is_kindergarten:
+                # الروضة لا توجد بها نسبة نجاح (تقييم وصفي مهاراتي مستمر)
+                attrs['passing_percentage'] = None
+        return attrs
+
 
 class SectionSerializer(serializers.ModelSerializer):
     occupied_seats = serializers.IntegerField(read_only=True)
     available_seats = serializers.IntegerField(read_only=True)
+    occupancy_percentage = serializers.SerializerMethodField()
     grade_name = serializers.CharField(source='grade.name', read_only=True)
 
     class Meta:
         model = Section
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id']
+
+    def get_occupancy_percentage(self, obj) -> float:
+        cap = getattr(obj, 'capacity', 0) or 0
+        if cap <= 0:
+            return 0.0
+        occupied = getattr(obj, 'occupied_seats', 0) or 0
+        return min(100.0, round((occupied / cap) * 100, 1))
 
 
 class SubjectGroupSerializer(serializers.ModelSerializer):

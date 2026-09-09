@@ -1,4 +1,6 @@
+import re
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404
 from django.utils.deprecation import MiddlewareMixin
 from apps.tenants.domain.models import Tenant
@@ -38,18 +40,19 @@ class TenantMiddleware(MiddlewareMixin):
         if tenant_id_header:
             try:
                 tenant = Tenant.objects.get(id=tenant_id_header, is_active=True)
-            except (ValueError, Tenant.DoesNotExist):
+            except (ValueError, ObjectDoesNotExist):
                 pass
 
         # 2. التعرف عبر النطاق الفرعي (Subdomain resolution)
-        #    لا نُطبّق ذلك على نطاق منصة الـ API نفسه (مثل *.onrender.com)
-        #    بل نعتمد على ترويسة X-Tenant-ID لتمرير المستأجر.
-        if not tenant and not _is_platform_host(host) and len(parts) > 2:
+        #    لا نُطبّق ذلك على نطاق منصة الـ API نفسه (مثل *.onrender.com) أو عناوين الـ IP (مثل 127.0.0.1)
+        #    بل نعتمد على ترويسة X-Tenant-ID أو السقوط للمدرسة الواحدة.
+        is_ip_address = len(parts) == 4 and all(p.isdigit() for p in parts)
+        if not tenant and not _is_platform_host(host) and not is_ip_address and host != 'localhost' and len(parts) > 2:
             subdomain = parts[0]
             if subdomain not in ('www', 'api', 'admin'):
                 try:
                     tenant = Tenant.objects.get(subdomain=subdomain, is_active=True)
-                except Tenant.DoesNotExist:
+                except ObjectDoesNotExist:
                     raise Http404("المدرسة المطلوبة غير موجودة أو تم تعطيلها.")
 
         # 3. نشر المدرسة الواحدة (Single-Tenant Fallback):

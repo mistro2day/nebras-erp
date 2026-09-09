@@ -40,7 +40,7 @@ export interface Grade {
   name: string;
   code: string;
   order: number;
-  passing_percentage: number;
+  passing_percentage: number | null;
   max_capacity: number;
 }
 
@@ -53,6 +53,9 @@ export interface Section {
   gender: string;
   academic_shift: string;
   status: boolean;
+  occupied_seats?: number;
+  available_seats?: number;
+  occupancy_percentage?: number;
 }
 
 export interface Subject {

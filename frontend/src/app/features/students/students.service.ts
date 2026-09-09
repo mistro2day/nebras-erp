@@ -95,15 +95,32 @@ export class StudentsService {
   selectedStudent = signal<Student>(EMPTY_STUDENT);
   dashboardWidgets = signal<any>(null);
   loading = signal<boolean>(false);
+  refreshing = signal<boolean>(false);
+  errorMessage = signal<string | null>(null);
 
   getStudents(params?: any): Observable<any> {
-    this.loading.set(true);
+    const hasCachedData = this.students().length > 0;
+    if (hasCachedData) {
+      this.refreshing.set(true);
+    } else {
+      this.loading.set(true);
+    }
+    this.errorMessage.set(null);
+
     return this.apiClient.get<any>('students/students/', params).pipe(
-      tap(res => {
-        if (res && res.success) {
-          this.students.set(res.data);
+      tap({
+        next: (res) => {
+          if (res && res.success) {
+            this.students.set(res.data);
+          }
+          this.loading.set(false);
+          this.refreshing.set(false);
+        },
+        error: (err) => {
+          this.loading.set(false);
+          this.refreshing.set(false);
+          this.errorMessage.set('تعذر جلب بيانات الطلاب. يرجى التحقق من جودة الاتصال بالإنترنت والمحاولة مجدداً.');
         }
-        this.loading.set(false);
       })
     );
   }

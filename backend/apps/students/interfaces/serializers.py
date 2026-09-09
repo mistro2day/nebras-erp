@@ -252,9 +252,149 @@ class StudentAlumniSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'tenant_id', 'student']
 
 
+def _resolve_lookup(context, category, entity_id, model_loader, name_extractor=None):
+    if not entity_id:
+        return None
+    lookups = context.get('lookups') if context else None
+    if lookups and category in lookups and entity_id in lookups[category]:
+        return lookups[category][entity_id]
+    
+    cache = context.setdefault(f'_{category}_cache', {}) if context else {}
+    if entity_id in cache:
+        return cache[entity_id]
+        
+    model_cls = model_loader()
+    item = model_cls.objects.filter(id=entity_id).first()
+    val = (name_extractor(item) if name_extractor else getattr(item, 'name', None)) if item else None
+    cache[entity_id] = val
+    return val
+
+
+class StudentProfileMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentProfile
+        fields = [
+            'id', 'arabic_name', 'english_name', 'gender', 'date_of_birth',
+            'nationality', 'national_id', 'photo'
+        ]
+        read_only_fields = ['id', 'student']
+
+
+class StudentEnrollmentMinimalSerializer(serializers.ModelSerializer):
+    branch_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    academic_year_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentEnrollment
+        fields = [
+            'id', 'academic_year_id', 'term_id', 'grade_id', 'section_id',
+            'campus_id', 'branch_id', 'enrollment_date', 'enrollment_type', 'status',
+            'branch_name', 'grade_name', 'academic_year_name', 'section_name'
+        ]
+        read_only_fields = ['id', 'student']
+
+    def get_branch_name(self, obj):
+        from apps.organization.domain.models import Branch
+        return _resolve_lookup(self.context, 'branches', obj.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+
+    def get_grade_name(self, obj):
+        from apps.academics.domain.models import Grade
+        return _resolve_lookup(self.context, 'grades', obj.grade_id, lambda: Grade)
+
+    def get_academic_year_name(self, obj):
+        from apps.academics.domain.models import AcademicYear
+        return _resolve_lookup(self.context, 'academic_years', obj.academic_year_id, lambda: AcademicYear)
+
+    def get_section_name(self, obj):
+        from apps.academics.domain.models import Section
+        return _resolve_lookup(self.context, 'sections', obj.section_id, lambda: Section)
+
+
+class StudentFamilyRelationMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentFamilyRelation
+        fields = ['id', 'full_name', 'relationship', 'phone', 'emergency_contact']
+        read_only_fields = ['id', 'student']
+
+
+class StudentListSerializer(serializers.ModelSerializer):
+    """
+    Serializer خفيف فائق السرعة مخصص لقوائم الطلاب، يتجنب استعلامات N+1 تماماً
+    ويعتمد على الـ prefetching والـ bulk lookup بالذاكرة ليتناسب مع شبكات السودان.
+    """
+    profile = StudentProfileMinimalSerializer(read_only=True)
+    enrollments = StudentEnrollmentMinimalSerializer(many=True, read_only=True)
+    family_relations = StudentFamilyRelationMinimalSerializer(many=True, read_only=True)
+    
+    grade_name = serializers.SerializerMethodField()
+    academic_year_name = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Student
+        fields = [
+            'id', 'student_number', 'status', 'created_at', 'updated_at',
+            'profile', 'enrollments', 'family_relations',
+            'grade_name', 'academic_year_name', 'branch_name', 'section_name',
+            'guardian_name', 'guardian_phone'
+        ]
+        read_only_fields = ['id', 'student_number', 'status']
+
+    def _latest_enrollment(self, obj):
+        enrs = list(obj.enrollments.all())
+        return next((e for e in enrs if e.status == 'active'), enrs[0] if enrs else None)
+
+    def get_grade_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.grade_id:
+            from apps.academics.domain.models import Grade
+            return _resolve_lookup(self.context, 'grades', enr.grade_id, lambda: Grade)
+        return None
+
+    def get_academic_year_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.academic_year_id:
+            from apps.academics.domain.models import AcademicYear
+            return _resolve_lookup(self.context, 'academic_years', enr.academic_year_id, lambda: AcademicYear)
+        return None
+
+    def get_branch_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.branch_id:
+            from apps.organization.domain.models import Branch
+            return _resolve_lookup(self.context, 'branches', enr.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+        return None
+
+    def get_section_name(self, obj):
+        enr = self._latest_enrollment(obj)
+        if enr and enr.section_id:
+            from apps.academics.domain.models import Section
+            return _resolve_lookup(self.context, 'sections', enr.section_id, lambda: Section)
+        return None
+
+    def _primary_relation(self, obj):
+        rels = list(obj.family_relations.all())
+        if not rels:
+            return None
+        return next((r for r in rels if r.relationship in ('father', 'guardian')), rels[0])
+
+    def get_guardian_name(self, obj):
+        rel = self._primary_relation(obj)
+        return rel.full_name if rel else None
+
+    def get_guardian_phone(self, obj):
+        rel = self._primary_relation(obj)
+        return rel.phone if rel else None
+
+
 class StudentSerializer(serializers.ModelSerializer):
     """
-    الـ Serializer الرئيسي للطالب مع الحقول المتداخلة وتسهيل عرض الصف والفرع وولي الأمر
+    الـ Serializer الرئيسي لتفاصيل الطالب مع الحقول المتداخلة
     """
     profile = StudentProfileSerializer(read_only=True)
     medical_profile = StudentMedicalProfileSerializer(read_only=True)
@@ -283,45 +423,47 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'student_number', 'status']
 
     def _latest_enrollment(self, obj):
-        enrs = obj.enrollments.all()
-        return enrs.filter(status='active').first() or enrs.first()
+        enrs = list(obj.enrollments.all())
+        return next((e for e in enrs if e.status == 'active'), enrs[0] if enrs else None)
 
     def get_grade_name(self, obj):
         enr = self._latest_enrollment(obj)
         if enr and enr.grade_id:
             from apps.academics.domain.models import Grade
-            g = Grade.objects.filter(id=enr.grade_id).first()
-            return g.name if g else None
+            return _resolve_lookup(self.context, 'grades', enr.grade_id, lambda: Grade)
         return None
 
     def get_academic_year_name(self, obj):
         enr = self._latest_enrollment(obj)
         if enr and enr.academic_year_id:
             from apps.academics.domain.models import AcademicYear
-            ay = AcademicYear.objects.filter(id=enr.academic_year_id).first()
-            return ay.name if ay else None
+            return _resolve_lookup(self.context, 'academic_years', enr.academic_year_id, lambda: AcademicYear)
         return None
 
     def get_branch_name(self, obj):
         enr = self._latest_enrollment(obj)
         if enr and enr.branch_id:
             from apps.organization.domain.models import Branch
-            b = Branch.objects.filter(id=enr.branch_id).first()
-            return (b.name_ar or b.name) if b else None
+            return _resolve_lookup(self.context, 'branches', enr.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
         return None
 
     def get_section_name(self, obj):
         enr = self._latest_enrollment(obj)
         if enr and enr.section_id:
             from apps.academics.domain.models import Section
-            s = Section.objects.filter(id=enr.section_id).first()
-            return s.name if s else None
+            return _resolve_lookup(self.context, 'sections', enr.section_id, lambda: Section)
         return None
 
+    def _primary_relation(self, obj):
+        rels = list(obj.family_relations.all())
+        if not rels:
+            return None
+        return next((r for r in rels if getattr(r, 'relationship', None) in ('father', 'guardian')), rels[0])
+
     def get_guardian_name(self, obj):
-        rel = obj.family_relations.first()
+        rel = self._primary_relation(obj)
         return rel.full_name if rel else None
 
     def get_guardian_phone(self, obj):
-        rel = obj.family_relations.first()
+        rel = self._primary_relation(obj)
         return rel.phone if rel else None

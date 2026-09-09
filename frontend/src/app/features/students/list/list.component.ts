@@ -51,6 +51,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
         subtitle="البحث المتقدم والتوزيع الأكاديمي للطلاب مع ميزات العرض الشبكي وجدول البيانات."
       >
         <div class="header-actions">
+          <span *ngIf="refreshing()" class="refresh-pill">🔄 تحديث في الخلفية...</span>
           <button class="nb-btn-secondary" (click)="showBulkImportModal.set(true)">
             📥 استيراد كشف إكسل
           </button>
@@ -131,6 +132,15 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
           </button>
         </div>
       </div>
+
+      @if (errorMessage()) {
+        <div class="network-error-banner" @fadeSlide>
+          <div class="err-text">
+            <span>⚠️ {{ errorMessage() }}</span>
+          </div>
+          <button class="nb-btn-secondary sm" (click)="loadStudents()">إعادة المحاولة</button>
+        </div>
+      }
 
       @if (loading()) {
         <nb-loading message="جاري تحميل الطلاب..."></nb-loading>
@@ -336,6 +346,33 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       }
 
+      .network-error-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff8e6;
+        color: #8a6300;
+        border: 1px solid #ffd57e;
+        border-radius: var(--nb-radius);
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      }
+      .network-error-banner .err-text { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+      .refresh-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--nb-primary-700);
+        background: var(--nb-primary-50);
+        border: 1px solid var(--nb-primary-200);
+        padding: 4px 12px;
+        border-radius: 20px;
+      }
+
       /* العرض الشبكي المتقدم */
       .student-cards-grid {
         display: grid;
@@ -526,6 +563,8 @@ export class StudentsListComponent implements OnInit {
 
   readonly students = this.studentsService.students;
   readonly loading = this.studentsService.loading;
+  readonly refreshing = this.studentsService.refreshing;
+  readonly errorMessage = this.studentsService.errorMessage;
   readonly exporting = signal(false);
   readonly viewMode = signal<'grid' | 'table'>('table');
 

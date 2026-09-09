@@ -1,8 +1,11 @@
+import typing
+from typing import Any
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
-from django.db.models import Count
+from django.db import transaction, models
+from django.db.models import Count, F
 from apps.academics.domain.models import (
     AcademicYear, Term, AcademicCalendarEvent, Stage, Grade, Section, SchoolShift, TeachingPeriod
 )
@@ -18,12 +21,19 @@ from apps.academics.application.services import AcademicValidationService
 from apps.common.responses import StandardResponse, StandardPagination
 
 class AcademicsBaseViewSet(viewsets.ModelViewSet):
+    model_class: Any = None
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 
     def get_queryset(self):
-        return self.model_class.objects.filter(deleted_at__isnull=True)
+        if self.model_class is None:
+            return super().get_queryset()
+        qs = self.model_class.objects.filter(deleted_at__isnull=True)
+        tenant_id = getattr(getattr(self.request, 'tenant', None), 'id', None)
+        if tenant_id and hasattr(self.model_class, 'tenant_id'):
+            qs = qs.filter(tenant_id=tenant_id)
+        return qs
 
     def perform_create(self, serializer):
         tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
@@ -36,6 +46,8 @@ class AcademicsBaseViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='restore')
     def restore(self, request, pk=None):
+        if self.model_class is None:
+            return StandardResponse(None, status=400, message="النموذج غير محدد.")
         instance = self.model_class.all_objects.get(pk=pk)
         instance.restore()
         return StandardResponse(None, message="تم استرجاع العنصر الأكاديمي بنجاح.")
@@ -47,12 +59,13 @@ class AcademicYearViewSet(AcademicsBaseViewSet):
     search_fields = ['name', 'code']
 
     def perform_create(self, serializer):
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
-        AcademicValidationService.validate_year_no_overlap(
-            tenant_id,
-            self.request.data.get('start_date'),
-            self.request.data.get('end_date')
-        )
+        tenant_id = getattr(getattr(self.request, 'tenant', None), 'id', None)
+        if tenant_id is not None:
+            AcademicValidationService.validate_year_no_overlap(
+                tenant_id,
+                self.request.data.get('start_date'),
+                self.request.data.get('end_date')
+            )
         super().perform_create(serializer)
 
 
@@ -72,12 +85,92 @@ class StageViewSet(AcademicsBaseViewSet):
     model_class = Stage
     serializer_class = StageSerializer
     search_fields = ['name', 'code']
+    ordering_fields = ['order', 'name', 'code']
+    ordering = ['order']
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        target_order = serializer.validated_data.get('order')
+
+        if target_order is not None:
+            # إزاحة تلقائية: إذا كانت هناك مراحل بنفس الترتيب أو أعلى يتم زيادة ترتيبها بمقدار (+1)
+            qs = Stage.objects.filter(deleted_at__isnull=True, order__gte=target_order)
+            if tenant_id:
+                qs = qs.filter(tenant_id=tenant_id)
+            qs.update(order=F('order') + 1)
+
+        serializer.save(tenant_id=tenant_id)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        instance = self.get_object()
+        old_order = instance.order
+        new_order = serializer.validated_data.get('order', old_order)
+
+        if new_order is not None and new_order != old_order:
+            qs = Stage.objects.filter(deleted_at__isnull=True).exclude(pk=instance.pk)
+            if tenant_id:
+                qs = qs.filter(tenant_id=tenant_id)
+
+            if new_order < old_order:
+                # عند تقديم المرحلة (ترتيب أقل عدداً)، إزاحة المراحل في المدى [new_order, old_order - 1] لأسفل (+1)
+                qs.filter(order__gte=new_order, order__lt=old_order).update(order=F('order') + 1)
+            else:
+                # عند تأخير المرحلة (ترتيب أكبر عدداً)، إزاحة المراحل في المدى [old_order + 1, new_order] لأعلى (-1)
+                qs.filter(order__gt=old_order, order__lte=new_order).update(order=F('order') - 1)
+
+        serializer.save()
 
 
 class GradeViewSet(AcademicsBaseViewSet):
     model_class = Grade
     serializer_class = GradeSerializer
     search_fields = ['name', 'code']
+    ordering_fields = ['order', 'name', 'code', 'passing_percentage', 'max_capacity']
+    ordering = ['order']
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('stage')
+        stage_id = self.request.query_params.get('stage') or self.request.query_params.get('stage_id')
+        if stage_id:
+            qs = qs.filter(stage_id=stage_id)
+        return qs
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        target_order = serializer.validated_data.get('order')
+        stage = serializer.validated_data.get('stage')
+
+        if target_order is not None and stage:
+            qs = Grade.objects.filter(deleted_at__isnull=True, stage=stage, order__gte=target_order)
+            if tenant_id:
+                qs = qs.filter(tenant_id=tenant_id)
+            qs.update(order=F('order') + 1)
+
+        serializer.save(tenant_id=tenant_id)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+        instance = self.get_object()
+        old_order = instance.order
+        new_order = serializer.validated_data.get('order', old_order)
+        stage = serializer.validated_data.get('stage', instance.stage)
+
+        if new_order is not None and new_order != old_order:
+            qs = Grade.objects.filter(deleted_at__isnull=True, stage=stage).exclude(pk=instance.pk)
+            if tenant_id:
+                qs = qs.filter(tenant_id=tenant_id)
+
+            if new_order < old_order:
+                qs.filter(order__gte=new_order, order__lt=old_order).update(order=F('order') + 1)
+            else:
+                qs.filter(order__gt=old_order, order__lte=new_order).update(order=F('order') - 1)
+
+        serializer.save()
 
 
 class SectionViewSet(AcademicsBaseViewSet):
@@ -146,7 +239,8 @@ class SubjectViewSet(AcademicsBaseViewSet):
         created_stages = created_grades = created_subjects = 0
         skipped_subjects = 0
 
-        for st in CURRICULUM_PLAN:
+        for st_raw in CURRICULUM_PLAN:
+            st: dict[str, Any] = typing.cast(dict[str, Any], st_raw)
             stage, s_new = Stage.objects.get_or_create(
                 tenant_id=tenant_id, name=st['stage'],
                 defaults={'code': f"ST{st['order']:02d}", 'order': st['order'],
@@ -154,7 +248,8 @@ class SubjectViewSet(AcademicsBaseViewSet):
             )
             created_stages += int(s_new)
 
-            for gr in st['grades']:
+            grades_list: list[dict[str, Any]] = typing.cast(list[dict[str, Any]], st.get('grades', []))
+            for gr in grades_list:
                 grade, g_new = Grade.objects.get_or_create(
                     tenant_id=tenant_id, name=gr['name'],
                     defaults={'stage': stage, 'code': f"G{gr['order']:02d}", 'order': gr['order']},
@@ -166,7 +261,8 @@ class SubjectViewSet(AcademicsBaseViewSet):
                 created_grades += int(g_new)
 
                 seq = 0
-                for item in gr['subjects']:
+                subjects_list: list[dict[str, Any]] = typing.cast(list[dict[str, Any]], gr.get('subjects', []))
+                for item in subjects_list:
                     name = item['name']
                     track = item.get('track', '')
                     seq += 1
