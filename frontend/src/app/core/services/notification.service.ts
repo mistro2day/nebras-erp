@@ -9,6 +9,14 @@ export class NotificationService {
     this.snackBar.open(message, 'إغلاق', { duration: 3500, panelClass: 'snackbar-success' });
   }
 
+  info(message: string): void {
+    this.snackBar.open(message, 'إغلاق', { duration: 3500, panelClass: 'snackbar-info' });
+  }
+
+  warning(message: string): void {
+    this.snackBar.open(message, 'إغلاق', { duration: 4000, panelClass: 'snackbar-warning' });
+  }
+
   error(message: string): void {
     this.snackBar.open(message, 'إغلاق', { duration: 5000, panelClass: 'snackbar-error' });
   }

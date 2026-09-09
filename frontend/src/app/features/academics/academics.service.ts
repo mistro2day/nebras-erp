@@ -122,7 +122,35 @@ export class AcademicsService {
   // ---------- مؤشرات اللوحة الأكاديمية (مربوطة بالطلاب) ----------
   getDashboardStats(params?: any): Observable<any> { return this.apiClient.get('academics/dashboard-stats/', params); }
 
-  // ---------- توزيع الطلاب على الشعب (يعتمد نقاط نهاية الطلاب) ----------
+  // ---------- توزيع الطلاب على الشعب (نقاط النهاية السريعة والذكية) ----------
+  /** جلب نظرة عامة مجمعة وشاملة لكافة شعب الصف والطلاب المقيدين في طلب واحد فائق السرعة. */
+  getDistributionOverview(gradeId: string, academicYearId: string): Observable<any> {
+    return this.apiClient.get('academics/sections/distribution-overview/', {
+      grade_id: gradeId,
+      academic_year_id: academicYearId,
+    });
+  }
+
+  /** حفظ مجمع لتسكين ونقل الطلاب بين الشعب في معاملة ذرية واحدة. */
+  bulkDistribute(payload: {
+    grade_id: string;
+    academic_year_id: string;
+    allocations: { student_id: string; section_id: string | null }[];
+    allow_overflow?: boolean;
+  }): Observable<any> {
+    return this.apiClient.post('academics/sections/bulk-distribute/', payload);
+  }
+
+  /** محاكاة واقتراح توزيع آلي ذكي للمعاينة قبل الاعتماد. */
+  simulateAutoDistribution(payload: {
+    grade_id: string;
+    academic_year_id: string;
+    strategy: 'balanced' | 'alphabetical' | 'gender';
+    options?: { preserve_existing?: boolean; allow_overflow?: boolean };
+  }): Observable<any> {
+    return this.apiClient.post('academics/sections/auto-distribute-preview/', payload);
+  }
+
   /** جلب طلاب صف معيّن مع تسجيلاتهم (enrollments) لتحديد شعبة كل طالب. */
   getStudentsByGrade(gradeId: string): Observable<any> {
     return this.apiClient.get('students/students/', { grade_id: gradeId, page_size: 500 });

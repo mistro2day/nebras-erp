@@ -266,6 +266,81 @@ class SectionViewSet(AcademicsBaseViewSet):
             qs = qs.filter(models.Q(gender=gender) | models.Q(gender='mixed'))
         return qs
 
+    @action(detail=False, methods=['get'], url_path='distribution-overview')
+    def distribution_overview(self, request):
+        """جلب نظرة عامة سريعة ومجمعة لتسكين طلاب الصف في الشعب."""
+        from apps.academics.application.student_distribution_service import StudentDistributionService
+        tenant_id = self._get_request_tenant_id(request)
+        grade_id = request.query_params.get('grade_id')
+        academic_year_id = request.query_params.get('academic_year_id')
+
+        if not grade_id or not academic_year_id:
+            return Response({'error': 'يجب تحديد grade_id و academic_year_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            data = StudentDistributionService.get_distribution_overview(
+                tenant_id=tenant_id,
+                grade_id=uuid.UUID(grade_id),
+                academic_year_id=uuid.UUID(academic_year_id)
+            )
+            return StandardResponse(data, message="تم استرجاع بيانات توزيع طلاب الصف بنجاح.")
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='bulk-distribute')
+    def bulk_distribute(self, request):
+        """حفظ مجمع لتسكين ونقل مجموعة طلاب دفعة واحدة في معاملة ذرية."""
+        from apps.academics.application.student_distribution_service import StudentDistributionService
+        tenant_id = self._get_request_tenant_id(request)
+        user_id = request.user.id if getattr(request, 'user', None) and request.user.is_authenticated else None
+
+        grade_id = request.data.get('grade_id')
+        academic_year_id = request.data.get('academic_year_id')
+        allocations = request.data.get('allocations', [])
+        allow_overflow = bool(request.data.get('allow_overflow', False))
+
+        if not grade_id or not academic_year_id:
+            return Response({'error': 'يجب توفير grade_id و academic_year_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = StudentDistributionService.bulk_assign_sections(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                academic_year_id=uuid.UUID(academic_year_id),
+                grade_id=uuid.UUID(grade_id),
+                allocations=allocations,
+                allow_overflow=allow_overflow
+            )
+            return StandardResponse(result, message=result.get('message', 'تم حفظ التوزيع بنجاح.'))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='auto-distribute-preview')
+    def auto_distribute_preview(self, request):
+        """محاكاة وتوليد خطة توزيع تلقائي ذكي متوازن للمعاينة قبل الحفظ."""
+        from apps.academics.application.student_distribution_service import StudentDistributionService
+        tenant_id = self._get_request_tenant_id(request)
+
+        grade_id = request.data.get('grade_id')
+        academic_year_id = request.data.get('academic_year_id')
+        strategy = request.data.get('strategy', 'balanced')
+        options = request.data.get('options', {})
+
+        if not grade_id or not academic_year_id:
+            return Response({'error': 'يجب توفير grade_id و academic_year_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = StudentDistributionService.simulate_auto_distribution(
+                tenant_id=tenant_id,
+                grade_id=uuid.UUID(grade_id),
+                academic_year_id=uuid.UUID(academic_year_id),
+                strategy=strategy,
+                options=options
+            )
+            return StandardResponse(result, message=result.get('message', 'تم توليد خطة التوزيع الذكي للمعاينة.'))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SubjectGroupViewSet(AcademicsBaseViewSet):
     model_class = SubjectGroup
