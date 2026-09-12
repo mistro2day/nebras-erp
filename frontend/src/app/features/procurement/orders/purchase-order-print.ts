@@ -1,19 +1,21 @@
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
 /**
  * طباعة أمر الشراء الرسمي (Purchase Order - PO)
- * بهوية نظام نبراس وترويسة وفوتر المستأجر السوداني.
+ * بهوية المستأجر السوداني المعتمدة وترويسة المدرسة.
  * معايير صفحة واحدة A4 Portrait قياسية، تفقيط بالجنيه السوداني، الأبعاد المالية والتوقيعات.
  */
 export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: string): void {
   if (!order) return;
 
-  const schoolNameAr = tenantInfo?.nameAr || tenantInfo?.name || 'مدارس النبراس النموذجية الأهلية';
-  const schoolNameEn = tenantInfo?.nameEn || 'Nebras Model Educational Schools';
-  const logoUrl = tenantInfo?.logoUrl || '/assets/images/branding/nebras_official_blue.png';
-  const phone = tenantInfo?.phone || '0912300000';
-  const email = tenantInfo?.email || 'procurement@nebras-edu.sd';
-  const address = tenantInfo?.address || 'جمهورية السودان — ولاية الخرطوم — إدارة الإمداد والمشتريات';
+  const branding = getTenantPrintBranding(tenantInfo);
+  const schoolNameAr = branding.schoolNameAr;
+  const schoolNameEn = branding.schoolNameEn;
+  const logoUrl = branding.logoUrl;
+  const phone = branding.phone;
+  const email = branding.email;
+  const address = branding.address;
 
   const totalAmount = Number(order.total_amount) || 0;
   const tafqeetText = tafqeetArabic(totalAmount, 'جنيه سوداني');

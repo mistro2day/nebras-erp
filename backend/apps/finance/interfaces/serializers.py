@@ -424,10 +424,25 @@ class FinancialDocumentSerializer(serializers.ModelSerializer):
 
 
 class VoucherSerializer(serializers.ModelSerializer):
+    voucher_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
     class Meta:
         model = Voucher
         fields = '__all__'
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at', 'journal_entry')
+
+    def validate(self, attrs):
+        v_num = (attrs.get('voucher_number') or '').strip()
+        if not v_num or v_num in ('AUTO', 'تلقائي') or v_num.startswith('جارٍ'):
+            v_type = attrs.get('voucher_type', 'payment')
+            prefix_map = {'payment': 'PV-', 'receipt': 'RV-', 'journal': 'JV-'}
+            from django.utils import timezone
+            prefix = f"{prefix_map.get(v_type, 'PV-')}{timezone.now().year}-"
+            request = self.context.get('request')
+            tenant_id = request.tenant.id if request and hasattr(request, 'tenant') and request.tenant else None
+            from apps.shared.application.numbering import generate_unique_number
+            attrs['voucher_number'] = generate_unique_number(Voucher, tenant_id, prefix, 'voucher_number', width=4)
+        return super().validate(attrs)
 
 
 class FinancialTransactionSerializer(serializers.ModelSerializer):

@@ -55,19 +55,22 @@ export function tafqeetArabic(num: number, currency = 'جنيه سوداني'): 
   return `فقط ${words} ${currency} لا غير`;
 }
 
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
+
 /**
- * طباعة سند قيد اليومية المحاسبي الرسمي بهوية نظام نبراس وترويسة وفوتر المستأجر
+ * طباعة سند قيد اليومية المحاسبي الرسمي بهوية المستأجر وترويسة المدرسة المعتمدة
  * مستوحى من Odoo 18 و Microsoft Dynamics 365 Finance.
  */
 export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: string): void {
   if (!journal) return;
 
-  const schoolNameAr = tenantInfo?.nameAr || tenantInfo?.name || 'مدارس النبراس النموذجية الأهلية';
-  const schoolNameEn = tenantInfo?.nameEn || 'Nebras Model Educational Schools';
-  const logoUrl = tenantInfo?.logoUrl || '/assets/images/branding/nebras_official_blue.png';
-  const phone = tenantInfo?.phone || '0912300000';
-  const email = tenantInfo?.email || 'finance@nebras-edu.sd';
-  const address = tenantInfo?.address || 'جمهورية السودان — ولاية الخرطوم — قطاع التعليم الخاص';
+  const branding = getTenantPrintBranding(tenantInfo);
+  const schoolNameAr = branding.schoolNameAr;
+  const schoolNameEn = branding.schoolNameEn;
+  const logoUrl = branding.logoUrl;
+  const phone = branding.phone;
+  const email = branding.email;
+  const address = branding.address;
 
   const lines = journal.lines || [];
   const totalDebit = lines.reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0);

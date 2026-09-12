@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
 export interface CalendarDay {
   date: Date;
@@ -271,7 +272,7 @@ export interface CalendarDay {
           <div class="print-document-header print-only">
             <div class="print-header-content">
               <div class="print-org-info">
-                <h2>مدارس النبراس النموذجية الأهلية</h2>
+                <h2>{{ currentSchoolName() }}</h2>
                 <p>نظام نبراس ERP المتكامل · الإدارة المالية والحسابات المدرسية</p>
                 <div class="print-doc-title">
                   {{ selectedDay() ? 'كشف استحقاق أقساط يوم: ' + selectedDay()?.dateStr : 'كشف استحقاق الأقساط المجدولة لشهر ' + monthNames[currentMonth() - 1] + ' ' + currentYear() }}
@@ -1443,6 +1444,10 @@ export interface CalendarDay {
 export class SfInstallmentsCalendarComponent implements OnInit {
   private svc = inject(StudentFinanceService);
   private router = inject(Router);
+
+  currentSchoolName(): string {
+    return getTenantPrintBranding().schoolNameAr;
+  }
 
   readonly monthNames = [
     'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',

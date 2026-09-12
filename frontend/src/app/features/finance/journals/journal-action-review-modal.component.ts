@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 
 export type JournalActionMode = 'approve' | 'post' | 'reverse';
 
@@ -10,7 +11,7 @@ export type JournalActionMode = 'approve' | 'post' | 'reverse';
   selector: 'app-journal-action-review-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent],
   template: `
     <nb-modal [open]="open" [title]="modalTitle()" [subtitle]="modalSubtitle()" maxWidth="760px" (closed)="onCancel()">
       <div class="review-flow" dir="rtl">
@@ -94,7 +95,7 @@ export type JournalActionMode = 'approve' | 'post' | 'reverse';
                   <div class="form-grid2">
                     <label>
                       <span class="req">تاريخ القيد العكسي *</span>
-                      <input class="fld" type="date" [(ngModel)]="reversalDate" />
+                      <nb-datepicker [(value)]="reversalDate" ariaLabel="تاريخ القيد العكسي"></nb-datepicker>
                     </label>
                     <label>
                       <span class="req">سبب عكس القيد (إلزامي) *</span>

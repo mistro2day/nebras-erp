@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 
 export interface PurchaseOrderItemInput {
@@ -18,7 +19,7 @@ export interface PurchaseOrderItemInput {
   selector: 'app-purchase-order-create-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent],
   template: `
     <nb-modal
       [open]="open"
@@ -50,7 +51,7 @@ export interface PurchaseOrderItemInput {
 
             <label>
               <span>تاريخ أمر الشراء *</span>
-              <input type="date" class="fld mono" [(ngModel)]="orderDate" required />
+              <nb-datepicker [(value)]="orderDate" ariaLabel="تاريخ أمر الشراء"></nb-datepicker>
             </label>
 
             <label>

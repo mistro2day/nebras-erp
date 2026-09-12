@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from './journal-voucher-print';
 
 export interface CreateJournalLine {
@@ -17,7 +18,7 @@ export interface CreateJournalLine {
   selector: 'app-journal-entry-create-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent],
   template: `
     <nb-modal
       [open]="open"
@@ -39,7 +40,7 @@ export interface CreateJournalLine {
 
             <label>
               <span>تاريخ القيد *</span>
-              <input type="date" class="fld mono" [(ngModel)]="entryDate" required />
+              <nb-datepicker [(value)]="entryDate" ariaLabel="تاريخ القيد"></nb-datepicker>
             </label>
 
             <label>

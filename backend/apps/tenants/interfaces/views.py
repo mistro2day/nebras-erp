@@ -83,6 +83,10 @@ class TenantViewSet(viewsets.ModelViewSet):
         data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
         data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
         data['school_name_en'] = tenant.name_en or 'Al-Mawred Model Private Schools'
+        data['phone'] = tenant.phone_number or '09123456789'
+        data['phone_number'] = tenant.phone_number or '09123456789'
+        data['email'] = tenant.email or 'accounts@almawred.edu.sd'
+        data['address'] = tenant.address or 'جمهورية السودان — ولاية الخرطوم — الرياض — شارع 15'
         if tenant.logo:
             data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
         else:

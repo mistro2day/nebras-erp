@@ -11,6 +11,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { VoucherCreateModalComponent } from './voucher-create-modal.component';
 import { printVoucher } from './voucher-print';
+import { TenantService } from '../../../core/services/tenant.service';
 
 /**
  * السندات المالية (Vouchers) — سندات الصرف والقبض وترحيلها للدفاتر،
@@ -62,26 +63,43 @@ import { printVoucher } from './voucher-print';
             </thead>
             <tbody>
               @if (loading()) {
-                <tr><td colspan="8"><nb-loading message="جارٍ تحميل السندات…"></nb-loading></td></tr>
-              } @else {
-              @for (v of vouchers(); track v.id) {
-                <tr class="clickable" (click)="detail.set(v)">
-                  <td><strong>{{ v.voucher_number }}</strong></td>
-                  <td><span class="badge" [class.pay]="v.voucher_type==='payment'" [class.rcv]="v.voucher_type==='receipt'">{{ typeLabel(v.voucher_type) }}</span></td>
-                  <td class="mono">{{ v.date }}</td>
-                  <td class="end mono"><strong>{{ v.amount | number:'1.2-2' }}</strong></td>
-                  <td>{{ methodName(v.payment_method) }}</td>
-                  <td>{{ v.description }}</td>
-                  <td><span class="badge" [class]="v.status">{{ statusLabel(v.status) }}</span></td>
-                  <td class="actions-cell" (click)="$event.stopPropagation()">
-                    <button class="btn ghost xs" title="طباعة السند الرسمي A4" (click)="print(v)">🖨️ طباعة</button>
-                    @if (v.status === 'draft' || v.status === 'approved') {
-                      <button class="btn primary xs" (click)="post(v)">ترحيل</button>
-                    }
-                  </td>
+                <tr>
+                  <td colspan="8"><nb-loading message="جارٍ تحميل السندات المالية…"></nb-loading></td>
                 </tr>
-              }
-              @if (!vouchers().length) { <tr><td colspan="8" class="empty">لا توجد سندات مطابقة.</td></tr> }
+              } @else {
+                @for (v of vouchers(); track v.id) {
+                  <tr>
+                    <td class="mono font-bold">{{ v.voucher_number }}</td>
+                    <td>
+                      <span class="badge" [class.payment]="v.voucher_type === 'payment'" [class.receipt]="v.voucher_type === 'receipt'">
+                        {{ typeLabel(v.voucher_type) }}
+                      </span>
+                    </td>
+                    <td>{{ v.date }}</td>
+                    <td class="end mono font-bold">{{ v.amount | number:'1.2-2' }}</td>
+                    <td>{{ methodName(v.payment_method) }}</td>
+                    <td class="desc">{{ v.description || '—' }}</td>
+                    <td>
+                      <span class="badge" [class.draft]="v.status === 'draft'" [class.posted]="v.status === 'posted'">
+                        {{ statusLabel(v.status) }}
+                      </span>
+                    </td>
+                    <td style="text-align: center;">
+                      <div class="row-actions">
+                        <button type="button" class="action-icon-btn" (click)="print(v)" title="طباعة السند بهوية المستأجر">
+                          🖨️
+                        </button>
+                        <button type="button" class="action-icon-btn" (click)="detail.set(v)" title="عرض التفاصيل">
+                          👁️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="empty-state">لا توجد سندات مالية مسجلة حالياً.</td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
@@ -176,6 +194,7 @@ export class VouchersComponent implements OnInit {
   private service = inject(FinanceService);
   private notify = inject(NotificationService);
   private router = inject(Router);
+  tenantService = inject(TenantService);
 
   vouchers = signal<any[]>([]);
   loading = signal(true);
@@ -274,7 +293,7 @@ export class VouchersComponent implements OnInit {
       bank_account_name: this.bankName(v.bank_account),
       cash_box_name: this.boxName(v.cash_box),
     };
-    printVoucher(populated);
+    printVoucher(populated, this.tenantService.currentTenant());
   }
 
   cols(): ExportColumn[] {

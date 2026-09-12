@@ -6,7 +6,6 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -28,7 +27,7 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, DecimalPipe,
-    NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent,
+    NbPageHeaderComponent, NbPanelComponent,
     NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent,
     JournalActionReviewModalComponent,
     JournalEntryCreateModalComponent,

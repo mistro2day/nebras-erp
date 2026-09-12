@@ -1,15 +1,18 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from '../journals/journal-voucher-print';
 
 @Component({
   selector: 'app-voucher-create-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent],
   template: `
     <nb-modal
       [open]="open"
@@ -26,7 +29,7 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
           <div class="form-grid">
             <label>
               <span>نوع السند المالي *</span>
-              <select class="fld" [(ngModel)]="voucherType">
+              <select class="fld" [(ngModel)]="voucherType" (change)="onTypeChange()">
                 <option value="payment">سند صرف مالي (Payment Voucher)</option>
                 <option value="receipt">سند قبض مالي (Receipt Voucher)</option>
                 <option value="journal">سند تسوية مالية (Journal Voucher)</option>
@@ -34,13 +37,36 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
             </label>
 
             <label>
-              <span>رقم السند *</span>
-              <input type="text" class="fld mono" [(ngModel)]="voucherNumber" placeholder="مثال: PV-2026-001" required />
+              <div class="fld-header-row">
+                <span>رقم السند *</span>
+                @if (autoNumber()) {
+                  <span class="auto-badge">⚡ توليد آلي</span>
+                }
+              </div>
+              <div class="auto-input-wrap">
+                <input
+                  type="text"
+                  class="fld mono"
+                  [class.auto-active]="autoNumber()"
+                  [(ngModel)]="voucherNumber"
+                  [readonly]="autoNumber()"
+                  placeholder="يتم التوليد آلياً بواسطة النظام…"
+                  required
+                />
+                <button
+                  type="button"
+                  class="btn-toggle-auto"
+                  (click)="toggleAutoNumber()"
+                  [title]="autoNumber() ? 'التبديل إلى الإدخال اليدوي' : 'العودة للتوليد الآلي'"
+                >
+                  {{ autoNumber() ? '✏️ تعديل' : '⚡ آلي' }}
+                </button>
+              </div>
             </label>
 
             <label>
               <span>تاريخ السند *</span>
-              <input type="date" class="fld mono" [(ngModel)]="voucherDate" required />
+              <nb-datepicker [(value)]="voucherDate" ariaLabel="تاريخ السند"></nb-datepicker>
             </label>
 
             <label>
@@ -55,7 +81,7 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
 
           <div class="step-hint-box">
             <span class="hint-icon">💡</span>
-            <span>يتم توليد السندات تلقائياً في حالة تحصيل الرسوم الدراسية أو سداد فواتير المشتريات، واستخدم هذا المعالج للإصدار اليدوي المباشر.</span>
+            <span>يتم ترقيم السندات المالية آلياً بالتسلسل المالي المعتمد، ويمكنك التحويل للإدخال اليدوي عند تسجيل سند ورقي سابق.</span>
           </div>
         }
 
@@ -103,27 +129,27 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
             </label>
 
             <label class="full-width">
-              <span>المبلغ الإجمالي (بالجنيه السوداني ج.س) *</span>
-              <input type="number" min="0.01" step="0.01" class="fld mono font-bold big-input" [(ngModel)]="amount" placeholder="0.00" />
+              <span>المبلغ الإجمالي المالي (ج.س) *</span>
+              <input type="number" class="fld mono font-bold big-input" [(ngModel)]="amount" min="1" step="any" placeholder="0.00" required />
             </label>
 
             @if (amount > 0) {
-              <div class="tafqeet-preview full-width">
-                <span class="t-lbl">التفقيط الرسمي:</span>
+              <div class="full-width tafqeet-preview">
+                <span class="t-lbl">المبلغ كتابة باللغة العربية:</span>
                 <span class="t-val">{{ tafqeet(amount) }}</span>
               </div>
             }
 
             <label class="full-width">
-              <span>البيان والغرض من السند *</span>
-              <textarea class="fld-area" [(ngModel)]="description" rows="2" placeholder="اكتب بياناً واضحاً للعملية والمستفيد أو الدافع…"></textarea>
+              <span>البيان والغرض المالي من السند *</span>
+              <textarea class="fld-area" [(ngModel)]="description" rows="2" placeholder="اكتب بياناً مفصلاً عن الغرض من السند والطرف المستفيد…" required></textarea>
             </label>
           </div>
         }
 
         <!-- الخطوة 3: المراجعة والتأكيد النهائي -->
         @if (currentStep() === 2) {
-          <div class="review-panel">
+          <div class="step-review">
             <div class="review-summary-card">
               <div class="rev-row">
                 <span class="k">نوع السند:</span>
@@ -133,7 +159,11 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
               </div>
               <div class="rev-row">
                 <span class="k">رقم السند والتاريخ:</span>
-                <span class="v mono font-bold">{{ voucherNumber }} — {{ voucherDate }}</span>
+                <span class="v mono font-bold">
+                  {{ voucherNumber || 'توليد تلقائي' }}
+                  @if (autoNumber()) { <span class="auto-badge-sm">آلي</span> }
+                  — {{ voucherDate }}
+                </span>
               </div>
               <div class="rev-row">
                 <span class="k">طريقة الدفع:</span>
@@ -199,6 +229,14 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .full-width { grid-column: 1 / -1; }
     label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--nb-text); }
+    .fld-header-row { display: flex; justify-content: space-between; align-items: center; }
+    .auto-badge { font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-weight: 700; }
+    .auto-badge-sm { font-size: 10px; background: #e0f2fe; color: #0369a1; padding: 1px 6px; border-radius: 8px; font-weight: 700; margin: 0 4px; }
+    .auto-input-wrap { display: flex; gap: 6px; align-items: center; width: 100%; }
+    .auto-input-wrap .fld { flex: 1; }
+    .auto-input-wrap .fld.auto-active { background: #f8fafc; color: #1e3a8a; font-weight: 700; border-color: #cbd5e1; }
+    .btn-toggle-auto { height: 38px; padding: 0 10px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text-muted); cursor: pointer; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .btn-toggle-auto:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
     .fld { height: 38px; padding: 0 12px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
       background: var(--nb-surface); color: var(--nb-text); font-family: inherit; font-size: 13px; width: 100%; box-sizing: border-box; }
     .fld.big-input { font-size: 16px; height: 42px; }
@@ -240,7 +278,9 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
   `]
 })
-export class VoucherCreateModalComponent {
+export class VoucherCreateModalComponent implements OnInit, OnChanges {
+  private http = inject(HttpClient);
+
   @Input() open = false;
   @Input() currencies: any[] = [];
   @Input() methods: any[] = [];
@@ -253,6 +293,7 @@ export class VoucherCreateModalComponent {
   @Output() confirm = new EventEmitter<any>();
 
   currentStep = signal(0);
+  autoNumber = signal(true);
 
   voucherType = 'payment';
   voucherNumber = '';
@@ -276,6 +317,54 @@ export class VoucherCreateModalComponent {
       (this.voucherType === 'receipt' ? 'إنشاء سند قبض مالي جديد' : 'إنشاء سند تسوية مالية');
   });
 
+  ngOnInit(): void {
+    this.refreshNextVoucherNumber();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['open']?.currentValue === true) {
+      this.currentStep.set(0);
+      if (this.autoNumber()) {
+        this.refreshNextVoucherNumber();
+      }
+    }
+  }
+
+  onTypeChange(): void {
+    if (this.autoNumber()) {
+      this.refreshNextVoucherNumber();
+    }
+  }
+
+  toggleAutoNumber(): void {
+    this.autoNumber.update(a => !a);
+    if (this.autoNumber()) {
+      this.refreshNextVoucherNumber();
+    }
+  }
+
+  refreshNextVoucherNumber(): void {
+    const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
+    this.http.get<any>(`${base}finance/vouchers/next-number/?voucher_type=${this.voucherType}`).subscribe({
+      next: (res) => {
+        if (res?.next_number) {
+          this.voucherNumber = res.next_number;
+        } else {
+          this.generateFallbackNumber();
+        }
+      },
+      error: () => {
+        this.generateFallbackNumber();
+      }
+    });
+  }
+
+  private generateFallbackNumber(): void {
+    const prefix = this.voucherType === 'payment' ? 'PV-' : (this.voucherType === 'receipt' ? 'RV-' : 'JV-');
+    const year = new Date().getFullYear();
+    this.voucherNumber = `${prefix}${year}-${String(Math.floor(1000 + Math.random() * 9000)).padStart(4, '0')}`;
+  }
+
   onStepChange(step: number) {
     if (step <= this.currentStep() || this.canProceed()) {
       this.currentStep.set(step);
@@ -296,7 +385,8 @@ export class VoucherCreateModalComponent {
 
   canProceed(): boolean {
     if (this.currentStep() === 0) {
-      return !!this.voucherType && !!this.voucherNumber.trim() && !!this.voucherDate;
+      const hasNumber = this.autoNumber() || !!this.voucherNumber.trim();
+      return !!this.voucherType && hasNumber && !!this.voucherDate;
     }
     if (this.currentStep() === 1) {
       return !!this.paymentMethodId && !!this.glAccountId && this.amount > 0 && !!this.description.trim();
@@ -342,7 +432,7 @@ export class VoucherCreateModalComponent {
   onConfirm() {
     const payload = {
       voucher_type: this.voucherType,
-      voucher_number: this.voucherNumber.trim(),
+      voucher_number: this.autoNumber() ? (this.voucherNumber || 'AUTO') : this.voucherNumber.trim(),
       date: this.voucherDate,
       currency: this.currencyId || (this.currencies.find(c => c.is_base)?.id || this.currencies[0]?.id),
       payment_method: this.paymentMethodId,

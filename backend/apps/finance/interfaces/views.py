@@ -499,6 +499,16 @@ class VoucherViewSet(BaseCRUDViewSet):
             qs = qs.filter(payment_method_id=payment_method)
         return qs
 
+    @action(detail=False, methods=['get'], url_path='next-number')
+    def next_number(self, request):
+        v_type = request.query_params.get('voucher_type', 'payment')
+        prefix_map = {'payment': 'PV-', 'receipt': 'RV-', 'journal': 'JV-'}
+        prefix = f"{prefix_map.get(v_type, 'PV-')}{timezone.now().year}-"
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        from apps.shared.application.numbering import next_document_number
+        num = next_document_number(Voucher, tenant_id, prefix, 'voucher_number', width=4)
+        return Response({'next_number': num})
+
     @action(detail=True, methods=['post'], url_path='post')
     def post_voucher(self, request, pk=None):
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None

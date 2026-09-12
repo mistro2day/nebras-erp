@@ -1,18 +1,20 @@
 import { tafqeetArabic } from '../journals/journal-voucher-print';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
 /**
  * محرك طباعة كشف حساب دفتر الأستاذ العام الرسمي (General Ledger Statement)
- * مصمم ليحتوي كشف الحساب في صفحة A4 واحدة (Single Page A4) أو متصلة بترويسة وفوتر المستأجر الرسمي.
+ * مصمم ليحتوي كشف الحساب في صفحة A4 واحدة أو متصلة بترويسة المستأجر وهوية المدرسة المعتمدة.
  */
 export function printLedgerStatement(account: any, entries: any[], tenantInfo?: any, printedBy?: string): void {
   if (!entries) return;
 
-  const schoolNameAr = tenantInfo?.nameAr || tenantInfo?.name || 'مدارس النبراس النموذجية الأهلية';
-  const schoolNameEn = tenantInfo?.nameEn || 'Nebras Model Educational Schools';
-  const logoUrl = tenantInfo?.logoUrl || '/assets/images/branding/nebras_official_blue.png';
-  const phone = tenantInfo?.phone || '0912300000';
-  const email = tenantInfo?.email || 'finance@nebras-edu.sd';
-  const address = tenantInfo?.address || 'جمهورية السودان — ولاية الخرطوم — قطاع التعليم الخاص';
+  const branding = getTenantPrintBranding(tenantInfo);
+  const schoolNameAr = branding.schoolNameAr;
+  const schoolNameEn = branding.schoolNameEn;
+  const logoUrl = branding.logoUrl;
+  const phone = branding.phone;
+  const email = branding.email;
+  const address = branding.address;
 
   const totalDebit = entries.reduce((s: number, e: any) => s + (Number(e.debit) || 0), 0);
   const totalCredit = entries.reduce((s: number, e: any) => s + (Number(e.credit) || 0), 0);

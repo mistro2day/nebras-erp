@@ -6,9 +6,18 @@ export interface TenantInfo {
   id: string;
   name: string;
   nameAr: string;
+  nameEn?: string;
+  schoolNameAr?: string;
+  schoolNameEn?: string;
   primaryColor: string;
   secondaryColor: string;
   logoUrl?: string;
+  stampUrl?: string;
+  phone?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+  subdomain?: string;
 }
 
 /** السطح المُخدَّم بناءً على النطاق:
@@ -124,7 +133,7 @@ export class TenantService {
       this.subdomain.set(null);
       return;
     }
-    // نطاق فرعي لمدرسة: al-mawrid.nebras.com
+    // نطاق فرعي لمدرسة: almawred.nebras.com
     this.surface.set('tenant');
     this.subdomain.set(first);
   }
@@ -142,17 +151,11 @@ export class TenantService {
       this.applyBranding(stored);
     }
 
-    // الموقع العام ولوحة المالك لا يحتاجان مستأجراً محدّداً
-    if (this.surface() === 'public' || this.surface() === 'admin') {
-      return;
-    }
-
     // جلب بيانات المستأجر الحقيقية والاسم الفعلي من الخادم لتحديث أي بيانات قديمة
     this.resolveTenantFromHost();
   }
 
-  /** يجلب المستأجر الحالي والاسم الحقيقي من الخادم. */
-  /** يجلب المستأجر الحالي والاسم الحقيقي من الخادم. */
+  /** يجلب المستأجر الحالي والاسم الحقيقي وبيانات التواصل من الخادم. */
   resolveTenantFromHost(): void {
     const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
     this.http.get<any>(`${base}tenants/branding/current/`).subscribe({
@@ -163,9 +166,18 @@ export class TenantService {
           id: d.id,
           name: d.name || d.name_en || d.name_ar || 'Al-Mawred',
           nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
-          primaryColor: d.primary_color || '#3F51B5',
-          secondaryColor: d.secondary_color || '#7A8093',
-          logoUrl: d.logo_url,
+          nameEn: d.name_en || d.school_name_en || 'Al-Mawred Model Private Schools',
+          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          schoolNameEn: d.school_name_en || d.name_en || 'Al-Mawred Model Private Schools',
+          primaryColor: d.primary_color || '#1e3a8a',
+          secondaryColor: d.secondary_color || '#10b981',
+          logoUrl: d.logo_url || d.logo || '',
+          stampUrl: d.stamp_url || d.stamp || '',
+          phone: d.phone || d.phone_number || '09123456789',
+          phoneNumber: d.phone_number || d.phone || '09123456789',
+          email: d.email || 'accounts@almawred.edu.sd',
+          address: d.address || 'جمهورية السودان — ولاية الخرطوم — الرياض — شارع 15',
+          subdomain: d.subdomain || 'almawred',
         };
         this.setTenant(tenant);
       },

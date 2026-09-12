@@ -1,18 +1,20 @@
 import { tafqeetArabic } from '../journals/journal-voucher-print';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
 /**
- * طباعة سند الصرف أو القبض المالي الرسمي بهوية نظام نبراس وترويسة وفوتر المستأجر السوداني
+ * طباعة سند الصرف أو القبض المالي الرسمي بهوية المستأجر السوداني المعتمدة
  * صفحة واحدة A4 Portrait قياسية مع مصفوفة التوقيعات والختم المعتمد.
  */
 export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string): void {
   if (!voucher) return;
 
-  const schoolNameAr = tenantInfo?.nameAr || tenantInfo?.name || 'مدارس النبراس النموذجية الأهلية';
-  const schoolNameEn = tenantInfo?.nameEn || 'Nebras Model Educational Schools';
-  const logoUrl = tenantInfo?.logoUrl || '/assets/images/branding/nebras_official_blue.png';
-  const phone = tenantInfo?.phone || '0912300000';
-  const email = tenantInfo?.email || 'finance@nebras-edu.sd';
-  const address = tenantInfo?.address || 'جمهورية السودان — ولاية الخرطوم — قطاع التعليم الأهلي';
+  const branding = getTenantPrintBranding(tenantInfo);
+  const schoolNameAr = branding.schoolNameAr;
+  const schoolNameEn = branding.schoolNameEn;
+  const logoUrl = branding.logoUrl;
+  const phone = branding.phone;
+  const email = branding.email;
+  const address = branding.address;
 
   const isPayment = voucher.voucher_type === 'payment';
   const isReceipt = voucher.voucher_type === 'receipt';
