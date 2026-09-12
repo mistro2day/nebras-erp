@@ -193,7 +193,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                             const SizedBox(width: 10),
                             Text(
-                              'طالب جديد؟ انضم لصرح نبراس',
+                              'تقديم طلب تسجيل جديد',
                               style: GoogleFonts.tajawal(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -204,7 +204,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'تقديم طلب تسجيل والتحاق طالب جديد للعام 2026/2027\nلا يتطلب حساباً مسبقاً • تقديم فوري لمختلف المراحل',
+                          'تقديم طلب تسجيل والتحاق طالب جديد للعام 2026/2027\nلا يتطلب حساباً مسبقاً • متاح لكافة المراحل الدراسية',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.tajawal(
                             fontSize: 12,

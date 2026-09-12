@@ -358,7 +358,7 @@ class _PublicApplyPageState extends ConsumerState<PublicApplyPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'مدارس نبراس الأكاديمية النموذجية - السودان',
+                      'بوابة تسجيل وقبول الطلاب الموحدة',
                       style: GoogleFonts.tajawal(
                         fontSize: 12,
                         color: Colors.white.withAlpha(200),
