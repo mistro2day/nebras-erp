@@ -70,18 +70,18 @@ class StudentApplicationService:
             raise BusinessException(str(exc), code="plan_limit_exceeded")
 
     @classmethod
+    @atomic_method
     def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, financial_config: dict | None = None) -> Student:
         """
         إنشاء طالب جديد بناءً على طلب قبول معتمد ومقبول مع معالجة اختيارات الرسوم والأقساط والسداد الفوري
         """
-        with transaction.atomic():
-            # 1. جلب المتقدم والتحقق من حالته
-            applicant = Applicant.objects.filter(id=applicant_id, tenant_id=tenant_id).first()
-            if not applicant:
-                raise BusinessException("طلب التقديم غير موجود.", code="applicant_not_found")
-            
-            if applicant.status != 'accepted':
-                raise BusinessException("لا يمكن تسجيل طالب إلا إذا كان طلب التقديم 'مقبول'.", code="invalid_applicant_status")
+        # 1. جلب المتقدم والتحقق من حالته
+        applicant = Applicant.objects.filter(id=applicant_id, tenant_id=tenant_id).first()
+        if not applicant:
+            raise BusinessException("طلب التقديم غير موجود.", code="applicant_not_found")
+        
+        if applicant.status != 'accepted':
+            raise BusinessException("لا يمكن تسجيل طالب إلا إذا كان طلب التقديم 'مقبول'.", code="invalid_applicant_status")
             
         # التحقق من عدم تسجيل الطالب مسبقاً
         if Student.objects.filter(student_number=applicant.application_number).exists():
@@ -236,12 +236,12 @@ class StudentApplicationService:
         return student
 
     @classmethod
+    @atomic_method
     def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, academic_data: dict | None = None, financial_config: dict | None = None) -> Student:
         """
         إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأكاديمية والمالية
         """
-        with transaction.atomic():
-            cls._enforce_student_limit(tenant_id)
+        cls._enforce_student_limit(tenant_id)
 
         # 1. توليد رقم الطالب الأكاديمي
         student_number = StudentNumberGenerator.generate(
@@ -756,7 +756,7 @@ class StudentApplicationService:
         # إنشاء سجل الخريجين
         StudentAlumni.objects.create(
             student_id=student_id,
-            graduation_year=int(graduation_date.split('-')[0]) if '-' in str(graduation_date) else 2026,
+            graduation_year=int(graduation_date.split('-')[0]) if '-' in graduation_date else 2026,
             current_occupation="Alumni",
             contact_allowed=True,
             tenant_id=tenant_id,
