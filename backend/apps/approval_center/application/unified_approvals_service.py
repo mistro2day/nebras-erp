@@ -33,20 +33,40 @@ class UnifiedApprovalsService:
             for req in apv_qs[:50]:
                 payload = req.payload or {}
                 amount = payload.get('amount')
+                cat_code = req.category.code if req.category else "general"
+                
+                # تصنيف الموديول حسب نوع الطلب (إجازات وطلبات موظفين تتبع الموارد البشرية)
+                if cat_code in ('LEAVE', 'leave', 'permission', 'overtime', 'business_trip', 'employee_request', 'loan'):
+                    req_mod = 'hr'
+                    req_mod_ar = 'الموارد البشرية'
+                    req_icon = '🏖️'
+                elif cat_code in ('PAYROLL', 'PAYROLL_RUN', 'payroll', 'payroll_run'):
+                    req_mod = 'payroll'
+                    req_mod_ar = 'الرواتب والمستحقات'
+                    req_icon = '💰'
+                elif cat_code in ('voucher', 'journal_entry', 'budget'):
+                    req_mod = 'finance'
+                    req_mod_ar = 'المالية والمحاسبة'
+                    req_icon = '📑'
+                else:
+                    req_mod = 'hr' if ('موظف' in (req.title_ar or '') or 'إجازة' in (req.title_ar or '')) else getattr(req.category, 'module', 'workflow')
+                    req_mod_ar = 'الموارد البشرية' if req_mod == 'hr' else 'مسارات العمل المركزية'
+                    req_icon = '⚡'
+
                 items.append({
                     "id": f"approval_request:{req.id}",
                     "source": "approval_request",
                     "original_id": str(req.id),
-                    "category_code": req.category.code if req.category else "general",
-                    "category_name_ar": req.category.name_ar if req.category else "اعتماد عام",
-                    "module": getattr(req.category, 'module', 'workflow') if hasattr(req.category, 'module') else 'workflow',
-                    "module_name_ar": "مسارات العمل المركزية",
-                    "icon": "⚡",
+                    "category_code": cat_code,
+                    "category_name_ar": req.category.name_ar if req.category else "طلب اعتماد عام",
+                    "module": req_mod,
+                    "module_name_ar": req_mod_ar,
+                    "icon": req_icon,
                     "title_ar": req.title_ar or (req.category.name_ar if req.category else "طلب اعتماد"),
                     "reference_number": f"REQ-{str(req.id)[:8].upper()}",
                     "amount": float(amount) if amount is not None else None,
                     "currency": "SDG",
-                    "requester_name": payload.get('requester_name') or "مستخدم النظام",
+                    "requester_name": payload.get('requester_name') or "أحد موظفي المدرسة",
                     "status": req.status,
                     "priority_code": req.priority.code if req.priority else "normal",
                     "created_at": req.created_at.isoformat() if req.created_at else None,
@@ -282,14 +302,14 @@ class UnifiedApprovalsService:
                         })
 
                 if not category_code or category_code == 'employee_loan':
-                    loan_qs = EmployeeLoan.objects.filter(tenant_id=tenant_id)
+                    loan_qs = EmployeeLoan.objects.filter(tenant_id=tenant_id).select_related('employee')
                     if status_filter == 'pending':
                         loan_qs = loan_qs.filter(status='pending')
                     elif status_filter and status_filter != 'all':
                         loan_qs = loan_qs.filter(status=status_filter)
                     for loan in loan_qs[:20]:
                         emp_name = str(getattr(loan, 'employee', 'موظف'))
-                        loan_amt = float(loan.amount) if hasattr(loan, 'amount') and loan.amount else 0.0
+                        loan_amt = float(getattr(loan, 'loan_amount', 0.0) or getattr(loan, 'amount', 0.0) or 0.0)
                         items.append({
                             "id": f"employee_loan:{loan.id}",
                             "source": "employee_loan",
@@ -314,6 +334,79 @@ class UnifiedApprovalsService:
                                 "reason": getattr(loan, 'reason', ''),
                             }
                         })
+
+                # سلفيات الموظفين والمعلمين الطارئة للأبناء والظروف (EmployeeAdvance)
+                if not category_code or category_code == 'employee_advance':
+                    from apps.employees.domain.models import EmployeeAdvance
+                    adv_qs = EmployeeAdvance.objects.filter(tenant_id=tenant_id).select_related('employee')
+                    if status_filter == 'pending':
+                        adv_qs = adv_qs.filter(status='pending')
+                    elif status_filter and status_filter != 'all':
+                        adv_qs = adv_qs.filter(status=status_filter)
+                    for adv in adv_qs[:20]:
+                        emp_name = adv.employee.full_name_ar if adv.employee else "أحد منسوبي المدرسة"
+                        adv_amt = float(adv.amount) if adv.amount else 0.0
+                        items.append({
+                            "id": f"employee_advance:{adv.id}",
+                            "source": "employee_advance",
+                            "original_id": str(adv.id),
+                            "category_code": "employee_advance",
+                            "category_name_ar": "سلفيات الموظفين الطارئة",
+                            "module": "hr",
+                            "module_name_ar": "الموارد البشرية",
+                            "icon": "💵",
+                            "title_ar": f"طلب سلفة للموظف {emp_name}: {adv.reason or 'ظرف طارئ'}",
+                            "reference_number": f"ADV-{adv.id.hex[:6].upper()}",
+                            "amount": adv_amt,
+                            "currency": "SDG",
+                            "requester_name": emp_name,
+                            "status": "pending" if adv.status == 'pending' else adv.status,
+                            "priority_code": "high" if adv_amt > 100000 else "normal",
+                            "created_at": adv.request_date.isoformat() if hasattr(adv.request_date, 'isoformat') else str(adv.request_date),
+                            "details": {
+                                "employee": emp_name,
+                                "amount": adv_amt,
+                                "reason": adv.reason or 'سلفة مالية طارئة',
+                                "repayment_months": f"{adv.repayment_months} أشهر تقسيط",
+                            }
+                        })
+
+                # الإجازات الطبية والمرضية الخاصة بالموظفين (MedicalLeave - Employee)
+                if not category_code or category_code == 'medical_leave':
+                    from apps.clinic.domain.models import MedicalLeave
+                    from apps.employees.domain.models import Employee
+                    ml_qs = MedicalLeave.objects.filter(tenant_id=tenant_id, patient_type='employee')
+                    if status_filter == 'pending':
+                        ml_qs = ml_qs.filter(status='submitted')
+                    elif status_filter and status_filter != 'all':
+                        ml_qs = ml_qs.filter(status=status_filter)
+                    for ml in ml_qs[:20]:
+                        emp = Employee.objects.filter(id=ml.patient_user_id).first()
+                        emp_name = emp.full_name_ar if emp else "الموظف"
+                        items.append({
+                            "id": f"medical_leave:{ml.id}",
+                            "source": "medical_leave",
+                            "original_id": str(ml.id),
+                            "category_code": "medical_leave",
+                            "category_name_ar": "الإجازات الطبية والمرضية",
+                            "module": "hr",
+                            "module_name_ar": "الموارد البشرية",
+                            "icon": "🩺",
+                            "title_ar": f"إجازة مرضية للموظف {emp_name} ({ml.start_date} إلى {ml.end_date})",
+                            "reference_number": f"MED-{ml.id.hex[:6].upper()}",
+                            "amount": None,
+                            "currency": "SDG",
+                            "requester_name": emp_name,
+                            "status": "pending" if ml.status == 'submitted' else ml.status,
+                            "priority_code": "normal",
+                            "created_at": str(ml.start_date),
+                            "details": {
+                                "employee": emp_name,
+                                "start_date": str(ml.start_date),
+                                "end_date": str(ml.end_date),
+                                "reason": ml.reason or 'تقرير طبي معتمد',
+                            }
+                        })
             except Exception as exc:
                 logger.warning(f"Error querying HR/Payroll approvals: {exc}")
 
@@ -322,7 +415,7 @@ class UnifiedApprovalsService:
             try:
                 from apps.attendance.domain.models import CorrectionRequest
                 if not category_code or category_code == 'attendance_correction':
-                    corr_qs = CorrectionRequest.objects.filter(tenant_id=tenant_id)
+                    corr_qs = CorrectionRequest.objects.filter(tenant_id=tenant_id).select_related('employee')
                     if status_filter == 'pending':
                         corr_qs = corr_qs.filter(status='pending')
                     elif status_filter and status_filter != 'all':
@@ -758,13 +851,29 @@ class UnifiedApprovalsService:
             run.save(update_fields=['status'])
             msg = f"تم اعتماد مسير الرواتب بنجاح" if action == 'approve' else f"تم رفض مسير الرواتب"
 
-        # 7. سلفة موظف
+        # 7. سلفة موظف (جدول الرواتب)
         elif source == 'employee_loan':
             from apps.payroll.domain.models import EmployeeLoan
             loan = EmployeeLoan.objects.get(tenant_id=tenant_id, id=original_id)
             loan.status = 'approved' if action == 'approve' else 'rejected'
             loan.save(update_fields=['status'])
             msg = f"تم اعتماد طلب السلفة بنجاح" if action == 'approve' else f"تم رفض طلب السلفة"
+
+        # 7.1 سلفة موظف طارئة (موديول شؤون المعلمين والموظفين)
+        elif source == 'employee_advance':
+            from apps.employees.domain.models import EmployeeAdvance
+            adv = EmployeeAdvance.objects.get(tenant_id=tenant_id, id=original_id)
+            adv.status = 'approved' if action == 'approve' else 'rejected'
+            adv.save(update_fields=['status'])
+            msg = f"تم اعتماد سلفة الموظف بنجاح" if action == 'approve' else f"تم رفض طلب السلفة"
+
+        # 7.2 إجازة طبية مرضية للموظف (موديول العيادة والرعاية)
+        elif source == 'medical_leave':
+            from apps.clinic.domain.models import MedicalLeave
+            ml = MedicalLeave.objects.get(tenant_id=tenant_id, id=original_id)
+            ml.status = 'approved' if action == 'approve' else 'rejected'
+            ml.save(update_fields=['status'])
+            msg = f"تم اعتماد الإجازة المرضية للموظف" if action == 'approve' else f"تم رفض الإجازة المرضية"
 
         # 8. استدراك بصمة
         elif source == 'attendance_correction':
