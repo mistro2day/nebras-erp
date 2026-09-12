@@ -84,14 +84,13 @@ import { TenantService } from '../../../core/services/tenant.service';
                         {{ statusLabel(v.status) }}
                       </span>
                     </td>
-                    <td style="text-align: center;">
-                      <div class="row-actions">
-                        <button type="button" class="action-icon-btn" (click)="print(v)" title="طباعة السند بهوية المستأجر">
-                          🖨️
-                        </button>
-                        <button type="button" class="action-icon-btn" (click)="detail.set(v)" title="عرض التفاصيل">
-                          👁️
-                        </button>
+                    <td style="text-align: center;" (click)="$event.stopPropagation()">
+                      <div class="actions">
+                        <button type="button" class="btn ghost xs" (click)="detail.set(v)" title="معاينة تفاصيل السند">تفاصيل</button>
+                        <button type="button" class="btn ghost xs" (click)="print(v)" title="طباعة السند بهوية المستأجر">🖨️ طباعة</button>
+                        @if (v.status === 'draft' || v.status === 'approved') {
+                          <button type="button" class="btn primary xs" (click)="post(v)" title="ترحيل السند لدفتر الأستاذ">ترحيل</button>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -179,7 +178,7 @@ import { TenantService } from '../../../core/services/tenant.service';
     .badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
     .badge.cancelled { background: var(--nb-danger-bg); color: var(--nb-danger); }
 
-    .actions-cell { display: flex; gap: 6px; justify-content: center; align-items: center; }
+    .actions { display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
     .drawer-btns { display: flex; gap: 10px; }
 
     .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--nb-radius); cursor: pointer; border: none; }

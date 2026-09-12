@@ -6,13 +6,14 @@ import { environment } from '../../../../environments/environment';
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbSearchableSelectComponent } from '../../../shared/nebras/nb-searchable-select.component';
 import { tafqeetArabic } from '../journals/journal-voucher-print';
 
 @Component({
   selector: 'app-voucher-create-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, DecimalPipe, NbModalComponent, NbStepperComponent, NbDatepickerComponent, NbSearchableSelectComponent],
   template: `
     <nb-modal
       [open]="open"
@@ -120,12 +121,12 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
 
             <label>
               <span>الحساب المقابل في الدليل (GL) *</span>
-              <select class="fld" [(ngModel)]="glAccountId">
-                <option value="">اختر الحساب المحاسبي المقابل…</option>
-                @for (a of accounts; track a.id) {
-                  <option [value]="a.id">{{ a.code }} - {{ a.name_ar }}</option>
-                }
-              </select>
+              <nb-searchable-select
+                [items]="accounts"
+                [(value)]="glAccountId"
+                placeholder="اختر الحساب المحاسبي المقابل…"
+                searchPlaceholder="ابحث برقم الحساب أو الاسم (مثال: 1200 أو مصروفات)…"
+              ></nb-searchable-select>
             </label>
 
             <label class="full-width">
