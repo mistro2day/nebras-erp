@@ -29,7 +29,7 @@ class ProfileTab extends ConsumerWidget {
                 Text(session?.displayName ?? '',
                     style: GoogleFonts.tajawal(fontSize: 18, fontWeight: FontWeight.w800)),
                 if (session?.email != null)
-                  Text(session!.email!,
+                  Text(session?.email ?? '',
                       style: GoogleFonts.tajawal(fontSize: 13, color: NebrasTheme.textMuted)),
               ],
             ),

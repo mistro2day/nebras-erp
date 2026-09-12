@@ -11,6 +11,13 @@ class AppConfig {
 
   static String get apiBaseUrl {
     if (_envBase.isNotEmpty) return _envBase;
+    // عند التشغيل على المتصفح (Web)، نوجّه الطلبات لنفس النطاق الحالي لمنع حظر Safari CORS
+    try {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && origin != 'null' && origin.startsWith('http')) {
+        return '$origin/api/v1';
+      }
+    } catch (_) {}
     return renderBaseUrl;
   }
 
