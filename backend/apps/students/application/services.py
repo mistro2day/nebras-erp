@@ -46,6 +46,14 @@ def resolve_branch_for_gender(tenant_id, gender):
     return branch
 import uuid
 import datetime
+import typing
+
+F = typing.TypeVar('F', bound=typing.Callable[..., typing.Any])
+
+def atomic_method(func: F) -> F:
+    """مغلف تنفيذي لمعاملات قواعد البيانات يحافظ على توقيع الدالة للأدوات الفاحصة."""
+    return transaction.atomic(func)  # type: ignore
+
 
 class StudentApplicationService:
     """
@@ -62,19 +70,18 @@ class StudentApplicationService:
             raise BusinessException(str(exc), code="plan_limit_exceeded")
 
     @classmethod
-    @transaction.atomic
-    def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, financial_config: dict = None) -> Student:
+    def create_student_from_applicant(cls, applicant_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, financial_config: dict | None = None) -> Student:
         """
         إنشاء طالب جديد بناءً على طلب قبول معتمد ومقبول مع معالجة اختيارات الرسوم والأقساط والسداد الفوري
         """
-        # 1. جلب المتقدم والتحقق من حالته
-        try:
-            applicant = Applicant.objects.get(id=applicant_id, tenant_id=tenant_id)
-        except Applicant.DoesNotExist:
-            raise BusinessException("طلب التقديم غير موجود.", code="applicant_not_found")
+        with transaction.atomic():
+            # 1. جلب المتقدم والتحقق من حالته
+            applicant = Applicant.objects.filter(id=applicant_id, tenant_id=tenant_id).first()
+            if not applicant:
+                raise BusinessException("طلب التقديم غير موجود.", code="applicant_not_found")
             
-        if applicant.status != 'accepted':
-            raise BusinessException("لا يمكن تسجيل طالب إلا إذا كان طلب التقديم 'مقبول'.", code="invalid_applicant_status")
+            if applicant.status != 'accepted':
+                raise BusinessException("لا يمكن تسجيل طالب إلا إذا كان طلب التقديم 'مقبول'.", code="invalid_applicant_status")
             
         # التحقق من عدم تسجيل الطالب مسبقاً
         if Student.objects.filter(student_number=applicant.application_number).exists():
@@ -229,12 +236,12 @@ class StudentApplicationService:
         return student
 
     @classmethod
-    @transaction.atomic
-    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, academic_data: dict = None, financial_config: dict = None) -> Student:
+    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, academic_data: dict | None = None, financial_config: dict | None = None) -> Student:
         """
         إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأكاديمية والمالية
         """
-        cls._enforce_student_limit(tenant_id)
+        with transaction.atomic():
+            cls._enforce_student_limit(tenant_id)
 
         # 1. توليد رقم الطالب الأكاديمي
         student_number = StudentNumberGenerator.generate(
@@ -347,10 +354,10 @@ class StudentApplicationService:
         return student
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def process_student_registration_finance(cls, tenant_id: uuid.UUID, student_id: uuid.UUID,
-                                              grade_id: uuid.UUID = None, academic_year_id: uuid.UUID = None,
-                                              financial_config: dict = None, user_id: uuid.UUID = None):
+                                              grade_id: uuid.UUID | None = None, academic_year_id: uuid.UUID | None = None,
+                                              financial_config: dict | None = None, user_id: uuid.UUID | None = None):
         """
         معالجة البيانات المالية للطالب عند التسجيل أو التعديل (فاتورة مخصصة، خطة أقساط، وسداد فوري)
         """
@@ -535,7 +542,7 @@ class StudentApplicationService:
         }
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def delete_student(cls, student_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """
         حذف الطالب آمنياً بنمط Soft Delete
@@ -559,18 +566,17 @@ class StudentApplicationService:
         return True
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def enroll_student(cls, student_id: uuid.UUID, academic_year_id: uuid.UUID, grade_id: uuid.UUID,
-                       tenant_id: uuid.UUID, user_id: uuid.UUID, term_id: uuid.UUID = None,
-                       section_id: uuid.UUID = None, branch_id: uuid.UUID = None,
-                       campus_id: uuid.UUID = None, enrollment_type: str = 'new') -> StudentEnrollment:
+                       tenant_id: uuid.UUID, user_id: uuid.UUID, term_id: uuid.UUID | None = None,
+                       section_id: uuid.UUID | None = None, branch_id: uuid.UUID | None = None,
+                       campus_id: uuid.UUID | None = None, enrollment_type: str = 'new') -> StudentEnrollment:
         """
         تسجيل الطالب أكاديمياً في سنة دراسية ومرحلة/صف محدد
         """
         # التحقق من الطالب
-        try:
-            student = Student.objects.get(id=student_id, tenant_id=tenant_id)
-        except Student.DoesNotExist:
+        student = Student.objects.filter(id=student_id, tenant_id=tenant_id).first()
+        if not student:
             raise BusinessException("الطالب غير موجود.", code="student_not_found")
             
         # التحقق من قاعدة تفرد التسجيل النشط في نفس السنة الدراسية
@@ -607,7 +613,7 @@ class StudentApplicationService:
         return enrollment
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def promote_student(cls, student_id: uuid.UUID, from_grade_id: uuid.UUID, to_grade_id: uuid.UUID,
                         academic_year_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentPromotionHistory:
         """
@@ -674,7 +680,7 @@ class StudentApplicationService:
         return promotion
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def transfer_student(cls, student_id: uuid.UUID, transfer_type: str, school_name: str,
                          transfer_date: str, reason: str, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentTransfer:
         """
@@ -704,7 +710,7 @@ class StudentApplicationService:
         return transfer
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def withdraw_student(cls, student_id: uuid.UUID, withdrawal_date: str, reason: str,
                          tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentWithdrawal:
         """
@@ -725,14 +731,14 @@ class StudentApplicationService:
         # نشر حدث النطاق
         DomainEventPublisher.publish("StudentWithdrawn", {
             "student_id": str(student_id),
-            "withdrawal_date": str(withdrawal_date),
+            "withdrawal_date": withdrawal_date,
             "tenant_id": str(tenant_id)
         })
         
         return withdrawal
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def graduate_student(cls, student_id: uuid.UUID, graduation_date: str, graduation_class: str,
                          remarks: str, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentGraduation:
         """
@@ -763,14 +769,14 @@ class StudentApplicationService:
         # نشر حدث النطاق
         DomainEventPublisher.publish("StudentGraduated", {
             "student_id": str(student_id),
-            "graduation_date": str(graduation_date),
+            "graduation_date": graduation_date,
             "tenant_id": str(tenant_id)
         })
         
         return graduation
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def archive_student(cls, student_id: uuid.UUID, archive_reason: str, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentArchive:
         """
         أرشفة وحذف الطالب لطيفاً (Soft Delete)
@@ -801,7 +807,7 @@ class StudentApplicationService:
         return archive
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def restore_student(cls, student_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID) -> Student:
         """
         استعادة طالب مؤرشف محذوف لطيفاً
@@ -824,7 +830,7 @@ class StudentApplicationService:
         return student
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def update_medical_profile(cls, student_id: uuid.UUID, medical_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentMedicalProfile:
         """
         تحديث الملف الطبي للطالب
@@ -852,7 +858,7 @@ class StudentApplicationService:
         return med_profile
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def upload_attachment(cls, student_id: uuid.UUID, attachment_type: str, file_asset_id: uuid.UUID,
                           file_name: str, tenant_id: uuid.UUID, user_id: uuid.UUID) -> StudentAttachment:
         """
@@ -880,7 +886,7 @@ class StudentApplicationService:
         return attachment
 
     @classmethod
-    @transaction.atomic
+    @atomic_method
     def change_status(cls, student_id: uuid.UUID, action: str, comments: str, user_id: uuid.UUID, tenant_id: uuid.UUID) -> Student:
         """
         تغيير حالة الطالب وتحديث مسار العمل الخاص به

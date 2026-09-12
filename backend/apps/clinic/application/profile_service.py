@@ -27,18 +27,18 @@ def get_profile(tenant_id, person_type, person_id):
     ).first()
 
 
-@transaction.atomic
 def get_or_create_profile(tenant_id, person_type, person_id, user_id=None):
     """يضمن وجود ملف طبي للشخص — يُنشأ فارغاً عند أول حاجة إليه."""
     profile = get_profile(tenant_id, person_type, person_id)
     if profile is not None:
         return profile
-    return MedicalProfile.objects.create(
-        tenant_id=tenant_id,
-        patient_user_id=person_id,
-        patient_type=person_type,
-        created_by=user_id,
-    )
+    with transaction.atomic():
+        return MedicalProfile.objects.create(
+            tenant_id=tenant_id,
+            patient_user_id=person_id,
+            patient_type=person_type,
+            created_by=user_id,
+        )
 
 
 def read_intake(tenant_id, person_type, person_id):
@@ -74,7 +74,6 @@ def read_intake(tenant_id, person_type, person_id):
     }
 
 
-@transaction.atomic
 def write_intake(tenant_id, person_type, person_id, data, user_id=None):
     """يكتب ما يُقرّه الوليّ عند التسجيل في سجلّات العيادة — مسار الكتابة الوحيد.
 
@@ -84,36 +83,37 @@ def write_intake(tenant_id, person_type, person_id, data, user_id=None):
     if not data:
         return None
 
-    profile = get_or_create_profile(tenant_id, person_type, person_id, user_id)
+    with transaction.atomic():
+        profile = get_or_create_profile(tenant_id, person_type, person_id, user_id)
 
-    if 'blood_group' in data and data.get('blood_group'):
-        profile.blood_group = data['blood_group']
-    if data.get('medical_notes'):
-        profile.medical_alerts = data['medical_notes']
-    if data.get('disabilities'):
-        profile.disabilities = data['disabilities']
-    profile.save()
+        if 'blood_group' in data and data.get('blood_group'):
+            profile.blood_group = data['blood_group']
+        if data.get('medical_notes'):
+            profile.medical_alerts = data['medical_notes']
+        if data.get('disabilities'):
+            profile.disabilities = data['disabilities']
+        profile.save()
 
-    # المقارنة بالاسم تمنع التكرار عند إعادة الحفظ، وتُبقي ما أضافته
-    # الممرضة من تفاصيل على الصفوف القائمة.
-    declared_allergies = [a for a in (data.get('allergies') or []) if str(a).strip()]
-    if declared_allergies:
-        existing = {a.allergy_source for a in profile.allergies.all()}
-        for name in declared_allergies:
-            if str(name).strip() not in existing:
-                Allergy.objects.create(
-                    tenant_id=tenant_id, profile=profile,
-                    allergy_source=str(name).strip(), created_by=user_id,
-                )
+        # المقارنة بالاسم تمنع التكرار عند إعادة الحفظ، وتُبقي ما أضافته
+        # الممرضة من تفاصيل على الصفوف القائمة.
+        declared_allergies = [a for a in (data.get('allergies') or []) if str(a).strip()]
+        if declared_allergies:
+            existing = {a.allergy_source for a in profile.allergies.all()}
+            for name in declared_allergies:
+                if str(name).strip() not in existing:
+                    Allergy.objects.create(
+                        tenant_id=tenant_id, profile=profile,
+                        allergy_source=str(name).strip(), created_by=user_id,
+                    )
 
-    declared_conditions = [c for c in (data.get('chronic_diseases') or []) if str(c).strip()]
-    if declared_conditions:
-        existing = {c.condition_name for c in profile.chronic_conditions.all()}
-        for name in declared_conditions:
-            if str(name).strip() not in existing:
-                ChronicCondition.objects.create(
-                    tenant_id=tenant_id, profile=profile,
-                    condition_name=str(name).strip(), created_by=user_id,
-                )
+        declared_conditions = [c for c in (data.get('chronic_diseases') or []) if str(c).strip()]
+        if declared_conditions:
+            existing = {c.condition_name for c in profile.chronic_conditions.all()}
+            for name in declared_conditions:
+                if str(name).strip() not in existing:
+                    ChronicCondition.objects.create(
+                        tenant_id=tenant_id, profile=profile,
+                        condition_name=str(name).strip(), created_by=user_id,
+                    )
 
-    return profile
+        return profile
