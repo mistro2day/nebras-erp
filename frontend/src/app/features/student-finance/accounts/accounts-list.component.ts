@@ -8,16 +8,18 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
-import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+import { BillingAccountCreateModalComponent } from './billing-account-create-modal.component';
+import { InvoiceCreateModalComponent } from '../invoices/invoice-create-modal.component';
+import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.component';
 
 /**
  * حسابات الطلاب المالية — عرض 360° لحساب الطالب.
  * يربط الطالب (وحدة الطلاب) بالمالية (قيود واستحقاق وسندات قبض) عبر لوح تفاصيل موحّد:
- * الأرصدة، الفواتير، التحصيلات، المستحقات، المنح، والحظر المالي — مع إجراءات فورية
- * (إصدار فاتورة، تحصيل دفعة، منح، فرض/رفع حظر) تُرحّل مباشرة في دفتر أستاذ المالية.
+ * الأرصدة، الفواتير، التحصيلات، المستحقات، المنح، والحظر المالي — مع معالجات نبراس
+ * منبثقة بنظام الخطوات (فتح حساب، إصدار فاتورة، تحصيل دفعة) تُرحّل مباشرة في دفتر أستاذ المالية.
  */
 @Component({
   selector: 'app-sf-accounts-list',
@@ -25,7 +27,8 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent,
-    NbDrawerComponent, NbDatepickerComponent, NbExportMenuComponent, NbLoadingComponent, SfDocumentDrawerComponent,
+    NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent,
+    SfDocumentDrawerComponent, BillingAccountCreateModalComponent, InvoiceCreateModalComponent, ReceiptCreateModalComponent,
   ],
   template: `
     <div class="page" dir="rtl">
@@ -33,37 +36,32 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
         subtitle="عرض 360° لكل طالب: الأرصدة والفواتير والتحصيلات والمنح والحظر — مربوطة مباشرة بدفتر أستاذ المالية.">
         <button class="btn ghost" (click)="goDashboard()">لوحة التحكم</button>
         <nb-export-menu [columns]="cols()" [rows]="filtered()" title="حسابات الطلاب المالية" filename="حسابات-الطلاب"></nb-export-menu>
-        <button class="btn primary" (click)="toggleCreate()">{{ creating() ? 'إغلاق' : '＋ فتح حساب لطالب' }}</button>
+        <button class="btn primary" (click)="openCreateAccountModal()">＋ فتح حساب لطالب</button>
       </nb-page-header>
 
       @if (!settingsReady() && settingsChecked()) {
         <div class="warn-banner">⚠︎ لم تُضبط الإعدادات المالية للطلاب (حساب المدينين والإيرادات). قد تتعذّر الفوترة والتحصيل حتى تُهيّأ الوحدة.</div>
       }
 
-      @if (creating()) {
-        <nb-panel title="فتح حساب فوترة لطالب" class="mb">
-          <div class="grid3">
-            <label>الطالب
-              <select class="fld" [(ngModel)]="cf.student_id">
-                <option value="">اختر الطالب…</option>
-                @for (s of studentsWithoutAccount(); track s.id) {
-                  <option [value]="s.id">{{ s.profile?.arabic_name || s.student_number }} — {{ s.student_number }}</option>
-                }
-              </select>
-            </label>
-            <label>رقم الحساب<input class="fld" [(ngModel)]="cf.account_number" placeholder="SF-2026-0001" /></label>
-            <label>الرصيد الافتتاحي<input class="fld num" type="number" [(ngModel)]="cf.opening_balance" /></label>
-          </div>
-          <div class="form-actions">
-            <button class="btn primary" [disabled]="createBusy() || !cf.student_id || !cf.account_number" (click)="createAccount()">
-              {{ createBusy() ? 'جارٍ الفتح…' : 'فتح الحساب' }}
-            </button>
-          </div>
-          @if (studentsWithoutAccount().length === 0 && studentsLoaded()) {
-            <p class="hint">كل الطلاب المسجّلين لديهم حسابات فوترة بالفعل.</p>
-          }
-        </nb-panel>
-      }
+      <app-billing-account-create-modal
+        [open]="createAccountModalOpen()"
+        (closed)="createAccountModalOpen.set(false)"
+        (saved)="onAccountCreated($event)"
+      ></app-billing-account-create-modal>
+
+      <app-invoice-create-modal
+        [open]="createInvoiceModalOpen()"
+        [preselectedAccountId]="modalAccountId()"
+        (closed)="createInvoiceModalOpen.set(false)"
+        (saved)="onInvoiceSaved($event)"
+      ></app-invoice-create-modal>
+
+      <app-receipt-create-modal
+        [open]="createReceiptModalOpen()"
+        [preselectedAccountId]="modalAccountId()"
+        (closed)="createReceiptModalOpen.set(false)"
+        (saved)="onReceiptSaved($event)"
+      ></app-receipt-create-modal>
 
       <!-- مؤشرات سريعة -->
       <div class="kpis">
@@ -130,41 +128,15 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 
           <!-- إجراءات سريعة -->
           <div class="quick">
-            <button class="btn primary sm" [class.on]="pane()==='invoice'" (click)="setPane('invoice')">＋ إصدار فاتورة</button>
-            <button class="btn primary sm" [class.on]="pane()==='pay'" (click)="setPane('pay')">💵 تحصيل دفعة</button>
+            <button class="btn primary sm" (click)="openInvoiceModal(a.id)">＋ إصدار فاتورة</button>
+            <button class="btn primary sm" (click)="openReceiptModal(a.id)">💵 تحصيل دفعة</button>
             <button class="btn ghost sm" (click)="openStatement(a.id)">📄 كشف الحساب</button>
             <button class="btn ghost sm" [class.on]="pane()==='scholarship'" (click)="setPane('scholarship')">🎓 منحة</button>
             <button class="btn ghost sm" [class.on]="pane()==='hold'" (click)="setPane('hold')">⛔ حظر مالي</button>
             <a class="btn ghost sm" (click)="openStudent(a.student_id)">👤 ملف الطالب</a>
           </div>
 
-          <!-- نماذج الإجراءات -->
-          @if (pane() === 'invoice') {
-            <div class="action-box">
-              <h4>إصدار فاتورة رسوم</h4>
-              <div class="fee-list">
-                @for (fs of feeStructures(); track fs.id) {
-                  <label class="chk"><input type="checkbox" [checked]="picked.has(fs.id)" (change)="togglePick(fs.id)" /> {{ fs.name }} <span class="amt">{{ fs.amount | number:'1.0-0' }} ج.س</span></label>
-                }
-              </div>
-              <div class="row2">
-                <label>تاريخ الاستحقاق<nb-datepicker [value]="invForm.due_date" (valueChange)="invForm.due_date = $event"></nb-datepicker></label>
-                <div class="tot">الإجمالي المختار: <strong>{{ pickedTotal() | number:'1.0-0' }} ج.س</strong></div>
-              </div>
-              <button class="btn primary" [disabled]="busy() || !picked.size || !invForm.due_date" (click)="issueInvoice(a)">{{ busy() ? 'جارٍ الإصدار…' : 'إصدار وترحيل الفاتورة' }}</button>
-            </div>
-          }
-          @if (pane() === 'pay') {
-            <div class="action-box">
-              <h4>تحصيل دفعة</h4>
-              <div class="grid3">
-                <label>المبلغ<input class="fld num" type="number" min="0" step="0.01" placeholder="0.00" [(ngModel)]="payForm.amount" /></label>
-                <label>طريقة الدفع<select class="fld" [(ngModel)]="payForm.payment_method_id">@for (m of methods(); track m.id) { <option [value]="m.id">{{ m.name_ar }}</option> }</select></label>
-                <label>الصندوق<select class="fld" [(ngModel)]="payForm.cash_box_id">@for (c of cashBoxes(); track c.id) { <option [value]="c.id">{{ c.name_ar }}</option> }</select></label>
-              </div>
-              <button class="btn primary" [disabled]="busy() || !(payForm.amount > 0) || !payForm.payment_method_id" (click)="receivePayment(a)">{{ busy() ? 'جارٍ التحصيل…' : 'تحصيل وتوليد سند قبض' }}</button>
-            </div>
-          }
+          <!-- نماذج الإجراءات الفرعية -->
           @if (pane() === 'scholarship') {
             <div class="action-box">
               <h4>إضافة منحة</h4>
@@ -368,13 +340,12 @@ export class SfAccountsListComponent implements OnInit {
   holds = signal<any[]>([]);
   doc = signal<SfDoc>(null);
 
-  creating = signal(false);
-  createBusy = signal(false);
-  cf = { student_id: '', account_number: '', opening_balance: 0 };
+  // ---- معالجات نبراس متعددة الخطوات المنبثقة ----
+  createAccountModalOpen = signal(false);
+  createInvoiceModalOpen = signal(false);
+  createReceiptModalOpen = signal(false);
+  modalAccountId = signal<string | undefined>(undefined);
 
-  picked = new Set<string>();
-  invForm = { due_date: '' };
-  payForm: any = { amount: null, payment_method_id: '', cash_box_id: '' };
   schForm: any = { name: '', type: 'merit', amount_percentage: 25 };
   holdForm: any = { hold_type: 'exam', reason: '' };
 
@@ -402,7 +373,6 @@ export class SfAccountsListComponent implements OnInit {
     const linked = new Set(this.rows().map((a) => a.student_id));
     return this.allStudents().filter((s) => !linked.has(s.id));
   });
-  pickedTotal = computed(() => this.feeStructures().filter((f) => this.picked.has(f.id)).reduce((s, f) => s + (+f.amount || 0), 0));
 
   ngOnInit() {
     const q = this.route.snapshot.queryParamMap.get('q');
@@ -455,29 +425,44 @@ export class SfAccountsListComponent implements OnInit {
     ];
   }
 
-  // ---- إنشاء الحساب ----
-  toggleCreate() {
-    this.creating.update((v) => !v);
-    if (this.creating()) this.cf.account_number = `SF-${new Date().getFullYear()}-${String(this.rows().length + 1).padStart(4, '0')}`;
+  // ---- فتح الحساب عبر المعالج المنبثق ----
+  openCreateAccountModal() {
+    this.createAccountModalOpen.set(true);
   }
-  createAccount() {
-    this.createBusy.set(true);
-    this.svc.createBillingAccount({ ...this.cf }).subscribe({
-      next: (res: any) => {
-        this.createBusy.set(false); this.creating.set(false);
-        this.notify.success(res?.message || 'تم فتح حساب الفوترة بنجاح.');
-        this.cf = { student_id: '', account_number: '', opening_balance: 0 };
-        this.reload();
-      },
-      error: (e) => { this.createBusy.set(false); this.notify.error(e?.error?.message || 'تعذّر فتح الحساب (تحقق من تفرّد رقم الحساب).'); },
-    });
+
+  onAccountCreated(res: any) {
+    this.reload();
+  }
+
+  // ---- إصدار فاتورة عبر المعالج المنبثق ----
+  openInvoiceModal(accountId?: string) {
+    this.modalAccountId.set(accountId);
+    this.createInvoiceModalOpen.set(true);
+  }
+
+  onInvoiceSaved(res: any) {
+    this.reload();
+    if (this.sel()) {
+      this.refreshAfter(this.sel());
+    }
+  }
+
+  // ---- تحصيل دفعة وسند قبض عبر المعالج المنبثق ----
+  openReceiptModal(accountId?: string) {
+    this.modalAccountId.set(accountId);
+    this.createReceiptModalOpen.set(true);
+  }
+
+  onReceiptSaved(res: any) {
+    this.reload();
+    if (this.sel()) {
+      this.refreshAfter(this.sel());
+    }
   }
 
   // ---- درج الحساب ----
   openAccount(a: any) {
     this.sel.set(a); this.pane.set(''); this.tab.set('invoices');
-    this.payForm = { amount: null, payment_method_id: this.methods()[0]?.id || '', cash_box_id: this.cashBoxes()[0]?.id || '' };
-    this.invForm = { due_date: '' }; this.picked = new Set();
     this.loadAccountBundle(a.id);
   }
   loadAccountBundle(id: string) {
@@ -491,7 +476,6 @@ export class SfAccountsListComponent implements OnInit {
     this.svc.holdsForAccount(id).subscribe({ next: (r) => this.holds.set(r?.data ?? []), error: done, complete: done });
   }
   setPane(p: any) { this.pane.set(this.pane() === p ? '' : p); }
-  togglePick(id: string) { this.picked.has(id) ? this.picked.delete(id) : this.picked.add(id); }
 
   // ---- تفاصيل المستند (فاتورة/تحصيل/مستحق) — عبر المكوّن المشترك sf-document-drawer ----
   openDoc(type: 'invoice' | 'receipt' | 'receivable', data: any) { this.doc.set({ type, data }); }
@@ -505,20 +489,6 @@ export class SfAccountsListComponent implements OnInit {
     });
   }
 
-  issueInvoice(a: any) {
-    this.busy.set(true);
-    this.svc.generateStudentInvoice({ billing_account_id: a.id, fee_structure_ids: Array.from(this.picked), due_date: this.invForm.due_date }).subscribe({
-      next: () => { this.busy.set(false); this.notify.success('تم إصدار الفاتورة وترحيل قيد الاستحقاق في المالية.'); this.pane.set(''); this.picked = new Set(); this.refreshAfter(a); },
-      error: (e) => { this.busy.set(false); this.notify.error(e?.error?.error || e?.error?.message || 'تعذّر إصدار الفاتورة.'); },
-    });
-  }
-  receivePayment(a: any) {
-    this.busy.set(true);
-    this.svc.receiveStudentPayment({ billing_account_id: a.id, amount: +this.payForm.amount, payment_method_id: this.payForm.payment_method_id, cash_box_id: this.payForm.cash_box_id || undefined }).subscribe({
-      next: () => { this.busy.set(false); this.notify.success('تم التحصيل وتوليد سند القبض في المالية.'); this.pane.set(''); this.refreshAfter(a); },
-      error: (e) => { this.busy.set(false); this.notify.error(e?.error?.error || e?.error?.message || 'تعذّر التحصيل.'); },
-    });
-  }
   applyScholarship(a: any) {
     this.busy.set(true);
     this.svc.applyScholarshipApi({ billing_account_id: a.id, name: this.schForm.name, type: this.schForm.type, amount_percentage: +this.schForm.amount_percentage || 0, start_date: new Date().toISOString().slice(0, 10) }).subscribe({

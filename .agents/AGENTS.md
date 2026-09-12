@@ -5,6 +5,13 @@ For all frontend UI tasks — including building pages, components, layouts, cho
 
 ## Nebras OS UI & UX Rules
 - **STRICT PROHIBITION OF BROWSER DIALOGS**: Never use native browser dialogs (`alert()`, `prompt()`, `confirm()`). All alerts, confirmations, inputs, and popups MUST use Nebras OS custom styled modal popups (`<div class="modal-backdrop">...</div>` or Nebras OS modal components) adhering to the Nebras OS design system for a premium user experience.
+- **MANDATORY MULTI-STEP CREATION WIZARD PATTERN (نظام الخطوات الإلزامي لكافة أزرار ونوافذ الإنشاء)**:
+  Whenever creating or modifying any entity or module creation flow across Nebras ERP (e.g. Invoices, Receipts, Billing Accounts, Journals, Vouchers, Purchase Orders, Requests, Contracts, etc.), it is **STRICTLY MANDATORY** to implement the Nebras OS Multi-Step Wizard Modal pattern:
+  1. Use `<nb-modal>` with clear title and descriptive subtitle.
+  2. Use `<nb-stepper [steps]="steps" [current]="currentStep() + 1"></nb-stepper>`.
+  3. Form inputs MUST use Nebras components: `<nb-datepicker>` for dates, and `<nb-searchable-select>` for searchable account/student/vendor dropdowns. Native `<input type="date">` and unsearchable huge `<select>` tags are strictly prohibited.
+  4. The final step MUST ALWAYS be a comprehensive Review & Confirmation step (المراجعة والتأكيد) presenting key details and Sudanese currency formatting (`ج.س` with Arabic tafqeet) with clear confirm button before final persistence.
+  5. Action buttons on tables MUST use authentic Nebras button classes (`btn ghost xs`, `btn primary xs`), never raw square emoji boxes.
 
 ## Git Workflow Rules
 - **Arabic Git Commits**: All `git commit` messages MUST be written in Arabic to maintain context and history consistency.

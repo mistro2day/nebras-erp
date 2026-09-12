@@ -8,17 +8,27 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { downloadCsv } from '../../../shared/export';
 import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+import { ReceiptCreateModalComponent } from './receipt-create-modal.component';
 
 /**
  * سندات القبض / المدفوعات — وحدة عاملة (Nebras OS).
  * قائمة حقيقية من student-finance/receipts/ (تاريخ الدفعات) مع بحث، تصفية حالة،
- * فرز، ترقيم، حالات تحميل/فراغ، وتصدير CSV، والطباعة الرسمية.
+ * فرز، ترقيم، حالات تحميل/فراغ، وتصدير CSV، ومعالج إنشاء متعدد الخطوات بنمط نبراس.
  */
 @Component({
   selector: 'app-sf-receipts-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbLoadingComponent, SfDocumentDrawerComponent],
+  imports: [
+    FormsModule,
+    DecimalPipe,
+    MatSnackBarModule,
+    NbPageHeaderComponent,
+    NbPanelComponent,
+    NbLoadingComponent,
+    ReceiptCreateModalComponent,
+    SfDocumentDrawerComponent,
+  ],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -27,38 +37,14 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
       >
         <button class="nb-btn-secondary" (click)="exportCsv()" [disabled]="filtered().length === 0">تصدير CSV</button>
         <button class="nb-btn-secondary" (click)="reload()">تحديث</button>
-        <button class="nb-btn-primary" (click)="toggleCreate()">{{ creating() ? 'إغلاق' : 'استلام دفعة' }}</button>
+        <button class="nb-btn-primary" (click)="openCreateModal()">＋ استلام دفعة جديدة</button>
       </nb-page-header>
 
-      @if (creating()) {
-        <div class="create-panel">
-          <div class="cp-grid">
-            <div class="cfld req"><label>حساب الطالب</label>
-              <select [(ngModel)]="pf.billing_account_id">
-                <option value="">اختر الحساب…</option>
-                @for (a of accounts(); track a.id) {
-                  <option [value]="a.id">{{ a.account_number }} — مستحق: {{ a.outstanding_balance | number:'1.2-2' }}</option>
-                }
-              </select>
-            </div>
-            <div class="cfld req"><label>المبلغ (ج.س)</label>
-              <input type="number" min="0" step="0.01" [(ngModel)]="pf.amount" />
-            </div>
-            <div class="cfld req"><label>طريقة الدفع</label>
-              <select [(ngModel)]="pf.payment_method_id">
-                <option value="">اختر…</option>
-                @for (m of methods(); track m.id) { <option [value]="m.id">{{ m.name_ar }}</option> }
-              </select>
-            </div>
-            <button class="nb-btn-primary" (click)="receive()" [disabled]="payBusy() || !pf.billing_account_id || !pf.amount || !pf.payment_method_id">
-              {{ payBusy() ? 'جارٍ الاستلام…' : 'استلام وتوليد سند' }}
-            </button>
-          </div>
-          @if (methods().length === 0 && lookupsLoaded()) {
-            <p class="cp-hint">لا توجد طرق دفع معرّفة — أنشئها من وحدة المالية (طرق الدفع) أولًا.</p>
-          }
-        </div>
-      }
+      <app-receipt-create-modal
+        [open]="createModalOpen()"
+        (closed)="createModalOpen.set(false)"
+        (saved)="onReceiptSaved($event)"
+      ></app-receipt-create-modal>
 
       <div class="stat-row">
         <div class="mini"><span class="mini-label">عدد السندات المعروضة</span><span class="mini-val">{{ filtered().length }}</span></div>
@@ -111,7 +97,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
                 <span class="mono ok">{{ r.amount | number:'1.2-2' }} جنيه</span>
                 <span><span [class]="badge(r.status)">{{ statusText(r.status) }}</span></span>
                 <span class="row-actions" style="text-align: center;" (click)="$event.stopPropagation()">
-                  <button class="nb-btn-ghost sm" title="طباعة سند القبض الرسمي A4" (click)="openDoc(r)">🖨️ طباعة</button>
+                  <button class="btn ghost xs" title="طباعة سند القبض الرسمي A4" (click)="openDoc(r)">طباعة</button>
                 </span>
               </div>
             }
@@ -135,17 +121,6 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
-    .create-panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 14px; animation: paneIn 220ms cubic-bezier(0.2,0,0,1); }
-    @keyframes paneIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-    @media (prefers-reduced-motion: reduce) { .create-panel { animation: none; } }
-    .cp-grid { display: grid; grid-template-columns: 1.8fr 1fr 1.2fr auto; gap: 12px; align-items: end; }
-    @media (max-width: 860px) { .cp-grid { grid-template-columns: 1fr; } }
-    .cfld { display: flex; flex-direction: column; gap: 5px; }
-    .cfld label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
-    .cfld.req label::after { content: ' *'; color: var(--nb-danger); }
-    .cfld input, .cfld select { height: 36px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
-    .cfld input:focus, .cfld select:focus { border-color: var(--nb-primary-600); box-shadow: var(--nb-focus-ring); }
-    .cp-hint { font-size: 12px; color: var(--nb-text-muted); margin: 10px 0 0; }
     .stat-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .mini { display: flex; flex-direction: column; gap: 3px; background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 10px 14px; min-width: 170px; }
     .mini-label { font-size: 11px; color: var(--nb-text-muted); }
@@ -169,6 +144,13 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
     .mono { font-variant-numeric: tabular-nums; }
     .mono.ok { color: var(--nb-success); font-weight: 600; }
     .tbl-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--nb-text-muted); }
+    .row-actions { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn { height: 32px; padding: 0 12px; font-family: inherit; font-size: 12px; font-weight: 600; border-radius: var(--nb-radius); cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s ease; }
+    .btn.xs { height: 26px; padding: 0 8px; font-size: 11px; }
+    .btn.primary { background: var(--nb-primary-600); color: #fff; }
+    .btn.primary:hover:not(:disabled) { background: var(--nb-primary-700); }
+    .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
+    .btn.ghost:hover:not(:disabled) { background: var(--nb-surface); }
     .nb-btn-ghost.sm { height: 26px; padding: 0 12px; font-size: 12px; }
     .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
     .pager-info { font-size: 12px; color: var(--nb-text-muted); }
@@ -178,42 +160,16 @@ export class SfReceiptsListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
   private readonly snack = inject(MatSnackBar);
 
-  // ---- استلام دفعة (دورة: فاتورة ← سند قبض) ----
-  readonly creating = signal(false);
-  readonly payBusy = signal(false);
-  readonly lookupsLoaded = signal(false);
-  readonly accounts = signal<any[]>([]);
+  // ---- معالج استلام الدفعات الجديد بنمط الخطوات ----
+  readonly createModalOpen = signal(false);
   readonly methods = signal<any[]>([]);
-  pf = { billing_account_id: '', amount: 0, payment_method_id: '' };
 
-  toggleCreate(): void {
-    this.creating.update((v) => !v);
-    if (this.creating() && !this.lookupsLoaded()) {
-      this.svc.listBillingAccounts({ page_size: 100 }).subscribe((res) => this.accounts.set(res?.data ?? []));
-      this.svc.listPaymentMethods().subscribe({
-        next: (res) => { this.methods.set(res?.data ?? []); this.lookupsLoaded.set(true); },
-        error: () => this.lookupsLoaded.set(true),
-      });
-    }
+  openCreateModal(): void {
+    this.createModalOpen.set(true);
   }
 
-  receive(): void {
-    if (this.payBusy()) return;
-    this.payBusy.set(true);
-    this.svc.receiveStudentPayment({ ...this.pf, amount: +this.pf.amount }).subscribe({
-      next: (res) => {
-        this.payBusy.set(false);
-        this.creating.set(false);
-        const num = res?.receipt_number || res?.data?.receipt_number || '';
-        this.snack.open(num ? `تم استلام الدفعة — سند رقم ${num}.` : 'تم استلام الدفعة وتوليد السند.', 'إغلاق', { duration: 5000 });
-        this.pf = { billing_account_id: '', amount: 0, payment_method_id: '' };
-        this.reload();
-      },
-      error: (e) => {
-        this.payBusy.set(false);
-        this.snack.open(e?.error?.message || e?.error?.error || 'تعذّر استلام الدفعة.', 'إغلاق', { duration: 5000 });
-      },
-    });
+  onReceiptSaved(res: any): void {
+    this.reload();
   }
 
   readonly loading = signal(false);
