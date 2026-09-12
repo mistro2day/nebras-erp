@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:nebras_mobile/core/theme/app_theme.dart';
@@ -79,12 +80,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   Text('تسجيل الدخول الموحد لجميع البوابات (إدارة • معلمين • أولياء أمور • طلاب)',
                       style: GoogleFonts.tajawal(
                           fontSize: 12, color: Colors.white.withAlpha(160))),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(30),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Form(
                       key: _formKey,
@@ -137,6 +145,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: NebrasTheme.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
                               onPressed: _loading ? null : _submit,
                               child: _loading
                                   ? const SizedBox(
@@ -153,6 +166,78 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // بطاقة تقديم طلب تسجيل طالب جديد (دون الحاجة لحساب)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(25),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withAlpha(45), width: 1.2),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withAlpha(40),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF34D399), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'طالب جديد؟ انضم لصرح نبراس',
+                              style: GoogleFonts.tajawal(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'تقديم طلب تسجيل والتحاق طالب جديد للعام 2026/2027\nلا يتطلب حساباً مسبقاً • تقديم فوري لمختلف المراحل',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.tajawal(
+                            fontSize: 12,
+                            color: Colors.white.withAlpha(200),
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () => context.push('/apply'),
+                            icon: const Icon(Icons.app_registration_rounded, size: 20),
+                            label: Text(
+                              'تقديم طلب تسجيل طالب جديد',
+                              style: GoogleFonts.tajawal(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -162,3 +247,4 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 }
+

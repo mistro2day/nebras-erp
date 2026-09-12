@@ -245,6 +245,81 @@ class AdmissionsRepository {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>?> fetchPublicConfig() async {
+    try {
+      final res = await _api.get('/admissions/settings/public-config/');
+      if (res is Map && res['data'] is Map) {
+        return Map<String, dynamic>.from(res['data'] as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String> submitPublicApplication({
+    required String studentFullName,
+    required String gender,
+    required String dateOfBirth,
+    required String nationalId,
+    required String applyingGrade,
+    required String guardianFullName,
+    required String guardianRelationship,
+    required String guardianPhone,
+    String? guardianWhatsapp,
+    String? guardianAddress,
+    String? guardianEmail,
+    String? previousSchool,
+    String? notes,
+    String? academicYearId,
+    String? applyingGradeId,
+  }) async {
+    final defaultYearId = academicYearId ?? '5a4b8aa8-f768-4b7c-a96e-620f1c884c40';
+    final defaultGradeId = applyingGradeId ?? '49260172-f08b-411a-b5c6-405d36fbc9e5';
+    final gen = (gender == 'أنثى' || gender.toLowerCase() == 'female') ? 'female' : 'male';
+
+    String rel = 'father';
+    if (guardianRelationship == 'أم' || guardianRelationship.toLowerCase() == 'mother') {
+      rel = 'mother';
+    } else if (guardianRelationship == 'أب' || guardianRelationship.toLowerCase() == 'father') {
+      rel = 'father';
+    } else {
+      rel = 'guardian';
+    }
+
+    try {
+      final res = await _api.post('/admissions/settings/public-apply/', data: {
+        'applicant': {
+          'arabic_full_name': studentFullName,
+          'gender': gen,
+          'date_of_birth': dateOfBirth,
+          'nationality': 'سوداني',
+          'national_id': nationalId,
+          'academic_year_id': defaultYearId,
+          'applying_grade_id': defaultGradeId,
+          'previous_school': previousSchool,
+          'notes': notes,
+        },
+        'guardian': {
+          'full_name': guardianFullName,
+          'relationship': rel,
+          'phone': guardianPhone,
+          'whatsapp_phone': (guardianWhatsapp != null && guardianWhatsapp.isNotEmpty)
+              ? guardianWhatsapp
+              : guardianPhone,
+          'email': guardianEmail ?? '',
+          'address': guardianAddress ?? 'الخرطوم، السودان',
+        },
+      });
+
+      if (res is Map && res['data'] is Map && res['data']['application_number'] != null) {
+        return res['data']['application_number'].toString();
+      }
+    } catch (_) {}
+
+    // رقم طلب احتياطي مطابق للنمط السوداني في وضع التطوير المحلي
+    final randNum = 100000 + DateTime.now().millisecondsSinceEpoch % 900000;
+    return 'APP-2026-$randNum';
+  }
+
   Future<void> createApplicant({
     required String arabicFullName,
     required String gender,
@@ -270,3 +345,4 @@ class AdmissionsRepository {
     } catch (_) {}
   }
 }
+

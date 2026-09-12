@@ -16,6 +16,7 @@ import '../features/admin/presentation/admin_shell.dart';
 import '../features/admissions/presentation/admissions_list_page.dart';
 import '../features/admissions/presentation/applicant_detail_page.dart';
 import '../features/admissions/presentation/new_applicant_form_page.dart';
+import '../features/admissions/presentation/public_apply_page.dart';
 import '../features/common/role_placeholder_page.dart';
 import '../features/transport/presentation/driver_trip_live_page.dart';
 import '../features/parent/presentation/child_bus_tracker_page.dart';
@@ -46,14 +47,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(authControllerProvider);
-      final loggingIn = state.matchedLocation == '/login';
+      final loc = state.matchedLocation;
+      final isPublicRoute = loc == '/login' || loc == '/apply';
 
-      if (session == null) return loggingIn ? null : '/login';
-      if (loggingIn) return _homePathFor(session.role);
+      if (session == null) return isPublicRoute ? null : '/login';
+      if (loc == '/login') return _homePathFor(session.role);
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (c, s) => const LoginPage()),
+      GoRoute(path: '/apply', builder: (c, s) => const PublicApplyPage()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminShell()),
       GoRoute(path: '/admin/admissions', builder: (c, s) => const AdmissionsListPage()),
       GoRoute(path: '/admin/admissions/new', builder: (c, s) => const NewApplicantFormPage()),
