@@ -22,4 +22,6 @@ export interface ExportMeta {
   subtitle?: string;
   /** اسم الملف بدون امتداد (افتراضي: العنوان). */
   filename?: string;
+  /** اتجاه الصفحة للطباعة وتصدير PDF (طولي portrait أو عرضي landscape). */
+  orientation?: 'portrait' | 'landscape';
 }

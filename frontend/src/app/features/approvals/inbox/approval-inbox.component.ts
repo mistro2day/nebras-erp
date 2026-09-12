@@ -1194,6 +1194,7 @@ export class ApprovalInboxComponent implements OnInit {
         title: 'مركز الموافقات الموحد — كشف المعاملات المعلقة',
         subtitle: `القطاع: ${sectorName}${urgencyName} · إجمالي المعاملات: ${items.length} معاملة · إجمالي المبالغ المعلقة: ${this.totalPendingAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.س`,
         filename: `كشف-الموافقات-المعلقة-${new Date().toISOString().slice(0, 10)}`,
+        orientation: 'landscape',
       },
       columns,
       items

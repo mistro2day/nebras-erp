@@ -159,10 +159,14 @@ const DOC_CSS = `
 
 /* ─────────────────────────── طباعة ─────────────────────────── */
 export function printDoc(meta: ExportMeta, columns: ExportColumn[], rows: any[]): void {
+  const isLandscape = meta.orientation === 'landscape';
+  const pageCss = isLandscape
+    ? '@page { size: A4 landscape; margin: 10mm 15mm; }'
+    : '@page { size: A4 portrait; margin: 15mm; }';
   const html = `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${meta.title}</title>
-    <style>${DOC_CSS}@media print{.nb-doc{padding:0}}</style></head>
+    <style>${DOC_CSS} ${pageCss} @media print{.nb-doc{padding:0}}</style></head>
     <body>${renderDocHtml(meta, columns, rows)}<script>window.onload=()=>window.print()</script></body></html>`;
-  const w = window.open('', '_blank', 'width=980,height=720');
+  const w = window.open('', '_blank', isLandscape ? 'width=1150,height=750' : 'width=980,height=720');
   if (!w) return;
   w.document.open();
   w.document.write(html);
@@ -175,18 +179,20 @@ export async function exportPdf(meta: ExportMeta, columns: ExportColumn[], rows:
   const JsPDF = jspdfMod.jsPDF ?? jspdfMod.default;
   const html2canvas = html2canvasMod.default ?? html2canvasMod;
 
-  // حاوية مخفية بعرض A4 (794px ≈ 210mm عند 96dpi) لتصوير المحتوى العربي المُنسّق
+  const isLandscape = meta.orientation === 'landscape';
+  const holderWidth = isLandscape ? 1122 : 794;
+  // حاوية مخفية بعرض A4 لتصوير المحتوى العربي المُنسّق
   const holder = document.createElement('div');
   holder.setAttribute('dir', 'rtl');
-  holder.style.cssText = 'position:fixed; top:0; inset-inline-start:-10000px; width:794px; background:#fff; z-index:-1;';
+  holder.style.cssText = `position:fixed; top:0; inset-inline-start:-10000px; width:${holderWidth}px; background:#fff; z-index:-1;`;
   holder.innerHTML = `<style>${DOC_CSS}</style>${renderDocHtml(meta, columns, rows)}`;
   document.body.appendChild(holder);
 
   try {
     const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    const pdf = new JsPDF('p', 'mm', 'a4');
-    const pageW = 210;
-    const pageH = 297;
+    const pdf = new JsPDF(isLandscape ? 'l' : 'p', 'mm', 'a4');
+    const pageW = isLandscape ? 297 : 210;
+    const pageH = isLandscape ? 210 : 297;
     const imgW = pageW;
     const imgH = (canvas.height * imgW) / canvas.width;
     const img = canvas.toDataURL('image/png');
