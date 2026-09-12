@@ -157,72 +157,76 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
   <style>
     @page {
       size: A4 portrait;
-      margin: 14mm 12mm 16mm 12mm;
+      margin: 8mm 10mm 8mm 10mm;
     }
     * { box-sizing: border-box; font-family: 'Segoe UI', 'Tajawal', Tahoma, Arial, sans-serif; }
-    body {
+    html, body {
       margin: 0;
       padding: 0;
       background: #ffffff;
       color: #0f172a;
-      font-size: 12.5px;
-      line-height: 1.4;
+      font-size: 11px;
+      line-height: 1.35;
       direction: rtl;
     }
     .print-sheet {
       width: 100%;
-      max-width: 800px;
+      max-width: 100%;
       margin: 0 auto;
-      padding: 10px;
+      padding: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
-    /* ترويسة المستأجر الرسمية */
+    /* ترويسة المستأجر الرسمية - مدمجة وأنيقة */
     .tenant-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2.5px solid #1e3a8a;
-      padding-bottom: 12px;
-      margin-bottom: 14px;
+      border-bottom: 2px solid #1e3a8a;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
     }
     .org-meta {
       flex: 1;
     }
     .country-line {
-      font-size: 11px;
+      font-size: 9.5px;
       font-weight: 700;
       color: #475569;
-      margin: 0 0 3px 0;
+      margin: 0 0 2px 0;
+      letter-spacing: 0.2px;
     }
     .org-name-ar {
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 900;
       color: #1e3a8a;
-      margin: 0 0 2px 0;
+      margin: 0 0 1px 0;
+      line-height: 1.2;
     }
     .org-name-en {
-      font-size: 12px;
+      font-size: 10.5px;
       font-weight: 600;
       color: #64748b;
-      margin: 0 0 4px 0;
+      margin: 0 0 2px 0;
       font-family: 'Segoe UI', Arial, sans-serif;
     }
     .contact-line {
-      font-size: 10.5px;
+      font-size: 9.5px;
       color: #64748b;
       margin: 0;
     }
     .logo-box {
       flex: none;
-      width: 75px;
-      height: 75px;
+      width: 58px;
+      height: 58px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 6px;
+      border-radius: 8px;
+      padding: 4px;
     }
     .logo-img {
       max-width: 100%;
@@ -230,7 +234,7 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       object-fit: contain;
     }
     .logo-placeholder {
-      font-size: 32px;
+      font-size: 26px;
     }
 
     /* شريط عنوان السند */
@@ -240,34 +244,35 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       align-items: center;
       background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
       color: #ffffff;
-      border-radius: 8px;
-      padding: 10px 16px;
-      margin-bottom: 14px;
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin-bottom: 8px;
     }
     .doc-titles h1 {
       margin: 0;
-      font-size: 17px;
+      font-size: 14px;
       font-weight: 900;
       letter-spacing: -0.2px;
+      line-height: 1.2;
     }
     .doc-titles span {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 600;
-      opacity: 0.85;
+      opacity: 0.9;
       text-transform: uppercase;
       display: block;
-      margin-top: 2px;
+      margin-top: 1px;
     }
     .doc-badge-wrap {
       text-align: end;
     }
     .status-badge {
       display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.22);
       border: 1px solid rgba(255, 255, 255, 0.4);
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 14px;
+      font-size: 10px;
       font-weight: 700;
     }
 
@@ -275,25 +280,25 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
     .meta-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      gap: 6px 12px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 14px;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
     }
     .meta-col {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
     }
     .meta-col .k {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       color: #64748b;
     }
     .meta-col .v {
-      font-size: 12.5px;
+      font-size: 11px;
       font-weight: 700;
       color: #0f172a;
     }
@@ -302,82 +307,83 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
     .description-box {
       background: #ffffff;
       border: 1px dashed #cbd5e1;
-      border-radius: 8px;
-      padding: 8px 12px;
-      margin-bottom: 14px;
-      font-size: 12px;
+      border-radius: 6px;
+      padding: 5px 9px;
+      margin-bottom: 8px;
+      font-size: 10.5px;
       color: #334155;
+      line-height: 1.35;
     }
     .description-box strong {
       color: #1e3a8a;
-      margin-inline-end: 6px;
+      margin-inline-end: 4px;
     }
 
     /* بطاقة الشريك / الطالب */
     .partner-box {
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 14px;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 8px;
     }
     .p-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 6px;
+      gap: 8px;
+      margin-bottom: 4px;
     }
     .badge-role {
       background: #dcfce7;
       color: #166534;
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 9.5px;
       font-weight: 700;
     }
     .p-name {
       margin: 0;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 800;
       color: #14532d;
     }
     .p-id {
-      font-size: 11.5px;
+      font-size: 10.5px;
       color: #166534;
       margin-inline-start: auto;
     }
     .p-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 6px 14px;
-      font-size: 11.5px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px 10px;
+      font-size: 10px;
       border-top: 1px dashed #bbf7d0;
-      padding-top: 6px;
+      padding-top: 4px;
     }
     .p-grid .lbl { color: #475569; }
     .p-grid .val { font-weight: 700; color: #1e293b; }
-    .method-tag { background: #e0e7ff; color: #3730a3; padding: 1px 6px; border-radius: 4px; }
+    .method-tag { background: #e0e7ff; color: #3730a3; padding: 1px 5px; border-radius: 3px; font-weight: 700; }
 
     /* جدول أسطر القيد المزدوج */
     .table-container {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .journal-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 10.5px;
     }
     .journal-table th {
       background: #1e3a8a;
       color: #ffffff;
-      padding: 8px 10px;
+      padding: 5px 8px;
       font-weight: 700;
-      font-size: 11px;
+      font-size: 10px;
       border: 1px solid #1e3a8a;
       text-align: start;
     }
     .journal-table td {
-      padding: 7px 10px;
+      padding: 4px 8px;
       border: 1px solid #e2e8f0;
       color: #1e293b;
     }
@@ -388,100 +394,104 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       background: #f1f5f9;
       font-weight: 800;
       border-top: 2px solid #cbd5e1;
-      padding: 9px 10px;
+      padding: 5px 8px;
     }
 
     /* التفقيط والتوازن */
     .tafqeet-box {
       background: #eff6ff;
       border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      padding: 9px 14px;
-      margin-bottom: 14px;
+      border-radius: 6px;
+      padding: 5px 10px;
+      margin-bottom: 8px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
+      font-size: 10.5px;
     }
     .t-title { font-weight: 800; color: #1e40af; }
     .t-words { font-weight: 700; color: #0f172a; }
     .balance-tag {
       background: #dcfce7;
       color: #15803d;
-      padding: 3px 8px;
-      border-radius: 4px;
+      padding: 2px 7px;
+      border-radius: 3px;
       font-weight: 800;
-      font-size: 11px;
+      font-size: 10px;
     }
 
     /* جدول بنود الرسوم */
     .fee-section {
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 14px;
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-bottom: 8px;
     }
     .fee-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       color: #475569;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .fee-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11px;
+      font-size: 10px;
     }
-    .fee-table th { background: #f8fafc; padding: 5px 8px; border: 1px solid #e2e8f0; color: #475569; }
-    .fee-table td { padding: 5px 8px; border: 1px solid #e2e8f0; }
+    .fee-table th { background: #f8fafc; padding: 3px 6px; border: 1px solid #e2e8f0; color: #475569; }
+    .fee-table td { padding: 3px 6px; border: 1px solid #e2e8f0; }
 
     /* مصفوفة التوقيعات والاعتمادات */
     .signatures-matrix {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-top: 16px;
-      margin-bottom: 16px;
+      gap: 8px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .sig-col {
       border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 6px;
+      padding: 6px 8px;
       text-align: center;
       background: #ffffff;
     }
     .sig-label {
       display: block;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       color: #1e3a8a;
       border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 5px;
-      margin-bottom: 35px;
+      padding-bottom: 3px;
+      margin-bottom: 22px;
     }
     .sig-sign {
       display: block;
-      font-size: 10px;
+      font-size: 9.5px;
       color: #94a3b8;
     }
 
     /* تذييل المستأجر وهوية نبراس */
     .tenant-footer {
       border-top: 1.5px solid #cbd5e1;
-      padding-top: 10px;
+      padding-top: 6px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 10.5px;
+      font-size: 9.5px;
       color: #64748b;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .f-brand strong { color: #1e3a8a; }
     .f-qr {
       font-family: monospace;
       background: #f1f5f9;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 1px 5px;
+      border-radius: 3px;
     }
 
     /* أدوات */
@@ -492,15 +502,26 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
     .text-muted { color: #64748b; }
     .text-info { color: #0284c7; }
     .text-success { color: #16a34a; }
-    .desc-cell { font-size: 11.5px; color: #475569; }
+    .desc-cell { font-size: 10px; color: #475569; }
 
     @media print {
-      body { background: #fff; }
-      .print-sheet { padding: 0; max-width: 100%; }
+      html, body {
+        width: 100%;
+        height: auto;
+        background: #fff;
+      }
+      .print-sheet {
+        padding: 0;
+        max-width: 100%;
+        page-break-after: avoid;
+        break-after: avoid;
+      }
       .doc-banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .journal-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .partner-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .tafqeet-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .signatures-matrix { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      tr { page-break-inside: avoid; break-inside: avoid; }
     }
   </style>
 </head>
@@ -566,13 +587,13 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       <table class="journal-table">
         <thead>
           <tr>
-            <th style="width: 30px;" class="center">#</th>
-            <th style="width: 85px;">رقم الحساب</th>
-            <th style="width: 170px;">اسم الحساب</th>
-            <th style="width: 100px;">مركز التكلفة</th>
+            <th style="width: 28px;" class="center">#</th>
+            <th style="width: 80px;">رقم الحساب</th>
+            <th style="width: 160px;">اسم الحساب</th>
+            <th style="width: 90px;">مركز التكلفة</th>
             <th>البيان والشرح التفصيلي</th>
-            <th style="width: 110px;" class="end">مدين (ج.س)</th>
-            <th style="width: 110px;" class="end">دائن (ج.س)</th>
+            <th style="width: 105px;" class="end">مدين (ج.س)</th>
+            <th style="width: 105px;" class="end">دائن (ج.س)</th>
           </tr>
         </thead>
         <tbody>
@@ -622,11 +643,11 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
     <!-- 9. تذييل المستأجر وهوية نبراس -->
     <footer class="tenant-footer">
       <div class="f-brand">
-        منظومة <strong>نبراس (Nebras OS)</strong> لإدارة المؤسسات التعليمية • موديول الإدارة المالية والحسابات العامة
+        منظومة <strong>نبراس (Nebras OS)</strong> • الإدارة المالية والحسابات العامة
       </div>
       <div class="f-meta">
-        <span class="f-qr">وثيقة مالية صادرة: ${journal.entry_number}</span>
-        <span> • طُبعت بواسطة: ${printedBy || 'المحاسب المعتمد'} • ${printTimestamp}</span>
+        <span class="f-qr">وثيقة مالية: ${journal.entry_number}</span>
+        <span> • طُبعت: ${printTimestamp}</span>
       </div>
     </footer>
   </div>
@@ -643,7 +664,7 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
 
   const w = window.open('', '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
   if (!w) {
-    alert('يرجى السماح بالنوافذ المنبثقة للطباعة.');
+    console.warn('تعذر فتح نافذة الطباعة المنبثقة، يرجى السماح بالنوافذ المنبثقة للمتصفح.');
     return;
   }
   w.document.open();
