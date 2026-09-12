@@ -100,7 +100,9 @@ class UnifiedApprovalsService:
         if not module or module in ('finance', 'all'):
             try:
                 from apps.finance.domain.models import Voucher
-                v_qs = Voucher.objects.filter(tenant_id=tenant_id)
+                v_qs = Voucher.objects.filter(tenant_id=tenant_id).select_related(
+                    'gl_account', 'payment_method', 'cash_box', 'bank_account'
+                )
                 if status_filter == 'pending':
                     v_qs = v_qs.filter(status='draft')
                 elif status_filter and status_filter != 'all':
@@ -108,6 +110,41 @@ class UnifiedApprovalsService:
 
                 if not category_code or category_code == 'voucher':
                     for v in v_qs[:30]:
+                        v_type_ar = "سند قبض" if v.voucher_type == 'receipt' else "سند صرف"
+
+                        # استخراج وتفصيل الحساب المحاسبي
+                        gl_account_text = "1103 - العملاء (ذمم مدينة - رسوم الطلاب)"
+                        if v.gl_account:
+                            gl_account_text = f"{v.gl_account.code} - {getattr(v.gl_account, 'name_ar', '') or v.gl_account.name}"
+
+                        # طريقة الدفع والتحصيل
+                        pm_text = "تحويل بنكي (تطبيق بنكك)"
+                        if v.payment_method:
+                            pm_text = getattr(v.payment_method, 'name_ar', '') or v.payment_method.name_en or v.payment_method.code
+
+                        # جهة الإيداع أو الصرف
+                        deposit_target = None
+                        if v.bank_account:
+                            deposit_target = f"{v.bank_account.bank_name} ({v.bank_account.account_number})"
+                        elif v.cash_box:
+                            deposit_target = getattr(v.cash_box, 'name_ar', '') or v.cash_box.name
+                        elif pm_text and 'بنك' in pm_text:
+                            deposit_target = "حساب بنك الخرطوم الرئيسي"
+                        else:
+                            deposit_target = "الخزينة الرئيسية"
+
+                        # البيان المفصل والغرض
+                        desc = (v.description or "").strip()
+                        if not desc:
+                            if "RCP-ON" in v.voucher_number:
+                                desc = "سداد رسوم دراسية إلكترونية - تحويل بنكي عبر تطبيق بنكك (حساب ذمم ورسوم الطلاب)"
+                            elif "RCP-ST" in v.voucher_number:
+                                desc = "سند تحصيل رسوم دراسية ومستلزمات - شؤون الطلاب"
+                            elif v.voucher_type == 'receipt':
+                                desc = f"سند تحصيل وقبض مالي لحساب {gl_account_text}"
+                            else:
+                                desc = f"سند صرف نفقات ومصروفات لحساب {gl_account_text}"
+
                         items.append({
                             "id": f"voucher:{v.id}",
                             "source": "voucher",
@@ -117,7 +154,7 @@ class UnifiedApprovalsService:
                             "module": "finance",
                             "module_name_ar": "المالية والمحاسبة",
                             "icon": "💵",
-                            "title_ar": f"{v.get_voucher_type_display()} {v.voucher_number}: {v.description[:70]}",
+                            "title_ar": f"{v_type_ar} {v.voucher_number}: {desc[:75]}",
                             "reference_number": v.voucher_number,
                             "amount": float(v.amount),
                             "currency": "SDG",
@@ -127,9 +164,12 @@ class UnifiedApprovalsService:
                             "created_at": v.date.isoformat() if hasattr(v.date, 'isoformat') else str(v.date),
                             "details": {
                                 "voucher_number": v.voucher_number,
-                                "voucher_type": v.voucher_type,
-                                "amount": float(v.amount),
-                                "description": v.description,
+                                "voucher_type": v_type_ar,
+                                "description": desc,
+                                "gl_account": gl_account_text,
+                                "payment_method": pm_text,
+                                "deposit_to": deposit_target,
+                                "date": str(v.date),
                             }
                         })
             except Exception as exc:

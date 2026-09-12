@@ -65,14 +65,25 @@ export interface DecisionPayload {
                 </div>
               }
 
+              <!-- بطاقة الغرض والبيان التفصيلي للمعاملة -->
+              @if (item.details?.description) {
+                <div class="purpose-card">
+                  <div class="purpose-title">
+                    <span class="purpose-icon">💡</span>
+                    <span class="purpose-label">الغرض والبيان من المعاملة:</span>
+                  </div>
+                  <p class="purpose-text">{{ item.details.description }}</p>
+                </div>
+              }
+
               <!-- تفاصيل إضافية حسب الكيان -->
               @if (item.details) {
                 <div class="details-grid">
                   @for (key of objectKeys(item.details); track key) {
-                    @if (item.details[key] !== null && item.details[key] !== undefined && item.details[key] !== '') {
+                    @if (key !== 'description' && item.details[key] !== null && item.details[key] !== undefined && item.details[key] !== '') {
                       <div class="detail-cell">
                         <span class="d-key">{{ translateKey(key) }}:</span>
-                        <span class="d-val mono">{{ item.details[key] }}</span>
+                        <span class="d-val">{{ item.details[key] }}</span>
                       </div>
                     }
                   }
@@ -380,6 +391,34 @@ export interface DecisionPayload {
         font-weight: 600;
       }
 
+      /* بطاقة الغرض والبيان */
+      .purpose-card {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 10px;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .purpose-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #166534;
+      }
+
+      .purpose-text {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.5;
+      }
+
       /* شبكة التفاصيل الإضافية */
       .details-grid {
         display: grid;
@@ -637,12 +676,17 @@ export class ApprovalDecisionWizardModalComponent {
     const dict: Record<string, string> = {
       entry_number: 'رقم القيد',
       date: 'التاريخ',
-      description: 'الوصف',
+      description: 'البيان / الغرض',
       source_type: 'مصدر القيد',
       total_debit: 'إجمالي المدين',
       voucher_number: 'رقم السند',
       voucher_type: 'نوع السند',
       amount: 'المبلغ',
+      gl_account: 'الحساب المحاسبي',
+      payment_method: 'طريقة التحصيل / الدفع',
+      deposit_to: 'جهة الإيداع / الخزينة',
+      beneficiary: 'المستفيد / الطرف المعني',
+      paid_by: 'الدافع / المستلم منه',
       request_number: 'رقم الطلب',
       title: 'العنوان',
       order_number: 'رقم أمر الشراء',

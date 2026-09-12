@@ -9,6 +9,7 @@ import {
   ApprovalDecisionWizardModalComponent,
   DecisionPayload,
 } from '../shared/approval-decision-wizard-modal.component';
+import { printDoc, ExportColumn } from '../../../shared/export';
 
 interface SectorTab {
   code: string;
@@ -35,6 +36,15 @@ interface SectorTab {
           </div>
         </div>
         <div class="header-actions">
+          <button
+            class="btn secondary sm"
+            (click)="printApprovalsTable()"
+            [disabled]="coreService.loading() || filteredItems().length === 0"
+            title="طباعة كشف الموافقات المعتمد وفق هوية نبراس"
+          >
+            <span class="btn-icon">🖨️</span>
+            طباعة الكشف
+          </button>
           <button class="btn secondary sm" (click)="refresh()" [disabled]="coreService.loading()">
             <span class="btn-icon">↻</span>
             تحديث البيانات
@@ -1126,5 +1136,67 @@ export class ApprovalInboxComponent implements OnInit {
 
   goOnlinePayments(): void {
     this.router.navigate(['/student-finance/payments']);
+  }
+
+  // طباعة كشف وجدول الموافقات بنمط وهوية نبراس OS الرسمية
+  printApprovalsTable(): void {
+    const items = this.filteredItems();
+    if (items.length === 0) return;
+
+    const sectorName = this.sectorTabs.find((t) => t.code === this.selectedSector())?.label || 'كافة القطاعات';
+    const urgencyName =
+      this.urgencyFilter() === 'urgent'
+        ? ' (المعاملات العاجلة فقط)'
+        : this.urgencyFilter() === 'normal'
+        ? ' (المعاملات العادية)'
+        : '';
+
+    const columns: ExportColumn[] = [
+      { key: 'reference_number', label: 'الرقم المرجعي', width: 16 },
+      { key: 'title_ar', label: 'بيانات المعاملة', width: 34 },
+      {
+        key: 'sector',
+        label: 'القطاع / الفئة',
+        map: (r) => `${r.module_name_ar} — ${r.category_name_ar}`,
+        width: 22,
+      },
+      { key: 'requester_name', label: 'مقدم الطلب', width: 18 },
+      {
+        key: 'amount_formatted',
+        label: 'المبلغ (ج.س)',
+        map: (r) =>
+          r.amount !== null && r.amount !== undefined
+            ? `${Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.س`
+            : '—',
+        width: 18,
+      },
+      {
+        key: 'priority',
+        label: 'الأولوية',
+        map: (r) =>
+          r.priority_code === 'urgent'
+            ? 'عاجل جداً'
+            : r.priority_code === 'high'
+            ? 'أولوية عالية'
+            : 'عادي',
+        width: 12,
+      },
+      {
+        key: 'created_at',
+        label: 'التاريخ',
+        map: (r) => (r.created_at ? r.created_at.substring(0, 10) : '—'),
+        width: 14,
+      },
+    ];
+
+    printDoc(
+      {
+        title: 'مركز الموافقات الموحد — كشف المعاملات المعلقة',
+        subtitle: `القطاع: ${sectorName}${urgencyName} · إجمالي المعاملات: ${items.length} معاملة · إجمالي المبالغ المعلقة: ${this.totalPendingAmount().toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.س`,
+        filename: `كشف-الموافقات-المعلقة-${new Date().toISOString().slice(0, 10)}`,
+      },
+      columns,
+      items
+    );
   }
 }
