@@ -194,7 +194,7 @@ class StudentApplicationService:
         applicant.status = 'enrolled'
         applicant.save(update_fields=['status', 'updated_at'])
 
-        # 8. معالجة الإعدادات المالية والأقساط والإيصالات (إن وُجدت)
+        # 8. معالجة الإعدادات المالية والأقساط والإيصالات
         if financial_config:
             cls.process_student_registration_finance(
                 tenant_id=tenant_id,
@@ -203,6 +203,20 @@ class StudentApplicationService:
                 academic_year_id=applicant.academic_year_id,
                 financial_config=financial_config,
                 user_id=user_id
+            )
+        else:
+            # فتح حساب فوترة رسمي للطالب دائماً لضمان ربطه المالي الفوري بموديول مالية الطلاب
+            from apps.student_finance.domain.models import StudentBillingAccount
+            StudentBillingAccount.objects.get_or_create(
+                tenant_id=tenant_id,
+                student_id=student.id,
+                defaults={
+                    'account_number': f"ACC-{student_number}",
+                    'opening_balance': 0,
+                    'current_balance': 0,
+                    'outstanding_balance': 0,
+                    'created_by': user_id
+                }
             )
 
         # 9. نشر حدث النطاق
@@ -296,7 +310,7 @@ class StudentApplicationService:
                 created_by=user_id,
             )
         
-        # 5. معالجة الإعدادات المالية والأقساط والإيصالات (إن وُجدت)
+        # 5. معالجة الإعدادات المالية والأقساط والإيصالات
         if financial_config:
             grade_id = academic_data.get('grade_id') if academic_data else None
             academic_year_id = academic_data.get('academic_year_id') if academic_data else None
@@ -307,6 +321,20 @@ class StudentApplicationService:
                 academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else None,
                 financial_config=financial_config,
                 user_id=user_id
+            )
+        else:
+            # فتح حساب فوترة رسمي للطالب دائماً لضمان ربطه الفوري بموديول مالية الطلاب
+            from apps.student_finance.domain.models import StudentBillingAccount
+            StudentBillingAccount.objects.get_or_create(
+                tenant_id=tenant_id,
+                student_id=student.id,
+                defaults={
+                    'account_number': f"ACC-{student_number}",
+                    'opening_balance': 0,
+                    'current_balance': 0,
+                    'outstanding_balance': 0,
+                    'created_by': user_id
+                }
             )
 
         # 6. نشر حدث النطاق
