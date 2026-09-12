@@ -13,7 +13,7 @@ import { CommonModule } from '@angular/common';
   template: `
     @if (open) {
       <div class="nb-modal-overlay" (click)="closed.emit()">
-        <div class="nb-modal-container" dir="rtl" role="dialog" (click)="$event.stopPropagation()">
+        <div class="nb-modal-container" [style.max-width]="maxWidth || (width ? (width + 'px') : '500px')" dir="rtl" role="dialog" (click)="$event.stopPropagation()">
           <header class="nb-modal-head">
             <div class="nb-modal-titles">
               <h2 class="nb-modal-title">{{ title }}</h2>
@@ -136,6 +136,8 @@ export class NbModalComponent {
   @Input() open = false;
   @Input({ required: true }) title = '';
   @Input() subtitle?: string;
+  @Input() maxWidth?: string;
+  @Input() width?: number | string;
   @Output() closed = new EventEmitter<void>();
 
   @HostListener('document:keydown.escape')

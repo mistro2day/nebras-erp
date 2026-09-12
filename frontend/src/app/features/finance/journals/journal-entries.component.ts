@@ -10,21 +10,28 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { JournalActionReviewModalComponent, JournalActionMode } from './journal-action-review-modal.component';
 
 interface Line { account: string; debit: number; credit: number; cost_center: string | null; description?: string; }
 
 /**
- * قيود اليومية (Journal Entries) — محرر القيد المزدوج مع دورة الاعتماد والترحيل،
- * على غرار Journal Entries في Odoo و General journal في D365 Finance.
+ * قيود اليومية والاعتمادات (Journal Entries & Approvals) — لغة تصميم Nebras OS
+ * مستوحاة من محركات القيود الرائدة في Odoo 18 و Microsoft Dynamics 365 Finance،
+ * مع ربط أطراف المعاملات (Partner / الطالب)، والمستندات المصدرية، ونوافذ مراجعة متعددة الخطوات.
  */
 @Component({
   selector: 'app-journal-entries',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent],
+  imports: [
+    CommonModule, FormsModule, DecimalPipe,
+    NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent,
+    NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent,
+    JournalActionReviewModalComponent,
+  ],
   template: `
     <div class="page" dir="rtl">
-      <nb-page-header title="قيود اليومية والاعتمادات" subtitle="إنشاء القيود المزدوجة المتوازنة، واعتمادها، وترحيلها لدفتر الأستاذ العام.">
+      <nb-page-header title="قيود اليومية والاعتمادات" subtitle="إنشاء القيود المزدوجة المتوازنة، ومراجعتها واعتمادها وترحيلها لدفتر الأستاذ العام وفق معايير Odoo و Dynamics 365.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
         <nb-export-menu [columns]="cols()" [rows]="journals()" title="قيود اليومية" subtitle="سجل القيود المحاسبية" filename="قيود-اليومية"></nb-export-menu>
         <button class="btn primary" (click)="toggleEditor()">＋ قيد يومية جديد</button>
@@ -47,11 +54,11 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
                 @for (p of periods(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
               </select>
             </label>
-            <label>المرجع<input class="fld" [(ngModel)]="draft.reference" placeholder="مرجع خارجي (اختياري)" /></label>
+            <label>المرجع / المستند المصدر<input class="fld" [(ngModel)]="draft.reference" placeholder="مثال: سند قبض، فاتورة، أمر شراء" /></label>
           </div>
-          <label class="full">البيان / الوصف<input class="fld" [(ngModel)]="draft.description" placeholder="وصف المعاملة المحاسبية" /></label>
+          <label class="full">البيان / الوصف<input class="fld" [(ngModel)]="draft.description" placeholder="وصف المعاملة المحاسبية والطرف المعني" /></label>
 
-          <div class="lines-head"><span>الحساب</span><span>مركز التكلفة</span><span>مدين</span><span>دائن</span><span></span></div>
+          <div class="lines-head"><span>الحساب</span><span>مركز التكلفة</span><span>مدين (ج.س)</span><span>دائن (ج.س)</span><span></span></div>
           @for (ln of draft.lines; track $index) {
             <div class="line">
               <select class="fld" [(ngModel)]="ln.account">
@@ -70,9 +77,9 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
           <button class="btn ghost sm" (click)="addLine()">＋ إضافة سطر</button>
 
           <div class="totals" [class.ok]="balanced()" [class.bad]="!balanced()">
-            <span>إجمالي المدين: <strong>{{ totalDebit() | number:'1.2-2' }}</strong></span>
-            <span>إجمالي الدائن: <strong>{{ totalCredit() | number:'1.2-2' }}</strong></span>
-            <span>الفرق: <strong>{{ (totalDebit() - totalCredit()) | number:'1.2-2' }}</strong></span>
+            <span>إجمالي المدين: <strong>{{ totalDebit() | number:'1.2-2' }} ج.س</strong></span>
+            <span>إجمالي الدائن: <strong>{{ totalCredit() | number:'1.2-2' }} ج.س</strong></span>
+            <span>الفرق: <strong>{{ (totalDebit() - totalCredit()) | number:'1.2-2' }} ج.س</strong></span>
             <span class="verdict">{{ balanced() ? '✓ القيد متوازن' : '✗ القيد غير متوازن' }}</span>
           </div>
 
@@ -86,60 +93,161 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
       <nb-panel [flush]="true">
         <div class="table-wrap">
           <table class="nb-table">
-            <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>المصدر</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead>
+              <tr>
+                <th>رقم القيد</th>
+                <th>التاريخ</th>
+                <th>الطرف المعني / الطالب</th>
+                <th>المستند المصدري</th>
+                <th>البيان المحاسبي</th>
+                <th>المصدر</th>
+                <th>الحالة</th>
+                <th>إجراءات التدقيق والاعتماد</th>
+              </tr>
+            </thead>
             <tbody>
               @if (loading()) {
-                <tr><td colspan="6"><nb-loading message="جارٍ تحميل القيود…"></nb-loading></td></tr>
+                <tr><td colspan="8"><nb-loading message="جارٍ تحميل سجل القيود المحاسبية…"></nb-loading></td></tr>
               } @else {
               @for (j of journals(); track j.id) {
                 <tr class="clickable" (click)="openDetail(j)">
-                  <td><strong>{{ j.entry_number }}</strong></td>
-                  <td class="mono">{{ j.date }}</td>
-                  <td>{{ j.description }}</td>
-                  <td>{{ sourceLabel(j.source_type) }}</td>
+                  <td><strong class="entry-code mono">{{ j.entry_number }}</strong></td>
+                  <td class="mono date-col">{{ j.date }}</td>
+                  <td>
+                    @if (j.partner_details; as p) {
+                      <div class="partner-cell">
+                        <span class="p-name">{{ p.name }}</span>
+                        @if (p.student_number) { <span class="p-num mono">{{ p.student_number }}</span> }
+                      </div>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (j.reference) {
+                      <span class="ref-pill mono">{{ j.reference }}</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td class="desc-cell" [title]="j.description">{{ j.description }}</td>
+                  <td><span class="src-tag">{{ sourceLabel(j.source_type) }}</span></td>
                   <td><span class="badge" [class]="j.status">{{ statusLabel(j.status) }}</span></td>
                   <td (click)="$event.stopPropagation()">
                     <div class="actions">
-                      @if (j.status === 'draft') { <button class="btn primary xs" (click)="approve(j)">اعتماد</button> }
-                      @if (j.status === 'approved') { <button class="btn primary xs" (click)="post(j)">ترحيل</button> }
-                      @if (j.status === 'posted') { <button class="btn danger xs" (click)="reverse(j)">عكس القيد</button> }
+                      <button class="btn ghost xs" (click)="openDetail(j)" title="معاينة التفاصيل الكاملة">تفاصيل</button>
+                      @if (j.status === 'draft') {
+                        <button class="btn primary xs" (click)="triggerActionModal(j, 'approve')">اعتماد</button>
+                      }
+                      @if (j.status === 'approved') {
+                        <button class="btn info-btn xs" (click)="triggerActionModal(j, 'post')">ترحيل</button>
+                      }
+                      @if (j.status === 'posted') {
+                        <button class="btn danger xs" (click)="triggerActionModal(j, 'reverse')">عكس القيد</button>
+                      }
                     </div>
                   </td>
                 </tr>
               }
-              @if (!journals().length) { <tr><td colspan="6" class="empty">لا توجد قيود بهذه الحالة.</td></tr> }
+              @if (!journals().length) { <tr><td colspan="8" class="empty">لا توجد قيود مسجلة بهذه الحالة.</td></tr> }
               }
             </tbody>
           </table>
         </div>
       </nb-panel>
 
-      <!-- تفاصيل القيد المحاسبي -->
-      <nb-drawer [open]="!!detail()" [width]="640"
-        [title]="'قيد رقم ' + (detail()?.entry_number || '')"
+      <!-- درج تفاصيل القيد المحاسبي المعمق (Deep Drawer View) -->
+      <nb-drawer [open]="!!detail()" [width]="680"
+        [title]="'تفاصيل القيد المحاسبي: ' + (detail()?.entry_number || '')"
         [subtitle]="detail()?.description" (closed)="detail.set(null)">
         @if (detail(); as d) {
+          <!-- بطاقة الطرف المقابل (طالب / مورد / موظف) -->
+          @if (d.partner_details; as p) {
+            <div class="drawer-card partner-drawer-card">
+              <div class="p-head">
+                <span class="p-avatar">🎓</span>
+                <div class="p-titles">
+                  <span class="p-role">{{ p.partner_type_label || 'الطرف المعني' }}</span>
+                  <h4 class="p-main-name">{{ p.name }}</h4>
+                  @if (p.student_number) { <span class="p-num-large mono">الرقم الأكاديمي: {{ p.student_number }}</span> }
+                </div>
+              </div>
+              <div class="p-specs">
+                @if (p.grade_name) { <div><span class="k">الصف / المرحلة:</span> <span class="v">{{ p.grade_name }}</span></div> }
+                @if (p.guardian_name) { <div><span class="k">ولي الأمر:</span> <span class="v">{{ p.guardian_name }}</span></div> }
+                @if (d.source_details?.payment_method) { <div><span class="k">وسيلة الدفع:</span> <span class="v badge-method">{{ d.source_details.payment_method }}</span></div> }
+                @if (d.source_details?.destination) { <div><span class="k">الحساب المستلم:</span> <span class="v">{{ d.source_details.destination }}</span></div> }
+              </div>
+            </div>
+          }
+
+          <!-- بطاقة المستند المصدر وبنود الرسوم -->
+          @if (d.source_details; as src) {
+            <div class="drawer-card source-drawer-card">
+              <div class="src-head">
+                <div>
+                  <span class="src-type-label">{{ src.doc_type_label }}</span>
+                  <strong class="src-number mono">{{ src.doc_number }}</strong>
+                  <span class="src-dt">تاريخ: {{ src.date }}</span>
+                </div>
+                <div class="src-total mono">
+                  <span class="t-val">{{ src.amount | number:'1.2-2' }}</span>
+                  <span class="t-cur">ج.س</span>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (d.fee_breakdown && d.fee_breakdown.length > 0) {
+            <div class="drawer-card fee-breakdown-card">
+              <h5 class="dh5">تفصيل بنود الرسوم والخدمات المسددة / المستحقة</h5>
+              <div class="fee-table-wrap">
+                <table class="nb-table mini">
+                  <thead><tr><th>بند الرسوم</th><th>البيان</th><th>الفاتورة</th><th class="end">المبلغ (ج.س)</th></tr></thead>
+                  <tbody>
+                    @for (item of d.fee_breakdown; track $index) {
+                      <tr>
+                        <td><strong>{{ item.fee_name }}</strong></td>
+                        <td class="text-muted">{{ item.description || item.fee_name }}</td>
+                        <td class="mono">{{ item.invoice_number || '—' }}</td>
+                        <td class="end mono highlight">{{ (item.allocated_amount || item.amount) | number:'1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
           <div class="dsummary">
-            <div class="chip"><span class="k">التاريخ</span><span class="v mono">{{ d.date }}</span></div>
+            <div class="chip"><span class="k">تاريخ القيد</span><span class="v mono">{{ d.date }}</span></div>
             <div class="chip"><span class="k">الحالة</span><span class="badge" [class]="d.status">{{ statusLabel(d.status) }}</span></div>
             <div class="chip"><span class="k">المصدر</span><span class="v">{{ sourceLabel(d.source_type) }}</span></div>
-            @if (d.reference) { <div class="chip"><span class="k">المرجع</span><span class="v">{{ d.reference }}</span></div> }
+            @if (d.reference) { <div class="chip"><span class="k">المرجع</span><span class="v mono">{{ d.reference }}</span></div> }
           </div>
 
-          <h4 class="dh">أسطر القيد</h4>
+          <h4 class="dh">أسطر القيد المحاسبي المزدوج</h4>
           <div class="table-wrap">
             <table class="nb-table dlines">
-              <thead><tr><th>الحساب</th><th class="end">مدين</th><th class="end">دائن</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>الحساب المحاسبي</th>
+                  <th>مركز التكلفة / البيان</th>
+                  <th class="end">مدين (ج.س)</th>
+                  <th class="end">دائن (ج.س)</th>
+                </tr>
+              </thead>
               <tbody>
                 @for (l of d.lines || []; track $index) {
                   <tr>
                     <td><strong>{{ l.account_code }}</strong> <span class="nm">{{ l.account_name }}</span></td>
+                    <td class="desc-cell">{{ l.description || l.cost_center_name || '—' }}</td>
                     <td class="end mono info">{{ +l.debit > 0 ? (l.debit | number:'1.2-2') : '—' }}</td>
                     <td class="end mono success">{{ +l.credit > 0 ? (l.credit | number:'1.2-2') : '—' }}</td>
                   </tr>
                 }
                 <tr class="sum">
-                  <td>الإجمالي</td>
+                  <td colspan="2">الإجمالي الكلي</td>
                   <td class="end mono"><strong>{{ detailDebit() | number:'1.2-2' }}</strong></td>
                   <td class="end mono"><strong>{{ detailCredit() | number:'1.2-2' }}</strong></td>
                 </tr>
@@ -149,10 +257,27 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
         }
         <div drawer-actions>
           <button class="btn ghost" (click)="printDetail()">🖨️ طباعة القيد</button>
-          @if (detail()?.status === 'draft') { <button class="btn primary" (click)="approve(detail()); detail.set(null)">اعتماد</button> }
-          @if (detail()?.status === 'approved') { <button class="btn primary" (click)="post(detail()); detail.set(null)">ترحيل</button> }
+          @if (detail()?.status === 'draft') {
+            <button class="btn primary" (click)="triggerActionModal(detail(), 'approve')">اعتماد القيد</button>
+          }
+          @if (detail()?.status === 'approved') {
+            <button class="btn info-btn" (click)="triggerActionModal(detail(), 'post')">ترحيل لدفتر الأستاذ</button>
+          }
+          @if (detail()?.status === 'posted') {
+            <button class="btn danger" (click)="triggerActionModal(detail(), 'reverse')">عكس القيد</button>
+          }
         </div>
       </nb-drawer>
+
+      <!-- نافذة المراجعة والتأكيد متعددة الخطوات بنمط نبراس (Nebras Modal Wizard) -->
+      <app-journal-action-review-modal
+        [open]="actionModalOpen()"
+        [entry]="actionTarget()"
+        [mode]="actionMode()"
+        [submitting]="actionSubmitting()"
+        (confirmed)="onActionConfirmed($event)"
+        (cancelled)="actionModalOpen.set(false)"
+      ></app-journal-action-review-modal>
     </div>
   `,
   styles: [`
@@ -186,28 +311,66 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
     .totals.bad .verdict { color: var(--nb-danger); }
     .form-actions { display: flex; gap: 10px; }
 
+    /* جدول القيود */
     .table-wrap { overflow-x: auto; }
     .nb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .nb-table th { text-align: start; font-weight: 700; font-size: 11px; color: var(--nb-text-muted);
-      background: var(--nb-surface-raised); padding: 9px 12px; border-bottom: 1px solid var(--nb-border-soft); }
-    .nb-table td { padding: 9px 12px; border-bottom: 1px solid var(--nb-border-row); color: var(--nb-text); }
+      background: var(--nb-surface-raised); padding: 10px 12px; border-bottom: 1px solid var(--nb-border-soft); }
+    .nb-table td { padding: 10px 12px; border-bottom: 1px solid var(--nb-border-row); color: var(--nb-text); vertical-align: middle; }
     .nb-table tr:last-child td { border-bottom: none; }
     .nb-table tbody tr:hover td { background: var(--nb-surface-raised); }
+    .nb-table.mini th { padding: 6px 10px; font-size: 10.5px; }
+    .nb-table.mini td { padding: 6px 10px; font-size: 12px; }
     .mono { font-variant-numeric: tabular-nums; }
     .empty { text-align: center; padding: 26px; color: var(--nb-text-muted); }
-    .actions { display: flex; gap: 6px; }
+    .actions { display: flex; gap: 6px; align-items: center; }
     .nb-table tbody tr.clickable { cursor: pointer; }
     .info { color: var(--nb-info); } .success { color: var(--nb-success); }
     .nm { color: var(--nb-text-muted); font-size: 12px; }
 
+    .entry-code { color: var(--nb-primary-600); }
+    .date-col { font-size: 12px; color: var(--nb-text-muted); }
+    .partner-cell { display: flex; flex-direction: column; gap: 2px; }
+    .p-name { font-weight: 700; color: var(--nb-text); font-size: 13px; }
+    .p-num { font-size: 11px; color: var(--nb-text-muted); }
+    .ref-pill { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: #334155; }
+    .desc-cell { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; color: #475569; }
+    .src-tag { font-size: 11.5px; color: #64748b; }
+
     /* درج التفاصيل */
-    .dsummary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-    .chip { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--nb-border-soft);
-      border-radius: var(--nb-radius); background: var(--nb-surface-raised); min-width: 110px; }
-    .chip .k { font-size: 11px; color: var(--nb-text-muted); }
-    .chip .v { font-size: 13px; font-weight: 700; color: var(--nb-text); }
-    .dh { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 4px 0 10px; }
+    .drawer-card { border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+    .partner-drawer-card { background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border: 1px solid #bbf7d0; }
+    .p-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .p-avatar { width: 34px; height: 34px; border-radius: 8px; background: #dcfce7; display: grid; place-items: center; font-size: 17px; }
+    .p-role { font-size: 10.5px; font-weight: 700; color: #15803d; }
+    .p-main-name { margin: 0; font-size: 14.5px; font-weight: 800; color: #111827; }
+    .p-num-large { font-size: 11.5px; color: #6b7280; }
+    .p-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; border-top: 1px solid #dcfce7; padding-top: 6px; }
+    .p-specs .k { color: #6b7280; }
+    .p-specs .v { font-weight: 600; color: #1f2937; }
+    .badge-method { background: #e0e7ff; color: #3730a3; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+    .source-drawer-card { background: #f8fafc; border: 1px solid #e2e8f0; }
+    .src-head { display: flex; justify-content: space-between; align-items: center; }
+    .src-type-label { font-size: 11px; color: #64748b; margin-inline-end: 6px; }
+    .src-number { color: var(--nb-primary-600); font-size: 13px; }
+    .src-dt { font-size: 11px; color: #94a3b8; margin-inline-start: 8px; }
+    .src-total { display: flex; align-items: baseline; gap: 4px; }
+    .t-val { font-size: 15px; font-weight: 800; color: #0f172a; }
+    .t-cur { font-size: 11px; font-weight: 700; color: #64748b; }
+
+    .fee-breakdown-card { background: #ffffff; border: 1px solid #e2e8f0; }
+    .dh5 { margin: 0 0 8px; font-size: 12px; font-weight: 700; color: #475569; }
+    .fee-table-wrap { border: 1px solid #f1f5f9; border-radius: 6px; overflow: hidden; }
+
+    .dsummary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .chip { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px solid var(--nb-border-soft);
+      border-radius: var(--nb-radius); background: var(--nb-surface-raised); min-width: 100px; }
+    .chip .k { font-size: 10.5px; color: var(--nb-text-muted); }
+    .chip .v { font-size: 12.5px; font-weight: 700; color: var(--nb-text); }
+    .dh { font-size: 13px; font-weight: 700; color: var(--nb-text); margin: 6px 0 10px; }
     .dlines .sum td { border-top: 2px solid var(--nb-border); font-weight: 700; background: var(--nb-surface-raised); }
+
     .badge { display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: var(--nb-radius-sm); }
     .badge.draft { background: var(--nb-border-soft); color: var(--nb-text-secondary); }
     .badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
@@ -219,6 +382,8 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
     .btn.xs { height: 28px; padding: 0 10px; font-size: 11.5px; }
     .btn.primary { background: var(--nb-primary-600); color: #fff; }
     .btn.primary:hover:not(:disabled) { background: var(--nb-primary-700); }
+    .btn.info-btn { background: #0284c7; color: #fff; }
+    .btn.info-btn:hover:not(:disabled) { background: #0369a1; }
     .btn.danger { background: var(--nb-danger); color: #fff; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn:disabled { opacity: .55; cursor: not-allowed; }
@@ -239,6 +404,12 @@ export class JournalEntriesComponent implements OnInit {
   statusFilter = signal<string>('');
   detail = signal<any | null>(null);
 
+  // حالة نافذة المراجعة المتدرجة (Modal Review Wizard)
+  actionModalOpen = signal(false);
+  actionTarget = signal<any | null>(null);
+  actionMode = signal<JournalActionMode>('approve');
+  actionSubmitting = signal(false);
+
   detailDebit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0));
   detailCredit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0));
 
@@ -249,7 +420,7 @@ export class JournalEntriesComponent implements OnInit {
 
   draft: any = this.blank();
 
-  private draftVersion = signal(0); // لإعادة حساب المجاميع عند تعديل السطور
+  private draftVersion = signal(0);
   totalDebit = computed(() => { this.draftVersion(); return this.draft.lines.reduce((s: number, l: Line) => s + (Number(l.debit) || 0), 0); });
   totalCredit = computed(() => { this.draftVersion(); return this.draft.lines.reduce((s: number, l: Line) => s + (Number(l.credit) || 0), 0); });
   balanced = computed(() => this.totalDebit() > 0 && Math.abs(this.totalDebit() - this.totalCredit()) < 0.01);
@@ -300,14 +471,103 @@ export class JournalEntriesComponent implements OnInit {
     });
   }
 
-  approve(j: any) { this.service.approveJournal(j.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم اعتماد القيد.'); this.load(); } else this.notify.error(r?.message || 'تعذر الاعتماد.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر اعتماد القيد.') }); }
-  post(j: any) { this.service.postJournal(j.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم ترحيل القيد لدفتر الأستاذ.'); this.load(); } else this.notify.error(r?.message || 'تعذر الترحيل.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر ترحيل القيد.') }); }
-  reverse(j: any) { this.service.reverseJournal(j.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم إنشاء القيد العكسي.'); this.load(); } else this.notify.error(r?.message || 'تعذر العكس.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر عكس القيد.') }); }
+  /**
+   * فتح نافذة المراجعة والتأكيد متعددة الخطوات (بدون نوافذ متصفح تلقائية)
+   */
+  triggerActionModal(j: any, mode: JournalActionMode) {
+    this.actionSubmitting.set(false);
+    this.actionMode.set(mode);
+
+    // إذا كانت بيانات القيد غير مكتملة الأسطر، نجلب التفاصيل أولاً لضمان دقة المعاينة
+    if (!j.lines || j.lines.length === 0) {
+      this.service.getJournalDetails(j.id).subscribe({
+        next: (r) => {
+          this.actionTarget.set(r?.data || j);
+          this.actionModalOpen.set(true);
+        },
+        error: () => {
+          this.actionTarget.set(j);
+          this.actionModalOpen.set(true);
+        }
+      });
+    } else {
+      this.actionTarget.set(j);
+      this.actionModalOpen.set(true);
+    }
+  }
+
+  onActionConfirmed(event: { mode: JournalActionMode; notes?: string; reversal_date?: string; reversal_reason?: string }) {
+    const target = this.actionTarget();
+    if (!target) return;
+
+    this.actionSubmitting.set(true);
+
+    if (event.mode === 'approve') {
+      this.service.approveJournal(target.id, { notes: event.notes }).subscribe({
+        next: (r) => {
+          this.actionSubmitting.set(false);
+          this.actionModalOpen.set(false);
+          if (r?.success) {
+            this.notify.success('تم اعتماد القيد المحاسبي بنجاح.');
+            this.load();
+            if (this.detail()?.id === target.id) this.openDetail(target);
+          } else {
+            this.notify.error(r?.message || 'تعذر اعتماد القيد.');
+          }
+        },
+        error: (e) => {
+          this.actionSubmitting.set(false);
+          this.notify.error(e?.error?.message || 'تعذر اعتماد القيد.');
+        }
+      });
+    } else if (event.mode === 'post') {
+      this.service.postJournal(target.id).subscribe({
+        next: (r) => {
+          this.actionSubmitting.set(false);
+          this.actionModalOpen.set(false);
+          if (r?.success) {
+            this.notify.success('تم ترحيل القيد إلى دفتر الأستاذ العام بنجاح.');
+            this.load();
+            if (this.detail()?.id === target.id) this.openDetail(target);
+          } else {
+            this.notify.error(r?.message || 'تعذر ترحيل القيد.');
+          }
+        },
+        error: (e) => {
+          this.actionSubmitting.set(false);
+          this.notify.error(e?.error?.message || 'تعذر ترحيل القيد لدفتر الأستاذ.');
+        }
+      });
+    } else if (event.mode === 'reverse') {
+      this.service.reverseJournal(target.id, {
+        reversal_date: event.reversal_date,
+        reversal_reason: event.reversal_reason
+      }).subscribe({
+        next: (r) => {
+          this.actionSubmitting.set(false);
+          this.actionModalOpen.set(false);
+          if (r?.success) {
+            this.notify.success('تم إنشاء القيد العكسي وترحيله لتصحيح الأرصدة.');
+            this.load();
+            if (this.detail()?.id === target.id) this.openDetail(target);
+          } else {
+            this.notify.error(r?.message || 'تعذر عكس القيد.');
+          }
+        },
+        error: (e) => {
+          this.actionSubmitting.set(false);
+          this.notify.error(e?.error?.message || 'تعذر عكس القيد المحاسبي.');
+        }
+      });
+    }
+  }
 
   cols(): ExportColumn[] {
     return [
       { key: 'entry_number', label: 'رقم القيد' },
       { key: 'date', label: 'التاريخ' },
+      { key: 'partner', label: 'الطرف المعني', map: (r) => r.partner_details?.name || '—' },
+      { key: 'reference', label: 'المستند المصدري', map: (r) => r.reference || '—' },
       { key: 'description', label: 'البيان' },
       { key: 'source_type', label: 'المصدر', map: (r) => this.sourceLabel(r.source_type) },
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
@@ -315,9 +575,10 @@ export class JournalEntriesComponent implements OnInit {
   }
 
   openDetail(j: any) {
-    this.detail.set(j); // عرض فوري بالبيانات المتوفرة
+    this.detail.set(j);
     this.service.getJournalDetails(j.id).subscribe({ next: (r) => { if (r?.success) this.detail.set(r.data); } });
   }
+
   printDetail() {
     const d = this.detail();
     if (!d) return;
@@ -326,8 +587,9 @@ export class JournalEntriesComponent implements OnInit {
         { title: `قيد يومية رقم ${d.entry_number}`, subtitle: d.description },
         [
           { key: 'account', label: 'الحساب', map: (l: any) => `${l.account_code} - ${l.account_name}` },
-          { key: 'debit', label: 'مدين', align: 'end' },
-          { key: 'credit', label: 'دائن', align: 'end' },
+          { key: 'description', label: 'البيان', map: (l: any) => l.description || '—' },
+          { key: 'debit', label: 'مدين (ج.س)', align: 'end' },
+          { key: 'credit', label: 'دائن (ج.س)', align: 'end' },
         ],
         d.lines || [],
       );

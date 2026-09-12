@@ -90,14 +90,14 @@ export class FinanceService {
   updateJournal(id: string, data: any): Observable<any> {
     return this.http.put<any>(`${this.baseUrl}/journals/${id}/`, data);
   }
-  approveJournal(id: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/journals/${id}/approve/`, {});
+  approveJournal(id: string, payload?: { notes?: string }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/journals/${id}/approve/`, payload || {});
   }
   postJournal(id: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/journals/${id}/post/`, {});
   }
-  reverseJournal(id: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/journals/${id}/reverse/`, {});
+  reverseJournal(id: string, payload?: { reversal_date?: string; reversal_reason?: string }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/journals/${id}/reverse/`, payload || {});
   }
 
   // 5. دفتر الأستاذ (General Ledger)

@@ -149,21 +149,25 @@ class PostingService:
 
     @classmethod
     @transaction.atomic
-    def reverse_journal_entry(cls, tenant_id, journal_entry_id, user_id=None):
+    def reverse_journal_entry(cls, tenant_id, journal_entry_id, user_id=None, reversal_date=None, reversal_reason=None):
         """
-        عمل قيد عكسي لقيد يومية مرحل لإلغاء تأثيره المالي.
+        عمل قيد عكسي لقيد يومية مرحل لإلغاء تأثيره المالي، مع تسجيل سبب وتاريخ العكس.
         """
         original = JournalEntry.objects.get(id=journal_entry_id, tenant_id=tenant_id)
         if original.status != 'posted':
             raise ValidationError("يمكن فقط عكس قيود اليومية المرحلة.")
         
+        entry_date = reversal_date or date.today()
+        reason_note = f" — السبب: {reversal_reason}" if reversal_reason else ""
+
         # 1. إنشاء قيد جديد كنسخة عكسية
         rev_entry = JournalEntry.objects.create(
             tenant_id=tenant_id,
             entry_number=f"REV-{original.entry_number}-{timezone.now().strftime('%m%d%H%M')}",
-            date=date.today(),
+            date=entry_date,
             accounting_period=original.accounting_period,
-            description=f"قيد عكسي لتصحيح القيد رقم: {original.entry_number}",
+            reference=original.entry_number,
+            description=f"قيد عكسي لتصحيح القيد رقم: {original.entry_number}{reason_note}",
             source_type='reversing',
             status='draft',
             currency=original.currency,
@@ -181,7 +185,7 @@ class PostingService:
                 cost_center=line.cost_center,
                 debit=line.credit, # الدائن يصبح مديناً
                 credit=line.debit, # المدين يصبح دائناً
-                description=f"عكس سطر قيد {original.entry_number}"
+                description=f"عكس سطر: {line.description or original.entry_number}"
             )
 
         # 3. اعتماد وتوجيه القيد الجديد تلقائياً
@@ -520,32 +524,54 @@ class CashManagementService:
         if not period:
             raise ValidationError("تاريخ السند لا يقع ضمن أي فترة محاسبية نشطة.")
 
+        # استخراج بيانات الطرف المقابل (طالب / مستند قبض) إن وجدت
+        partner_info = ""
+        try:
+            from apps.student_finance.domain.models import Receipt
+            from apps.students.domain.models import Student
+            rcp = Receipt.objects.filter(voucher_id=voucher.id).first() or Receipt.objects.filter(receipt_number=voucher.voucher_number).first()
+            if rcp:
+                st = Student.objects.filter(id=rcp.student_billing_account.student_id).first()
+                if st and hasattr(st, 'profile') and st.profile:
+                    partner_info = f" — الطالب: {st.profile.arabic_name} ({st.student_number})"
+        except Exception:
+            pass
+
+        method_label = voucher.payment_method.name_ar if voucher.payment_method else ""
+        base_desc = voucher.description or f"قيد تلقائي لسند {voucher.get_voucher_type_display()} رقم {voucher.voucher_number}"
+        entry_description = f"{base_desc}{partner_info}"
+
         journal = JournalEntry.objects.create(
             tenant_id=tenant_id,
             entry_number=f"JV-{voucher.voucher_number}",
             date=voucher.date,
             accounting_period=period,
-            description=voucher.description or f"قيد تلقائي لسند {voucher.get_voucher_type_display()} رقم {voucher.voucher_number}",
+            reference=voucher.voucher_number,
+            description=entry_description,
             source_type='automatic',
             status='draft',
             currency=voucher.currency,
             created_by=user_id
         )
 
-        # 3. إضافة أسطر القيد
+        # 3. إضافة أسطر القيد مع توضيح الشريك وطريقة السداد
         if voucher.voucher_type == 'payment':
             JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, debit=voucher.amount
+                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, debit=voucher.amount,
+                description=f"صرف مالي - {voucher.voucher_number}{partner_info}"
             )
             JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, credit=voucher.amount
+                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, credit=voucher.amount,
+                description=f"سحب من {gl_cash_or_bank.name_ar} عبر {method_label}"
             )
         elif voucher.voucher_type == 'receipt':
             JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, debit=voucher.amount
+                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, debit=voucher.amount,
+                description=f"إيداع تحصيل في {gl_cash_or_bank.name_ar} عبر {method_label}"
             )
             JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, credit=voucher.amount
+                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, credit=voucher.amount,
+                description=f"تسديد مستحقات{partner_info} - سند {voucher.voucher_number}"
             )
 
         # 4. ترحيل القيد تلقائياً

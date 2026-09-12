@@ -255,10 +255,14 @@ class JournalEntryViewSet(BaseCRUDViewSet):
     def reverse_entry(self, request, pk=None):
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
         user_id = request.user.id if request.user else None
+        reversal_date = request.data.get('reversal_date')
+        reversal_reason = request.data.get('reversal_reason', '')
         rev_entry = PostingService.reverse_journal_entry(
             tenant_id=tenant_id,
             journal_entry_id=pk,
-            user_id=user_id
+            user_id=user_id,
+            reversal_date=reversal_date,
+            reversal_reason=reversal_reason
         )
         return StandardResponse(data=JournalEntrySerializer(rev_entry).data, message="تم إجراء الترحيل العكسي وتصحيح الأرصدة بنجاح.")
 
@@ -269,7 +273,12 @@ class JournalEntryViewSet(BaseCRUDViewSet):
         entry.status = 'approved'
         entry.approved_by = request.user.id if request.user else None
         entry.approved_at = timezone.now()
-        entry.save(update_fields=['status', 'approved_by', 'approved_at'])
+        notes = request.data.get('notes')
+        if notes:
+            entry.description = f"{entry.description} [ملاحظة اعتماد: {notes}]"
+            entry.save(update_fields=['status', 'approved_by', 'approved_at', 'description'])
+        else:
+            entry.save(update_fields=['status', 'approved_by', 'approved_at'])
         return StandardResponse(data=JournalEntrySerializer(entry).data, message="تم اعتماد قيد اليومية للترحيل.")
 
 
