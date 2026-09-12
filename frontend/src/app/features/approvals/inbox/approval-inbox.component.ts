@@ -127,10 +127,10 @@ interface SectorTab {
             class="search-input"
             placeholder="البحث بالرقم المرجعي، اسم المعاملة، أو مقدم الطلب..."
             [ngModel]="searchQuery()"
-            (ngModelChange)="searchQuery.set($event)"
+            (ngModelChange)="searchQuery.set($event); page.set(1)"
           />
           @if (searchQuery()) {
-            <button class="clear-search" (click)="searchQuery.set('')">✕</button>
+            <button class="clear-search" (click)="searchQuery.set(''); page.set(1)">✕</button>
           }
         </div>
 
@@ -138,21 +138,21 @@ interface SectorTab {
           <button
             class="pill"
             [class.active]="urgencyFilter() === 'all'"
-            (click)="urgencyFilter.set('all')"
+            (click)="urgencyFilter.set('all'); page.set(1)"
           >
             كافة الأولويات
           </button>
           <button
             class="pill pill-urgent"
             [class.active]="urgencyFilter() === 'urgent'"
-            (click)="urgencyFilter.set('urgent')"
+            (click)="urgencyFilter.set('urgent'); page.set(1)"
           >
             🔥 العاجلة فقط
           </button>
           <button
             class="pill"
             [class.active]="urgencyFilter() === 'normal'"
-            (click)="urgencyFilter.set('normal')"
+            (click)="urgencyFilter.set('normal'); page.set(1)"
           >
             العادية
           </button>
@@ -219,7 +219,7 @@ interface SectorTab {
                 </tr>
               </thead>
               <tbody>
-                @for (item of filteredItems(); track item.id) {
+                @for (item of paginatedItems(); track item.id) {
                   <tr [class.row-selected]="selectedItemIds().has(item.id)">
                     <td class="col-check" (click)="$event.stopPropagation()">
                       <input
@@ -284,6 +284,56 @@ interface SectorTab {
                 }
               </tbody>
             </table>
+          </div>
+
+          <!-- شريط ترقيم وتوزيع الصفحات (Pagination Footer) -->
+          <div class="card-footer-pager">
+            <div class="pager-left">
+              <span class="pager-info">
+                عرض <strong>{{ startIndex() }} - {{ endIndex() }}</strong> من إجمالي <strong>{{ filteredItems().length }}</strong> معاملة
+              </span>
+              <div class="page-size-selector">
+                <span>عرض في الصفحة:</span>
+                <select [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); page.set(1)">
+                  <option [value]="10">10 معاملات</option>
+                  <option [value]="25">25 معاملة</option>
+                  <option [value]="50">50 معاملة</option>
+                  <option [value]="100">عرض الكل ({{ filteredItems().length }})</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pager-nav">
+              <button
+                class="btn secondary xs"
+                [disabled]="page() === 1"
+                (click)="prevPage()"
+                title="الصفحة السابقة"
+              >
+                ← السابق
+              </button>
+              
+              <div class="page-numbers">
+                @for (p of pageNumbers(); track p) {
+                  <button
+                    class="page-num-btn"
+                    [class.active]="p === page()"
+                    (click)="goToPage(p)"
+                  >
+                    {{ p }}
+                  </button>
+                }
+              </div>
+
+              <button
+                class="btn secondary xs"
+                [disabled]="page() === totalPages()"
+                (click)="nextPage()"
+                title="الصفحة التالية"
+              >
+                التالي →
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -614,6 +664,8 @@ interface SectorTab {
 
       .table-wrap {
         overflow-x: auto;
+        max-height: 560px;
+        overflow-y: auto;
       }
 
       .nb-table {
@@ -628,15 +680,20 @@ interface SectorTab {
         }
 
         th {
-          padding: 12px 14px;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          background: #f8fafc;
+          padding: 10px 12px;
           font-weight: 700;
           color: var(--nb-text-muted, #64748b);
           font-size: 12px;
           white-space: nowrap;
+          box-shadow: 0 1px 0 var(--nb-border-soft, #e2e8f0);
         }
 
         td {
-          padding: 12px 14px;
+          padding: 9px 12px;
           border-bottom: 1px solid var(--nb-border-soft, #f1f5f9);
           color: var(--nb-text, #0f172a);
           vertical-align: middle;
@@ -658,6 +715,97 @@ interface SectorTab {
       .col-priority { width: 110px; }
       .col-date { width: 110px; }
       .col-actions { width: 190px; text-align: center; }
+
+      /* شريط ترقيم وتوزيع الصفحات */
+      .card-footer-pager {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 18px;
+        background: #f8fafc;
+        border-top: 1px solid var(--nb-border-soft, #e2e8f0);
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .pager-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .pager-info {
+        font-size: 12.5px;
+        color: #475569;
+        strong {
+          color: #0f172a;
+        }
+      }
+
+      .page-size-selector {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--nb-text-muted, #64748b);
+
+        select {
+          height: 28px;
+          padding: 0 8px;
+          border-radius: 6px;
+          border: 1px solid var(--nb-border, #cbd5e1);
+          background: #ffffff;
+          font-size: 12px;
+          color: #1e293b;
+          font-weight: 600;
+          cursor: pointer;
+          outline: none;
+
+          &:focus {
+            border-color: #2563eb;
+          }
+        }
+      }
+
+      .pager-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .page-numbers {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .page-num-btn {
+        min-width: 28px;
+        height: 28px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        border: 1px solid var(--nb-border-soft, #e2e8f0);
+        background: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: #f1f5f9;
+          border-color: #cbd5e1;
+        }
+
+        &.active {
+          background: #2563eb;
+          color: #ffffff;
+          border-color: #2563eb;
+        }
+      }
 
       .ref-badge {
         background: #fef3c7;
@@ -815,6 +963,10 @@ export class ApprovalInboxComponent implements OnInit {
   urgencyFilter = signal<'all' | 'urgent' | 'normal'>('all');
   selectedItemIds = signal<Set<string>>(new Set());
 
+  // ترقيم وتوزيع الصفحات (Pagination)
+  page = signal<number>(1);
+  pageSize = signal<number>(10);
+
   // حالة المودال بنظام الخطوات
   decisionModalOpen = signal<boolean>(false);
   selectedModalItem = signal<UnifiedApprovalItem | null>(null);
@@ -870,6 +1022,38 @@ export class ApprovalInboxComponent implements OnInit {
     return list;
   });
 
+  // حسابات الصفحات والمعاملات المعروضة
+  totalPages = computed(() => {
+    const total = this.filteredItems().length;
+    const size = this.pageSize();
+    return Math.max(1, Math.ceil(total / size));
+  });
+
+  paginatedItems = computed(() => {
+    const items = this.filteredItems();
+    const size = this.pageSize();
+    const start = (this.page() - 1) * size;
+    return items.slice(start, start + size);
+  });
+
+  startIndex = computed(() => {
+    if (this.filteredItems().length === 0) return 0;
+    return (this.page() - 1) * this.pageSize() + 1;
+  });
+
+  endIndex = computed(() => {
+    return Math.min(this.page() * this.pageSize(), this.filteredItems().length);
+  });
+
+  pageNumbers = computed(() => {
+    const total = this.totalPages();
+    const pages: number[] = [];
+    for (let i = 1; i <= total; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
   urgentCount = computed(() => {
     return this.coreService.unifiedItems().filter((it) => it.priority_code === 'urgent' || it.priority_code === 'high').length;
   });
@@ -896,6 +1080,23 @@ export class ApprovalInboxComponent implements OnInit {
   selectSector(code: string): void {
     this.selectedSector.set(code);
     this.selectedItemIds.set(new Set());
+    this.page.set(1);
+  }
+
+  prevPage(): void {
+    if (this.page() > 1) {
+      this.page.update((p) => p - 1);
+    }
+  }
+
+  nextPage(): void {
+    if (this.page() < this.totalPages()) {
+      this.page.update((p) => p + 1);
+    }
+  }
+
+  goToPage(p: number): void {
+    this.page.set(p);
   }
 
   countForSector(code: string): number {
@@ -911,13 +1112,13 @@ export class ApprovalInboxComponent implements OnInit {
 
   // التحديد والمحددات المجمعة
   isAllSelected(): boolean {
-    const items = this.filteredItems();
+    const items = this.paginatedItems();
     return items.length > 0 && items.every((it) => this.selectedItemIds().has(it.id));
   }
 
   toggleSelectAll(): void {
     const current = new Set(this.selectedItemIds());
-    const items = this.filteredItems();
+    const items = this.paginatedItems();
     if (this.isAllSelected()) {
       for (const it of items) current.delete(it.id);
     } else {
