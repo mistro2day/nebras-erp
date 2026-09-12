@@ -425,10 +425,12 @@ class StudentInvoiceViewSet(BaseCRUDViewSet):
         tenant_id = request.tenant_id
         billing_account_id = request.data.get('billing_account_id')
         fee_structure_ids = request.data.get('fee_structure_ids', [])
+        fee_structure_amounts = request.data.get('fee_structure_amounts', {})
+        custom_items = request.data.get('custom_items', [])
         due_date_str = request.data.get('due_date')
         
-        if not billing_account_id or not fee_structure_ids or not due_date_str:
-            return Response({'error': 'billing_account_id, fee_structure_ids, and due_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not billing_account_id or (not fee_structure_ids and not custom_items) or not due_date_str:
+            return Response({'error': 'billing_account_id, (fee_structure_ids or custom_items), and due_date are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         fee_structures = FeeStructure.objects.filter(id__in=fee_structure_ids, tenant_id=tenant_id)
         due_date = timezone.datetime.strptime(due_date_str, '%Y-%m-%d').date()
@@ -438,7 +440,9 @@ class StudentInvoiceViewSet(BaseCRUDViewSet):
             billing_account_id=billing_account_id,
             fee_structures=fee_structures,
             due_date=due_date,
-            user_id=request.user.id if request.user else None
+            user_id=request.user.id if request.user else None,
+            custom_items=custom_items,
+            fee_structure_amounts=fee_structure_amounts
         )
         serializer = self.get_serializer(invoice)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

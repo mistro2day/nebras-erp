@@ -214,13 +214,24 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/fee-structures/', { page_size: 100, ...(params ?? {}) });
   }
 
+  /** أنواع الرسوم المتاحة (fee-types). */
+  listFeeTypes(): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/fee-types/', { page_size: 100 });
+  }
+
   /** طرق الدفع من وحدة المالية العامة. */
   listPaymentMethods(): Observable<PagedResponse<any>> {
     return this.api.get<PagedResponse<any>>('finance/payment-methods/', { page_size: 100 });
   }
 
-  /** توليد فاتورة لحساب طالب من هياكل رسوم (خدمة الفوترة الخلفية). */
-  generateStudentInvoice(body: { billing_account_id: string; fee_structure_ids: string[]; due_date: string }): Observable<any> {
+  /** توليد فاتورة لحساب طالب من هياكل رسوم أو بنود يدوية (خدمة الفوترة الخلفية). */
+  generateStudentInvoice(body: {
+    billing_account_id: string;
+    fee_structure_ids: string[];
+    due_date: string;
+    custom_items?: Array<{ name: string; amount: number; description?: string; fee_type_id?: string }>;
+    fee_structure_amounts?: Record<string, number>;
+  }): Observable<any> {
     return this.api.post('student-finance/invoices/generate-invoice/', body);
   }
 

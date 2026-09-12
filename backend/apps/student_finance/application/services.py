@@ -52,9 +52,9 @@ class BillingService:
 
     @classmethod
     @db_atomic
-    def generate_student_invoice(cls, tenant_id, billing_account_id, fee_structures, due_date, user_id=None):
+    def generate_student_invoice(cls, tenant_id, billing_account_id, fee_structures, due_date, user_id=None, custom_items=None, fee_structure_amounts=None):
         """
-        إنشاء فاتورة طالب لعدة هياكل رسوم مع احتساب الخصومات والمنح آلياً وترحيل قيد الاستحقاق.
+        إنشاء فاتورة طالب لعدة هياكل رسوم مع إمكانية إدخال بنود يدوية وتعديل المبالغ واحتساب الخصومات والمنح آلياً وترحيل قيد الاستحقاق.
         """
         account = StudentBillingAccount.objects.select_for_update().get(id=billing_account_id, tenant_id=tenant_id)
         if account.is_blocked:
@@ -84,10 +84,12 @@ class BillingService:
         )
 
         total_amount = Decimal('0.0')
+        fee_structure_amounts = fee_structure_amounts or {}
 
-        # 3. إدراج بنود الرسوم
+        # 3. إدراج بنود الرسوم من هياكل الرسوم المعتمدة
         for fs in fee_structures:
-            item_amount = Decimal(str(fs.amount))
+            override_amt = fee_structure_amounts.get(str(fs.id))
+            item_amount = Decimal(str(override_amt)) if override_amt is not None else Decimal(str(fs.amount))
             InvoiceItem.objects.create(
                 tenant_id=tenant_id,
                 invoice=invoice,
@@ -96,6 +98,36 @@ class BillingService:
                 description=f"رسوم {fs.fee_type.name_ar} - العام الدراسي {fs.academic_year}"
             )
             total_amount += item_amount
+
+        # 3b. إدراج بنود الرسوم اليدوية / المخصصة (custom_items)
+        if custom_items:
+            default_fee_type = FeeType.objects.filter(tenant_id=tenant_id).first()
+            for ci in custom_items:
+                ci_name = (ci.get('name') or '').strip()
+                if not ci_name:
+                    ci_name = 'رسوم يدوية مخصصة'
+                ci_amount = Decimal(str(ci.get('amount') or 0))
+                if ci_amount <= 0:
+                    continue
+                ft_id = ci.get('fee_type_id')
+                ft = FeeType.objects.filter(id=ft_id, tenant_id=tenant_id).first() if ft_id else default_fee_type
+                if not ft:
+                    category, _ = FeeCategory.objects.get_or_create(
+                        tenant_id=tenant_id, code='general',
+                        defaults={'name_ar': 'رسوم عامة', 'name_en': 'General Fees'}
+                    )
+                    ft, _ = FeeType.objects.get_or_create(
+                        tenant_id=tenant_id, code='custom_fee',
+                        defaults={'name_ar': 'رسوم مخصصة', 'name_en': 'Custom Fee', 'fee_category': category}
+                    )
+                InvoiceItem.objects.create(
+                    tenant_id=tenant_id,
+                    invoice=invoice,
+                    fee_type=ft,
+                    amount=ci_amount,
+                    description=ci.get('description') or ci_name
+                )
+                total_amount += ci_amount
 
         # 4. احتساب الخصومات والمنح الدراسية النشطة للطالب (تكامل مع محرك القواعد)
         active_scholarships = Scholarship.objects.filter(
