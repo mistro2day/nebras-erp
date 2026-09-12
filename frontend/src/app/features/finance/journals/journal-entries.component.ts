@@ -10,7 +10,9 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { TenantService } from '../../../core/services/tenant.service';
 import { JournalActionReviewModalComponent, JournalActionMode } from './journal-action-review-modal.component';
+import { printJournalVoucher } from './journal-voucher-print';
 
 interface Line { account: string; debit: number; credit: number; cost_center: string | null; description?: string; }
 
@@ -136,6 +138,7 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
                   <td (click)="$event.stopPropagation()">
                     <div class="actions">
                       <button class="btn ghost xs" (click)="openDetail(j)" title="معاينة التفاصيل الكاملة">تفاصيل</button>
+                      <button class="btn ghost xs" (click)="printJournal(j)" title="طباعة سند القيد الرسمي (ترويسة المستأجر)">🖨️ طباعة</button>
                       @if (j.status === 'draft') {
                         <button class="btn primary xs" (click)="triggerActionModal(j, 'approve')">اعتماد</button>
                       }
@@ -574,26 +577,30 @@ export class JournalEntriesComponent implements OnInit {
     ];
   }
 
+  private tenantService = inject(TenantService);
+
   openDetail(j: any) {
     this.detail.set(j);
     this.service.getJournalDetails(j.id).subscribe({ next: (r) => { if (r?.success) this.detail.set(r.data); } });
   }
 
+  printJournal(j: any) {
+    if (!j) return;
+    if (!j.lines || j.lines.length === 0 || !j.partner_details) {
+      this.service.getJournalDetails(j.id).subscribe({
+        next: (r) => {
+          const full = r?.data || j;
+          printJournalVoucher(full, this.tenantService.currentTenant());
+        },
+        error: () => printJournalVoucher(j, this.tenantService.currentTenant())
+      });
+    } else {
+      printJournalVoucher(j, this.tenantService.currentTenant());
+    }
+  }
+
   printDetail() {
-    const d = this.detail();
-    if (!d) return;
-    import('../../../shared/export').then(({ printDoc }) => {
-      printDoc(
-        { title: `قيد يومية رقم ${d.entry_number}`, subtitle: d.description },
-        [
-          { key: 'account', label: 'الحساب', map: (l: any) => `${l.account_code} - ${l.account_name}` },
-          { key: 'description', label: 'البيان', map: (l: any) => l.description || '—' },
-          { key: 'debit', label: 'مدين (ج.س)', align: 'end' },
-          { key: 'credit', label: 'دائن (ج.س)', align: 'end' },
-        ],
-        d.lines || [],
-      );
-    });
+    this.printJournal(this.detail());
   }
 
   statusLabel(s: string) { return ({ draft: 'مسودة', approved: 'معتمد', posted: 'مرحّل', cancelled: 'ملغي', reversed: 'معكوس' } as any)[s] || s; }
