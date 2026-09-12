@@ -238,7 +238,17 @@ class JournalEntryViewSet(BaseCRUDViewSet):
             qs = qs.filter(status=status_param)
         if source_type:
             qs = qs.filter(source_type=source_type)
-        return qs
+        
+        # تحسين فائق للأداء: جلب العملة وأسطر القيد والحسابات والسندات دفعة واحدة مجمعة (0 استعلام إضافي أثناء الـ serialization)
+        return qs.select_related('currency', 'accounting_period').prefetch_related(
+            'lines',
+            'lines__account',
+            'lines__cost_center',
+            'vouchers',
+            'vouchers__payment_method',
+            'vouchers__bank_account__bank',
+            'vouchers__cash_box'
+        )
 
     @action(detail=True, methods=['post'], url_path='post')
     def post_entry(self, request, pk=None):

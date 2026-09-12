@@ -429,10 +429,17 @@ export class JournalEntriesComponent implements OnInit {
   balanced = computed(() => this.totalDebit() > 0 && Math.abs(this.totalDebit() - this.totalCredit()) < 0.01);
 
   ngOnInit() {
+    // تحميل القيود فوراً وبأعلى أولوية دون تزاحم في الطلبات
+    this.load();
+  }
+
+  private editorDataLoaded = false;
+  private ensureEditorData() {
+    if (this.editorDataLoaded) return;
+    this.editorDataLoaded = true;
     this.service.getCOA({ status: 'active' }).subscribe((r) => { if (r?.success) this.accounts.set(r.data); });
     this.service.getPeriods({ status: 'open' }).subscribe((r) => { if (r?.success) this.periods.set(r.data); });
     this.service.getCostCenters({ status: 'active' }).subscribe((r) => { if (r?.success) this.costCenters.set(r.data); });
-    this.load();
   }
 
   blank() {
@@ -450,7 +457,13 @@ export class JournalEntriesComponent implements OnInit {
     });
   }
 
-  toggleEditor() { this.showEditor.update((v) => !v); if (this.showEditor()) this.draft = this.blank(); }
+  toggleEditor() {
+    this.showEditor.update((v) => !v);
+    if (this.showEditor()) {
+      this.draft = this.blank();
+      this.ensureEditorData();
+    }
+  }
   addLine() { this.draft.lines = [...this.draft.lines, { account: '', debit: 0, credit: 0, cost_center: null }]; this.draftVersion.update((v) => v + 1); }
   removeLine(i: number) { this.draft.lines = this.draft.lines.filter((_: any, idx: number) => idx !== i); this.draftVersion.update((v) => v + 1); }
   onDebit(ln: Line) { if (ln.debit) ln.credit = 0; this.draftVersion.update((v) => v + 1); }
