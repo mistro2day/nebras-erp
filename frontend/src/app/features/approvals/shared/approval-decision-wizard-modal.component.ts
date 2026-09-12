@@ -604,11 +604,12 @@ export class ApprovalDecisionWizardModalComponent {
   @Output() closed = new EventEmitter<void>();
   @Output() confirmed = new EventEmitter<DecisionPayload>();
 
-  steps = [
-    { title: 'مراجعة المعاملة', description: 'تفاصيل ومبالغ المعاملة' },
-    { title: 'تحديد الإجراء', description: 'الاعتماد أو الرفض أو الإرجاع' },
-    { title: 'التأكيد النهائي', description: 'المراجعة واعتماد التغيير' },
+  steps: string[] = [
+    'مراجعة المعاملة',
+    'تحديد الإجراء',
+    'التأكيد النهائي',
   ];
+
 
   currentStep = signal<number>(0);
   selectedAction = signal<'approve' | 'reject' | 'return'>('approve');

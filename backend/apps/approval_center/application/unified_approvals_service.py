@@ -752,7 +752,7 @@ class UnifiedApprovalsService:
 
         # 11. قبول طالب
         elif source == 'applicant':
-            from apps.students.domain.models import Applicant
+            from apps.admissions.domain.models import Applicant
             app = Applicant.objects.get(tenant_id=tenant_id, id=original_id)
             app.status = 'accepted' if action == 'approve' else 'rejected'
             app.save(update_fields=['status'])
@@ -762,9 +762,12 @@ class UnifiedApprovalsService:
         elif source == 'student_withdrawal':
             from apps.students.domain.models import StudentWithdrawal
             wth = StudentWithdrawal.objects.get(tenant_id=tenant_id, id=original_id)
-            wth.status = 'approved' if action == 'approve' else 'rejected'
-            wth.save(update_fields=['status'])
-            msg = f"تم اعتماد طلب الانسحاب" if action == 'approve' else f"تم رفض الطلب"
+            if action == 'approve':
+                wth.approved_by = user_uuid
+            elif action == 'reject':
+                wth.approved_by = None
+            wth.save(update_fields=['approved_by'])
+            msg = f"تم اعتماد طلب الانسحاب" if action == 'approve' else f"تم رفض طلب الانسحاب"
 
         # 13. تسوية رسوم طالب
         elif source == 'invoice_adjustment':
@@ -777,14 +780,17 @@ class UnifiedApprovalsService:
             i_adj.save(update_fields=['approved_by'])
             msg = f"تم اعتماد تسوية الرسوم" if action == 'approve' else f"تم رفض تسوية الرسوم"
 
-
         # 14. منحة / إعفاء
         elif source == 'financial_aid':
             from apps.student_finance.domain.models import FinancialAid
             aid = FinancialAid.objects.get(tenant_id=tenant_id, id=original_id)
-            aid.status = 'approved' if action == 'approve' else 'rejected'
-            aid.save(update_fields=['status'])
+            if action == 'approve':
+                aid.approved_by = user_uuid
+            elif action == 'reject':
+                aid.approved_by = None
+            aid.save(update_fields=['approved_by'])
             msg = f"تم اعتماد المنحة المالية" if action == 'approve' else f"تم رفض المنحة"
+
 
         # 15. رصد درجات كنترول
         elif source == 'mark_approval':

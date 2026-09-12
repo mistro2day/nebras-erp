@@ -18,7 +18,7 @@ class Command(BaseCommand):
             tenants = Tenant.objects.all()
 
         if not tenants.exists():
-            self.stdout.write(self.style.WARNING("لا يوجد مستأجرين مسجلين في النظام."))
+            self.stdout.write("تحذير: لا يوجد مستأجرين مسجلين في النظام.")
             return
 
         total_created = 0
@@ -44,6 +44,7 @@ class Command(BaseCommand):
                         cat.save(update_fields=["name_ar", "name_en"])
                         total_updated += 1
 
-        self.stdout.write(self.style.SUCCESS(
+        self.stdout.write(
             f"تمت مزامنة فئات الموافقات بنجاح: {total_created} جديدة، {total_updated} محدثة لـ {tenants.count()} مستأجر."
-        ))
+        )
+

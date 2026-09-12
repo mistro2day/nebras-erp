@@ -1,5 +1,4 @@
-from django.utils import timezone
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.response import Response
@@ -40,15 +39,20 @@ from apps.approval_center.application.unified_approvals_service import UnifiedAp
 
 
 class TenantScopedViewSetMixin:
-    permission_classes = [IsAuthenticated, TenantHeaderRequired]
+    permission_classes = [IsAuthenticated, TenantHeaderRequired]  # type: ignore
 
     def get_queryset(self):
-        tenant_id = self.request.headers.get('X-Tenant-ID')
-        qs = super().get_queryset()
-        return qs.filter(tenant_id=tenant_id) if tenant_id else qs
+        request = getattr(self, 'request', None)
+        tenant_id = request.headers.get('X-Tenant-ID') if request else None
+        base_get_queryset = getattr(super(), 'get_queryset', None)
+        qs = base_get_queryset() if callable(base_get_queryset) else getattr(self, 'queryset', None)
+        return qs.filter(tenant_id=tenant_id) if tenant_id and qs is not None else qs
 
     def perform_create(self, serializer):
-        serializer.save(tenant_id=self.request.headers.get('X-Tenant-ID'))
+        request = getattr(self, 'request', None)
+        tenant_id = request.headers.get('X-Tenant-ID') if request else None
+        serializer.save(tenant_id=tenant_id)
+
 
 
 def _validation_error_response(exc):
@@ -110,9 +114,10 @@ class ApprovalTemplateViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         tenant_id = request.headers.get('X-Tenant-ID')
         try:
             payload = ApprovalTemplateService.apply_template(tenant_id, pk, request.data.get('overrides'))
-        except ApprovalTemplate.DoesNotExist:
+        except ObjectDoesNotExist:
             return Response({'detail': 'القالب غير موجود.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(payload, status=status.HTTP_200_OK)
+
 
 
 class ApprovalConfigurationViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
@@ -258,8 +263,9 @@ class ApprovalRequestViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         for request_id in request.data.get('request_ids', []):
             try:
                 req = ApprovalRequest.objects.get(tenant_id=tenant_id, id=request_id)
-            except ApprovalRequest.DoesNotExist:
+            except ObjectDoesNotExist:
                 continue
+
             ApprovalAssignmentService.assign(tenant_id, req, delegate_to_id, assigned_by=request.user.id)
             updated += 1
         return Response({'updated': updated}, status=status.HTTP_200_OK)
