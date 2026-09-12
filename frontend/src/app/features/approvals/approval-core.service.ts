@@ -43,9 +43,39 @@ export interface ApprovalPriority {
   code: string;
 }
 
+export interface UnifiedApprovalItem {
+  id: string;
+  source: string;
+  original_id: string;
+  category_code: string;
+  category_name_ar: string;
+  module: string;
+  module_name_ar: string;
+  icon: string;
+  title_ar: string;
+  reference_number: string;
+  amount: number | null;
+  currency: string;
+  requester_name: string;
+  status: string;
+  priority_code: string;
+  created_at: string | null;
+  details: any;
+}
+
+export interface ApprovalStats {
+  total_pending: number;
+  urgent_count: number;
+  approved_today: number;
+  total_pending_amount_sdg: number;
+  counts_by_module: Record<string, number>;
+  counts_by_category: Record<string, number>;
+}
+
 function unwrapList<T>(res: any): T[] {
   return Array.isArray(res) ? res : (res?.data ?? []);
 }
+
 
 @Injectable({ providedIn: 'root' })
 export class ApprovalCoreService {
@@ -154,4 +184,46 @@ export class ApprovalCoreService {
       tap((data) => this.priorities.set(data))
     );
   }
+
+  // ==========================================
+  // مركز الموافقات الموحد — Unified Approvals Hub
+  // ==========================================
+  unifiedItems = signal<UnifiedApprovalItem[]>([]);
+  unifiedStats = signal<ApprovalStats | null>(null);
+
+  getUnifiedInbox(params?: { module?: string; category?: string; status?: string; search?: string }): Observable<UnifiedApprovalItem[]> {
+    this.loading.set(true);
+    return this.http.get<UnifiedApprovalItem[]>(`${this.apiUrl}/unified-inbox/`, { params: (params || {}) as any }).pipe(
+      tap({
+        next: (data) => this.unifiedItems.set(data),
+        finalize: () => this.loading.set(false),
+      })
+    );
+  }
+
+  getUnifiedStats(): Observable<ApprovalStats> {
+    return this.http.get<ApprovalStats>(`${this.apiUrl}/unified-inbox/stats/`).pipe(
+      tap({
+        next: (s) => this.unifiedStats.set(s),
+      })
+    );
+  }
+
+  takeUnifiedAction(payload: {
+    source: string;
+    original_id: string;
+    action: 'approve' | 'reject' | 'return';
+    comments?: string;
+  }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/unified-inbox/take-action/`, payload);
+  }
+
+  bulkUnifiedAction(
+    items: { source: string; original_id: string; id: string }[],
+    action: 'approve' | 'reject',
+    comments?: string
+  ): Observable<any> {
+    return this.http.post(`${this.apiUrl}/unified-inbox/bulk-action/`, { items, action, comments });
+  }
 }
+

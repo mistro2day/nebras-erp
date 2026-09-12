@@ -35,6 +35,8 @@ from apps.approval_center.application.services import (
     ApprovalCollaborationService, ApprovalAnalyticsService, ApprovalNotificationService,
     ApprovalTemplateService,
 )
+from apps.approval_center.application.unified_approvals_service import UnifiedApprovalsService
+
 
 
 class TenantScopedViewSetMixin:
@@ -519,3 +521,86 @@ class ApprovalDashboardViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         tenant_id = request.headers.get('X-Tenant-ID')
         dashboard = ApprovalAnalyticsService.get_user_dashboard_config(tenant_id, request.user.id)
         return Response(ApprovalDashboardSerializer(dashboard).data, status=status.HTTP_200_OK)
+
+
+class UnifiedApprovalsViewSet(TenantScopedViewSetMixin, viewsets.ViewSet):
+    """
+    مركز الموافقات الموحد — جلب موحد لكافة الموافقات من جميع قطاعات وموديولات النظام
+    واتخاذ إجراءات الاعتماد/الرفض المباشرة والمجمعة.
+    """
+    def list(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        module = request.query_params.get('module')
+        category_code = request.query_params.get('category')
+        status_filter = request.query_params.get('status', 'pending')
+        search = request.query_params.get('search')
+        items = UnifiedApprovalsService.get_unified_inbox(
+            tenant_id=tenant_id,
+            module=module,
+            category_code=category_code,
+            status_filter=status_filter,
+            search=search
+        )
+        return Response(items, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        data = UnifiedApprovalsService.get_inbox_statistics(tenant_id)
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='take-action')
+    def take_action(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        source = request.data.get('source')
+        original_id = request.data.get('original_id')
+        act = request.data.get('action')
+        comments = request.data.get('comments', '')
+
+        if not source or not original_id or not act:
+            return Response({'detail': 'الحقول source و original_id و action مطلوبة.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            res = UnifiedApprovalsService.take_action(
+                tenant_id=tenant_id,
+                user_id=request.user.id,
+                source=source,
+                original_id=original_id,
+                action=act,
+                comments=comments
+            )
+            return Response(res, status=status.HTTP_200_OK)
+        except ValidationError as exc:
+            return _validation_error_response(exc)
+        except Exception as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='bulk-action')
+    def bulk_action(self, request):
+        tenant_id = request.headers.get('X-Tenant-ID')
+        items = request.data.get('items', [])
+        act = request.data.get('action')
+        comments = request.data.get('comments', '')
+
+        if not items or not act:
+            return Response({'detail': 'الحقول items و action مطلوبة.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        for it in items:
+            source = it.get('source')
+            original_id = it.get('original_id')
+            try:
+                res = UnifiedApprovalsService.take_action(
+                    tenant_id=tenant_id,
+                    user_id=request.user.id,
+                    source=source,
+                    original_id=original_id,
+                    action=act,
+                    comments=comments
+                )
+                results.append({'id': it.get('id'), 'success': True, 'message': res.get('message')})
+            except Exception as exc:
+                results.append({'id': it.get('id'), 'success': False, 'error': str(exc)})
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
+

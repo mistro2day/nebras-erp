@@ -8,12 +8,16 @@ from apps.approval_center.interfaces.views import (
     ApprovalCommentViewSet, ApprovalAttachmentViewSet, ApprovalAssignmentViewSet, ApprovalOutcomeViewSet,
     ApprovalDelegationViewSet, ApprovalEscalationViewSet, SLATrackingViewSet, ApprovalDeadlineViewSet,
     ApprovalReminderViewSet, ApprovalAuditViewSet, ApprovalNotificationViewSet, ApprovalStatisticsViewSet,
-    ApprovalDashboardViewSet,
+    ApprovalDashboardViewSet, UnifiedApprovalsViewSet,
 )
 
 router = DefaultRouter()
+# مركز الموافقات الموحد — المسار الجديد الشامل
+router.register('unified-inbox', UnifiedApprovalsViewSet, basename='unified-inbox')
+
 # صندوق الوارد ودورة حياة الطلب (المسارات الأصلية — لا يتم تغيير مكانها للحفاظ على التوافق الخلفي)
 router.register('inbox', InboxItemViewSet, basename='inbox')
+
 router.register('requests', ApprovalRequestViewSet, basename='request')
 router.register('history', ApprovalHistoryViewSet, basename='history')
 
