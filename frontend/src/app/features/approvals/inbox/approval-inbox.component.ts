@@ -285,58 +285,28 @@ interface SectorTab {
               </tbody>
             </table>
           </div>
-
-          <!-- شريط ترقيم وتوزيع الصفحات (Pagination Footer) -->
-          <div class="card-footer-pager">
-            <div class="pager-left">
-              <span class="pager-info">
-                عرض <strong>{{ startIndex() }} - {{ endIndex() }}</strong> من إجمالي <strong>{{ filteredItems().length }}</strong> معاملة
-              </span>
-              <div class="page-size-selector">
-                <span>عرض في الصفحة:</span>
-                <select [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); page.set(1)">
-                  <option [value]="10">10 معاملات</option>
-                  <option [value]="25">25 معاملة</option>
-                  <option [value]="50">50 معاملة</option>
-                  <option [value]="100">عرض الكل ({{ filteredItems().length }})</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="pager-nav">
-              <button
-                class="btn secondary xs"
-                [disabled]="page() === 1"
-                (click)="prevPage()"
-                title="الصفحة السابقة"
-              >
-                ← السابق
-              </button>
-              
-              <div class="page-numbers">
-                @for (p of pageNumbers(); track p) {
-                  <button
-                    class="page-num-btn"
-                    [class.active]="p === page()"
-                    (click)="goToPage(p)"
-                  >
-                    {{ p }}
-                  </button>
-                }
-              </div>
-
-              <button
-                class="btn secondary xs"
-                [disabled]="page() === totalPages()"
-                (click)="nextPage()"
-                title="الصفحة التالية"
-              >
-                التالي →
-              </button>
-            </div>
-          </div>
         }
       </div>
+
+      <!-- نظام ترقيم الصفحات بنمط نبراس OS المعتمد -->
+      @if (filteredItems().length > 0) {
+        <div class="pager">
+          <div class="page-size-selector">
+            <span>عرض:</span>
+            <select [ngModel]="pageSize()" (ngModelChange)="pageSize.set(+$event); page.set(1)">
+              <option [value]="10">10 معاملات</option>
+              <option [value]="25">25 معاملة</option>
+              <option [value]="50">50 معاملة</option>
+              <option [value]="100">100 معاملة (الكل)</option>
+            </select>
+          </div>
+          <div class="pager-nav" *ngIf="totalPages() > 1">
+            <button class="nb-btn-ghost sm" [disabled]="page() === 1" (click)="prev()">السابق</button>
+            <span class="pager-info">صفحة {{ page() }} من {{ totalPages() }} · إجمالي {{ filteredItems().length }} معاملة</span>
+            <button class="nb-btn-ghost sm" [disabled]="page() === totalPages()" (click)="next()">التالي</button>
+          </div>
+        </div>
+      }
 
       <!-- نافذة معالج اتخاذ القرار بنظام الخطوات الإلزامي المعتمد في نبراس OS -->
       <app-approval-decision-wizard-modal
@@ -350,13 +320,14 @@ interface SectorTab {
   styles: [
     `
       .approvals-hub {
+        flex: 1;
         display: flex;
         flex-direction: column;
         gap: 16px;
-        padding: 20px 24px;
-        background: var(--nb-surface-raised, #f8fafc);
-        min-height: 100vh;
+        padding: 20px;
+        background: var(--nb-bg, #f8fafc);
         font-family: var(--nb-font-family, system-ui, sans-serif);
+        min-width: 0;
       }
 
       /* الرأس والعنوان */
@@ -664,8 +635,6 @@ interface SectorTab {
 
       .table-wrap {
         overflow-x: auto;
-        max-height: 560px;
-        overflow-y: auto;
       }
 
       .nb-table {
@@ -680,20 +649,15 @@ interface SectorTab {
         }
 
         th {
-          position: sticky;
-          top: 0;
-          z-index: 2;
-          background: #f8fafc;
-          padding: 10px 12px;
+          padding: 12px 14px;
           font-weight: 700;
           color: var(--nb-text-muted, #64748b);
           font-size: 12px;
           white-space: nowrap;
-          box-shadow: 0 1px 0 var(--nb-border-soft, #e2e8f0);
         }
 
         td {
-          padding: 9px 12px;
+          padding: 12px 14px;
           border-bottom: 1px solid var(--nb-border-soft, #f1f5f9);
           color: var(--nb-text, #0f172a);
           vertical-align: middle;
@@ -716,30 +680,20 @@ interface SectorTab {
       .col-date { width: 110px; }
       .col-actions { width: 190px; text-align: center; }
 
-      /* شريط ترقيم وتوزيع الصفحات */
-      .card-footer-pager {
+      /* نظام الصفحات بنمط نبراس OS المعتمد */
+      .pager {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 18px;
-        background: #f8fafc;
-        border-top: 1px solid var(--nb-border-soft, #e2e8f0);
+        gap: 14px;
+        margin-top: 14px;
         flex-wrap: wrap;
-        gap: 12px;
       }
 
-      .pager-left {
+      .pager-nav {
         display: flex;
         align-items: center;
-        gap: 16px;
-      }
-
-      .pager-info {
-        font-size: 12.5px;
-        color: #475569;
-        strong {
-          color: #0f172a;
-        }
+        gap: 10px;
       }
 
       .page-size-selector {
@@ -753,57 +707,40 @@ interface SectorTab {
           height: 28px;
           padding: 0 8px;
           border-radius: 6px;
-          border: 1px solid var(--nb-border, #cbd5e1);
-          background: #ffffff;
+          border: 1px solid var(--nb-border-soft, #e2e8f0);
+          background: var(--nb-surface, #ffffff);
           font-size: 12px;
-          color: #1e293b;
-          font-weight: 600;
-          cursor: pointer;
+          color: var(--nb-text, #0f172a);
           outline: none;
-
-          &:focus {
-            border-color: #2563eb;
-          }
         }
       }
 
-      .pager-nav {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .page-numbers {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .page-num-btn {
-        min-width: 28px;
-        height: 28px;
-        padding: 0 6px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        border: 1px solid var(--nb-border-soft, #e2e8f0);
-        background: #ffffff;
+      .pager-info {
         font-size: 12px;
-        font-weight: 700;
-        color: #475569;
+        color: var(--nb-text-muted, #64748b);
+      }
+
+      .nb-btn-ghost.sm {
+        height: 26px;
+        padding: 0 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--nb-border-soft, #cbd5e1);
+        background: var(--nb-surface, #ffffff);
+        color: var(--nb-text, #0f172a);
         cursor: pointer;
+        font-family: inherit;
+        font-weight: 500;
         transition: all 0.15s ease;
 
-        &:hover {
-          background: #f1f5f9;
-          border-color: #cbd5e1;
+        &:hover:not(:disabled) {
+          background: var(--nb-surface-raised, #f1f5f9);
+          border-color: var(--nb-border, #94a3b8);
         }
 
-        &.active {
-          background: #2563eb;
-          color: #ffffff;
-          border-color: #2563eb;
+        &:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
       }
 
@@ -963,9 +900,9 @@ export class ApprovalInboxComponent implements OnInit {
   urgencyFilter = signal<'all' | 'urgent' | 'normal'>('all');
   selectedItemIds = signal<Set<string>>(new Set());
 
-  // ترقيم وتوزيع الصفحات (Pagination)
-  page = signal<number>(1);
-  pageSize = signal<number>(10);
+  // ترقيم وتوزيع الصفحات بنمط نبراس OS المعتمد
+  readonly pageSize = signal<number>(10);
+  readonly page = signal<number>(1);
 
   // حالة المودال بنظام الخطوات
   decisionModalOpen = signal<boolean>(false);
@@ -1022,36 +959,13 @@ export class ApprovalInboxComponent implements OnInit {
     return list;
   });
 
-  // حسابات الصفحات والمعاملات المعروضة
-  totalPages = computed(() => {
-    const total = this.filteredItems().length;
-    const size = this.pageSize();
-    return Math.max(1, Math.ceil(total / size));
-  });
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize()))
+  );
 
-  paginatedItems = computed(() => {
-    const items = this.filteredItems();
-    const size = this.pageSize();
-    const start = (this.page() - 1) * size;
-    return items.slice(start, start + size);
-  });
-
-  startIndex = computed(() => {
-    if (this.filteredItems().length === 0) return 0;
-    return (this.page() - 1) * this.pageSize() + 1;
-  });
-
-  endIndex = computed(() => {
-    return Math.min(this.page() * this.pageSize(), this.filteredItems().length);
-  });
-
-  pageNumbers = computed(() => {
-    const total = this.totalPages();
-    const pages: number[] = [];
-    for (let i = 1; i <= total; i++) {
-      pages.push(i);
-    }
-    return pages;
+  readonly paginatedItems = computed(() => {
+    const start = (this.page() - 1) * this.pageSize();
+    return this.filteredItems().slice(start, start + this.pageSize());
   });
 
   urgentCount = computed(() => {
@@ -1070,7 +984,6 @@ export class ApprovalInboxComponent implements OnInit {
     });
   }
 
-
   refresh(): void {
     this.coreService.getUnifiedInbox().subscribe();
     this.coreService.getUnifiedStats().subscribe();
@@ -1083,20 +996,12 @@ export class ApprovalInboxComponent implements OnInit {
     this.page.set(1);
   }
 
-  prevPage(): void {
-    if (this.page() > 1) {
-      this.page.update((p) => p - 1);
-    }
+  prev(): void {
+    if (this.page() > 1) this.page.update((p) => p - 1);
   }
 
-  nextPage(): void {
-    if (this.page() < this.totalPages()) {
-      this.page.update((p) => p + 1);
-    }
-  }
-
-  goToPage(p: number): void {
-    this.page.set(p);
+  next(): void {
+    if (this.page() < this.totalPages()) this.page.update((p) => p + 1);
   }
 
   countForSector(code: string): number {
