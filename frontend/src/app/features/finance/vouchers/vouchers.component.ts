@@ -6,10 +6,11 @@ import { FinanceService } from '../finance.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
-import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { VoucherCreateModalComponent } from './voucher-create-modal.component';
+import { printVoucher } from './voucher-print';
 
 /**
  * السندات المالية (Vouchers) — سندات الصرف والقبض وترحيلها للدفاتر،
@@ -19,13 +20,23 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
   selector: 'app-vouchers',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, DecimalPipe, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    DecimalPipe,
+    NbPageHeaderComponent,
+    NbPanelComponent,
+    NbDrawerComponent,
+    NbExportMenuComponent,
+    NbLoadingComponent,
+    VoucherCreateModalComponent,
+  ],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="سندات الصرف والقبض" subtitle="إصدار السندات المالية النقدية والبنكية واعتمادها وترحيلها لدفتر الأستاذ.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
         <nb-export-menu [columns]="cols()" [rows]="vouchers()" title="السندات المالية" subtitle="سندات الصرف والقبض" filename="السندات-المالية"></nb-export-menu>
-        <button class="btn primary" (click)="showForm.set(!showForm())">＋ سند جديد</button>
+        <button class="btn primary" (click)="showModal.set(true)">＋ سند جديد</button>
       </nb-page-header>
 
       <div class="statusbar">
@@ -34,63 +45,24 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
         }
       </div>
 
-      @if (showForm()) {
-        <nb-panel title="إنشاء سند مالي" class="mb">
-          <div class="grid4">
-            <label>نوع السند
-              <select class="fld" [(ngModel)]="form.voucher_type">
-                <option value="payment">سند صرف</option>
-                <option value="receipt">سند قبض</option>
-                <option value="journal">سند تسوية</option>
-              </select>
-            </label>
-            <label>رقم السند<input class="fld" [(ngModel)]="form.voucher_number" placeholder="PV-1001" /></label>
-            <label>التاريخ<nb-datepicker [value]="form.date" (valueChange)="form.date = $event"></nb-datepicker></label>
-            <label>المبلغ<input class="fld num" type="number" min="0" [(ngModel)]="form.amount" /></label>
-            <label>العملة
-              <select class="fld" [(ngModel)]="form.currency">
-                @for (c of currencies(); track c.id) { <option [value]="c.id">{{ c.code }} - {{ c.name_ar }}</option> }
-              </select>
-            </label>
-            <label>طريقة الدفع
-              <select class="fld" [(ngModel)]="form.payment_method">
-                @for (m of methods(); track m.id) { <option [value]="m.id">{{ m.name_ar }}</option> }
-              </select>
-            </label>
-            <label>الحساب المقابل (GL)
-              <select class="fld" [(ngModel)]="form.gl_account">
-                <option value="">اختر الحساب…</option>
-                @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.code }} - {{ a.name_ar }}</option> }
-              </select>
-            </label>
-            <label>الحساب البنكي
-              <select class="fld" [(ngModel)]="form.bank_account">
-                <option [ngValue]="null">— بدون —</option>
-                @for (b of bankAccounts(); track b.id) { <option [ngValue]="b.id">{{ b.bank_name }} - {{ b.account_number }}</option> }
-              </select>
-            </label>
-            <label>الصندوق النقدي
-              <select class="fld" [(ngModel)]="form.cash_box">
-                <option [ngValue]="null">— بدون —</option>
-                @for (cb of cashBoxes(); track cb.id) { <option [ngValue]="cb.id">{{ cb.name_ar }}</option> }
-              </select>
-            </label>
-          </div>
-          <label class="full">البيان / الوصف<input class="fld" [(ngModel)]="form.description" placeholder="الغرض من السند" /></label>
-          <div class="form-actions">
-            <button class="btn primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'جارٍ الحفظ…' : 'حفظ السند' }}</button>
-            <button class="btn ghost" (click)="showForm.set(false)">إلغاء</button>
-          </div>
-        </nb-panel>
-      }
-
       <nb-panel [flush]="true">
         <div class="table-wrap">
           <table class="nb-table">
-            <thead><tr><th>رقم السند</th><th>النوع</th><th>التاريخ</th><th class="end">المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead>
+              <tr>
+                <th>رقم السند</th>
+                <th>النوع</th>
+                <th>التاريخ</th>
+                <th class="end">المبلغ (ج.س)</th>
+                <th>طريقة السداد</th>
+                <th>البيان</th>
+                <th>الحالة</th>
+                <th style="text-align: center;">إجراءات</th>
+              </tr>
+            </thead>
             <tbody>
               @if (loading()) {
-                <tr><td colspan="7"><nb-loading message="جارٍ تحميل السندات…"></nb-loading></td></tr>
+                <tr><td colspan="8"><nb-loading message="جارٍ تحميل السندات…"></nb-loading></td></tr>
               } @else {
               @for (v of vouchers(); track v.id) {
                 <tr class="clickable" (click)="detail.set(v)">
@@ -98,39 +70,62 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
                   <td><span class="badge" [class.pay]="v.voucher_type==='payment'" [class.rcv]="v.voucher_type==='receipt'">{{ typeLabel(v.voucher_type) }}</span></td>
                   <td class="mono">{{ v.date }}</td>
                   <td class="end mono"><strong>{{ v.amount | number:'1.2-2' }}</strong></td>
+                  <td>{{ methodName(v.payment_method) }}</td>
                   <td>{{ v.description }}</td>
                   <td><span class="badge" [class]="v.status">{{ statusLabel(v.status) }}</span></td>
-                  <td (click)="$event.stopPropagation()">@if (v.status === 'draft' || v.status === 'approved') { <button class="btn primary xs" (click)="post(v)">ترحيل</button> }</td>
+                  <td class="actions-cell" (click)="$event.stopPropagation()">
+                    <button class="btn ghost xs" title="طباعة السند الرسمي A4" (click)="print(v)">🖨️ طباعة</button>
+                    @if (v.status === 'draft' || v.status === 'approved') {
+                      <button class="btn primary xs" (click)="post(v)">ترحيل</button>
+                    }
+                  </td>
                 </tr>
               }
-              @if (!vouchers().length) { <tr><td colspan="7" class="empty">لا توجد سندات مطابقة.</td></tr> }
+              @if (!vouchers().length) { <tr><td colspan="8" class="empty">لا توجد سندات مطابقة.</td></tr> }
               }
             </tbody>
           </table>
         </div>
       </nb-panel>
 
-      <!-- تفاصيل السند المالي -->
-      <nb-drawer [open]="!!detail()" [width]="560"
+      <!-- تفاصيل السند المالي في الدرج الجانبي -->
+      <nb-drawer [open]="!!detail()" [width]="580"
         [title]="typeLabel(detail()?.voucher_type) + ' — ' + (detail()?.voucher_number || '')"
         [subtitle]="detail()?.description" (closed)="detail.set(null)">
         @if (detail(); as v) {
           <div class="dl">
             <div class="dl-row"><span class="k">نوع السند</span><span class="v"><span class="badge" [class.pay]="v.voucher_type==='payment'" [class.rcv]="v.voucher_type==='receipt'">{{ typeLabel(v.voucher_type) }}</span></span></div>
             <div class="dl-row"><span class="k">التاريخ</span><span class="v mono">{{ v.date }}</span></div>
-            <div class="dl-row big"><span class="k">المبلغ</span><span class="v mono">{{ v.amount | number:'1.2-2' }} {{ currCode(v.currency) }}</span></div>
+            <div class="dl-row big"><span class="k">المبلغ الإجمالي</span><span class="v mono">{{ v.amount | number:'1.2-2' }} جنيه سوداني</span></div>
             <div class="dl-row"><span class="k">طريقة الدفع</span><span class="v">{{ methodName(v.payment_method) }}</span></div>
             <div class="dl-row"><span class="k">الحساب المقابل</span><span class="v">{{ accName(v.gl_account) }}</span></div>
             @if (v.bank_account) { <div class="dl-row"><span class="k">الحساب البنكي</span><span class="v">{{ bankName(v.bank_account) }}</span></div> }
-            @if (v.cash_box) { <div class="dl-row"><span class="k">الصندوق</span><span class="v">{{ boxName(v.cash_box) }}</span></div> }
+            @if (v.cash_box) { <div class="dl-row"><span class="k">الصندوق النقدي</span><span class="v">{{ boxName(v.cash_box) }}</span></div> }
             <div class="dl-row"><span class="k">الحالة</span><span class="v"><span class="badge" [class]="v.status">{{ statusLabel(v.status) }}</span></span></div>
-            <div class="dl-row"><span class="k">البيان</span><span class="v">{{ v.description }}</span></div>
+            <div class="dl-row"><span class="k">البيان المدون</span><span class="v">{{ v.description }}</span></div>
           </div>
         }
-        <div drawer-actions>
-          @if (detail()?.status === 'draft' || detail()?.status === 'approved') { <button class="btn primary" (click)="post(detail()); detail.set(null)">ترحيل السند</button> }
+        <div drawer-actions class="drawer-btns">
+          <button class="btn ghost" (click)="print(detail())">🖨️ طباعة السند الرسمي (A4)</button>
+          @if (detail()?.status === 'draft' || detail()?.status === 'approved') {
+            <button class="btn primary" (click)="post(detail()); detail.set(null)">ترحيل السند للدفاتر</button>
+          }
         </div>
       </nb-drawer>
+
+      <!-- معالج إنشاء السند المالي بنمط نبراس متعدد الخطوات -->
+      <app-voucher-create-modal
+        [open]="showModal()"
+        [currencies]="currencies()"
+        [methods]="methods()"
+        [accounts]="accounts()"
+        [bankAccounts]="bankAccounts()"
+        [cashBoxes]="cashBoxes()"
+        [saving]="saving()"
+        (cancel)="showModal.set(false)"
+        (confirm)="handleCreateConfirm($event)"
+      >
+      </app-voucher-create-modal>
     </div>
   `,
   styles: [`
@@ -140,14 +135,6 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .seg { height: 32px; padding: 0 14px; border: 1px solid var(--nb-border); background: var(--nb-surface);
       color: var(--nb-text-secondary); border-radius: var(--nb-radius); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
     .seg.active { background: var(--nb-primary-600); border-color: var(--nb-primary-600); color: #fff; }
-    .fld { height: 34px; padding: 0 10px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius);
-      background: var(--nb-surface); color: var(--nb-text); font-family: inherit; font-size: 13px; box-sizing: border-box; width: 100%; }
-    .fld.num { text-align: end; font-variant-numeric: tabular-nums; }
-    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    @media (max-width: 900px) { .grid4 { grid-template-columns: 1fr 1fr; } }
-    label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--nb-text-muted); }
-    label.full { margin-top: 12px; }
-    .form-actions { display: flex; gap: 10px; margin-top: 14px; }
 
     .table-wrap { overflow-x: auto; }
     .nb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -168,11 +155,14 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
     .dl-row { display: flex; justify-content: space-between; gap: 16px; padding: 11px 2px; border-bottom: 1px solid var(--nb-border-soft); font-size: 13px; }
     .dl-row .k { color: var(--nb-text-muted); }
     .dl-row .v { color: var(--nb-text); font-weight: 600; text-align: end; }
-    .dl-row.big .v { font-size: 18px; font-weight: 800; }
+    .dl-row.big .v { font-size: 18px; font-weight: 800; color: var(--nb-primary-700); }
     .badge.draft { background: var(--nb-border-soft); color: var(--nb-text-secondary); }
     .badge.approved { background: var(--nb-info-bg); color: var(--nb-info); }
     .badge.posted { background: var(--nb-success-bg); color: var(--nb-success); }
     .badge.cancelled { background: var(--nb-danger-bg); color: var(--nb-danger); }
+
+    .actions-cell { display: flex; gap: 6px; justify-content: center; align-items: center; }
+    .drawer-btns { display: flex; gap: 10px; }
 
     .btn { height: 34px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--nb-radius); cursor: pointer; border: none; }
     .btn.xs { height: 28px; padding: 0 10px; font-size: 11.5px; }
@@ -194,43 +184,98 @@ export class VouchersComponent implements OnInit {
   accounts = signal<any[]>([]);
   bankAccounts = signal<any[]>([]);
   cashBoxes = signal<any[]>([]);
-  showForm = signal(false);
+  showModal = signal(false);
   saving = signal(false);
   typeFilter = signal('');
   detail = signal<any | null>(null);
 
-  typeTabs = [{ key: '', label: 'الكل' }, { key: 'payment', label: 'سندات الصرف' }, { key: 'receipt', label: 'سندات القبض' }, { key: 'journal', label: 'سندات التسوية' }];
-
-  form: any = this.blank();
+  typeTabs = [
+    { key: '', label: 'الكل' },
+    { key: 'payment', label: 'سندات الصرف' },
+    { key: 'receipt', label: 'سندات القبض' },
+    { key: 'journal', label: 'سندات التسوية' }
+  ];
 
   ngOnInit() {
-    this.service.getCurrencies({ status: 'active' }).subscribe((r) => { if (r?.success) { this.currencies.set(r.data); const b = r.data.find((c: any) => c.is_base) || r.data[0]; if (b) this.form.currency = b.id; } });
-    this.service.getPaymentMethods().subscribe((r) => { if (r?.success) this.methods.set(r.data); });
-    this.service.getCOA({ status: 'active' }).subscribe((r) => { if (r?.success) this.accounts.set(r.data); });
-    this.service.getBankAccounts().subscribe((r) => { if (r?.success) this.bankAccounts.set(r.data); });
-    this.service.getCashBoxes().subscribe((r) => { if (r?.success) this.cashBoxes.set(r.data); });
+    this.service.getCurrencies({ status: 'active' }).subscribe((r) => {
+      if (r?.success) this.currencies.set(r.data);
+    });
+    this.service.getPaymentMethods().subscribe((r) => {
+      if (r?.success) this.methods.set(r.data);
+    });
+    this.service.getCOA({ status: 'active' }).subscribe((r) => {
+      if (r?.success) this.accounts.set(r.data);
+    });
+    this.service.getBankAccounts().subscribe((r) => {
+      if (r?.success) this.bankAccounts.set(r.data);
+    });
+    this.service.getCashBoxes().subscribe((r) => {
+      if (r?.success) this.cashBoxes.set(r.data);
+    });
     this.load();
   }
 
-  blank() { return { voucher_type: 'payment', voucher_number: '', date: new Date().toISOString().split('T')[0], amount: 0, currency: '', payment_method: '', gl_account: '', bank_account: null, cash_box: null, description: '', status: 'draft' }; }
-  setType(t: string) { this.typeFilter.set(t); this.load(); }
+  setType(t: string) {
+    this.typeFilter.set(t);
+    this.load();
+  }
+
   load() {
     this.loading.set(true);
     this.service.getVouchers(this.typeFilter() ? { voucher_type: this.typeFilter() } : undefined).subscribe({
-      next: (r) => { if (r?.success) this.vouchers.set(r.data); this.loading.set(false); },
+      next: (r) => {
+        if (r?.success) this.vouchers.set(r.data);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
 
-  save() {
-    if (!this.form.voucher_number || !this.form.gl_account || !this.form.payment_method || !(Number(this.form.amount) > 0)) { this.notify.error('يرجى تعبئة رقم السند والمبلغ والحساب وطريقة الدفع.'); return; }
+  handleCreateConfirm(payload: any) {
     this.saving.set(true);
-    this.service.createVoucher(this.form).subscribe({
-      next: (r) => { this.saving.set(false); if (r?.success) { this.notify.success('تم حفظ السند بنجاح.'); this.showForm.set(false); const cur = this.form.currency; this.form = this.blank(); this.form.currency = cur; this.load(); } else this.notify.error(r?.message || 'تعذر حفظ السند.'); },
-      error: () => { this.saving.set(false); this.notify.error('حدث خطأ أثناء الاتصال بالخادم.'); },
+    this.service.createVoucher(payload).subscribe({
+      next: (r) => {
+        this.saving.set(false);
+        if (r?.success) {
+          this.notify.success('تم إنشاء السند المالي بنجاح.');
+          this.showModal.set(false);
+          this.load();
+        } else {
+          this.notify.error(r?.message || 'تعذر حفظ السند.');
+        }
+      },
+      error: () => {
+        this.saving.set(false);
+        this.notify.error('حدث خطأ أثناء حفظ السند.');
+      },
     });
   }
-  post(v: any) { this.service.postVoucher(v.id).subscribe({ next: (r) => { if (r?.success) { this.notify.success('تم ترحيل السند للدفاتر.'); this.load(); } else this.notify.error(r?.message || 'تعذر الترحيل.'); }, error: (e) => this.notify.error(e?.error?.message || 'تعذر ترحيل السند.') }); }
+
+  post(v: any) {
+    this.service.postVoucher(v.id).subscribe({
+      next: (r) => {
+        if (r?.success) {
+          this.notify.success('تم ترحيل السند للدفاتر بنجاح.');
+          this.load();
+        } else {
+          this.notify.error(r?.message || 'تعذر الترحيل.');
+        }
+      },
+      error: (e) => this.notify.error(e?.error?.message || 'تعذر ترحيل السند.')
+    });
+  }
+
+  print(v: any) {
+    if (!v) return;
+    const populated = {
+      ...v,
+      payment_method_name: this.methodName(v.payment_method),
+      gl_account_name: this.accName(v.gl_account),
+      bank_account_name: this.bankName(v.bank_account),
+      cash_box_name: this.boxName(v.cash_box),
+    };
+    printVoucher(populated);
+  }
 
   cols(): ExportColumn[] {
     return [
@@ -242,6 +287,7 @@ export class VouchersComponent implements OnInit {
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
     ];
   }
+
   currCode(id: string) { return this.currencies().find((c) => c.id === id)?.code || ''; }
   methodName(id: string) { return this.methods().find((m) => m.id === id)?.name_ar || '—'; }
   accName(id: string) { const a = this.accounts().find((x) => x.id === id); return a ? `${a.code} - ${a.name_ar}` : '—'; }

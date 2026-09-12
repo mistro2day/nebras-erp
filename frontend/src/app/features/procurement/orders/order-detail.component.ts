@@ -9,6 +9,7 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/compo
 import { InputDialogComponent, InputDialogData } from '../../../shared/components/input-dialog/input-dialog.component';
 import { PayVendorDialogComponent } from './pay-vendor-dialog.component';
 import { printDoc, ExportColumn } from '../../../shared/export';
+import { printPurchaseOrder } from './purchase-order-print';
 
 /**
  * تفاصيل أمر الشراء — المستند الذي يحمل الالتزام المالي.
@@ -384,27 +385,17 @@ export class ProcurementOrderDetailComponent implements OnInit {
     });
   }
 
-  /** طباعة أمر الشراء ببنوده وأبعاده المالية. */
+  /** طباعة أمر الشراء الرسمي بهوية نبراس وترويسة وفوتر المستأجر السوداني. */
   print(o: any): void {
-    const cols: ExportColumn[] = [
-      { key: 'item_name', label: 'الصنف' },
-      { key: 'quantity', label: 'الكمية', align: 'end' },
-      { key: 'unit', label: 'الوحدة' },
-      { key: 'unit_price', label: 'سعر الوحدة', align: 'end', map: (i) => Number(i.unit_price) || 0 },
-      { key: 'budget_account_id', label: 'حساب الموازنة', map: (i) => this.accName(i.budget_account_id) },
-      { key: 'cost_center_id', label: 'مركز التكلفة', map: (i) => this.ccName(i.cost_center_id) },
-      { key: 'total_price', label: 'الإجمالي', align: 'end', map: (i) => Number(i.total_price) || 0 },
-    ];
-    const inv = o.vendor_invoice_number ? ` · فاتورة المورّد: ${o.vendor_invoice_number}` : '';
-    printDoc(
-      {
-        title: `أمر شراء ${o.po_number}`,
-        subtitle: `المورّد: ${this.vendorName(o.vendor)} · التاريخ: ${o.date} · `
-          + `الحالة: ${this.statusText(o.status)} · الإجمالي: ${this.fmt(o.total_amount)}${inv}`,
-        filename: `أمر-شراء-${o.po_number}`,
-      },
-      cols,
-      o.items || []
-    );
+    const populated = {
+      ...o,
+      vendor_name: this.vendorName(o.vendor),
+      items: (o.items || []).map((it: any) => ({
+        ...it,
+        budget_account_name: this.accName(it.budget_account_id),
+        cost_center_name: this.ccName(it.cost_center_id),
+      })),
+    };
+    printPurchaseOrder(populated);
   }
 }

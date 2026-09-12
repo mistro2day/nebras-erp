@@ -305,11 +305,41 @@ class LedgerSerializer(serializers.ModelSerializer):
 class LedgerEntrySerializer(serializers.ModelSerializer):
     account_code = serializers.ReadOnlyField(source='account.code')
     account_name = serializers.ReadOnlyField(source='account.name_ar')
+    entry_number = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.entry_number')
+    entry_id = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.id')
+    entry_date = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.date')
+    reference = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.reference')
+    cost_center_name = serializers.ReadOnlyField(source='cost_center.name_ar')
+    line_description = serializers.SerializerMethodField()
+    partner_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LedgerEntry
         fields = '__all__'
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at')
+
+    def get_line_description(self, obj):
+        if obj.journal_entry_line:
+            return obj.journal_entry_line.description or getattr(obj.journal_entry_line.journal_entry, 'description', '')
+        return ''
+
+    def get_partner_name(self, obj):
+        try:
+            import re
+            desc = self.get_line_description(obj)
+            if 'الطالب' in desc or 'طالب' in desc:
+                m = re.search(r'الطالب[/: ]+([^\(\-\n]+)', desc)
+                if m:
+                    return m.group(1).strip()
+            if obj.journal_entry_line and obj.journal_entry_line.journal_entry:
+                entry_num = obj.journal_entry_line.journal_entry.entry_number or ''
+                if entry_num.startswith('JV-PO-') or entry_num.startswith('JV-GR-'):
+                    return 'مورد معتمد'
+                if entry_num.startswith('MNT-WO-'):
+                    return 'قسم الصيانة والتشغيل'
+        except Exception:
+            pass
+        return ''
 
 
 class BankSerializer(serializers.ModelSerializer):

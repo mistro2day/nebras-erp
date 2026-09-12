@@ -10,6 +10,8 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
 import { downloadCsv } from '../../../shared/export';
 import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+
 /**
  * فواتير الطلاب — وحدة عاملة (Nebras OS).
  * قائمة حقيقية من student-finance/invoices/ مع بحث برقم الفاتورة، تصفية حالة،
@@ -19,7 +21,17 @@ import { SendMessageModalComponent } from '../../communications/components/send-
   selector: 'app-sf-invoices-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, SendMessageModalComponent],
+  imports: [
+    FormsModule,
+    DecimalPipe,
+    MatSnackBarModule,
+    NbPageHeaderComponent,
+    NbPanelComponent,
+    NbDatepickerComponent,
+    NbLoadingComponent,
+    SendMessageModalComponent,
+    SfDocumentDrawerComponent,
+  ],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -112,7 +124,7 @@ import { SendMessageModalComponent } from '../../communications/components/send-
             <nb-loading message="جارٍ تحميل الفواتير…"></nb-loading>
           } @else {
             @for (i of paged(); track i.id) {
-              <div class="tbl-row">
+              <div class="tbl-row clickable" (click)="openDoc(i)">
                 <span class="mono strong">{{ i.invoice_number }}</span>
                 <span class="mono">{{ i.issue_date }}</span>
                 <span class="mono">{{ i.due_date }}</span>
@@ -120,7 +132,8 @@ import { SendMessageModalComponent } from '../../communications/components/send-
                 <span class="mono">{{ i.paid_amount | number:'1.2-2' }}</span>
                 <span class="mono" [class.due]="+i.outstanding_amount > 0">{{ i.outstanding_amount | number:'1.2-2' }}</span>
                 <span><span [class]="badge(i.status)">{{ statusText(i.status) }}</span></span>
-                <span class="row-actions">
+                <span class="row-actions" (click)="$event.stopPropagation()">
+                  <button class="nb-btn-ghost sm" title="طباعة الفاتورة الرسمية A4" (click)="openDoc(i)">🖨️ طباعة</button>
                   <button class="nb-btn-ghost sm" (click)="openMessageModal(i)">💬 إرسال</button>
                 </span>
               </div>
@@ -157,10 +170,14 @@ import { SendMessageModalComponent } from '../../communications/components/send-
         defaultTemplateCode="INVOICE_ISSUED"
         [allowedCategories]="['finance']"
       ></app-send-message-modal>
+
+      <!-- ساحبة المستند الرسمي الفاخر للطباعة A4 -->
+      <sf-document-drawer [doc]="doc()" (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
     .page { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+    .tbl-row.clickable { cursor: pointer; }
     .create-panel { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 16px; margin-bottom: 14px; animation: paneIn 220ms cubic-bezier(0.2,0,0,1); }
     @keyframes paneIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
     @media (prefers-reduced-motion: reduce) { .create-panel { animation: none; } }
@@ -221,6 +238,12 @@ export class SfInvoicesListComponent implements OnInit {
   showMsgModal = false;
   selectedInvoice = signal<any | null>(null);
   todayDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
+
+  readonly doc = signal<SfDoc>(null);
+
+  openDoc(invoice: any) {
+    this.doc.set({ type: 'invoice', data: invoice });
+  }
 
   openMessageModal(invoice: any) {
     this.selectedInvoice.set(invoice);

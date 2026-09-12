@@ -7,6 +7,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { printDoc, ExportColumn } from '../../../shared/export';
+import { printPurchaseRequest } from './purchase-request-print';
 
 /**
  * تفاصيل طلب الشراء — عرض الاستمارة (Form View) على نمط Odoo/D365.
@@ -288,28 +289,16 @@ export class ProcurementRequestDetailComponent implements OnInit {
   }
 
   print(r: any): void {
-    // دالة الطباعة وتصدير المستند
-    const cols: ExportColumn[] = [
-      { key: 'item_name', label: 'الصنف' },
-      { key: 'quantity', label: 'الكمية', align: 'end' },
-      { key: 'unit', label: 'الوحدة' },
-      { key: 'estimated_unit_price', label: 'سعر تقديري', align: 'end',
-        map: (i) => Number(i.estimated_unit_price) || 0 },
-      { key: 'budget_account_id', label: 'حساب الموازنة', map: (i) => this.accName(i.budget_account_id) },
-      { key: 'cost_center_id', label: 'مركز التكلفة', map: (i) => this.ccName(i.cost_center_id) },
-      { key: 'total', label: 'الإجمالي', align: 'end', map: (i) => this.lineTotal(i) },
-    ];
-    printDoc(
-      {
-        title: `طلب شراء ${r.request_number}`,
-        subtitle: `القسم الطالب: ${this.deptName(r.department_id)} · التاريخ: ${r.date} · `
-          + `الحالة: ${this.statusText(r.status)} · الأولوية: ${this.priText(r.priority)} · `
-          + `الإجمالي التقديري: ${this.fmt(r.total_estimated_amount)}`,
-        filename: `طلب-شراء-${r.request_number}`,
-      },
-      cols,
-      r.items || []
-    );
+    const populated = {
+      ...r,
+      department_name: this.deptName(r.department_id),
+      items: (r.items || []).map((it: any) => ({
+        ...it,
+        budget_account_name: this.accName(it.budget_account_id),
+        cost_center_name: this.ccName(it.cost_center_id),
+      })),
+    };
+    printPurchaseRequest(populated);
   }
 
   back() { this.router.navigate(['/procurement/requests']); }

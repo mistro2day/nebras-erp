@@ -335,7 +335,7 @@ class LedgerEntryViewSet(BaseCRUDViewSet):
             qs = qs.filter(cost_center_id=cost_center)
         if date_param:
             qs = qs.filter(date=date_param)
-        return qs
+        return qs.select_related('account', 'cost_center', 'journal_entry_line__journal_entry')
 
 
 class BankViewSet(BaseCRUDViewSet):

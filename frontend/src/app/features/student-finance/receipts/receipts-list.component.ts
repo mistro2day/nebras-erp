@@ -99,6 +99,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
             <span>تاريخ الدفع</span>
             <span>المبلغ</span>
             <span>الحالة</span>
+            <span style="text-align: center;">إجراءات</span>
           </div>
           @if (loading()) {
             <nb-loading message="جارٍ تحميل السندات…"></nb-loading>
@@ -109,6 +110,9 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
                 <span class="mono">{{ r.payment_date }}</span>
                 <span class="mono ok">{{ r.amount | number:'1.2-2' }} جنيه</span>
                 <span><span [class]="badge(r.status)">{{ statusText(r.status) }}</span></span>
+                <span class="row-actions" style="text-align: center;" (click)="$event.stopPropagation()">
+                  <button class="nb-btn-ghost sm" title="طباعة سند القبض الرسمي A4" (click)="openDoc(r)">🖨️ طباعة</button>
+                </span>
               </div>
             }
             @if (filtered().length === 0) {
@@ -156,7 +160,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
     .field select { height: 34px; min-width: 160px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); padding: 0 10px; font-family: var(--nb-font-family); font-size: 13px; color: var(--nb-text); background: var(--nb-surface); outline: none; }
     .notice { font-size: 12px; color: var(--nb-text-muted); background: var(--nb-info-bg); border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); padding: 8px 12px; margin-bottom: 12px; }
     .tbl { display: flex; flex-direction: column; }
-    .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.4fr 1.2fr 1.2fr 1.2fr; gap: 8px; padding: 9px 16px; align-items: center; }
+    .tbl-head, .tbl-row { display: grid; grid-template-columns: 1.4fr 1.2fr 1.2fr 1fr 1fr; gap: 8px; padding: 9px 16px; align-items: center; }
     .tbl-head { background: var(--nb-surface-raised); border-bottom: 1px solid var(--nb-border-soft); padding: 8px 16px; font-size: 11px; font-weight: 700; color: var(--nb-text-muted); }
     .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
     .tbl-row:last-child { border-bottom: none; }

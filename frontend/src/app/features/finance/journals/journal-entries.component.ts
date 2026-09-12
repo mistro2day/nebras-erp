@@ -12,6 +12,7 @@ import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { TenantService } from '../../../core/services/tenant.service';
 import { JournalActionReviewModalComponent, JournalActionMode } from './journal-action-review-modal.component';
+import { JournalEntryCreateModalComponent } from './journal-entry-create-modal.component';
 import { printJournalVoucher } from './journal-voucher-print';
 
 interface Line { account: string; debit: number; credit: number; cost_center: string | null; description?: string; }
@@ -30,13 +31,14 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
     NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent,
     NbDrawerComponent, NbExportMenuComponent, NbLoadingComponent,
     JournalActionReviewModalComponent,
+    JournalEntryCreateModalComponent,
   ],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="قيود اليومية والاعتمادات" subtitle="إنشاء القيود المزدوجة المتوازنة، ومراجعتها واعتمادها وترحيلها لدفتر الأستاذ العام وفق معايير Odoo و Dynamics 365.">
         <button class="btn ghost" (click)="back()">رجوع لمساحة العمل</button>
         <nb-export-menu [columns]="cols()" [rows]="journals()" title="قيود اليومية" subtitle="سجل القيود المحاسبية" filename="قيود-اليومية"></nb-export-menu>
-        <button class="btn primary" (click)="toggleEditor()">＋ قيد يومية جديد</button>
+        <button class="btn primary" (click)="openCreateModal()">＋ قيد يومية جديد</button>
       </nb-page-header>
 
       <div class="statusbar">
@@ -44,53 +46,6 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
           <button class="seg" [class.active]="statusFilter()===s.key" (click)="setStatus(s.key)">{{ s.label }}</button>
         }
       </div>
-
-      @if (showEditor()) {
-        <nb-panel title="محرر القيد المزدوج" subtitle="يجب أن يتساوى إجمالي المدين مع إجمالي الدائن قبل الحفظ." class="mb">
-          <div class="grid4">
-            <label>رقم القيد<input class="fld" [(ngModel)]="draft.entry_number" placeholder="JV-1001" /></label>
-            <label>التاريخ<nb-datepicker [value]="draft.date" (valueChange)="draft.date = $event"></nb-datepicker></label>
-            <label>الفترة المحاسبية
-              <select class="fld" [(ngModel)]="draft.accounting_period">
-                <option value="">اختر الفترة…</option>
-                @for (p of periods(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
-              </select>
-            </label>
-            <label>المرجع / المستند المصدر<input class="fld" [(ngModel)]="draft.reference" placeholder="مثال: سند قبض، فاتورة، أمر شراء" /></label>
-          </div>
-          <label class="full">البيان / الوصف<input class="fld" [(ngModel)]="draft.description" placeholder="وصف المعاملة المحاسبية والطرف المعني" /></label>
-
-          <div class="lines-head"><span>الحساب</span><span>مركز التكلفة</span><span>مدين (ج.س)</span><span>دائن (ج.س)</span><span></span></div>
-          @for (ln of draft.lines; track $index) {
-            <div class="line">
-              <select class="fld" [(ngModel)]="ln.account">
-                <option value="">— اختر الحساب —</option>
-                @for (a of accounts(); track a.id) { <option [value]="a.id">{{ a.code }} - {{ a.name_ar }}</option> }
-              </select>
-              <select class="fld" [(ngModel)]="ln.cost_center">
-                <option [ngValue]="null">— بدون —</option>
-                @for (c of costCenters(); track c.id) { <option [ngValue]="c.id">{{ c.name_ar }}</option> }
-              </select>
-              <input class="fld num" type="number" min="0" [(ngModel)]="ln.debit" (ngModelChange)="onDebit(ln)" />
-              <input class="fld num" type="number" min="0" [(ngModel)]="ln.credit" (ngModelChange)="onCredit(ln)" />
-              <button class="icon-btn" (click)="removeLine($index)" title="حذف السطر">✕</button>
-            </div>
-          }
-          <button class="btn ghost sm" (click)="addLine()">＋ إضافة سطر</button>
-
-          <div class="totals" [class.ok]="balanced()" [class.bad]="!balanced()">
-            <span>إجمالي المدين: <strong>{{ totalDebit() | number:'1.2-2' }} ج.س</strong></span>
-            <span>إجمالي الدائن: <strong>{{ totalCredit() | number:'1.2-2' }} ج.س</strong></span>
-            <span>الفرق: <strong>{{ (totalDebit() - totalCredit()) | number:'1.2-2' }} ج.س</strong></span>
-            <span class="verdict">{{ balanced() ? '✓ القيد متوازن' : '✗ القيد غير متوازن' }}</span>
-          </div>
-
-          <div class="form-actions">
-            <button class="btn primary" [disabled]="!balanced() || saving()" (click)="save()">{{ saving() ? 'جارٍ الحفظ…' : 'حفظ كمسودة' }}</button>
-            <button class="btn ghost" (click)="showEditor.set(false)">إلغاء</button>
-          </div>
-        </nb-panel>
-      }
 
       <nb-panel [flush]="true">
         <div class="table-wrap">
@@ -281,6 +236,17 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
         (confirmed)="onActionConfirmed($event)"
         (cancelled)="actionModalOpen.set(false)"
       ></app-journal-action-review-modal>
+
+      <!-- معالج إنشاء قيد يومية جديد بنمط نبراس (Nebras Create Wizard Modal) -->
+      <app-journal-entry-create-modal
+        [open]="createModalOpen()"
+        [accounts]="accounts()"
+        [periods]="periods()"
+        [costCenters]="costCenters()"
+        [submitting]="saving()"
+        (submitted)="onCreateJournalSubmitted($event)"
+        (cancelled)="createModalOpen.set(false)"
+      ></app-journal-entry-create-modal>
     </div>
   `,
   styles: [`
@@ -403,6 +369,7 @@ export class JournalEntriesComponent implements OnInit {
   periods = signal<any[]>([]);
   costCenters = signal<any[]>([]);
   showEditor = signal(false);
+  createModalOpen = signal(false);
   saving = signal(false);
   statusFilter = signal<string>('');
   detail = signal<any | null>(null);
@@ -421,13 +388,6 @@ export class JournalEntriesComponent implements OnInit {
     { key: 'approved', label: 'معتمد' }, { key: 'posted', label: 'مرحّل' }, { key: 'reversed', label: 'معكوس' },
   ];
 
-  draft: any = this.blank();
-
-  private draftVersion = signal(0);
-  totalDebit = computed(() => { this.draftVersion(); return this.draft.lines.reduce((s: number, l: Line) => s + (Number(l.debit) || 0), 0); });
-  totalCredit = computed(() => { this.draftVersion(); return this.draft.lines.reduce((s: number, l: Line) => s + (Number(l.credit) || 0), 0); });
-  balanced = computed(() => this.totalDebit() > 0 && Math.abs(this.totalDebit() - this.totalCredit()) < 0.01);
-
   ngOnInit() {
     // تحميل القيود فوراً وبأعلى أولوية دون تزاحم في الطلبات
     this.load();
@@ -442,9 +402,43 @@ export class JournalEntriesComponent implements OnInit {
     this.service.getCostCenters({ status: 'active' }).subscribe((r) => { if (r?.success) this.costCenters.set(r.data); });
   }
 
-  blank() {
-    return { entry_number: '', date: new Date().toISOString().split('T')[0], accounting_period: '', reference: '', description: '',
-      lines: [{ account: '', debit: 0, credit: 0, cost_center: null }, { account: '', debit: 0, credit: 0, cost_center: null }] as Line[] };
+  openCreateModal() {
+    this.ensureEditorData();
+    this.createModalOpen.set(true);
+  }
+
+  onCreateJournalSubmitted(data: any) {
+    this.saving.set(true);
+    this.service.getCurrencies({ is_base: true }).subscribe({
+      next: (cr) => {
+        const base = cr?.data?.[0];
+        const payload = {
+          ...data,
+          currency: base?.id,
+          exchange_rate: 1.0,
+        };
+        this.service.createJournal(payload).subscribe({
+          next: (r) => {
+            this.saving.set(false);
+            if (r?.success) {
+              this.notify.success('تم إنشاء وحفظ قيد اليومية بنجاح كمسودة معتمدة.');
+              this.createModalOpen.set(false);
+              this.load();
+            } else {
+              this.notify.error(r?.message || 'تعذر إنشاء القيد المحاسبي.');
+            }
+          },
+          error: (err) => {
+            this.saving.set(false);
+            this.notify.error(err?.error?.message || 'حدث خطأ أثناء حفظ القيد المحاسبي.');
+          }
+        });
+      },
+      error: () => {
+        this.saving.set(false);
+        this.notify.error('تعذر جلب العملة الأساسية للنظام.');
+      }
+    });
   }
 
   setStatus(s: string) { this.statusFilter.set(s); this.load(); }
@@ -454,36 +448,6 @@ export class JournalEntriesComponent implements OnInit {
     this.service.getJournals(params).subscribe({
       next: (r) => { if (r?.success) this.journals.set(r.data); this.loading.set(false); },
       error: () => this.loading.set(false),
-    });
-  }
-
-  toggleEditor() {
-    this.showEditor.update((v) => !v);
-    if (this.showEditor()) {
-      this.draft = this.blank();
-      this.ensureEditorData();
-    }
-  }
-  addLine() { this.draft.lines = [...this.draft.lines, { account: '', debit: 0, credit: 0, cost_center: null }]; this.draftVersion.update((v) => v + 1); }
-  removeLine(i: number) { this.draft.lines = this.draft.lines.filter((_: any, idx: number) => idx !== i); this.draftVersion.update((v) => v + 1); }
-  onDebit(ln: Line) { if (ln.debit) ln.credit = 0; this.draftVersion.update((v) => v + 1); }
-  onCredit(ln: Line) { if (ln.credit) ln.debit = 0; this.draftVersion.update((v) => v + 1); }
-
-  save() {
-    if (!this.draft.entry_number || !this.draft.accounting_period) { this.notify.error('يرجى إدخال رقم القيد والفترة المحاسبية.'); return; }
-    this.saving.set(true);
-    this.service.getCurrencies({ is_base: true }).subscribe((cr) => {
-      const base = cr?.data?.[0];
-      const payload = { ...this.draft, currency: base?.id, exchange_rate: 1.0,
-        lines: this.draft.lines.filter((l: Line) => l.account && (Number(l.debit) || Number(l.credit))) };
-      this.service.createJournal(payload).subscribe({
-        next: (r) => {
-          this.saving.set(false);
-          if (r?.success) { this.notify.success('تم حفظ القيد كمسودة بنجاح.'); this.showEditor.set(false); this.draft = this.blank(); this.load(); }
-          else { this.notify.error(r?.message || 'تعذر حفظ القيد.'); }
-        },
-        error: () => { this.saving.set(false); this.notify.error('حدث خطأ أثناء الاتصال بالخادم.'); },
-      });
     });
   }
 

@@ -101,6 +101,10 @@ export class ProcurementService {
     return this.http.get<any>(`${this.apiUrl}/orders/`, { params: params || {} });
   }
 
+  createPurchaseOrder(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/orders/`, payload);
+  }
+
   /** أمر شراء مفرد مع بنوده. */
   getPurchaseOrder(id: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/orders/${id}/`);
