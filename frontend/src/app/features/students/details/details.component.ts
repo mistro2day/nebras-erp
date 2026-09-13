@@ -55,15 +55,19 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                 <div class="badge-row">
                   <span [class]="statusBadge(s.status)">{{ statusText(s.status) }}</span>
                   <span class="num-badge">رقم الطالب: {{ s.student_number }}</span>
+                  <span class="academic-badge grade-badge">🏫 {{ s.grade_name || 'الصف غير مسجل' }}</span>
+                  <span class="academic-badge section-badge">🏷️ {{ s.section_name || 'الشعبة غير محددة' }}</span>
+                  <span class="academic-badge year-badge" *ngIf="s.academic_year_name">📅 {{ s.academic_year_name }}</span>
                 </div>
               </div>
             </div>
             
             <div class="quick-stats">
-              <div class="stat-item"><span class="label">الصف الدراسي</span><span class="val font-semibold" style="color: var(--nb-primary-600);">{{ s.grade_name || '—' }}</span></div>
-              <div class="stat-item"><span class="label">الشعبة / الفصل</span><span class="val">{{ s.section_name || '—' }}</span></div>
+              <div class="stat-item highlight"><span class="label">الصف الدراسي</span><span class="val font-semibold">{{ s.grade_name || 'غير مسكن' }}</span></div>
+              <div class="stat-item highlight"><span class="label">الشعبة / الفصل</span><span class="val font-semibold">{{ s.section_name || 'غير محدد' }}</span></div>
               <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile.nationality || '—' }}</span></div>
               <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile.gender === 'male' ? 'ذكر' : s.profile.gender === 'female' ? 'أنثى' : '—' }}</span></div>
+              <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile.date_of_birth || '—' }}</span></div>
               <div class="stat-item"><span class="label">العمر</span><span class="val font-semibold">{{ getAge(s.profile.date_of_birth) }}</span></div>
             </div>
           </div>
@@ -92,10 +96,13 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             <!-- تبويب 1: نظرة عامة -->
             <mat-tab label="نظرة عامة">
               <div class="tab-content">
-                <h3>البيانات الأكاديمية والتسكين</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h3 style="margin: 0;">🎓 البيانات الأكاديمية والتسكين المدرسي</h3>
+                  <a [routerLink]="['/students/edit', s.id]" class="nb-btn-secondary sm" style="font-size: 12px; padding: 4px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">✏️ تعديل الصف والشعبة</a>
+                </div>
                 <div class="info-grid" style="margin-bottom: 24px;">
-                  <div class="info-item"><strong>الصف الدراسي الحالي</strong><span style="font-weight: 700; color: var(--nb-primary-700);">{{ s.grade_name || 'غير مسكن بصف' }}</span></div>
-                  <div class="info-item"><strong>الشعبة / الفصل</strong><span>{{ s.section_name || 'غير محدد' }}</span></div>
+                  <div class="info-item"><strong>الصف الدراسي الحالي</strong><span style="font-weight: 700; color: var(--nb-primary-700); font-size: 14.5px;">{{ s.grade_name || 'غير مسكن بصف بعد' }}</span></div>
+                  <div class="info-item"><strong>الشعبة / الفصل</strong><span style="font-weight: 600;">{{ s.section_name || 'غير محدد' }}</span></div>
                   <div class="info-item"><strong>العام الدراسي</strong><span>{{ s.academic_year_name || '—' }}</span></div>
                   <div class="info-item"><strong>الفرع / المجمع</strong><span>{{ s.branch_name || 'المقر الرئيسي' }}</span></div>
                 </div>
@@ -674,13 +681,39 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
     .basic-info h2 { font-size: 22px; font-weight: 700; margin: 0; color: var(--nb-text); }
     .eng-name { color: var(--nb-text-muted); margin: 2px 0 10px; font-size: 13.5px; }
-    .badge-row { display: flex; gap: 8px; align-items: center; }
+    .badge-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .num-badge { background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); padding: 2px 8px; border-radius: var(--nb-radius-sm); font-size: 12px; color: var(--nb-text-secondary); }
     
-    .quick-stats { display: flex; gap: 28px; }
+    .academic-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .academic-badge.grade-badge {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .academic-badge.section-badge {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .academic-badge.year-badge {
+      background: #f8fafc;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .quick-stats { display: flex; gap: 24px; flex-wrap: wrap; }
     .stat-item { display: flex; flex-direction: column; align-items: flex-start; }
     .stat-item .label { font-size: 11px; color: var(--nb-text-muted); }
     .stat-item .val { font-size: 14.5px; font-weight: 600; color: var(--nb-text); margin-top: 2px; }
+    .stat-item.highlight .val { color: var(--nb-primary-600); font-weight: 700; }
     
     .action-bar { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--nb-border-soft); flex-wrap: wrap; }
     .action-bar .spacer { flex: 1; }

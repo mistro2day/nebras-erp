@@ -261,8 +261,6 @@ def _resolve_lookup(context, category, entity_id, model_loader, name_extractor=N
         str_id = str(entity_id)
         if str_id in cat_dict:
             return cat_dict[str_id]
-        # إذا تم تحميل قاموس هذه الفئة مسبقاً، لا ننفذ أي استعلام SQL إضافي لتفادي تأخير الشبكة
-        return None
     
     cache = context.setdefault(f'_{category}_cache', {}) if context else {}
     if entity_id in cache:
@@ -272,6 +270,9 @@ def _resolve_lookup(context, category, entity_id, model_loader, name_extractor=N
     item = model_cls.objects.filter(id=entity_id).first()
     val = (name_extractor(item) if name_extractor else getattr(item, 'name', None)) if item else None
     cache[entity_id] = val
+    if lookups and category in lookups:
+        lookups[category][entity_id] = val
+        lookups[category][str(entity_id)] = val
     return val
 
 

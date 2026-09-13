@@ -83,7 +83,12 @@ class StudentViewSet(viewsets.ModelViewSet):
         from apps.academics.domain.models import Grade, Section, AcademicYear
         from apps.organization.domain.models import Branch
 
-        tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else 'global'
+        tenant = getattr(self.request, 'tenant', None)
+        tenant_id = tenant.id if tenant else getattr(self.request, 'tenant_id', None)
+        if not tenant_id and students:
+            tenant_id = getattr(students[0], 'tenant_id', None)
+        tenant_id = tenant_id or 'global'
+
         cache_key = f"academic_lookups_tenant_{tenant_id}"
         cached_data = cache.get(cache_key)
 
@@ -144,7 +149,10 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
+        lookups = self._build_academic_lookups([instance])
+        serializer_context = self.get_serializer_context()
+        serializer_context['lookups'] = lookups
+        serializer = self.get_serializer(instance, context=serializer_context)
         return StandardResponse(serializer.data, message="تم جلب بيانات الطالب بنجاح.")
 
     def destroy(self, request, *args, **kwargs):
