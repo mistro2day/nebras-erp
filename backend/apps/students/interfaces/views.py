@@ -63,15 +63,34 @@ class StudentViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
             
+        gender_filter = self.request.query_params.get('gender', None)
+        if gender_filter and gender_filter in ('male', 'female'):
+            qs = qs.filter(profile__gender=gender_filter)
+
         grade_filter = self.request.query_params.get('grade_id', None)
         if grade_filter:
             qs = qs.filter(enrollments__grade_id=grade_filter, enrollments__status='active')
-            
+
+        section_filter = self.request.query_params.get('section_id', None)
+        if section_filter:
+            qs = qs.filter(enrollments__section_id=section_filter, enrollments__status='active')
+
         branch_filter = self.request.query_params.get('branch_id', None)
         if branch_filter:
             qs = qs.filter(enrollments__branch_id=branch_filter, enrollments__status='active')
-            
-        return qs.select_related('profile').prefetch_related('enrollments', 'family_relations').order_by('-created_at')
+
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        valid_orderings = {
+            'name': 'profile__arabic_name',
+            '-name': '-profile__arabic_name',
+            'created_at': 'created_at',
+            '-created_at': '-created_at',
+            'student_number': 'student_number',
+            '-student_number': '-student_number',
+        }
+        order_field = valid_orderings.get(ordering, '-created_at')
+
+        return qs.select_related('profile').prefetch_related('enrollments', 'family_relations').order_by(order_field)
 
     def get_serializer_class(self):
         if self.action == 'list':
