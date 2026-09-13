@@ -563,12 +563,41 @@ class StudentViewSet(viewsets.ModelViewSet):
         student = self.get_object()
         file_obj = request.FILES.get('file')
         if not file_obj:
-            return StandardResponse(None, success=False, message="يرجى اختيار ملف لرفعه.", status_code=status.HTTP_400_BAD_REQUEST)
+            return StandardResponse(None, success=False, message="يرجى اختيار ملف لرفعه.", status=status.HTTP_400_BAD_REQUEST)
 
         attachment_type = request.data.get('attachment_type', 'custom')
         file_name = request.data.get('file_name') or file_obj.name
         user_id = request.user.id if request.user and request.user.is_authenticated else None
         tenant_id = getattr(request, 'tenant', None) and getattr(request.tenant, 'id', None) or student.tenant_id
+
+        # منع تكرار الوثائق لنفس الطالب
+        # 1. التحقق من عدم وجود وثيقة نشطة من نفس النوع (ما عدا المرفقات المخصصة)
+        if attachment_type != 'custom':
+            existing_type = student.attachments.filter(
+                deleted_at__isnull=True,
+                attachment_type=attachment_type
+            ).first()
+            if existing_type:
+                type_name = existing_type.get_attachment_type_display()
+                return StandardResponse(
+                    None,
+                    success=False,
+                    message=f"توجد وثيقة مسجلة مسبقاً لهذا الطالب من نوع «{type_name}». يرجى حذف الوثيقة السابقة أولاً إذا كنت ترغب في استبدالها.",
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # 2. التحقق من عدم تكرار نفس مسمى الوثيقة لنفس الطالب
+        existing_name = student.attachments.filter(
+            deleted_at__isnull=True,
+            file_name__iexact=file_name
+        ).first()
+        if existing_name:
+            return StandardResponse(
+                None,
+                success=False,
+                message=f"يوجد ملف مسجل مسبقاً لهذا الطالب بنفس المسمى «{file_name}». يرجى استخدام مسمى مختلف أو حذف الملف القديم.",
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # حفظ الملف في مسار المستأجر المعزول
         t_prefix = f"tenant_{tenant_id}" if tenant_id else "tenant_default"
@@ -603,7 +632,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         )
 
         serializer = StudentAttachmentSerializer(attachment)
-        return StandardResponse(serializer.data, message="تم رفع الوثيقة وحفظها بنجاح.", status_code=status.HTTP_201_CREATED)
+        return StandardResponse(serializer.data, message="تم رفع الوثيقة وحفظها بنجاح.", status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['delete'], url_path=r'delete-attachment/(?P<attachment_id>[^/.]+)')
     def delete_attachment(self, request, pk=None, attachment_id=None):
@@ -611,7 +640,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         student = self.get_object()
         attachment = student.attachments.filter(id=attachment_id, deleted_at__isnull=True).first()
         if not attachment:
-            return StandardResponse(None, success=False, message="الوثيقة غير موجودة أو تم حذفها مسبقاً.", status_code=status.HTTP_404_NOT_FOUND)
+            return StandardResponse(None, success=False, message="الوثيقة غير موجودة أو تم حذفها مسبقاً.", status=status.HTTP_404_NOT_FOUND)
 
         attachment.deleted_at = timezone.now()
         attachment.audit_trail.append({

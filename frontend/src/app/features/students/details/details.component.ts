@@ -722,6 +722,26 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                   </div>
                 </div>
 
+                <!-- تنبيه منع تكرار نوع أو مسمى الوثيقة -->
+                @if (isDuplicateType()) {
+                  <div class="duplicate-warning-box">
+                    <span class="warn-icon">⚠️</span>
+                    <div class="warn-text">
+                      <strong>تنبيه: نوع الوثيقة مسجل مسبقاً لهذا الطالب!</strong>
+                      <p>توجد وثيقة مسجلة مسبقاً من نوع «{{ getDocTypeDisplay(uploadDocType) }}». لمنع التكرار، يرجى حذف الوثيقة السابقة أولاً إذا كنت ترغب في استبدالها.</p>
+                    </div>
+                  </div>
+                }
+                @if (isDuplicateName()) {
+                  <div class="duplicate-warning-box">
+                    <span class="warn-icon">⚠️</span>
+                    <div class="warn-text">
+                      <strong>تنبيه: مسمى الوثيقة مسجل مسبقاً!</strong>
+                      <p>يوجد ملف مسجل مسبقاً للطالب بنفس العنوان. يرجى اختيار مسمى آخر أو حذف الملف القديم.</p>
+                    </div>
+                  </div>
+                }
+
                 <!-- منطقة السحب والإفلات / اختيار الملف -->
                 <div class="dropzone" [class.has-file]="!!selectedFile()" [class.dragging]="isDragging()"
                      (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onFileDropped($event)"
@@ -787,7 +807,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                 <button type="button" class="nb-btn-secondary" (click)="closeUploadModal()" [disabled]="uploadingAttachment()">
                   إلغاء
                 </button>
-                <button type="button" class="nb-btn-primary" (click)="submitUpload()" [disabled]="!selectedFile() || uploadingAttachment()">
+                <button type="button" class="nb-btn-primary" (click)="submitUpload()" [disabled]="!selectedFile() || uploadingAttachment() || isDuplicateType() || isDuplicateName()">
                   @if (uploadingAttachment()) {
                     <span>جارٍ الرفع والحفظ…</span>
                   } @else {
@@ -1678,6 +1698,31 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
       font-size: 12.5px;
       color: var(--nb-text);
     }
+    .duplicate-warning-box {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      color: #92400e;
+    }
+    .warn-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .warn-text strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .warn-text p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+    }
     .modal-footer {
       padding: 14px 20px;
       border-top: 1px solid var(--nb-border-soft);
@@ -1945,7 +1990,41 @@ export class StudentDetailsComponent implements OnInit {
     return !!f && (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   }
 
+  isDuplicateType(): boolean {
+    if (this.uploadDocType === 'custom') return false;
+    return this.attachments().some(a => a.attachment_type === this.uploadDocType && !a.deleted_at);
+  }
+
+  isDuplicateName(): boolean {
+    const title = (this.uploadDocTitle || '').trim().toLowerCase();
+    if (!title) return false;
+    return this.attachments().some(a => (a.file_name || '').trim().toLowerCase() === title && !a.deleted_at);
+  }
+
+  getDocTypeDisplay(type: string): string {
+    const map: Record<string, string> = {
+      national_id: 'الرقم الوطني / الهوية السودانية',
+      birth_certificate: 'شهادة الميلاد الرسمية',
+      passport: 'جواز السفر',
+      medical_report: 'التقرير الطبي والفحوصات',
+      academic_certificate: 'الشهادة الأكاديمية السابقة',
+      transfer_certificate: 'شهادة انتقال',
+      photo: 'الصورة الشخصية الرسمية',
+      custom: 'وثيقة / مستند إضافي',
+    };
+    return map[type] || 'وثيقة رسمية';
+  }
+
   submitUpload(): void {
+    if (this.isDuplicateType()) {
+      this.snack.open(`توجد وثيقة مسجلة مسبقاً لهذا الطالب من نوع «${this.getDocTypeDisplay(this.uploadDocType)}». يرجى حذفها أولاً.`, 'إغلاق', { duration: 4500 });
+      return;
+    }
+    if (this.isDuplicateName()) {
+      this.snack.open('يوجد ملف مسجل مسبقاً للطالب بنفس المسمى. يرجى اختيار مسمى آخر.', 'إغلاق', { duration: 4500 });
+      return;
+    }
+
     const fileToUpload = this.compressedFile() || this.selectedFile();
     if (!fileToUpload) {
       this.snack.open('يرجى اختيار ملف الوثيقة أولاً', 'إغلاق', { duration: 3000 });
@@ -1956,15 +2035,17 @@ export class StudentDetailsComponent implements OnInit {
     const title = this.uploadDocTitle || fileToUpload.name;
 
     this.studentsService.uploadStudentAttachment(this.id, fileToUpload, type, title).subscribe({
-      next: () => {
+      next: (res) => {
         this.uploadingAttachment.set(false);
-        this.snack.open('تم رفع الوثيقة بنجاح وحفظها في السحابة', 'إغلاق', { duration: 4000 });
+        const successMsg = res?.message || 'تم رفع الوثيقة بنجاح وحفظها في السحابة';
+        this.snack.open(successMsg, 'إغلاق', { duration: 4000 });
         this.showUploadModal.set(false);
         this.reload();
       },
       error: (err) => {
         this.uploadingAttachment.set(false);
-        this.snack.open(err?.error?.message || 'تعذر رفع الوثيقة. حاول مجدداً.', 'إغلاق', { duration: 5000 });
+        const errorMsg = err?.error?.message || err?.error?.detail || (typeof err?.error === 'string' ? err.error : 'تعذر رفع الوثيقة. حاول مجدداً.');
+        this.snack.open(errorMsg, 'إغلاق', { duration: 5000 });
       }
     });
   }

@@ -6,6 +6,8 @@ class StandardResponse(Response):
     صيغة الاستجابة الموحدة للنجاح (Success Format)
     """
     def __init__(self, data=None, message=None, success=True, status=None, **kwargs):
+        if 'status_code' in kwargs:
+            status = kwargs.pop('status_code')
         formatted_data = {
             'success': success,
             'message': message,

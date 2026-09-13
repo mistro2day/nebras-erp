@@ -23,3 +23,6 @@ backend/baileys_auth_info/
 .claude/
 *.apk
 
+# Media uploads
+backend/media/
+media/
