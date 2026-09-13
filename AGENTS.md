@@ -22,3 +22,11 @@ For all frontend UI tasks — including building pages, components, layouts, cho
 - **Currency**: Always use Sudanese Pound (`ج.س` / SDG / الجنيه السوداني). Never use `ر.س` or SAR.
 - **Banking**: Always reference Sudanese banks and payment systems (e.g. تطبيق بنكك - بنك الخرطوم, فوري - بنك فيصل الإسلامي, أوكاش - بنك أمدرمان الوطني). Never use Al Rajhi, Al Ahli, etc.
 - **Names & Locations**: All sample/mock/test names MUST be authentic Sudanese names (e.g., عثمان دفع الله, الفاتح بابكر, إخلاص ميرغني, مزمل الكباشي, التاج إبراهيم, نزار المجذوب, فاطمة البدوي). Locations must be Sudanese states/cities (الخرطوم, أم درمان, بحري, الجزيرة, بورتسودان, إلخ).
+
+## Mandatory Documentation in Docs Rules (قاعدة التوثيق الإلزامي في مجلد docs)
+- **STRICT MANDATORY DOCUMENTATION AFTER ANY DEVELOPMENT (التوثيق الإلزامي الفوري لكافة التطويرات)**:
+  It is strictly mandatory after completing any feature, enhancement, or bug fix across Nebras ERP to update the documentation in `docs/`:
+  1. **Update `docs/CHANGELOG.md`**: Record the changes under `Added`, `Changed`, or `Fixed` in Arabic with clear bullet points.
+  2. **Update Module Documentation in `docs/modules/<module-name>.md`**: Add or update the relevant module documentation (e.g. `docs/modules/students.md`, `docs/modules/tenant-school-identity.md`, etc.) detailing the new architecture, business rules, APIs, and UI capabilities.
+  3. No task or development is considered complete until its corresponding documentation in `docs/` is updated and committed to Git.
+
