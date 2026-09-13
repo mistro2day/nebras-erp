@@ -17,10 +17,10 @@ from decimal import Decimal
 # category_code -> (name_ar, name_en, [ (type_code, type_ar, type_en, default_amount) ])
 STANDARD_FEES = {
     "tuition": ("الرسوم الدراسية", "Tuition", [
-        ("tuition_annual", "الرسوم الدراسية السنوية", "Annual Tuition", 1200000),
+        ("tuition_annual", "الرسوم الدراسية السنوية", "Annual Tuition", 1000000),
     ]),
     "registration": ("رسوم التسجيل", "Registration", [
-        ("registration", "رسوم التسجيل والقبول", "Registration & Admission", 150000),
+        ("registration", "رسوم التسجيل والقبول", "Registration & Admission", 300000),
     ]),
     "transport": ("رسوم النقل", "Transport", [
         ("transport", "رسوم النقل المدرسي", "School Transport", 300000),

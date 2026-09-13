@@ -1436,9 +1436,10 @@ export class DashboardLayoutComponent {
           label: 'تكوين وإعدادات النظام',
           icon: '🛠️',
           match: '/config',
-          link: '/config',
+          link: '/config/school-identity',
           children: [
-            { label: 'الإعدادات والميزات', link: '/config' },
+            { label: 'بيانات المدرسة وهوية المطبوعات', link: '/config/school-identity' },
+            { label: 'الإعدادات والميزات', link: '/config/features' },
             { label: 'التكامل والربط الخارجي', link: '/integration' },
             { label: 'التخصيص والمظهر', link: '/personalization' },
             { label: 'لوحة الأوامر المتقدمة', link: '/command' },

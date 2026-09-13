@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface TenantInfo {
@@ -15,6 +16,8 @@ export interface TenantInfo {
   stampUrl?: string;
   phone?: string;
   phoneNumber?: string;
+  phones?: string[];
+  whatsapp?: string;
   email?: string;
   address?: string;
   subdomain?: string;
@@ -173,10 +176,12 @@ export class TenantService {
           secondaryColor: d.secondary_color || '#10b981',
           logoUrl: d.logo_url || d.logo || '',
           stampUrl: d.stamp_url || d.stamp || '',
-          phone: d.phone || d.phone_number || '09123456789',
-          phoneNumber: d.phone_number || d.phone || '09123456789',
+          phone: d.phone || d.phone_number || '0123689814',
+          phoneNumber: d.phone_number || d.phone || '0123689814',
+          phones: Array.isArray(d.phones) && d.phones.length > 0 ? d.phones : ['0123689814', '0110100504', '0110100505', '0110100506'],
+          whatsapp: d.whatsapp || '0120397775',
           email: d.email || 'accounts@almawred.edu.sd',
-          address: d.address || 'جمهورية السودان — ولاية الخرطوم — الرياض — شارع 15',
+          address: d.address || 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54',
           subdomain: d.subdomain || 'almawred',
         };
         this.setTenant(tenant);
@@ -189,6 +194,49 @@ export class TenantService {
 
   refreshCurrentTenant(): void {
     this.resolveTenantFromHost();
+  }
+
+  updateTenantSettings(data: Partial<{
+    name: string;
+    name_ar: string;
+    name_en: string;
+    address: string;
+    phone_number: string;
+    phone: string;
+    phones: string[];
+    whatsapp: string;
+    address_short: string;
+    email: string;
+    logo: string;
+    logo_url: string;
+  }>): Observable<TenantInfo> {
+    const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
+    return this.http.patch<any>(`${base}tenants/branding/current/`, data).pipe(
+      map((res) => {
+        const d = res?.data ?? res;
+        const tenant: TenantInfo = {
+          id: d.id,
+          name: d.name || d.name_en || d.name_ar || 'Al-Mawred',
+          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          nameEn: d.name_en || d.school_name_en || 'Al-Mawred Model Private Schools',
+          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          schoolNameEn: d.school_name_en || d.name_en || 'Al-Mawred Model Private Schools',
+          primaryColor: d.primary_color || '#1e3a8a',
+          secondaryColor: d.secondary_color || '#10b981',
+          logoUrl: d.logo_url || d.logo || '',
+          stampUrl: d.stamp_url || d.stamp || '',
+          phone: d.phone || d.phone_number || '0123689814',
+          phoneNumber: d.phone_number || d.phone || '0123689814',
+          phones: Array.isArray(d.phones) && d.phones.length > 0 ? d.phones : ['0123689814', '0110100504', '0110100505', '0110100506'],
+          whatsapp: d.whatsapp || '0120397775',
+          email: d.email || 'accounts@almawred.edu.sd',
+          address: d.address || 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54',
+          subdomain: d.subdomain || 'almawred',
+        };
+        this.setTenant(tenant);
+        return tenant;
+      })
+    );
   }
 
   setTenant(tenant: TenantInfo) {

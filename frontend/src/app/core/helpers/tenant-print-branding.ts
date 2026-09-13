@@ -13,6 +13,9 @@ export interface TenantPrintBranding {
   logoUrl: string;
   stampUrl: string;
   phone: string;
+  phones: string[];
+  phonesFormatted: string;
+  whatsapp: string;
   email: string;
   address: string;
 }
@@ -65,12 +68,17 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     info.stamp ||
     '';
 
-  // الهاتف المعتمد
-  const phone =
-    info.phone ||
-    info.phoneNumber ||
-    info.phone_number ||
-    '09123456789';
+  // الهواتف المعتمدة
+  const defaultPhones = ['0123689814', '0110100504', '0110100505', '0110100506'];
+  const phones: string[] = Array.isArray(info.phones) && info.phones.length > 0 ? info.phones : defaultPhones;
+  const phonesFormatted = phones.join(' - ');
+
+  // الواتساب
+  const whatsapp = info.whatsapp || '0120397775';
+
+  // الهاتف المعتمد المعروض في الترويسات الرسمية
+  const phone = `${phonesFormatted} | واتساب: ${whatsapp}`;
+  const primaryPhone = phones[0] || '0123689814';
 
   // البريد الإلكتروني المعتمد للمستأجر
   let email =
@@ -84,7 +92,7 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
   // العنوان الجغرافي المعتمد للمستأجر في السودان
   let address =
     info.address ||
-    'جمهورية السودان — ولاية الخرطوم — الرياض — شارع 15';
+    'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54';
 
   return {
     schoolNameAr,
@@ -92,6 +100,9 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     logoUrl,
     stampUrl,
     phone,
+    phones,
+    phonesFormatted,
+    whatsapp,
     email,
     address,
   };

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StudentFinanceService } from '../../student-finance/student-finance.service';
+import { AdmissionsService } from '../../admissions/admissions.service';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 
@@ -22,7 +23,7 @@ export interface FinancialConfig {
   discount_reason: string;
   custom_fee_items: CustomFeeItem[];
   installment_plan: {
-    plan_type: string; // '1_installment' | '2_installments' | '3_installments' | '4_installments' | 'custom'
+    plan_type: string; // 'standard_sudan' | '1_installment' | '2_installments' | '3_installments' | '4_installments' | 'custom'
     installments: InstallmentItem[];
   };
   initial_payment: {
@@ -43,16 +44,36 @@ export interface FinancialConfig {
   template: `
     <div class="finance-form-container" dir="rtl">
       <!-- 1. قسم تعديل الرسوم الأساسية والخصومات -->
-      <nb-panel title="تعديل الرسوم الدراسية والخصومات" subtitle="تحديد رسوم التسجيل، الرسوم السنوية، والخصومات المطبقة للطالب.">
+      <nb-panel title="تعديل الرسوم الدراسية والخصومات" subtitle="تحديد رسوم التسجيل، الرسوم السنوية، والخصومات المطبقة للطالب مع إمكانية تثبيتها كافتراضية.">
+        <!-- شريط الرسوم الافتراضية وحفظ التعديلات لاحقاً -->
+        <div class="panel-top-actions">
+          <div class="defaults-info">
+            <span class="info-icon">💡</span>
+            <span class="info-text">الرسوم الافتراضية: <strong>{{ registrationFee() | number }} ج.س</strong> للتسجيل و <strong>{{ tuitionFee() | number }} ج.س</strong> للدراسية.</span>
+          </div>
+          <div class="defaults-action-group">
+            <button type="button" class="btn-save-default" (click)="saveCurrentAsDefault()" [disabled]="isSavingDefaults()" title="حفظ هذه المبالغ كإعدادات افتراضية لجميع عمليات التسجيل القادمة">
+              @if (isSavingDefaults()) {
+                <span>جاري الحفظ...</span>
+              } @else {
+                <span>💾 حفظ كرسوم افتراضية للنظام</span>
+              }
+            </button>
+            @if (defaultsSavedSuccess()) {
+              <span class="save-success-msg">✓ تم اعتماد المبالغ كافتراضية لجميع عمليات التسجيل القادمة</span>
+            }
+          </div>
+        </div>
+
         <div class="form-grid">
           <div class="field">
-            <label>رسوم التسجيل والقبول (جنيه/ريال)</label>
-            <input type="number" [(ngModel)]="registrationFee" (ngModelChange)="onFeesChange()" min="0" placeholder="150000" />
+            <label>رسوم التسجيل والقبول (جنيه سوداني)</label>
+            <input type="number" [(ngModel)]="registrationFee" (ngModelChange)="onFeesChange()" min="0" placeholder="300000" />
           </div>
 
           <div class="field">
-            <label>الرسوم الدراسية السنوية (جنيه/ريال)</label>
-            <input type="number" [(ngModel)]="tuitionFee" (ngModelChange)="onFeesChange()" min="0" placeholder="1200000" />
+            <label>الرسوم الدراسية السنوية (جنيه سوداني)</label>
+            <input type="number" [(ngModel)]="tuitionFee" (ngModelChange)="onFeesChange()" min="0" placeholder="1000000" />
           </div>
 
           <div class="field">
@@ -100,12 +121,13 @@ export interface FinancialConfig {
       </nb-panel>
 
       <!-- 2. قسم خطة وتقسيط الرسوم -->
-      <nb-panel title="خطة الأقساط وتواريخ الاستحقاق" subtitle="تحديد وتوزيع الأقساط المجدولة على العام الدراسي.">
+      <nb-panel title="خطة الأقساط وتواريخ الاستحقاق" subtitle="تحديد وتوزيع الأقساط المجدولة على العام الدراسي (شهر 11 وبداية شهر 1).">
         <div class="plan-type-selector">
           <label>اختر خطة الأقساط المناسبة:</label>
           <div class="plan-buttons">
-            <button type="button" [class.active]="planType() === '1_installment'" (click)="selectPlanType('1_installment')">دفعة واحدة (100%)</button>
+            <button type="button" [class.active]="planType() === 'standard_sudan'" (click)="selectPlanType('standard_sudan')">الخطة المعتمدة (تسجيل + قسطين شهر 11 وشهر 1)</button>
             <button type="button" [class.active]="planType() === '2_installments'" (click)="selectPlanType('2_installments')">قسطين (50% / 50%)</button>
+            <button type="button" [class.active]="planType() === '1_installment'" (click)="selectPlanType('1_installment')">دفعة واحدة (100%)</button>
             <button type="button" [class.active]="planType() === '3_installments'" (click)="selectPlanType('3_installments')">3 أقساط (40% / 30% / 30%)</button>
             <button type="button" [class.active]="planType() === '4_installments'" (click)="selectPlanType('4_installments')">4 أقساط متساوية</button>
             <button type="button" [class.active]="planType() === 'custom'" (click)="selectPlanType('custom')">مخصص</button>
@@ -608,6 +630,57 @@ export interface FinancialConfig {
         padding-top: 14px;
         border-top: 1px dashed var(--nb-border-soft);
       }
+      .panel-top-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 10px 14px;
+        background: var(--nb-surface-raised, #f8fafc);
+        border: 1px dashed var(--nb-border, #cbd5e1);
+        border-radius: var(--nb-radius-sm, 6px);
+      }
+      .defaults-info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--nb-text-muted, #64748b);
+      }
+      .defaults-action-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn-save-default {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--nb-primary-50, #f0f9ff);
+        border: 1px solid var(--nb-primary-600, #0284c7);
+        color: var(--nb-primary-700, #0369a1);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .btn-save-default:hover:not(:disabled) {
+        background: var(--nb-primary-100, #e0f2fe);
+      }
+      .btn-save-default:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .save-success-msg {
+        font-size: 12px;
+        color: #16a34a;
+        font-weight: 700;
+        animation: fadeIn 0.3s ease-out;
+      }
       .fade-in { animation: fadeIn 0.3s ease-out; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     `
@@ -615,9 +688,15 @@ export interface FinancialConfig {
 })
 export class RegistrationFinanceFormComponent implements OnInit {
   private financeSvc = inject(StudentFinanceService);
+  private admissionsSvc = inject(AdmissionsService);
+
+  private hasCustomConfigPassed = false;
+  isSavingDefaults = signal(false);
+  defaultsSavedSuccess = signal(false);
 
   @Input() set config(val: Partial<FinancialConfig> | null) {
     if (val) {
+      this.hasCustomConfigPassed = true;
       if (val.registration_fee !== undefined) {
         this.registrationFee.set(val.registration_fee);
         this.payRegistrationAmount.set(val.registration_fee);
@@ -627,7 +706,7 @@ export class RegistrationFinanceFormComponent implements OnInit {
       if (val.discount_reason !== undefined) this.discountReason.set(val.discount_reason);
       if (val.custom_fee_items) this.customItems.set([...val.custom_fee_items]);
       if (val.installment_plan) {
-        this.planType.set(val.installment_plan.plan_type || '1_installment');
+        this.planType.set(val.installment_plan.plan_type || 'standard_sudan');
         if (val.installment_plan.installments) {
           this.installments.set([...val.installment_plan.installments]);
         }
@@ -645,17 +724,17 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   @Output() configChange = new EventEmitter<FinancialConfig>();
 
-  registrationFee = signal(150000);
-  tuitionFee = signal(1200000);
+  registrationFee = signal(300000);
+  tuitionFee = signal(1000000);
   discountAmount = signal(0);
   discountReason = signal('');
   customItems = signal<CustomFeeItem[]>([]);
 
-  planType = signal<string>('3_installments');
+  planType = signal<string>('standard_sudan');
   installments = signal<InstallmentItem[]>([]);
 
-  isImmediatePayment = signal(false);
-  receiptAmount = signal(150000);
+  isImmediatePayment = signal(true);
+  receiptAmount = signal(300000);
   paymentMethodId = signal('');
   cashBoxId = signal('');
   bankAccountId = signal('');
@@ -663,7 +742,7 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   // تفصيل بنود التحصيل الفوري بالإيصال
   includeRegistrationFee = signal(true);
-  payRegistrationAmount = signal(150000);
+  payRegistrationAmount = signal(300000);
 
   includeFirstInstallment = signal(false);
   payFirstInstallmentAmount = signal(0);
@@ -710,9 +789,74 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   ngOnInit() {
     this.loadFinanceMetadata();
-    this.recalculateInstallments();
-    this.payRegistrationAmount.set(this.registrationFee());
-    this.updateImmediateBreakdown();
+    this.loadDefaultFeesFromSettings();
+  }
+
+  loadDefaultFeesFromSettings() {
+    this.admissionsSvc.getAdmissionSettings().subscribe({
+      next: (res) => {
+        const d = res?.data ?? res;
+        if (d && !this.hasCustomConfigPassed) {
+          const rFee = Number(d.registration_fee);
+          const tFee = Number(d.annual_tuition);
+          if (rFee > 0) {
+            this.registrationFee.set(rFee);
+            this.payRegistrationAmount.set(rFee);
+            this.receiptAmount.set(rFee);
+          }
+          if (tFee > 0) {
+            this.tuitionFee.set(tFee);
+          }
+        }
+        if (!this.hasCustomConfigPassed) {
+          this.recalculateInstallments();
+          this.updateImmediateBreakdown();
+        }
+      },
+      error: () => {
+        if (!this.hasCustomConfigPassed) {
+          this.recalculateInstallments();
+          this.updateImmediateBreakdown();
+        }
+      }
+    });
+  }
+
+  /** حفظ الرسوم الحالية كإعدادات افتراضية للنظام */
+  saveCurrentAsDefault() {
+    this.isSavingDefaults.set(true);
+    const { novDate, janDate } = this.getAcademicInstallmentDates();
+    const tui = Number(this.tuitionFee()) || 0;
+    const tuiHalf = Math.round(tui / 2);
+    const installmentsToSave = [
+      { title: 'القسط الأول', amount: tuiHalf, note: `استحقاق شهر 11 (نوفمبر) - ${novDate}` },
+      { title: 'القسط الثاني والأخير', amount: tui - tuiHalf, note: `استحقاق بداية شهر 1 (يناير) - ${janDate}` },
+    ];
+    this.admissionsSvc.saveAdmissionSettings({
+      registration_fee: Number(this.registrationFee()) || 0,
+      annual_tuition: tui,
+      fee_installments: installmentsToSave,
+    }).subscribe({
+      next: () => {
+        this.isSavingDefaults.set(false);
+        this.defaultsSavedSuccess.set(true);
+        setTimeout(() => this.defaultsSavedSuccess.set(false), 5000);
+      },
+      error: () => {
+        this.isSavingDefaults.set(false);
+      }
+    });
+  }
+
+  getAcademicInstallmentDates() {
+    const today = new Date();
+    const currYear = today.getFullYear();
+    // إذا كان الشهر الحالي 11 أو 12، تكون التواريخ للعام القادم، وإلا للعام الحالي
+    const novYear = today.getMonth() >= 10 ? currYear + 1 : currYear;
+    const novDate = `${novYear}-11-01`;
+    const janDate = `${novYear + 1}-01-05`;
+    const todayStr = today.toISOString().split('T')[0];
+    return { todayStr, novDate, janDate };
   }
 
   loadFinanceMetadata() {
@@ -776,37 +920,43 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   recalculateInstallments() {
     const net = this.netTotal();
-    const today = new Date();
     const type = this.planType();
+    const { todayStr, novDate, janDate } = this.getAcademicInstallmentDates();
+    const reg = Number(this.registrationFee()) || 0;
+    const tui = Number(this.tuitionFee()) || 0;
 
-    if (type === '1_installment') {
-      const d1 = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0];
+    if (type === 'standard_sudan') {
+      const tuiHalf = Math.round(tui / 2);
+      const tuiRem = tui - tuiHalf;
+      this.installments.set([
+        { due_date: todayStr, amount: reg },
+        { due_date: novDate, amount: tuiHalf },
+        { due_date: janDate, amount: tuiRem }
+      ]);
+    } else if (type === '1_installment') {
+      const d1 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
       this.installments.set([{ due_date: d1, amount: net }]);
     } else if (type === '2_installments') {
-      const d1 = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0];
-      const d2 = new Date(today.getTime() + 120 * 86400000).toISOString().split('T')[0];
       const half = Math.round(net / 2);
       this.installments.set([
-        { due_date: d1, amount: half },
-        { due_date: d2, amount: net - half }
+        { due_date: novDate, amount: half },
+        { due_date: janDate, amount: net - half }
       ]);
     } else if (type === '3_installments') {
-      const d1 = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0];
-      const d2 = new Date(today.getTime() + 120 * 86400000).toISOString().split('T')[0];
-      const d3 = new Date(today.getTime() + 210 * 86400000).toISOString().split('T')[0];
+      const d1 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
       const p1 = Math.round(net * 0.4);
       const p2 = Math.round(net * 0.3);
       const p3 = net - p1 - p2;
       this.installments.set([
         { due_date: d1, amount: p1 },
-        { due_date: d2, amount: p2 },
-        { due_date: d3, amount: p3 }
+        { due_date: novDate, amount: p2 },
+        { due_date: janDate, amount: p3 }
       ]);
     } else if (type === '4_installments') {
       const quarter = Math.round(net / 4);
       const list: InstallmentItem[] = [];
       for (let i = 0; i < 4; i++) {
-        const d = new Date(today.getTime() + (30 + i * 75) * 86400000).toISOString().split('T')[0];
+        const d = new Date(Date.now() + (30 + i * 75) * 86400000).toISOString().split('T')[0];
         const amt = i === 3 ? net - (quarter * 3) : quarter;
         list.push({ due_date: d, amount: amt });
       }

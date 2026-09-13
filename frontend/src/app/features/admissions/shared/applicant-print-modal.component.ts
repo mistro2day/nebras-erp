@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalStageConfig } from './admissions.shared';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
 @Component({
   selector: 'app-applicant-print-modal',
@@ -32,9 +33,21 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalS
           <!-- ترويسة الاستمارة الرسمية المخصصة للمرحلة -->
           <div class="paper-header">
             <div class="bismillah">بسم الله الرحمن الرحيم</div>
-            <div class="school-brand">
-              <h1>المــورد الجديــدة للتعليم الخـاص</h1>
-              <h2>{{ stageConfig.stageTitle }} – (بنين – بنات)</h2>
+            <div class="school-brand-container">
+              @if (branding.logoUrl) {
+                <div class="brand-logo-cell">
+                  <img [src]="branding.logoUrl" alt="شعار المدرسة" class="paper-brand-logo" (error)="$any($event.target).style.display='none'" />
+                </div>
+              }
+              <div class="school-brand">
+                <h1>{{ branding.schoolNameAr }}</h1>
+                <h2>{{ stageConfig.stageTitle }} – (بنين – بنات)</h2>
+                <div class="school-contact-line">
+                  <span>📍 {{ branding.address }}</span>
+                  <span>📞 هواتف: {{ branding.phonesFormatted }}</span>
+                  <span>💬 واتساب: {{ branding.whatsapp }}</span>
+                </div>
+              </div>
             </div>
             <div class="form-title-box">
               <h3>{{ stageConfig.formTitle }}</h3>
@@ -178,8 +191,8 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalS
           </section>
 
           <footer class="paper-footer">
+            <span>{{ branding.schoolNameAr }} · {{ branding.address }} · هواتف: {{ branding.phonesFormatted }} · واتساب: {{ branding.whatsapp }}</span>
             <span>نظام نبراس ERP لإدارة المؤسسات التعليمية · استمارة إلكترونية معتمدة</span>
-            <span>الصفحة 1 من 1</span>
           </footer>
         </div>
       </div>
@@ -200,8 +213,12 @@ import { AdmissionFees, DEFAULT_ADMISSION_FEES, resolveStageConfig, EducationalS
     .print-paper { flex: 1; overflow-y: auto; padding: 32px 36px; background: #fff; color: #000; font-family: 'Times New Roman', Arial, sans-serif; line-height: 1.5; }
     .paper-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
     .bismillah { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+    .school-brand-container { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 4px 0 8px; }
+    .brand-logo-cell { display: flex; align-items: center; justify-content: center; }
+    .paper-brand-logo { max-height: 65px; max-width: 95px; object-fit: contain; }
     .school-brand h1 { font-size: 20px; font-weight: bold; margin: 0; }
     .school-brand h2 { font-size: 15px; margin: 2px 0 8px; font-weight: normal; }
+    .school-contact-line { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; font-size: 11px; font-weight: bold; color: #111; margin: 4px 0 6px; }
     .form-title-box { display: inline-block; border: 2px solid #000; padding: 4px 20px; margin: 6px 0; border-radius: 4px; }
     .form-title-box h3 { font-size: 17px; margin: 0; font-weight: bold; }
     .meta-row { display: flex; justify-content: space-around; font-size: 13px; font-weight: bold; margin-top: 8px; border-top: 1px dashed #666; padding-top: 6px; }
@@ -256,6 +273,7 @@ export class ApplicantPrintModalComponent {
   @Input() fees: AdmissionFees = DEFAULT_ADMISSION_FEES;
   @Output() close = new EventEmitter<void>();
 
+  readonly branding = getTenantPrintBranding();
   readonly currentDate = new Date().toLocaleDateString('ar-SD');
 
   get stageConfig(): EducationalStageConfig {

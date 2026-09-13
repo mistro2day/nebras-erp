@@ -55,9 +55,9 @@ class TenantViewSet(viewsets.ModelViewSet):
         }
         return Response(report_data)
 
-    @action(detail=False, methods=['get'], url_path='current')
+    @action(detail=False, methods=['get', 'put', 'patch'], url_path='current')
     def current_tenant(self, request):
-        """الحصول على بيانات المستأجر الحالي (المدرسة).
+        """الحصول على أو تحديث بيانات المستأجر الحالي (المدرسة).
 
         الأولوية للمستأجر الذي حلّه الميدلوير من النطاق الفرعي (Host)، ثم ترويسة
         X-Tenant-ID، ثم أول مستأجر (نشر مدرسة واحدة).
@@ -76,6 +76,71 @@ class TenantViewSet(viewsets.ModelViewSet):
                 
         if not tenant:
             return Response({"detail": "المستأجر غير موجود"}, status=404)
+
+        if request.method in ('PUT', 'PATCH'):
+            payload = request.data
+            if 'name' in payload and payload['name']:
+                tenant.name = payload['name']
+            if 'name_ar' in payload and payload['name_ar']:
+                tenant.name_ar = payload['name_ar']
+                if not payload.get('name'):
+                    tenant.name = payload['name_ar']
+            if 'name_en' in payload:
+                tenant.name_en = payload['name_en']
+            if 'address' in payload:
+                tenant.address = payload['address']
+            if 'phone_number' in payload:
+                tenant.phone_number = payload['phone_number']
+            elif 'phone' in payload:
+                tenant.phone_number = payload['phone']
+            if 'email' in payload:
+                tenant.email = payload['email']
+
+            feat = dict(tenant.features or {})
+            if 'phones' in payload and isinstance(payload['phones'], list):
+                feat['phones'] = [str(p).strip() for p in payload['phones'] if str(p).strip()]
+                if feat['phones'] and not tenant.phone_number:
+                    tenant.phone_number = feat['phones'][0]
+            if 'whatsapp' in payload:
+                feat['whatsapp'] = str(payload['whatsapp']).strip()
+            if 'address_short' in payload:
+                feat['address_short'] = str(payload['address_short']).strip()
+
+            # معالجة تحديث الشعار
+            if 'logo' in request.FILES:
+                tenant.logo = request.FILES['logo']
+            elif 'logo' in payload:
+                logo_val = payload['logo']
+                if isinstance(logo_val, str) and logo_val.startswith('data:image'):
+                    try:
+                        import base64
+                        from django.core.files.base import ContentFile
+                        header_part, base64_data = logo_val.split(';base64,')
+                        ext = 'png'
+                        if '/' in header_part:
+                            ext = header_part.split(';')[0].split('/')[-1]
+                        tenant.logo.save(f"school_logo_{tenant.id}.{ext}", ContentFile(base64.b64decode(base64_data)), save=False)
+                    except Exception:
+                        pass
+                elif isinstance(logo_val, str) and (logo_val.startswith('http') or logo_val.startswith('/') or logo_val.startswith('assets/')):
+                    feat['logo_url'] = logo_val
+                elif not logo_val:
+                    tenant.logo = None
+                    feat.pop('logo_url', None)
+
+            tenant.features = feat
+            tenant.save()
+
+            # مزامنة رقم هاتف القبول والتسجيل
+            try:
+                from apps.admissions.domain.models import AdmissionSettings
+                adm = AdmissionSettings.objects.filter(tenant=tenant).first()
+                if adm:
+                    phones_list = feat.get('phones', [])
+                    adm.contact_phone = " / ".join(phones_list[:2]) if phones_list else (tenant.phone_number or '')
+                    adm.save(update_fields=['contact_phone'])
+            except Exception:
+                pass
             
         # إضافة المسارات الكاملة للوغو والختم وبيانات المدرسة
         data = self.get_serializer(tenant).data
@@ -83,14 +148,23 @@ class TenantViewSet(viewsets.ModelViewSet):
         data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
         data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
         data['school_name_en'] = tenant.name_en or 'Al-Mawred Model Private Schools'
-        data['phone'] = tenant.phone_number or '09123456789'
-        data['phone_number'] = tenant.phone_number or '09123456789'
+        data['phone'] = tenant.phone_number or '0123689814'
+        data['phone_number'] = tenant.phone_number or '0123689814'
+        feat = tenant.features or {}
+        data['phones'] = feat.get('phones', ['0123689814', '0110100504', '0110100505', '0110100506'])
+        data['whatsapp'] = feat.get('whatsapp', '0120397775')
+        data['address_short'] = feat.get('address_short', 'أركويت - شارع الفردوس - مربع 54')
         data['email'] = tenant.email or 'accounts@almawred.edu.sd'
-        data['address'] = tenant.address or 'جمهورية السودان — ولاية الخرطوم — الرياض — شارع 15'
+        data['address'] = tenant.address or 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54'
         if tenant.logo:
-            data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
+            try:
+                data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
+            except Exception:
+                data['logo_url'] = feat.get('logo_url') or "/assets/branding/logo-dark.png"
+        elif feat.get('logo_url'):
+            data['logo_url'] = feat['logo_url']
         else:
-            data['logo_url'] = "/assets/default_school_logo.png"
+            data['logo_url'] = "/assets/branding/logo-dark.png"
             
         if tenant.stamp:
             data['stamp_url'] = request.build_absolute_uri(tenant.stamp.url)

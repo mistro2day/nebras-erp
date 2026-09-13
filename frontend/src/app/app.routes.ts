@@ -120,7 +120,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        redirectTo: 'platform/settings',
+        redirectTo: 'config/school-identity',
         pathMatch: 'full',
       },
       {
