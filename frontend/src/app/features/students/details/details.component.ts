@@ -24,12 +24,13 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 import { compressFile, formatFileSize, CompressionResult } from '../../../core/utils/file-compressor.util';
 
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-modal.component';
 
 @Component({
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent, FormsModule],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent, FormsModule, StudentCascadeDeleteModalComponent],
   template: `
     @if (pageLoading() || !student().id) {
       <div class="page" dir="rtl" style="display: flex; align-items: center; justify-content: center; min-height: 480px;">
@@ -906,6 +907,14 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             </div>
           </div>
         }
+
+        <!-- معالج الحذف الشامل لملف وسجلات الطالب بنظام الخطوات -->
+        <app-student-cascade-delete-modal
+          [open]="showCascadeDeleteModal()"
+          [student]="s"
+          (closed)="showCascadeDeleteModal.set(false)"
+          (deleted)="onStudentCascadeDeleted()"
+        ></app-student-cascade-delete-modal>
 
         </div>
       }
@@ -2039,29 +2048,16 @@ export class StudentDetailsComponent implements OnInit {
   readonly financeLoading = signal<boolean>(true);
   timeline = signal<any[]>([]);
 
-  deleteStudent(s: any): void {
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      width: '420px',
-      data: {
-        title: 'تأكيد حذف الطالب',
-        message: `هل أنت متأكد من حذف الطالب «${s.profile.arabic_name}» نهائياً؟ سيتم نقل الملف إلى سلة المحذوفات.`,
-        confirmText: 'حذف الطالب',
-        color: 'warn',
-      },
-    });
+  // حالة معالج الحذف الشامل بنظام الخطوات
+  readonly showCascadeDeleteModal = signal<boolean>(false);
 
-    ref.afterClosed().subscribe((ok: boolean) => {
-      if (!ok) return;
-      this.studentsService.deleteStudent(s.id).subscribe({
-        next: () => {
-          this.snack.open('تم حذف الطالب بنجاح', 'إغلاق', { duration: 5000 });
-          this.router.navigate(['/students/list']);
-        },
-        error: (err) => {
-          this.snack.open(err?.error?.message || 'تعذّر حذف الطالب. حاول مجددًا.', 'إغلاق', { duration: 5000 });
-        }
-      });
-    });
+  deleteStudent(s?: any): void {
+    this.showCascadeDeleteModal.set(true);
+  }
+
+  onStudentCascadeDeleted(): void {
+    this.showCascadeDeleteModal.set(false);
+    this.router.navigate(['/students/list']);
   }
   billingAccount = signal<any | null>(null);
   invoices = signal<any[]>([]);

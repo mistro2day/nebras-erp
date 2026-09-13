@@ -341,4 +341,16 @@ export class StudentsService {
   deleteStudentAttachment(studentId: string, attachmentId: string): Observable<any> {
     return this.apiClient.delete(`students/students/${studentId}/delete-attachment/${attachmentId}/`);
   }
+
+  /** فحص واستخراج ملخص السجلات والمتعلقات المرتبطة بالطالب عبر كافة الموديولات */
+  getStudentCascadeSummary(studentId: string): Observable<any> {
+    return this.apiClient.get(`students/students/${studentId}/cascade-summary/`).pipe(
+      map((res: any) => res?.data ?? res)
+    );
+  }
+
+  /** تنفيذ الحذف الجذري والشامل لملف الطالب وكافة متعلقاته المالية والأكاديمية */
+  executeCascadeDelete(studentId: string): Observable<any> {
+    return this.apiClient.post(`students/students/${studentId}/cascade-delete/`, {});
+  }
 }

@@ -651,6 +651,25 @@ class StudentViewSet(viewsets.ModelViewSet):
         attachment.save(update_fields=['deleted_at', 'audit_trail', 'updated_at'])
         return StandardResponse(None, message="تم حذف الوثيقة بنجاح.")
 
+    @action(detail=True, methods=['get'], url_path='cascade-summary')
+    def cascade_summary(self, request, pk=None):
+        """فحص واستعراض إجمالي السجلات والمتعلقات المرتبطة بالطالب عبر كافة الموديولات قبل الحذف"""
+        student = self.get_object()
+        tenant_id = getattr(request, 'tenant', None) and getattr(request.tenant, 'id', None) or student.tenant_id
+        from apps.students.application.cascade_service import StudentCascadeService
+        summary = StudentCascadeService.get_student_cascade_summary(student_id=student.id, tenant_id=tenant_id)
+        return StandardResponse(summary, message="تم استخراج ملخص السجلات المرتبطة بالطالب بنجاح.")
+
+    @action(detail=True, methods=['post'], url_path='cascade-delete')
+    def cascade_delete(self, request, pk=None):
+        """الحذف الجذري والذري الشامل لكافة سجلات ومتعلقات الطالب بجميع الموديولات (بما فيها السندات والفواتير)"""
+        student = self.get_object()
+        tenant_id = getattr(request, 'tenant', None) and getattr(request.tenant, 'id', None) or student.tenant_id
+        user_id = request.user.id if request.user and request.user.is_authenticated else None
+        from apps.students.application.cascade_service import StudentCascadeService
+        res = StudentCascadeService.execute_cascade_delete(student_id=student.id, tenant_id=tenant_id, user_id=user_id)
+        return StandardResponse(res, message="تم حذف الطالب وكافة متعلقاته المالية والأكاديمية بنجاح.")
+
     @action(detail=False, methods=['get'], url_path='dashboard-widgets')
     def dashboard_widgets(self, request):
         """لوحة التحكم ومؤشرات الأداء للطلاب — بيانات شاملة لدورة حياة الطالب."""
