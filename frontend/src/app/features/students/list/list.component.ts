@@ -47,13 +47,25 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
   ],
   template: `
     <div class="page" dir="rtl">
-      <!-- ترويسة الصفحة الاحترافية مع إجراءات سريعة -->
+      <!-- ترويسة الصفحة الاحترافية مع إجراءات سريعة وزر التحديث المباشر -->
       <nb-page-header
         title="قائمة وسجل الطلاب"
         subtitle="البحث المتقدم، التوزيع الأكاديمي، فرز البنين والبنات، وتحديث الإحصائيات اللحظية وفق المعروض."
       >
         <div class="header-actions">
-          <span *ngIf="refreshing()" class="refresh-pill">🔄 تحديث في الخلفية...</span>
+          <span *ngIf="refreshing()" class="refresh-pill">🔄 مزامنة مع الخادم...</span>
+          
+          <!-- زر تحديث البيانات المباشر المطلوب -->
+          <button
+            class="nb-btn-secondary"
+            (click)="refreshData()"
+            [disabled]="loading() || refreshing()"
+            title="تحديث وإعادة تحميل بيانات وسجلات الطلاب من الخادم"
+          >
+            <span *ngIf="!refreshing()">🔄 تحديث البيانات</span>
+            <span *ngIf="refreshing()">⏳ جاري التحديث...</span>
+          </button>
+
           <button class="nb-btn-secondary" (click)="showBulkImportModal.set(true)">
             📥 استيراد كشف إكسل
           </button>
@@ -278,23 +290,32 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
             </select>
           </div>
 
-          <!-- زر إعادة الضبط ومسح كافة الفلاتر -->
+          <!-- زر إعادة الضبط ومسح كافة الفلاتر وزر التحديث السريع -->
           <div class="filter-actions">
             <button
               *ngIf="hasActiveFilters()"
               type="button"
-              class="nb-btn-ghost reset-btn"
+              class="reset-btn"
               (click)="resetFilters()"
-              title="إلغاء وتفريغ كافة معايير الفلترة"
+              title="إلغاء وتفريغ كافة معايير الفلترة وإعادة إظهار كافة الطلاب"
             >
               <span>↺ مسح الفلاتر</span>
+            </button>
+            <button
+              type="button"
+              class="refresh-icon-btn"
+              (click)="refreshData()"
+              [disabled]="loading() || refreshing()"
+              title="تحديث البيانات من السيرفر"
+            >
+              🔄
             </button>
           </div>
         </div>
 
         <!-- شريط الفلاتر النشطة التفاعلي -->
         <div class="active-filters-bar" *ngIf="hasActiveFilters()">
-          <span class="active-filters-label">الفلاتر المطبقة حالياً:</span>
+          <span class="active-filters-label">الفلاتر المطبقة:</span>
           
           <span class="active-chip" *ngIf="genderFilter() !== 'all'">
             الجنس: {{ genderFilter() === 'male' ? 'البنين 👦' : 'البنات 👧' }}
@@ -338,7 +359,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
           <div class="err-text">
             <span>⚠️ {{ errorMessage() }}</span>
           </div>
-          <button class="nb-btn-secondary sm" (click)="loadStudents()">إعادة المحاولة</button>
+          <button class="nb-btn-secondary sm" (click)="refreshData()">إعادة المحاولة</button>
         </div>
       }
 
@@ -369,12 +390,12 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
 
                   <!-- اسم الطالب مع أفاتار مخصص للجنس -->
                   <div class="student-cell col-student">
-                    <div class="mini-avatar" [class.male]="element.profile?.gender === 'male'" [class.female]="element.profile?.gender === 'female'">
-                      {{ element.profile?.gender === 'male' ? '👦' : '👧' }}
+                    <div class="mini-avatar" [class.male]="element.profile.gender === 'male'" [class.female]="element.profile.gender === 'female'">
+                      {{ element.profile.gender === 'male' ? '👦' : '👧' }}
                     </div>
                     <div class="name-box">
-                      <span class="strong student-ar-name">{{ element.profile?.arabic_name || '—' }}</span>
-                      <span class="sub-text" *ngIf="element.profile?.english_name">{{ element.profile?.english_name }}</span>
+                      <span class="strong student-ar-name">{{ element.profile.arabic_name || '—' }}</span>
+                      <span class="sub-text" *ngIf="element.profile.english_name">{{ element.profile.english_name }}</span>
                     </div>
                   </div>
 
@@ -399,16 +420,16 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
 
                   <!-- الجنس -->
                   <div class="col-gender">
-                    <span class="gender-pill" [class.male]="element.profile?.gender === 'male'" [class.female]="element.profile?.gender === 'female'">
-                      {{ element.profile?.gender === 'male' ? 'بنين' : element.profile?.gender === 'female' ? 'بنات' : '—' }}
+                    <span class="gender-pill" [class.male]="element.profile.gender === 'male'" [class.female]="element.profile.gender === 'female'">
+                      {{ element.profile.gender === 'male' ? 'بنين' : element.profile.gender === 'female' ? 'بنات' : '—' }}
                     </span>
                   </div>
 
                   <!-- ولي الأمر والهاتف -->
                   <div class="guardian-cell col-guardian">
-                    <span class="g-name">{{ element.guardian_name || element.family_relations?.[0]?.full_name || '—' }}</span>
-                    <span class="g-phone mono" *ngIf="element.guardian_phone || element.family_relations?.[0]?.phone">
-                      📞 {{ element.guardian_phone || element.family_relations?.[0]?.phone }}
+                    <span class="g-name">{{ element.guardian_name || element.family_relations[0]?.full_name || '—' }}</span>
+                    <span class="g-phone mono" *ngIf="element.guardian_phone || element.family_relations[0]?.phone">
+                      📞 {{ element.guardian_phone || element.family_relations[0]?.phone }}
                     </span>
                   </div>
 
@@ -432,7 +453,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
                 <div class="empty-state-box">
                   <div class="empty-state-icon">🔍</div>
                   <h4>لم يتم العثور على أي طالب يطابق معايير الفرز</h4>
-                  <p>جرب تغيير خيارات الفلترة المطبقة (الصف، الفصل، الجنس، أو البحث) لعرض الطلاب.</p>
+                  <p>جرب تغيير خيارات الفلترة المطبقة أو اضغط على مسح الفلاتر لعرض كافة الطلاب.</p>
                   <button type="button" class="nb-btn-secondary" (click)="resetFilters()">
                     ↺ إعادة ضبط وتفريغ الفلاتر
                   </button>
@@ -450,16 +471,16 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
               
               <!-- أفاتار مع شارة الجنس الدائرية -->
               <div class="student-avatar-container">
-                <div class="student-avatar" [class.male]="student.profile?.gender === 'male'" [class.female]="student.profile?.gender === 'female'">
-                  {{ getInitials(student.profile?.arabic_name) }}
+                <div class="student-avatar" [class.male]="student.profile.gender === 'male'" [class.female]="student.profile.gender === 'female'">
+                  {{ getInitials(student.profile.arabic_name) }}
                 </div>
-                <span class="gender-mini-tag" [class.male]="student.profile?.gender === 'male'" [class.female]="student.profile?.gender === 'female'">
-                  {{ student.profile?.gender === 'male' ? '👦 بنين' : '👧 بنات' }}
+                <span class="gender-mini-tag" [class.male]="student.profile.gender === 'male'" [class.female]="student.profile.gender === 'female'">
+                  {{ student.profile.gender === 'male' ? '👦 بنين' : '👧 بنات' }}
                 </span>
               </div>
               
               <div class="student-info">
-                <h3 class="student-name">{{ student.profile?.arabic_name || 'طالب نبراس' }}</h3>
+                <h3 class="student-name">{{ student.profile.arabic_name || 'طالب نبراس' }}</h3>
                 <span class="student-id mono">{{ student.student_number }}</span>
                 
                 <!-- شارات الصف والفصل والفرع المدمجة -->
@@ -473,8 +494,8 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
                 </div>
 
                 <div class="meta-row">
-                  <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations?.[0]?.phone">
-                    📞 {{ student.guardian_phone || student.family_relations?.[0]?.phone }}
+                  <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations[0]?.phone">
+                    📞 {{ student.guardian_phone || student.family_relations[0]?.phone }}
                   </span>
                   <span class="meta-item" *ngIf="student.branch_name || student.enrollments?.[0]?.branch_name">
                     🏢 {{ student.branch_name || student.enrollments?.[0]?.branch_name }}
@@ -860,12 +881,13 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
       .filter-actions {
         display: flex;
         align-items: center;
+        gap: 6px;
         height: 36px;
       }
       .reset-btn {
         height: 36px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--nb-danger, #d32f2f);
         background: #fef2f2;
         border: 1px solid #fecaca;
@@ -880,6 +902,23 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
       .reset-btn:hover {
         background: #fee2e2;
         border-color: #fca5a5;
+      }
+      .refresh-icon-btn {
+        height: 36px;
+        width: 36px;
+        font-size: 14px;
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border-soft);
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .refresh-icon-btn:hover {
+        background: var(--nb-primary-50);
+        border-color: var(--nb-primary-300);
       }
 
       /* شريط الفلاتر النشطة */
@@ -1271,7 +1310,7 @@ export class StudentsListComponent implements OnInit {
     return this.students().filter(student => {
       // 1. فرز الجنس (بنين / بنات / الكل)
       if (gf !== 'all') {
-        if (student.profile?.gender !== gf) return false;
+        if (student.profile.gender !== gf) return false;
       }
 
       // 2. فرز حالة القيد
@@ -1304,12 +1343,12 @@ export class StudentsListComponent implements OnInit {
 
       // 6. البحث النصي الفوري
       if (q) {
-        const arName = (student.profile?.arabic_name || '').toLowerCase();
-        const enName = (student.profile?.english_name || '').toLowerCase();
+        const arName = (student.profile.arabic_name || '').toLowerCase();
+        const enName = (student.profile.english_name || '').toLowerCase();
         const stdNum = (student.student_number || '').toLowerCase();
-        const natId = (student.profile?.national_id || '').toLowerCase();
-        const gName = (student.guardian_name || student.family_relations?.[0]?.full_name || '').toLowerCase();
-        const gPhone = (student.guardian_phone || student.family_relations?.[0]?.phone || '').toLowerCase();
+        const natId = (student.profile.national_id || '').toLowerCase();
+        const gName = (student.guardian_name || student.family_relations[0]?.full_name || '').toLowerCase();
+        const gPhone = (student.guardian_phone || student.family_relations[0]?.phone || '').toLowerCase();
 
         const matches = arName.includes(q) || enName.includes(q) || stdNum.includes(q) ||
                         natId.includes(q) || gName.includes(q) || gPhone.includes(q);
@@ -1333,7 +1372,7 @@ export class StudentsListComponent implements OnInit {
 
   /** عدد البنين في القائمة المعروضة */
   readonly filteredBoysCount = computed(() => {
-    return this.filteredStudents().filter(s => s.profile?.gender === 'male').length;
+    return this.filteredStudents().filter(s => s.profile.gender === 'male').length;
   });
 
   /** نسبة البنين من المعروضين */
@@ -1344,7 +1383,7 @@ export class StudentsListComponent implements OnInit {
 
   /** عدد البنات في القائمة المعروضة */
   readonly filteredGirlsCount = computed(() => {
-    return this.filteredStudents().filter(s => s.profile?.gender === 'female').length;
+    return this.filteredStudents().filter(s => s.profile.gender === 'female').length;
   });
 
   /** نسبة البنات من المعروضين */
@@ -1366,12 +1405,12 @@ export class StudentsListComponent implements OnInit {
 
   /** إجمالي عدد البنين العام (لكافة الطلاب) */
   readonly totalBoysCount = computed(() => {
-    return this.students().filter(s => s.profile?.gender === 'male').length;
+    return this.students().filter(s => s.profile.gender === 'male').length;
   });
 
   /** إجمالي عدد البنات العام (لكافة الطلاب) */
   readonly totalGirlsCount = computed(() => {
-    return this.students().filter(s => s.profile?.gender === 'female').length;
+    return this.students().filter(s => s.profile.gender === 'female').length;
   });
 
   // فلاتر نشطة ومسميات
@@ -1415,9 +1454,18 @@ export class StudentsListComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.loadStudents();
+    this.refreshData();
     this.loadBranches();
     this.loadGrades();
+  }
+
+  /** تحديث وإعادة تحميل كافة بيانات الطلاب بالقوة من الخادم */
+  refreshData(): void {
+    this.studentsService.getStudents({}, true).subscribe({
+      next: () => {
+        this.page.set(1);
+      }
+    });
   }
 
   private loadBranches(): void {
@@ -1455,32 +1503,26 @@ export class StudentsListComponent implements OnInit {
         }
       });
     }
-
-    this.fetchFromServer();
   }
 
   onSectionChange(sectionId: string): void {
     this.sectionFilter.set(sectionId);
     this.page.set(1);
-    this.fetchFromServer();
   }
 
   onBranchChange(id: string): void {
     this.branchFilter.set(id);
     this.page.set(1);
-    this.fetchFromServer();
   }
 
   onStatusChange(status: string): void {
     this.statusFilter.set(status);
     this.page.set(1);
-    this.fetchFromServer();
   }
 
   setGenderFilter(gender: 'all' | 'male' | 'female'): void {
     this.genderFilter.set(gender);
     this.page.set(1);
-    this.fetchFromServer();
   }
 
   onSearchChange(val: string): void {
@@ -1491,9 +1533,11 @@ export class StudentsListComponent implements OnInit {
   clearSearch(): void {
     this.searchQuery.set('');
     this.page.set(1);
-    this.fetchFromServer();
   }
 
+  /**
+   * مسح الفلاتر: تصفير كافة معايير الفلترة فورياً وإعادة تحميل القائمة من السيرفر.
+   */
   resetFilters(): void {
     this.searchQuery.set('');
     this.statusFilter.set('');
@@ -1503,24 +1547,7 @@ export class StudentsListComponent implements OnInit {
     this.sectionFilter.set('');
     this.sections.set([]);
     this.page.set(1);
-    this.loadStudents();
-  }
-
-  loadStudents(): void {
-    this.page.set(1);
-    this.fetchFromServer();
-  }
-
-  private fetchFromServer(): void {
-    const params: Record<string, string> = {};
-    if (this.searchQuery().trim()) params['search'] = this.searchQuery().trim();
-    if (this.statusFilter()) params['status'] = this.statusFilter();
-    if (this.genderFilter() !== 'all') params['gender'] = this.genderFilter();
-    if (this.gradeFilter()) params['grade_id'] = this.gradeFilter();
-    if (this.sectionFilter()) params['section_id'] = this.sectionFilter();
-    if (this.branchFilter()) params['branch_id'] = this.branchFilter();
-
-    this.studentsService.getStudents(params).subscribe();
+    this.refreshData();
   }
 
   showMsgModal = false;
@@ -1530,12 +1557,12 @@ export class StudentsListComponent implements OnInit {
   onBulkImportSuccess(count: number): void {
     this.showBulkImportModal.set(false);
     this.page.set(1);
-    this.loadStudents();
+    this.refreshData();
   }
 
   onBulkImportClosed(): void {
     this.showBulkImportModal.set(false);
-    this.loadStudents();
+    this.refreshData();
   }
 
   openMessageModal(student: any) {
@@ -1584,7 +1611,7 @@ export class StudentsListComponent implements OnInit {
     this.dialog.open(ConfirmDialogComponent, { data }).afterClosed().subscribe((ok) => {
       if (ok) {
         this.studentsService.archiveStudent(student.id, 'أرشفة يدوية من قائمة الطلاب').subscribe({
-          next: () => this.loadStudents(),
+          next: () => this.refreshData(),
         });
       }
     });
@@ -1603,8 +1630,8 @@ export class StudentsListComponent implements OnInit {
       const grade = s.grade_name || s.enrollments?.[0]?.grade_name || '';
       const sec = s.section_name || s.enrollments?.[0]?.section_name || '';
       const branch = s.branch_name || s.enrollments?.[0]?.branch_name || '';
-      const genderStr = s.profile?.gender === 'male' ? 'ذكر' : s.profile?.gender === 'female' ? 'أنثى' : '';
-      csv += `"${s.student_number}","${s.profile?.arabic_name || ''}","${grade}","${sec}","${branch}","${genderStr}","${s.profile?.nationality || 'سوداني'}","${this.statusText(s.status)}"\n`;
+      const genderStr = s.profile.gender === 'male' ? 'ذكر' : s.profile.gender === 'female' ? 'أنثى' : '';
+      csv += `"${s.student_number}","${s.profile.arabic_name || ''}","${grade}","${sec}","${branch}","${genderStr}","${s.profile.nationality || 'سوداني'}","${this.statusText(s.status)}"\n`;
     }
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
