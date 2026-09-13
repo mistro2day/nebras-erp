@@ -6,6 +6,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentsService } from '../students.service';
 import { StudentFinanceService } from '../../student-finance/student-finance.service';
+import { AdmissionsService } from '../../admissions/admissions.service';
+import { pickList } from '../../admissions/shared/admissions.shared';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
@@ -86,12 +88,36 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
           </nb-panel>
         </div>
 
-        <!-- تبويب 2: الحالة الأكاديمية -->
+        <!-- تبويب 2: الحالة الأكاديمية والتسكين -->
         <div *ngIf="activeTab() === 'academic'" class="tab-panel">
-          <nb-panel title="إدارة حالة الطالب في النظام">
+          <nb-panel title="الصف الدراسي والتسكين الأكاديمي">
             <div class="form-grid">
               <div class="field">
-                <label>حالة الطالب الحالية</label>
+                <label>العام الدراسي</label>
+                <select [ngModel]="selectedAcademicYearId()" (ngModelChange)="selectedAcademicYearId.set($event)">
+                  <option value="">-- اختر العام الدراسي --</option>
+                  <option *ngFor="let y of academicYears()" [value]="y.id">{{ y.name }}</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>الصف الدراسي الحالي (مطلوب)</label>
+                <select [ngModel]="selectedGradeId()" (ngModelChange)="onGradeChange($event)">
+                  <option value="">-- اختر الصف الدراسي --</option>
+                  <option *ngFor="let g of grades()" [value]="g.id">{{ g.name }}</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>الشعبة / الفصل</label>
+                <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)">
+                  <option value="">-- اختر الشعبة --</option>
+                  <option *ngFor="let s of sections()" [value]="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>حالة قيد الطالب في النظام</label>
                 <select [(ngModel)]="studentStatus">
                   <option value="active">نشط</option>
                   <option value="registered">مسجل (جديد)</option>
@@ -100,6 +126,14 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
                   <option value="withdrawn">منسحب</option>
                   <option value="archived">مؤرشف</option>
                 </select>
+              </div>
+            </div>
+
+            <div class="academic-hint-card">
+              <span class="hint-icon">💡</span>
+              <div class="hint-text">
+                <strong>تنويه:</strong>
+                تعديل الصف الدراسي أو الشعبة هنا يقوم بتحديث القيد الأكاديمي النشط للطالب مباشرة في النظام، وتنعكس التغييرات فوراً في كشوف الدرجات، رصد الحضور، وجداول الحصص.
               </div>
             </div>
           </nb-panel>
@@ -317,6 +351,22 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
     .relation-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; border-top: 1px solid var(--nb-border-soft); padding-top: 12px; }
     .nb-btn-danger { background: #dc3545; color: white; border: none; padding: 0 14px; height: 38px; border-radius: var(--nb-radius); font-weight: 600; cursor: pointer; }
     .nb-btn-danger:hover { background: #c82333; }
+
+    .academic-hint-card {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      border-radius: var(--nb-radius);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--nb-text);
+      line-height: 1.6;
+    }
+    .hint-icon { font-size: 18px; line-height: 1; }
+    .hint-text strong { color: var(--nb-primary-600); margin-left: 6px; }
   `]
 })
 export class StudentEditComponent implements OnInit {
@@ -325,6 +375,7 @@ export class StudentEditComponent implements OnInit {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private studentsService = inject(StudentsService);
+  private admissionsService = inject(AdmissionsService);
   private financeService = inject(StudentFinanceService);
 
   private id = '';
@@ -334,6 +385,14 @@ export class StudentEditComponent implements OnInit {
   readonly activeTab = signal<'personal' | 'academic' | 'financial' | 'medical' | 'guardians'>('personal');
   readonly familyRelations = signal<any[]>([]);
   readonly showRelationForm = signal(false);
+
+  readonly academicYears = signal<Array<{ id: string; name: string }>>([]);
+  readonly grades = signal<Array<{ id: string; name: string }>>([]);
+  readonly sections = signal<Array<{ id: string; name: string }>>([]);
+
+  readonly selectedAcademicYearId = signal<string>('');
+  readonly selectedGradeId = signal<string>('');
+  readonly selectedSectionId = signal<string>('');
 
   financialConfig = signal<FinancialConfig | null>(null);
   existingFinancialConfig = signal<FinancialConfig | null>(null);
@@ -370,6 +429,7 @@ export class StudentEditComponent implements OnInit {
 
   ngOnInit(): void {
     this.id = this.route.snapshot.params['id'];
+    this.loadAcademicLookups();
     this.studentsService.getStudentById(this.id).subscribe((res) => {
       if (res && res.success) {
         const student = res.data;
@@ -381,6 +441,19 @@ export class StudentEditComponent implements OnInit {
         });
 
         this.studentStatus = student.status || 'active';
+
+        const enrs = student.enrollments || [];
+        const activeEnr = enrs.find((e: any) => e.status === 'active') || enrs[0];
+        if (activeEnr) {
+          if (activeEnr.academic_year_id) {
+            this.selectedAcademicYearId.set(String(activeEnr.academic_year_id));
+          }
+          if (activeEnr.grade_id) {
+            const gid = String(activeEnr.grade_id);
+            this.selectedGradeId.set(gid);
+            this.loadSectionsForGrade(gid, activeEnr.section_id ? String(activeEnr.section_id) : undefined);
+          }
+        }
 
         this.medicalForm.allergiesInput = (med.allergies || []).join(', ');
         this.medicalForm.chronicDiseasesInput = (med.chronic_diseases || []).join(', ');
@@ -397,6 +470,43 @@ export class StudentEditComponent implements OnInit {
     });
   }
 
+  loadAcademicLookups(): void {
+    this.admissionsService.getAcademicYears().subscribe({
+      next: (res) => {
+        const list = pickList(res).map((y: any) => ({ id: String(y.id), name: y.name }));
+        this.academicYears.set(list);
+      }
+    });
+    this.admissionsService.getGrades().subscribe({
+      next: (res) => {
+        const list = pickList(res).map((g: any) => ({ id: String(g.id), name: g.name }));
+        this.grades.set(list);
+      }
+    });
+  }
+
+  onGradeChange(gradeId: string): void {
+    this.selectedGradeId.set(gradeId);
+    this.selectedSectionId.set('');
+    if (gradeId) {
+      this.loadSectionsForGrade(gradeId);
+    } else {
+      this.sections.set([]);
+    }
+  }
+
+  loadSectionsForGrade(gradeId: string, preselectSectionId?: string): void {
+    this.admissionsService.getSections(gradeId).subscribe({
+      next: (res) => {
+        const list = pickList(res).map((s: any) => ({ id: String(s.id), name: s.name }));
+        this.sections.set(list);
+        if (preselectSectionId) {
+          this.selectedSectionId.set(preselectSectionId);
+        }
+      }
+    });
+  }
+
   loadStudentFinance() {
     this.financeService.invoicesForAccount(this.id).subscribe(res => {
       const invs = (res?.data as any)?.results || res?.data || [];
@@ -404,8 +514,8 @@ export class StudentEditComponent implements OnInit {
         const inv = invs[0];
         const regItem = (inv.items || []).find((i: any) => i.description?.includes('تسجيل'));
         const tuiItem = (inv.items || []).find((i: any) => i.description?.includes('دراسي'));
-        const regAmt = regItem ? Number(regItem.amount) : 150000;
-        const tuiAmt = tuiItem ? Number(tuiItem.amount) : 1200000;
+        const regAmt = regItem ? Number(regItem.amount) : 300000;
+        const tuiAmt = tuiItem ? Number(tuiItem.amount) : 1000000;
         const discAmt = (inv.discounts || []).reduce((acc: number, d: any) => acc + Number(d.amount), 0);
 
         this.existingFinancialConfig.set({
@@ -445,6 +555,9 @@ export class StudentEditComponent implements OnInit {
     const payload = {
       profile: { ...this.personalForm },
       status: this.studentStatus,
+      grade_id: this.selectedGradeId() || null,
+      section_id: this.selectedSectionId() || null,
+      academic_year_id: this.selectedAcademicYearId() || null,
       medical_profile: {
         allergies,
         chronic_diseases,

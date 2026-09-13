@@ -60,9 +60,10 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             </div>
             
             <div class="quick-stats">
+              <div class="stat-item"><span class="label">الصف الدراسي</span><span class="val font-semibold" style="color: var(--nb-primary-600);">{{ s.grade_name || '—' }}</span></div>
+              <div class="stat-item"><span class="label">الشعبة / الفصل</span><span class="val">{{ s.section_name || '—' }}</span></div>
               <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile.nationality || '—' }}</span></div>
               <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile.gender === 'male' ? 'ذكر' : s.profile.gender === 'female' ? 'أنثى' : '—' }}</span></div>
-              <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile.date_of_birth || '—' }}</span></div>
               <div class="stat-item"><span class="label">العمر</span><span class="val font-semibold">{{ getAge(s.profile.date_of_birth) }}</span></div>
             </div>
           </div>
@@ -91,6 +92,16 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             <!-- تبويب 1: نظرة عامة -->
             <mat-tab label="نظرة عامة">
               <div class="tab-content">
+                <h3>البيانات الأكاديمية والتسكين</h3>
+                <div class="info-grid" style="margin-bottom: 24px;">
+                  <div class="info-item"><strong>الصف الدراسي الحالي</strong><span style="font-weight: 700; color: var(--nb-primary-700);">{{ s.grade_name || 'غير مسكن بصف' }}</span></div>
+                  <div class="info-item"><strong>الشعبة / الفصل</strong><span>{{ s.section_name || 'غير محدد' }}</span></div>
+                  <div class="info-item"><strong>العام الدراسي</strong><span>{{ s.academic_year_name || '—' }}</span></div>
+                  <div class="info-item"><strong>الفرع / المجمع</strong><span>{{ s.branch_name || 'المقر الرئيسي' }}</span></div>
+                </div>
+
+                <hr class="nb-divider" />
+
                 <h3>المعلومات الشخصية الأساسية</h3>
                 <div class="info-grid">
                   <div class="info-item"><strong>الاسم الكامل (عربي)</strong>{{ s.profile.arabic_name }}</div>

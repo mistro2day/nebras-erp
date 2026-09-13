@@ -158,7 +158,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
+        tenant_id = getattr(instance, 'tenant_id', None) or (request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4())
         user_id = request.user.id if request.user else uuid.uuid4()
         
         # 1. تحديث البروفايل الشخصي
@@ -178,18 +178,64 @@ class StudentViewSet(viewsets.ModelViewSet):
         # 3. تحديث البيانات المالية وإنشائها/تحديثها إن وُجدت
         financial_config = request.data.get('financial_config', None)
         if financial_config:
-            grade_id = request.data.get('grade_id')
-            academic_year_id = request.data.get('academic_year_id')
+            f_grade_id = request.data.get('grade_id')
+            f_academic_year_id = request.data.get('academic_year_id')
             StudentApplicationService.process_student_registration_finance(
                 tenant_id=tenant_id,
                 student_id=instance.id,
-                grade_id=uuid.UUID(str(grade_id)) if grade_id else None,
-                academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else None,
+                grade_id=uuid.UUID(str(f_grade_id)) if f_grade_id else None,
+                academic_year_id=uuid.UUID(str(f_academic_year_id)) if f_academic_year_id else None,
                 financial_config=financial_config,
                 user_id=user_id
             )
 
-        # 4. تحديث حالة الطالب مباشرة
+        # 4. تحديث التسكين والصف الدراسي والشعبة الأكاديمية
+        grade_id = request.data.get('grade_id')
+        section_id = request.data.get('section_id')
+        academic_year_id = request.data.get('academic_year_id')
+        if grade_id or section_id is not None or academic_year_id:
+            enrollment = instance.enrollments.filter(status='active').first() or instance.enrollments.first()
+            if enrollment:
+                if grade_id:
+                    try:
+                        enrollment.grade_id = uuid.UUID(str(grade_id))
+                    except Exception:
+                        pass
+                if section_id is not None:
+                    try:
+                        enrollment.section_id = uuid.UUID(str(section_id)) if section_id else None
+                    except Exception:
+                        enrollment.section_id = None
+                if academic_year_id:
+                    try:
+                        enrollment.academic_year_id = uuid.UUID(str(academic_year_id))
+                    except Exception:
+                        pass
+                enrollment.save()
+            else:
+                if grade_id:
+                    try:
+                        from apps.students.domain.models import StudentEnrollment
+                        from datetime import date
+                        StudentEnrollment.objects.create(
+                            tenant_id=tenant_id,
+                            student=instance,
+                            grade_id=uuid.UUID(str(grade_id)),
+                            section_id=uuid.UUID(str(section_id)) if section_id else None,
+                            academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else uuid.uuid4(),
+                            enrollment_date=date.today(),
+                            status='active'
+                        )
+                    except Exception:
+                        pass
+            try:
+                from django.core.cache import cache
+                cache.delete(f"academic_lookups_tenant_{tenant_id}")
+                cache.delete("academic_lookups_tenant_global")
+            except Exception:
+                pass
+
+        # 5. تحديث حالة الطالب مباشرة
         status_val = request.data.get('status')
         if status_val:
             instance.status = status_val
