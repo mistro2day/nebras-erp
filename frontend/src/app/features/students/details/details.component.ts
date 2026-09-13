@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe, CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -74,20 +74,86 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
           </div>
 
           <div class="action-bar">
-            <button class="nb-btn-secondary" (click)="back()">عودة للقائمة</button>
+            <button class="nb-btn-secondary" (click)="back()">
+              <span>←</span> عودة للقائمة
+            </button>
             <button class="nb-btn-primary print-btn" (click)="printReportCard()" title="طباعة شهادة النتيجة على ورقة A4">
               <span class="pico" aria-hidden="true">🖨️</span> طباعة النتيجة (A4)
             </button>
             <div class="spacer"></div>
-            <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]" [queryParams]="{ tab: 'academic' }" title="الانتقال المباشر لتعديل الصف والفصل والحالة">تعديل الصف والفصل 🎓</button>
-            <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">تعديل الملف</button>
-            <button class="nb-btn-primary" (click)="activateStudent(s)" [disabled]="activatingStudent()" title="إنشاء حساب بوابة الطالب وإرسال بيانات الدخول عبر البريد وواتساب">
-              {{ activatingStudent() ? 'جارٍ التفعيل…' : '🎓 تفعيل حساب الطالب' }}
+
+            <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">
+              <span>✏️</span> تعديل الملف
             </button>
-            <button class="nb-btn-secondary" (click)="graduate(s)" [disabled]="s.status === 'graduated'">تخريج</button>
-            <button class="nb-btn-secondary" (click)="withdraw(s)" [disabled]="s.status === 'withdrawn'">تسجيل انسحاب</button>
-            <button class="nb-btn-danger" (click)="archive(s)">أرشفة</button>
-            <button class="nb-btn-danger" (click)="deleteStudent(s)">حذف الطالب 🗑️</button>
+
+            <!-- القائمة المنسدلة المجمعة لإجراءات وعمليات الطالب -->
+            <div class="actions-dropdown-wrap">
+              <button type="button" class="nb-btn-secondary actions-dropdown-trigger" 
+                      (click)="toggleActionsMenu($event)" 
+                      [class.active]="showActionsMenu()">
+                <span>⚡ إجراءات وعمليات الطالب</span>
+                <span class="caret" [class.open]="showActionsMenu()">▼</span>
+              </button>
+
+              @if (showActionsMenu()) {
+                <div class="actions-dropdown-menu" (click)="$event.stopPropagation()">
+                  <div class="menu-header">إجراءات الطالب الإدارية</div>
+                  
+                  <button type="button" class="menu-item" [routerLink]="['/students/edit', s.id]" [queryParams]="{ tab: 'academic' }" (click)="showActionsMenu.set(false)">
+                    <span class="item-icon">🎓</span>
+                    <div class="item-info">
+                      <span class="item-title">تعديل الصف والفصل</span>
+                      <span class="item-desc">تعديل التسكين الأكاديمي والفصل والحالة</span>
+                    </div>
+                  </button>
+
+                  <button type="button" class="menu-item" (click)="activateStudent(s); showActionsMenu.set(false)" [disabled]="activatingStudent()">
+                    <span class="item-icon">🔑</span>
+                    <div class="item-info">
+                      <span class="item-title">{{ activatingStudent() ? 'جارٍ التفعيل…' : 'تفعيل حساب بوابة الطالب' }}</span>
+                      <span class="item-desc">إنشاء حساب وإرسال بيانات الدخول للطالب</span>
+                    </div>
+                  </button>
+
+                  <div class="menu-divider"></div>
+                  <div class="menu-header">حالة القيد والمسار</div>
+
+                  <button type="button" class="menu-item" (click)="graduate(s); showActionsMenu.set(false)" [disabled]="s.status === 'graduated'">
+                    <span class="item-icon">📜</span>
+                    <div class="item-info">
+                      <span class="item-title">تخريج الطالب</span>
+                      <span class="item-desc">تحويل حالة الطالب إلى خريج</span>
+                    </div>
+                  </button>
+
+                  <button type="button" class="menu-item" (click)="withdraw(s); showActionsMenu.set(false)" [disabled]="s.status === 'withdrawn'">
+                    <span class="item-icon">🚪</span>
+                    <div class="item-info">
+                      <span class="item-title">تسجيل انسحاب</span>
+                      <span class="item-desc">تسجيل انسحاب الطالب وإنهاء القيد</span>
+                    </div>
+                  </button>
+
+                  <button type="button" class="menu-item" (click)="archive(s); showActionsMenu.set(false)">
+                    <span class="item-icon">📦</span>
+                    <div class="item-info">
+                      <span class="item-title">أرشفة الملف</span>
+                      <span class="item-desc">نقل ملف الطالب للأرشيف</span>
+                    </div>
+                  </button>
+
+                  <div class="menu-divider danger"></div>
+
+                  <button type="button" class="menu-item danger" (click)="deleteStudent(s); showActionsMenu.set(false)">
+                    <span class="item-icon">🗑️</span>
+                    <div class="item-info">
+                      <span class="item-title">حذف الطالب نهائياً</span>
+                      <span class="item-desc">إزالة سجل الطالب وكافة بياناته</span>
+                    </div>
+                  </button>
+                </div>
+              }
+            </div>
           </div>
         </div>
 
@@ -956,6 +1022,137 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
     .action-bar .spacer { flex: 1; }
     .print-btn { display: inline-flex; align-items: center; gap: 6px; }
     .print-btn .pico { font-size: 14px; line-height: 1; }
+
+    /* القائمة المنسدلة للعمليات العلوية */
+    .actions-dropdown-wrap { position: relative; display: inline-block; }
+    .actions-dropdown-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+    .actions-dropdown-trigger.active,
+    .actions-dropdown-trigger:hover {
+      background: var(--nb-surface-raised, #f1f5f9);
+      border-color: var(--nb-primary-400, #93c5fd);
+    }
+    .actions-dropdown-trigger .caret {
+      font-size: 10px;
+      transition: transform 0.2s ease;
+      color: var(--nb-text-muted);
+    }
+    .actions-dropdown-trigger .caret.open {
+      transform: rotate(180deg);
+    }
+
+    .actions-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 280px;
+      background: #ffffff;
+      border: 1px solid var(--nb-border, #e2e8f0);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      z-index: 1000;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .actions-dropdown-menu .menu-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--nb-text-muted, #64748b);
+      padding: 6px 10px 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .actions-dropdown-menu .menu-divider {
+      height: 1px;
+      background: var(--nb-border-soft, #f1f5f9);
+      margin: 4px 0;
+    }
+    .actions-dropdown-menu .menu-divider.danger {
+      background: #fee2e2;
+    }
+
+    .actions-dropdown-menu .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      text-align: right;
+      cursor: pointer;
+      width: 100%;
+      text-decoration: none;
+      color: var(--nb-text, #1e293b);
+      transition: background 0.15s ease, color 0.15s ease;
+      box-sizing: border-box;
+    }
+    .actions-dropdown-menu .menu-item:hover:not(:disabled) {
+      background: var(--nb-primary-50, #eff6ff);
+      color: var(--nb-primary-700, #1d4ed8);
+    }
+    .actions-dropdown-menu .menu-item:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .actions-dropdown-menu .menu-item.danger {
+      color: #dc2626;
+    }
+    .actions-dropdown-menu .menu-item.danger:hover:not(:disabled) {
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+
+    .actions-dropdown-menu .item-icon {
+      font-size: 16px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--nb-surface-raised, #f8fafc);
+      flex-shrink: 0;
+    }
+    .actions-dropdown-menu .menu-item.danger .item-icon {
+      background: #fee2e2;
+    }
+    .actions-dropdown-menu .item-info {
+      display: flex;
+      flex-direction: column;
+      text-align: right;
+      flex: 1;
+      min-width: 0;
+    }
+    .actions-dropdown-menu .item-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .actions-dropdown-menu .item-desc {
+      font-size: 11px;
+      color: var(--nb-text-muted, #64748b);
+      line-height: 1.2;
+      margin-top: 1px;
+    }
 
     /* التبويبات */
     .tabs-card {
@@ -1921,6 +2118,38 @@ export class StudentDetailsComponent implements OnInit {
   readonly previewDoc = signal<any | null>(null);
   readonly isDragging = signal<boolean>(false);
 
+  // حالة قائمة العمليات العلوية المنسدلة
+  readonly showActionsMenu = signal(false);
+
+  toggleActionsMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.showActionsMenu.update((v) => !v);
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.showActionsMenu()) {
+      this.showActionsMenu.set(false);
+    }
+  }
+
+  /** تحديث جزئي لحظي (Ajax) لقسم الوثائق والخط الزمني فقط دون إعادة تحميل بقية أجزاء الصفحة */
+  refreshAttachmentsAndTimeline(): void {
+    this.loadingAttachments.set(true);
+    this.studentsService.getStudentAttachments(this.id).subscribe({
+      next: (res) => {
+        const list = res?.data ?? res ?? [];
+        this.attachments.set(Array.isArray(list) ? list : []);
+        this.loadingAttachments.set(false);
+      },
+      error: () => this.loadingAttachments.set(false),
+    });
+
+    this.studentsService.getTimeline(this.id).subscribe((res) => {
+      if (res && res.success) this.timeline.set(res.data || []);
+    });
+  }
+
   openUploadModal(): void {
     this.uploadDocType = 'national_id';
     this.uploadDocTitle = 'الرقم الوطني / الهوية السودانية';
@@ -2040,7 +2269,7 @@ export class StudentDetailsComponent implements OnInit {
         const successMsg = res?.message || 'تم رفع الوثيقة بنجاح وحفظها في السحابة';
         this.snack.open(successMsg, 'إغلاق', { duration: 4000 });
         this.showUploadModal.set(false);
-        this.reload();
+        this.refreshAttachmentsAndTimeline();
       },
       error: (err) => {
         this.uploadingAttachment.set(false);
@@ -2128,7 +2357,7 @@ export class StudentDetailsComponent implements OnInit {
       this.studentsService.deleteStudentAttachment(this.id, att.id).subscribe({
         next: () => {
           this.snack.open('تم حذف الوثيقة بنجاح', 'إغلاق', { duration: 4000 });
-          this.reload();
+          this.refreshAttachmentsAndTimeline();
         },
         error: (err) => {
           this.snack.open(err?.error?.message || 'تعذّر حذف الوثيقة. حاول مجدداً.', 'إغلاق', { duration: 4000 });
