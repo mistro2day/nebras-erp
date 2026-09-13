@@ -14,7 +14,7 @@ class StudentPermission(permissions.BasePermission):
             return True
 
         # السماح بالقراءة وعمليات المعاينة والفحص الآمن بالذاكرة لجميع مستخدمي المدرسة المصادق عليهم
-        safe_actions = ['validate_import', 'download_template', 'bulk_export', 'list', 'retrieve', 'timeline', 'dashboard_widgets']
+        safe_actions = ['validate_import', 'download_template', 'bulk_export', 'list', 'retrieve', 'timeline', 'dashboard_widgets', 'attachments', 'upload_attachment', 'delete_attachment']
         if request.method in permissions.SAFE_METHODS or getattr(view, 'action', None) in safe_actions:
             return True
 

@@ -105,10 +105,53 @@ class StudentFamilyRelationSerializer(serializers.ModelSerializer):
 
 
 class StudentAttachmentSerializer(serializers.ModelSerializer):
+    attachment_type_display = serializers.CharField(source='get_attachment_type_display', read_only=True)
+    file_url = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
+    mime_type = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentAttachment
-        fields = '__all__'
+        fields = [
+            'id', 'student', 'attachment_type', 'attachment_type_display',
+            'file_asset_id', 'file_name', 'version', 'audit_trail',
+            'created_at', 'updated_at', 'file_url', 'file_size', 'mime_type'
+        ]
         read_only_fields = ['id', 'tenant_id', 'student']
+
+    def get_file_url(self, obj):
+        from apps.storage.domain.models import FileAsset
+        from django.conf import settings
+        from django.core.files.storage import default_storage
+        try:
+            asset = FileAsset.objects.filter(id=obj.file_asset_id).first()
+            if asset and asset.file_path:
+                if settings.DEBUG:
+                    return f"{settings.MEDIA_URL}{asset.file_path}"
+                return default_storage.url(asset.file_path)
+        except Exception:
+            pass
+        return None
+
+    def get_file_size(self, obj):
+        from apps.storage.domain.models import FileAsset
+        try:
+            asset = FileAsset.objects.filter(id=obj.file_asset_id).first()
+            if asset:
+                return asset.file_size
+        except Exception:
+            pass
+        return 0
+
+    def get_mime_type(self, obj):
+        from apps.storage.domain.models import FileAsset
+        try:
+            asset = FileAsset.objects.filter(id=obj.file_asset_id).first()
+            if asset:
+                return asset.mime_type
+        except Exception:
+            pass
+        return 'application/octet-stream'
 
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):

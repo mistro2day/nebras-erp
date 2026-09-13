@@ -1,7 +1,10 @@
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.utils import timezone
 from django.db.models import Q
 from apps.common.responses import StandardResponse, StandardPagination
 from apps.common.exceptions import BusinessException
@@ -475,45 +478,149 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='timeline')
     def timeline(self, request, pk=None):
-        """عرض الخط الزمني للأنشطة والعمليات على الطالب"""
+        """عرض الخط الزمني الشامل والتفاعلي للأنشطة والعمليات على الطالب"""
         student = self.get_object()
         
-        # جمع التاريخ والعمليات وعرضها كخط زمني مرتب تنازلياً
         timeline_events = []
         
-        # 1. تاريخ الحالات
+        # 1. تاريخ التسجيل والتسكين الأكاديمي
+        for enr in student.enrollments.all().order_by('-created_at'):
+            timeline_events.append({
+                'id': str(enr.id),
+                'type': 'enrollment',
+                'title': f"التسكين الأكاديمي ({enr.get_status_display() if hasattr(enr, 'get_status_display') else enr.status})",
+                'date': enr.enrollment_date or enr.created_at,
+                'user': str(enr.created_by or 'النظام'),
+                'comments': f"السنة الدراسية: {enr.academic_year_name or '—'} · الصف: {enr.grade_name or '—'} · الفصل: {enr.section_name or '—'}"
+            })
+
+        # 2. تاريخ الحالات
         for sh in student.status_history.all().order_by('-changed_at'):
             timeline_events.append({
+                'id': str(sh.id),
                 'type': 'status_change',
-                'title': f"تغيير الحالة إلى {sh.to_status}",
+                'title': f"تعديل الحالة إلى «{sh.to_status}»",
                 'date': sh.changed_at,
-                'user': str(sh.changed_by),
-                'comments': sh.comments
+                'user': str(sh.changed_by or 'المشرف'),
+                'comments': sh.comments or 'تحديث الحالة الأكاديمية للطالب'
             })
             
-        # 2. تاريخ الترفيع
+        # 3. تاريخ الترفيع
         for ph in student.promotion_history.all().order_by('-promoted_at'):
             timeline_events.append({
+                'id': str(ph.id),
                 'type': 'promotion',
-                'title': "ترفيع أكاديمي",
+                'title': "ترفيع وترقية أكاديمية",
                 'date': ph.promoted_at,
-                'user': str(ph.promoted_by),
-                'comments': f"من صف {ph.from_grade_id} إلى {ph.to_grade_id}"
+                'user': str(ph.promoted_by or 'لجنة الامتحانات'),
+                'comments': "من الصف السابق إلى الصف الجديد بنجاح"
             })
             
-        # 3. المرفقات
-        for att in student.attachments.all().order_by('-created_at'):
+        # 4. المرفقات والوثائق
+        for att in student.attachments.filter(deleted_at__isnull=True).order_by('-created_at'):
+            from apps.storage.domain.models import FileAsset
+            from django.conf import settings
+            file_url = None
+            file_size = 0
+            try:
+                fa = FileAsset.objects.filter(id=att.file_asset_id).first()
+                if fa:
+                    file_size = fa.file_size
+                    if settings.DEBUG:
+                        file_url = f"{settings.MEDIA_URL}{fa.file_path}"
+                    else:
+                        file_url = default_storage.url(fa.file_path)
+            except Exception:
+                pass
+
             timeline_events.append({
+                'id': str(att.id),
                 'type': 'document_upload',
                 'title': f"رفع وثيقة: {att.get_attachment_type_display()}",
                 'date': att.created_at,
-                'user': str(att.created_by),
-                'comments': att.file_name
+                'user': str(att.created_by or 'المستخدم'),
+                'comments': att.file_name,
+                'file_url': file_url,
+                'file_size': file_size,
+                'attachment_type': att.attachment_type
             })
             
         # ترتيب الأحداث تنازلياً
-        timeline_events.sort(key=lambda x: x['date'], reverse=True)
+        timeline_events.sort(key=lambda x: str(x['date']), reverse=True)
         return StandardResponse(timeline_events, message="تم جلب الخط الزمني للطالب بنجاح.")
+
+    @action(detail=True, methods=['get'], url_path='attachments')
+    def list_attachments(self, request, pk=None):
+        """عرض كافة الوثائق والمرفقات الخاصة بالطالب مع روابط المعاينة والتنزيل"""
+        student = self.get_object()
+        attachments = student.attachments.filter(deleted_at__isnull=True).order_by('-created_at')
+        serializer = StudentAttachmentSerializer(attachments, many=True)
+        return StandardResponse(serializer.data, message="تم جلب وثائق الطالب بنجاح.")
+
+    @action(detail=True, methods=['post'], url_path='upload-attachment', parser_classes=[MultiPartParser, FormParser])
+    def upload_attachment(self, request, pk=None):
+        """رفع وثيقة جديدة للطالب مباشرة مع التخزين وتوليد FileAsset و StudentAttachment"""
+        student = self.get_object()
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return StandardResponse(None, success=False, message="يرجى اختيار ملف لرفعه.", status_code=status.HTTP_400_BAD_REQUEST)
+
+        attachment_type = request.data.get('attachment_type', 'custom')
+        file_name = request.data.get('file_name') or file_obj.name
+        user_id = request.user.id if request.user and request.user.is_authenticated else None
+        tenant_id = getattr(request, 'tenant', None) and getattr(request.tenant, 'id', None) or student.tenant_id
+
+        # حفظ الملف في مسار المستأجر المعزول
+        t_prefix = f"tenant_{tenant_id}" if tenant_id else "tenant_default"
+        rel_path = f"{t_prefix}/students/{student.id}/attachments/{uuid.uuid4()}_{file_obj.name}"
+        saved_path = default_storage.save(rel_path, file_obj)
+
+        from apps.storage.domain.models import FileAsset
+        file_asset = FileAsset.objects.create(
+            tenant_id=tenant_id,
+            uploaded_by=user_id,
+            category='student_file',
+            file_name=file_name,
+            file_path=saved_path,
+            file_size=file_obj.size,
+            mime_type=file_obj.content_type or 'application/octet-stream'
+        )
+
+        attachment = StudentAttachment.objects.create(
+            student=student,
+            tenant_id=tenant_id,
+            attachment_type=attachment_type,
+            file_asset_id=file_asset.id,
+            file_name=file_name,
+            version=1,
+            audit_trail=[{
+                'action': 'uploaded',
+                'user': str(user_id) if user_id else 'system',
+                'date': timezone.now().isoformat(),
+                'file_size': file_obj.size
+            }],
+            created_by=user_id
+        )
+
+        serializer = StudentAttachmentSerializer(attachment)
+        return StandardResponse(serializer.data, message="تم رفع الوثيقة وحفظها بنجاح.", status_code=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path=r'delete-attachment/(?P<attachment_id>[^/.]+)')
+    def delete_attachment(self, request, pk=None, attachment_id=None):
+        """حذف وثيقة للطالب"""
+        student = self.get_object()
+        attachment = student.attachments.filter(id=attachment_id, deleted_at__isnull=True).first()
+        if not attachment:
+            return StandardResponse(None, success=False, message="الوثيقة غير موجودة أو تم حذفها مسبقاً.", status_code=status.HTTP_404_NOT_FOUND)
+
+        attachment.deleted_at = timezone.now()
+        attachment.audit_trail.append({
+            'action': 'deleted',
+            'user': str(request.user.id) if request.user and request.user.is_authenticated else None,
+            'date': timezone.now().isoformat()
+        })
+        attachment.save(update_fields=['deleted_at', 'audit_trail', 'updated_at'])
+        return StandardResponse(None, message="تم حذف الوثيقة بنجاح.")
 
     @action(detail=False, methods=['get'], url_path='dashboard-widgets')
     def dashboard_widgets(self, request):

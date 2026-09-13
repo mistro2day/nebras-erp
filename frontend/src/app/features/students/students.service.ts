@@ -322,4 +322,23 @@ export class StudentsService {
       map((res: any) => res?.data ?? res)
     );
   }
+
+  /** جلب قائمة وثائق ومرفقات الطالب المرفوعة */
+  getStudentAttachments(studentId: string): Observable<any> {
+    return this.apiClient.get(`students/students/${studentId}/attachments/`);
+  }
+
+  /** رفع وثيقة ومرفق جديد للطالب مباشرة */
+  uploadStudentAttachment(studentId: string, file: File, attachmentType: string, fileName?: string): Observable<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('attachment_type', attachmentType);
+    if (fileName) formData.append('file_name', fileName);
+    return this.apiClient.post(`students/students/${studentId}/upload-attachment/`, formData);
+  }
+
+  /** حذف وثيقة للطالب */
+  deleteStudentAttachment(studentId: string, attachmentId: string): Observable<any> {
+    return this.apiClient.delete(`students/students/${studentId}/delete-attachment/${attachmentId}/`);
+  }
 }

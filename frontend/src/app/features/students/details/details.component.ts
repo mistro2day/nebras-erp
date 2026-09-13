@@ -3,6 +3,8 @@ import { DatePipe, CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StudentsService } from '../students.service';
 import { StudentFinanceService } from '../../student-finance/student-finance.service';
 import { SfDocumentDrawerComponent, SfDoc } from '../../student-finance/shared/sf-document-drawer.component';
@@ -19,6 +21,7 @@ import {
 } from '../../../shared/components/account-action-dialog/account-action-dialog.component';
 
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
+import { compressFile, formatFileSize, CompressionResult } from '../../../core/utils/file-compressor.util';
 
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
@@ -26,7 +29,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent, FormsModule],
   template: `
     @if (pageLoading() || !student().id) {
       <div class="page" dir="rtl" style="display: flex; align-items: center; justify-content: center; min-height: 480px;">
@@ -386,39 +389,118 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             <!-- تبويب 6: الوثائق والخط الزمني -->
             <mat-tab label="الوثائق والخط الزمني">
               <div class="tab-content">
-                <h3>الوثائق المرفوعة</h3>
-                <div class="tbl" style="margin-bottom: 20px;">
-                  <div class="tbl-head doc"><span>الوثيقة</span><span>الملف</span><span>التاريخ</span></div>
-                  @for (d of documents(); track $index) {
-                    <div class="tbl-row doc">
-                      <span class="strong">{{ d.title }}</span>
-                      <span>{{ d.comments || '—' }}</span>
-                      <span>{{ d.date | date:'yyyy-MM-dd' }}</span>
-                    </div>
-                  }
-                  @if (documents().length === 0) {
-                    <div class="tbl-empty">لا توجد وثائق مرفوعة.</div>
-                  }
+                <!-- قسم الوثائق المرفوعة -->
+                <div class="docs-section-header">
+                  <div>
+                    <h3 class="docs-title">
+                      📁 الوثائق والمستندات الرسمية للطالب
+                      <span class="count-pill">{{ attachments().length }}</span>
+                    </h3>
+                    <p class="section-subtext">إدارة الوثائق الثبوتية والشهادات مع تقنية الضغط الذاتي الفائق للملفات لتقليص استهلاك الإنترنت.</p>
+                  </div>
+                  <button type="button" class="nb-btn-primary" (click)="openUploadModal()">
+                    <span style="font-size: 14px;">➕</span> رفع وثيقة جديدة مباشرة
+                  </button>
                 </div>
+
+                @if (loadingAttachments()) {
+                  <div style="padding: 28px 0; text-align: center;">
+                    <nb-loading message="جارٍ استرجاع وثائق ومرفقات الطالب…"></nb-loading>
+                  </div>
+                } @else if (attachments().length === 0) {
+                  <div class="empty-docs-box">
+                    <div class="empty-icon">📂</div>
+                    <h4>لا توجد وثائق مرفوعة للطالب حتى الآن</h4>
+                    <p>يمكنك رفع شهادة الميلاد، الرقم الوطني، الجواز، والتقارير الطبية والأكاديمية مباشرة هنا دون الحاجة للدخول في شاشة التعديل.</p>
+                    <button type="button" class="nb-btn-primary sm" (click)="openUploadModal()">
+                      ➕ رفع أول وثيقة للطالب
+                    </button>
+                  </div>
+                } @else {
+                  <div class="docs-grid">
+                    @for (att of attachments(); track att.id) {
+                      <div class="doc-card">
+                        <div class="doc-card-top">
+                          <div class="doc-type-icon">{{ getDocTypeIcon(att.attachment_type) }}</div>
+                          <div class="doc-info">
+                            <h4 class="doc-title" [title]="att.file_name || att.attachment_type_display">{{ att.file_name || att.attachment_type_display }}</h4>
+                            <div class="doc-meta-tags">
+                              <span class="doc-badge type">{{ att.attachment_type_display }}</span>
+                              <span class="doc-badge size">⚡ {{ formatSize(att.file_size) }}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div class="doc-card-details">
+                          <div class="doc-date">📅 {{ att.created_at | date:'yyyy/MM/dd' }}</div>
+                          <div class="doc-ext">{{ getFileExt(att.file_url) }}</div>
+                        </div>
+
+                        <div class="doc-card-actions">
+                          <button type="button" class="action-btn preview" (click)="viewDoc(att)" title="معاينة الوثيقة">
+                            👁️ معاينة
+                          </button>
+                          <a [href]="att.file_url" target="_blank" download class="action-btn download" title="تحميل الملف">
+                            📥 تحميل
+                          </a>
+                          <button type="button" class="action-btn delete" (click)="confirmDeleteDoc(att)" title="حذف الوثيقة">
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
 
                 <hr class="nb-divider" />
 
-                <h3>خط نشاط الطالب الزمني</h3>
-                <div class="timeline">
-                  @for (event of timeline(); track $index) {
-                    <div class="timeline-event">
-                      <div class="event-dot"></div>
-                      <div class="event-details">
-                        <div class="event-header">
-                          <h4>{{ event.title }}</h4>
-                          <span class="event-date">{{ event.date | date:'medium' }}</span>
+                <!-- قسم الخط الزمني المطور -->
+                <div class="timeline-section-header">
+                  <div>
+                    <h3 class="timeline-title">
+                      ⏳ خط نشاط ومحطات الطالب الأكاديمية
+                      <span class="count-pill">{{ timeline().length }}</span>
+                    </h3>
+                    <p class="section-subtext">سجل زمني حي وتفاعلي يوثّق التسكين المدرسي، رفع الوثائق، وتغيير الحالات الأكاديمية والترفيع.</p>
+                  </div>
+                </div>
+
+                <div class="timeline-v2">
+                  @for (ev of timeline(); track $index) {
+                    <div class="timeline-node">
+                      <div class="timeline-axis">
+                        <div class="node-icon-bubble" [style.background-color]="getTimelineColor(ev.type)">
+                          <span>{{ getTimelineIcon(ev.type) }}</span>
                         </div>
-                        <p class="event-comment">{{ event.comments }}</p>
+                      </div>
+                      
+                      <div class="timeline-card">
+                        <div class="node-header">
+                          <div class="node-title-group">
+                            <span class="node-badge" [style.color]="getTimelineColor(ev.type)">{{ getTimelineCategoryLabel(ev.type) }}</span>
+                            <h4 class="node-title">{{ ev.title }}</h4>
+                          </div>
+                          <span class="node-time">{{ ev.date | date:'yyyy/MM/dd - hh:mm a' }}</span>
+                        </div>
+                        
+                        <p class="node-desc">{{ ev.comments }}</p>
+                        
+                        @if (ev.file_url) {
+                          <div class="node-attachment-preview">
+                            <div class="att-thumb-info">
+                              <span>📎 المستند المرفق: <strong>{{ ev.comments || 'وثيقة رسمية' }}</strong></span>
+                              @if (ev.file_size) { <span class="att-size">({{ formatSize(ev.file_size) }})</span> }
+                            </div>
+                            <button type="button" class="nb-btn-secondary xs" (click)="viewDoc({ file_url: ev.file_url, file_name: ev.title })">
+                              👁️ معاينة المستند
+                            </button>
+                          </div>
+                        }
                       </div>
                     </div>
                   }
                   @if (timeline().length === 0) {
-                    <div class="no-data">لا يوجد سجل أنشطة للطالب حالياً.</div>
+                    <div class="tbl-empty">لا يوجد سجل أنشطة للطالب حالياً.</div>
                   }
                 </div>
               </div>
@@ -602,6 +684,142 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
           </div>
         </div>
+
+        <!-- نافذة رفع وثيقة جديدة مباشرة مع الضغط الفائق اللحظي -->
+        @if (showUploadModal()) {
+          <div class="modal-backdrop" (click)="closeUploadModal()">
+            <div class="modal-card modal-lg" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <div class="modal-title-box">
+                  <span class="modal-header-icon">📤</span>
+                  <div>
+                    <h3 class="modal-title">رفع وثيقة ومستند للطالب مباشرة</h3>
+                    <p class="modal-subtitle">المستند يُحفظ فوراً في السحابة الآمنة للمؤسسة مع ضغط فائق ذكي لتقليص استهلاك الإنترنت.</p>
+                  </div>
+                </div>
+                <button type="button" class="close-btn" (click)="closeUploadModal()">✖</button>
+              </div>
+
+              <div class="modal-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">نوع الوثيقة <span class="req">*</span></label>
+                    <select class="form-select" [(ngModel)]="uploadDocType" (ngModelChange)="onDocTypeChange($event)">
+                      <option value="national_id">الرقم الوطني / الهوية السودانية</option>
+                      <option value="birth_certificate">شهادة الميلاد الرسمية</option>
+                      <option value="passport">جواز السفر</option>
+                      <option value="medical_report">تقرير طبي / فحص سريري</option>
+                      <option value="academic_certificate">شهادة أكاديمية / نقل من مدرسة سابقة</option>
+                      <option value="transfer_certificate">شهادة انتقال</option>
+                      <option value="photo">صورة شخصية رسمية</option>
+                      <option value="custom">وثيقة / مستند إضافي آخر</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">عنوان أو مسمى الوثيقة</label>
+                    <input type="text" class="form-input" [(ngModel)]="uploadDocTitle" placeholder="مثال: شهادة ميلاد الطالب الأصلية" />
+                  </div>
+                </div>
+
+                <!-- منطقة السحب والإفلات / اختيار الملف -->
+                <div class="dropzone" [class.has-file]="!!selectedFile()" [class.dragging]="isDragging()"
+                     (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onFileDropped($event)"
+                     (click)="docFileInputRef.click()">
+                  <input type="file" #docFileInputRef (change)="onFileSelected($event)" style="display: none;" accept="image/*,application/pdf" />
+                  
+                  @if (!selectedFile()) {
+                    <div class="dropzone-content">
+                      <div class="upload-icon-anim">☁️</div>
+                      <p class="dropzone-title">اسحب وأفلت الملف هنا أو <span>تصفح جهازك</span></p>
+                      <p class="dropzone-hint">يدعم الصور (JPG, PNG, WebP) وملفات PDF — الحد الأقصى 10 ميجابايت</p>
+                    </div>
+                  } @else {
+                    <div class="selected-file-box">
+                      <div class="file-icon-box">
+                        {{ isSelectedFilePdf() ? '📄' : '🖼️' }}
+                      </div>
+                      <div class="file-details">
+                        <span class="file-name">{{ selectedFile()?.name }}</span>
+                        <span class="file-meta">الحجم الأصلي: {{ compressionResult()?.originalFormatted }}</span>
+                      </div>
+                      <button type="button" class="change-file-btn" (click)="$event.stopPropagation(); docFileInputRef.click()">
+                        تغيير الملف
+                      </button>
+                    </div>
+                  }
+                </div>
+
+                <!-- بطاقة مؤشر الضغط الفائق اللحظي -->
+                @if (compressionResult()) {
+                  <div class="compression-stat-box" [class.compressed]="compressionResult()?.wasCompressed">
+                    @if (compressionResult()?.wasCompressed) {
+                      <div class="comp-badge">⚡ ميزة الضغط الفائق في المتصفح (Ultra Client-side Compression)</div>
+                      <div class="comp-grid">
+                        <div class="comp-col">
+                          <span class="comp-lbl">الحجم الأصلي</span>
+                          <span class="comp-val strikethrough">{{ compressionResult()?.originalFormatted }}</span>
+                        </div>
+                        <div class="comp-arrow">←</div>
+                        <div class="comp-col">
+                          <span class="comp-lbl">الحجم بعد الضغط</span>
+                          <span class="comp-val highlight">{{ compressionResult()?.compressedFormatted }}</span>
+                        </div>
+                        <div class="comp-col savings">
+                          <span class="comp-lbl">نسبة التوفير</span>
+                          <span class="comp-val badge-saved">📉 وفرت {{ compressionResult()?.savedPercentage }}%</span>
+                        </div>
+                      </div>
+                      <p class="comp-note">
+                        تم ضغط الصورة بنجاح فائق وتجهيزها بأحدث معايير الويب مع بقاء النصوص والبيانات حادة وقابلة للقراءة بوضوح.
+                      </p>
+                    } @else {
+                      <div class="comp-pdf-note">
+                        <span>📄</span>
+                        <span>الملف جاهز للرفع المباشر بحجم <strong>{{ compressionResult()?.originalFormatted }}</strong>.</span>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="nb-btn-secondary" (click)="closeUploadModal()" [disabled]="uploadingAttachment()">
+                  إلغاء
+                </button>
+                <button type="button" class="nb-btn-primary" (click)="submitUpload()" [disabled]="!selectedFile() || uploadingAttachment()">
+                  @if (uploadingAttachment()) {
+                    <span>جارٍ الرفع والحفظ…</span>
+                  } @else {
+                    <span>🚀 تأكيد ورفع الوثيقة</span>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- نافذة معاينة الوثيقة الفورية -->
+        @if (previewDoc()) {
+          <div class="modal-backdrop" (click)="previewDoc.set(null)">
+            <div class="modal-card modal-preview" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <h3 class="modal-title">{{ previewDoc()?.file_name || previewDoc()?.title || 'معاينة الوثيقة' }}</h3>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <a [href]="previewDoc()?.file_url" target="_blank" download class="nb-btn-secondary sm">تحميل 📥</a>
+                  <button type="button" class="close-btn" (click)="previewDoc.set(null)">✖</button>
+                </div>
+              </div>
+              <div class="modal-body preview-body">
+                @if (isPdf(previewDoc()?.file_url)) {
+                  <iframe [src]="getSafeUrl(previewDoc()?.file_url)" class="preview-iframe"></iframe>
+                } @else {
+                  <img [src]="previewDoc()?.file_url" alt="معاينة الوثيقة" class="preview-img" />
+                }
+              </div>
+            </div>
+          </div>
+        }
 
         </div>
       }
@@ -861,17 +1079,613 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
     .tbl-row { border-bottom: 1px solid var(--nb-border-row); font-size: 13px; color: var(--nb-text); }
     .tbl-row:last-child { border-bottom: none; }
     .strong { font-weight: 600; }
-    
-    /* الخط الزمني */
-    .timeline { display: flex; flex-direction: column; gap: 14px; position: relative; padding-right: 20px; }
-    .timeline::before { content: ''; position: absolute; right: 5px; top: 4px; bottom: 4px; width: 2px; background: var(--nb-border); }
-    .timeline-event { display: flex; gap: 16px; position: relative; }
-    .event-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--nb-primary-600); position: absolute; right: -19px; top: 14px; border: 2px solid var(--nb-surface); }
-    .event-details { flex: 1; background: var(--nb-surface-raised); padding: 12px 14px; border-radius: var(--nb-radius-card); border: 1px solid var(--nb-border-soft); }
-    .event-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .event-header h4 { margin: 0; font-size: 13px; font-weight: 700; color: var(--nb-text); }
-    .event-date { font-size: 11px; color: var(--nb-text-muted); }
-    .event-comment { margin: 0; color: var(--nb-text-secondary); font-size: 12px; }
+
+    /* أنماط معرض الوثائق والملفات */
+    .docs-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .docs-title, .timeline-title {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--nb-text);
+    }
+    .count-pill {
+      display: inline-flex;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 12px;
+      border: 1px solid #bfdbfe;
+    }
+    .section-subtext {
+      margin: 4px 0 0;
+      color: var(--nb-text-muted);
+      font-size: 12.5px;
+    }
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .doc-card {
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border-soft);
+      border-radius: var(--nb-radius-card);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .doc-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--nb-primary-400);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    }
+    .doc-card-top {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .doc-type-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--nb-surface-raised);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+      border: 1px solid var(--nb-border-soft);
+    }
+    .doc-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .doc-title {
+      margin: 0 0 4px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--nb-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .doc-meta-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .doc-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .doc-badge.type {
+      background: var(--nb-surface-raised);
+      color: var(--nb-text-secondary);
+      border: 1px solid var(--nb-border-soft);
+    }
+    .doc-badge.size {
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+    }
+    .doc-card-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--nb-text-muted);
+      padding-top: 8px;
+      border-top: 1px dashed var(--nb-border-soft);
+    }
+    .doc-ext {
+      font-weight: 700;
+      background: var(--nb-surface-raised);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .doc-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--nb-border);
+      background: var(--nb-surface);
+      color: var(--nb-text);
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      background: var(--nb-surface-raised);
+    }
+    .action-btn.preview {
+      color: var(--nb-primary-700);
+      border-color: var(--nb-primary-200);
+      background: var(--nb-primary-50);
+    }
+    .action-btn.preview:hover {
+      background: var(--nb-primary-100);
+    }
+    .action-btn.download {
+      color: #0284c7;
+      border-color: #bae6fd;
+      background: #f0f9ff;
+    }
+    .action-btn.download:hover {
+      background: #e0f2fe;
+    }
+    .action-btn.delete {
+      flex: 0 0 34px;
+      color: #dc2626;
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+    .action-btn.delete:hover {
+      background: #fee2e2;
+    }
+    .empty-docs-box {
+      text-align: center;
+      padding: 40px 20px;
+      background: var(--nb-surface-raised);
+      border: 2px dashed var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      margin-bottom: 28px;
+    }
+    .empty-icon {
+      font-size: 44px;
+      margin-bottom: 8px;
+    }
+    .empty-docs-box h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--nb-text);
+    }
+    .empty-docs-box p {
+      margin: 0 0 16px;
+      font-size: 12.5px;
+      color: var(--nb-text-muted);
+      max-width: 440px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.5;
+    }
+
+    /* الخط الزمني المطور */
+    .timeline-section-header {
+      margin-top: 10px;
+      margin-bottom: 18px;
+    }
+    .timeline-v2 {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      padding-right: 32px;
+      gap: 16px;
+    }
+    .timeline-v2::before {
+      content: '';
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      bottom: 10px;
+      width: 2px;
+      background: var(--nb-border-soft);
+    }
+    .timeline-node {
+      display: flex;
+      gap: 16px;
+      position: relative;
+    }
+    .timeline-axis {
+      position: relative;
+    }
+    .node-icon-bubble {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #fff;
+      position: absolute;
+      right: -32px;
+      top: 10px;
+      border: 2px solid var(--nb-surface);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      z-index: 2;
+    }
+    .timeline-card {
+      flex: 1;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border-soft);
+      border-radius: var(--nb-radius-card);
+      padding: 14px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+      transition: all 0.15s;
+    }
+    .timeline-card:hover {
+      border-color: var(--nb-border);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+    }
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .node-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .node-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--nb-surface-raised);
+    }
+    .node-title {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--nb-text);
+    }
+    .node-time {
+      font-size: 11.5px;
+      color: var(--nb-text-muted);
+      direction: ltr;
+      text-align: left;
+    }
+    .node-desc {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--nb-text-secondary);
+      line-height: 1.5;
+    }
+    .node-attachment-preview {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: var(--nb-surface-raised);
+      border-radius: 8px;
+      border: 1px dashed var(--nb-border-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .att-thumb-info {
+      font-size: 12px;
+      color: var(--nb-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .att-size {
+      color: var(--nb-text-muted);
+      font-size: 11px;
+    }
+
+    /* نوافذ Nebras OS المنبثقة للرفع والمعاينة */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      background: var(--nb-surface);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 540px;
+      border: 1px solid var(--nb-border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-card.modal-preview {
+      max-width: 860px;
+      max-height: 90vh;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--nb-border-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--nb-surface-raised);
+    }
+    .modal-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .modal-header-icon {
+      font-size: 24px;
+    }
+    .modal-title {
+      margin: 0;
+      font-size: 15.5px;
+      font-weight: 700;
+      color: var(--nb-text);
+    }
+    .modal-subtitle {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--nb-text-muted);
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: var(--nb-text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .close-btn:hover {
+      background: rgba(0,0,0,0.06);
+      color: var(--nb-text);
+    }
+    .modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .preview-body {
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 380px;
+      max-height: calc(85vh - 70px);
+    }
+    .preview-img {
+      max-width: 100%;
+      max-height: calc(85vh - 90px);
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .preview-iframe {
+      width: 100%;
+      height: 75vh;
+      border: none;
+      border-radius: 8px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--nb-text);
+    }
+    .form-label .req {
+      color: #dc2626;
+    }
+    .form-select, .form-input {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--nb-border);
+      background: var(--nb-surface);
+      color: var(--nb-text);
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .form-select:focus, .form-input:focus {
+      border-color: var(--nb-primary-600);
+      box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+    }
+    .dropzone {
+      border: 2px dashed #93c5fd;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .dropzone:hover, .dropzone.dragging {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+    .dropzone.has-file {
+      border-style: solid;
+      border-color: #22c55e;
+      background: #f0fdf4;
+      padding: 14px;
+    }
+    .upload-icon-anim {
+      font-size: 34px;
+      margin-bottom: 6px;
+    }
+    .dropzone-title {
+      margin: 0 0 4px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--nb-text);
+    }
+    .dropzone-title span {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+    .dropzone-hint {
+      margin: 0;
+      font-size: 11.5px;
+      color: var(--nb-text-muted);
+    }
+    .selected-file-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .file-icon-box {
+      font-size: 26px;
+    }
+    .file-details {
+      flex: 1;
+      text-align: right;
+      min-width: 0;
+    }
+    .file-name {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--nb-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-meta {
+      font-size: 11.5px;
+      color: var(--nb-text-muted);
+    }
+    .change-file-btn {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      cursor: pointer;
+    }
+    .compression-stat-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .compression-stat-box.compressed {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+    }
+    .comp-badge {
+      font-size: 12px;
+      font-weight: 700;
+      color: #047857;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .comp-grid {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .comp-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .comp-lbl {
+      font-size: 10.5px;
+      color: var(--nb-text-muted);
+    }
+    .comp-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--nb-text);
+    }
+    .comp-val.strikethrough {
+      text-decoration: line-through;
+      color: #94a3b8;
+    }
+    .comp-val.highlight {
+      color: #047857;
+    }
+    .badge-saved {
+      background: #059669;
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .comp-arrow {
+      color: var(--nb-text-muted);
+      font-size: 16px;
+    }
+    .comp-note {
+      margin: 8px 0 0;
+      font-size: 11.5px;
+      color: #065f46;
+      line-height: 1.4;
+    }
+    .comp-pdf-note {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--nb-text);
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--nb-border-soft);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--nb-surface-raised);
+    }
 
     .nb-divider { border: 0; border-top: 1px solid var(--nb-border-soft); margin: 24px 0; }
     .loading { text-align: center; padding: 40px; color: var(--nb-text-muted); font-size: 13px; }
@@ -976,6 +1790,8 @@ export class StudentDetailsComponent implements OnInit {
   private snack = inject(MatSnackBar);
   private http = inject(HttpClient);
 
+  private sanitizer = inject(DomSanitizer);
+
   student = this.studentsService.selectedStudent;
   readonly pageLoading = signal<boolean>(true);
   readonly financeLoading = signal<boolean>(true);
@@ -1046,6 +1862,199 @@ export class StudentDetailsComponent implements OnInit {
   schoolInfo = signal<any>(null);
   readonly activatingStudent = signal(false);
   readonly activatingGuardianId = signal<string | null>(null);
+
+  // إشارات الوثائق المرفوعة ومحرك الضغط الفائق
+  attachments = signal<any[]>([]);
+  readonly loadingAttachments = signal<boolean>(true);
+  uploadDocType = 'national_id';
+  uploadDocTitle = 'الرقم الوطني / الهوية السودانية';
+  readonly selectedFile = signal<File | null>(null);
+  readonly compressedFile = signal<File | null>(null);
+  readonly compressionResult = signal<CompressionResult | null>(null);
+  readonly uploadingAttachment = signal<boolean>(false);
+  readonly showUploadModal = signal<boolean>(false);
+  readonly previewDoc = signal<any | null>(null);
+  readonly isDragging = signal<boolean>(false);
+
+  openUploadModal(): void {
+    this.uploadDocType = 'national_id';
+    this.uploadDocTitle = 'الرقم الوطني / الهوية السودانية';
+    this.selectedFile.set(null);
+    this.compressedFile.set(null);
+    this.compressionResult.set(null);
+    this.uploadingAttachment.set(false);
+    this.showUploadModal.set(true);
+  }
+
+  closeUploadModal(): void {
+    if (this.uploadingAttachment()) return;
+    this.showUploadModal.set(false);
+  }
+
+  onDocTypeChange(val: string): void {
+    this.uploadDocType = val;
+    const titles: Record<string, string> = {
+      national_id: 'الرقم الوطني / الهوية السودانية',
+      birth_certificate: 'شهادة الميلاد الرسمية',
+      passport: 'جواز السفر',
+      medical_report: 'التقرير الطبي والفحوصات',
+      academic_certificate: 'الشهادة الأكاديمية السابقة',
+      transfer_certificate: 'شهادة انتقال',
+      photo: 'الصورة الشخصية الرسمية',
+      custom: 'وثيقة / مستند إضافي',
+    };
+    if (!this.uploadDocTitle || Object.values(titles).includes(this.uploadDocTitle)) {
+      this.uploadDocTitle = titles[val] || 'وثيقة رسمية';
+    }
+  }
+
+  async handleFile(file: File): Promise<void> {
+    this.selectedFile.set(file);
+    const result = await compressFile(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.78 });
+    this.compressionResult.set(result);
+    this.compressedFile.set(result.file);
+  }
+
+  onFileSelected(event: any): void {
+    const file = event.target.files?.[0];
+    if (file) this.handleFile(file);
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(true);
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(false);
+  }
+
+  onFileDropped(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragging.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.handleFile(file);
+  }
+
+  isSelectedFilePdf(): boolean {
+    const f = this.selectedFile();
+    return !!f && (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  }
+
+  submitUpload(): void {
+    const fileToUpload = this.compressedFile() || this.selectedFile();
+    if (!fileToUpload) {
+      this.snack.open('يرجى اختيار ملف الوثيقة أولاً', 'إغلاق', { duration: 3000 });
+      return;
+    }
+    this.uploadingAttachment.set(true);
+    const type = this.uploadDocType;
+    const title = this.uploadDocTitle || fileToUpload.name;
+
+    this.studentsService.uploadStudentAttachment(this.id, fileToUpload, type, title).subscribe({
+      next: () => {
+        this.uploadingAttachment.set(false);
+        this.snack.open('تم رفع الوثيقة بنجاح وحفظها في السحابة', 'إغلاق', { duration: 4000 });
+        this.showUploadModal.set(false);
+        this.reload();
+      },
+      error: (err) => {
+        this.uploadingAttachment.set(false);
+        this.snack.open(err?.error?.message || 'تعذر رفع الوثيقة. حاول مجدداً.', 'إغلاق', { duration: 5000 });
+      }
+    });
+  }
+
+  viewDoc(doc: any): void {
+    this.previewDoc.set(doc);
+  }
+
+  isPdf(url?: string): boolean {
+    if (!url) return false;
+    return url.toLowerCase().includes('.pdf');
+  }
+
+  getSafeUrl(url?: string): SafeResourceUrl {
+    if (!url) return '';
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  formatSize(bytes: number): string {
+    return formatFileSize(bytes);
+  }
+
+  getFileExt(url?: string): string {
+    if (!url) return 'FILE';
+    const clean = url.split('?')[0];
+    const parts = clean.split('.');
+    return parts.length > 1 ? parts.pop()!.toUpperCase() : 'FILE';
+  }
+
+  getDocTypeIcon(type: string): string {
+    switch (type) {
+      case 'national_id': return '🪪';
+      case 'birth_certificate': return '📜';
+      case 'passport': return '🛂';
+      case 'medical_report': return '🏥';
+      case 'academic_certificate': return '🎓';
+      case 'transfer_certificate': return '📑';
+      case 'photo': return '🖼️';
+      default: return '📁';
+    }
+  }
+
+  getTimelineCategoryLabel(type: string): string {
+    switch (type) {
+      case 'enrollment': return 'تسكين أكاديمي';
+      case 'status_change': return 'تعديل حالة';
+      case 'promotion': return 'ترفيع أكاديمي';
+      case 'document_upload': return 'وثيقة مرفوعة';
+      default: return 'نشاط عام';
+    }
+  }
+
+  getTimelineIcon(type: string): string {
+    switch (type) {
+      case 'enrollment': return '🏫';
+      case 'status_change': return '🔄';
+      case 'promotion': return '🎓';
+      case 'document_upload': return '📄';
+      default: return '📌';
+    }
+  }
+
+  getTimelineColor(type: string): string {
+    switch (type) {
+      case 'enrollment': return '#2563eb';
+      case 'status_change': return '#d97706';
+      case 'promotion': return '#9333ea';
+      case 'document_upload': return '#059669';
+      default: return '#64748b';
+    }
+  }
+
+  async confirmDeleteDoc(att: any): Promise<void> {
+    const ok = await this.confirm({
+      title: 'حذف الوثيقة',
+      message: `هل أنت متأكد من حذف وثيقة «${att.file_name || att.attachment_type_display}»؟ سيتم إزالتها من ملف الطالب.`,
+      color: 'warn',
+    });
+    if (ok) {
+      this.studentsService.deleteStudentAttachment(this.id, att.id).subscribe({
+        next: () => {
+          this.snack.open('تم حذف الوثيقة بنجاح', 'إغلاق', { duration: 4000 });
+          this.reload();
+        },
+        error: (err) => {
+          this.snack.open(err?.error?.message || 'تعذّر حذف الوثيقة. حاول مجدداً.', 'إغلاق', { duration: 4000 });
+        }
+      });
+    }
+  }
 
   private id = '';
 
@@ -1137,6 +2146,16 @@ export class StudentDetailsComponent implements OnInit {
 
     this.studentsService.getTimeline(this.id).subscribe((res) => {
       if (res && res.success) this.timeline.set(res.data || []);
+    });
+
+    this.loadingAttachments.set(true);
+    this.studentsService.getStudentAttachments(this.id).subscribe({
+      next: (res) => {
+        const list = res?.data ?? res ?? [];
+        this.attachments.set(Array.isArray(list) ? list : []);
+        this.loadingAttachments.set(false);
+      },
+      error: () => this.loadingAttachments.set(false),
     });
 
     this.studentsService.getBranding().subscribe({
