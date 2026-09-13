@@ -141,13 +141,13 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                 </div>
               </div>
 
-              <!-- بطاقة التوزيع الأكاديمي واختيار الشعبة / الفصل الدراسي -->
+              <!-- بطاقة التوزيع الأكاديمي واختيار الفصل الدراسي -->
               <div class="academic-distribution-card">
                 <div class="distribution-header">
                   <span class="dist-icon">🏫</span>
                   <div>
-                    <h4 class="dist-title">التسكين الأكاديمي وتوزيع الفصل / الشعبة</h4>
-                    <p class="dist-sub">حدد الشعبة أو الفصل الدراسي لتسكين الطالب فور إكمال تسجيله.</p>
+                    <h4 class="dist-title">التسكين الأكاديمي وتوزيع الفصل</h4>
+                    <p class="dist-sub">حدد الفصل الدراسي لتسكين الطالب فور إكمال تسجيله.</p>
                   </div>
                 </div>
 
@@ -160,9 +160,9 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   </div>
 
                   <div class="field">
-                    <label>الشعبة / الفصل الدراسي (توزيع فوري)</label>
+                    <label>الفصل الدراسي (توزيع فوري)</label>
                     <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)" class="section-select-control">
-                      <option value="">{{ availableSections().length > 0 ? '-- اختر الشعبة أو الفصل لتسكين الطالب --' : '-- لا توجد شعب معرفة لهذا الصف حالياً --' }}</option>
+                      <option value="">{{ availableSections().length > 0 ? '-- اختر الفصل لتسكين الطالب --' : '-- لا توجد فصول معرفة لهذا الصف حالياً --' }}</option>
                       @for (sec of availableSections(); track sec.id) {
                         <option [value]="sec.id">
                           {{ sec.name }} (السعة: {{ sec.capacity }} · المقاعد الشاغرة: {{ sec.available_seats !== undefined ? sec.available_seats : (sec.capacity - (sec.occupied_seats || 0)) }})

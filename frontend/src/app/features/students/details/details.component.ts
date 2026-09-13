@@ -56,15 +56,13 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
                   <span [class]="statusBadge(s.status)">{{ statusText(s.status) }}</span>
                   <span class="num-badge">رقم الطالب: {{ s.student_number }}</span>
                   <span class="academic-badge grade-badge">🏫 {{ s.grade_name || 'الصف غير مسجل' }}</span>
-                  <span class="academic-badge section-badge">🏷️ {{ s.section_name || 'الشعبة غير محددة' }}</span>
+                  <span class="academic-badge section-badge">🏷️ {{ s.section_name ? ('الفصل: ' + s.section_name) : 'الفصل غير محدد' }}</span>
                   <span class="academic-badge year-badge" *ngIf="s.academic_year_name">📅 {{ s.academic_year_name }}</span>
                 </div>
               </div>
             </div>
             
             <div class="quick-stats">
-              <div class="stat-item highlight"><span class="label">الصف الدراسي</span><span class="val font-semibold">{{ s.grade_name || 'غير مسكن' }}</span></div>
-              <div class="stat-item highlight"><span class="label">الشعبة / الفصل</span><span class="val font-semibold">{{ s.section_name || 'غير محدد' }}</span></div>
               <div class="stat-item"><span class="label">الجنسية</span><span class="val">{{ s.profile.nationality || '—' }}</span></div>
               <div class="stat-item"><span class="label">الجنس</span><span class="val">{{ s.profile.gender === 'male' ? 'ذكر' : s.profile.gender === 'female' ? 'أنثى' : '—' }}</span></div>
               <div class="stat-item"><span class="label">تاريخ الميلاد</span><span class="val">{{ s.profile.date_of_birth || '—' }}</span></div>
@@ -78,6 +76,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
               <span class="pico" aria-hidden="true">🖨️</span> طباعة النتيجة (A4)
             </button>
             <div class="spacer"></div>
+            <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]" [queryParams]="{ tab: 'academic' }" title="الانتقال المباشر لتعديل الصف والفصل والحالة">تعديل الصف والفصل 🎓</button>
             <button class="nb-btn-secondary" [routerLink]="['/students/edit', s.id]">تعديل الملف</button>
             <button class="nb-btn-primary" (click)="activateStudent(s)" [disabled]="activatingStudent()" title="إنشاء حساب بوابة الطالب وإرسال بيانات الدخول عبر البريد وواتساب">
               {{ activatingStudent() ? 'جارٍ التفعيل…' : '🎓 تفعيل حساب الطالب' }}
@@ -98,11 +97,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
               <div class="tab-content">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                   <h3 style="margin: 0;">🎓 البيانات الأكاديمية والتسكين المدرسي</h3>
-                  <a [routerLink]="['/students/edit', s.id]" class="nb-btn-secondary sm" style="font-size: 12px; padding: 4px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">✏️ تعديل الصف والشعبة</a>
+                  <a [routerLink]="['/students/edit', s.id]" [queryParams]="{ tab: 'academic' }" class="nb-btn-secondary sm" style="font-size: 12px; padding: 4px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">✏️ تعديل الصف والفصل</a>
                 </div>
                 <div class="info-grid" style="margin-bottom: 24px;">
                   <div class="info-item"><strong>الصف الدراسي الحالي</strong><span style="font-weight: 700; color: var(--nb-primary-700); font-size: 14.5px;">{{ s.grade_name || 'غير مسكن بصف بعد' }}</span></div>
-                  <div class="info-item"><strong>الشعبة / الفصل</strong><span style="font-weight: 600;">{{ s.section_name || 'غير محدد' }}</span></div>
+                  <div class="info-item"><strong>الفصل</strong><span style="font-weight: 600;">{{ s.section_name ? ('فصل: ' + s.section_name) : 'الفصل غير محدد' }}</span></div>
                   <div class="info-item"><strong>العام الدراسي</strong><span>{{ s.academic_year_name || '—' }}</span></div>
                   <div class="info-item"><strong>الفرع / المجمع</strong><span>{{ s.branch_name || 'المقر الرئيسي' }}</span></div>
                 </div>

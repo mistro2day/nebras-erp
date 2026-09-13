@@ -90,7 +90,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 
         <!-- تبويب 2: الحالة الأكاديمية والتسكين -->
         <div *ngIf="activeTab() === 'academic'" class="tab-panel">
-          <nb-panel title="الصف الدراسي والتسكين الأكاديمي">
+          <nb-panel title="الصف والفصل والتسكين الأكاديمي">
             <div class="form-grid">
               <div class="field">
                 <label>العام الدراسي</label>
@@ -109,9 +109,9 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
               </div>
 
               <div class="field">
-                <label>الشعبة / الفصل</label>
+                <label>الفصل الدراسي</label>
                 <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)">
-                  <option value="">-- اختر الشعبة --</option>
+                  <option value="">-- اختر الفصل --</option>
                   <option *ngFor="let s of sections()" [value]="s.id">{{ s.name }}</option>
                 </select>
               </div>
@@ -133,7 +133,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
               <span class="hint-icon">💡</span>
               <div class="hint-text">
                 <strong>تنويه:</strong>
-                تعديل الصف الدراسي أو الشعبة هنا يقوم بتحديث القيد الأكاديمي النشط للطالب مباشرة في النظام، وتنعكس التغييرات فوراً في كشوف الدرجات، رصد الحضور، وجداول الحصص.
+                تعديل الصف الدراسي أو الفصل هنا يقوم بتحديث القيد الأكاديمي النشط للطالب مباشرة في النظام، وتنعكس التغييرات فوراً في كشوف الدرجات، رصد الحضور، وجداول الحصص.
               </div>
             </div>
           </nb-panel>
@@ -429,6 +429,12 @@ export class StudentEditComponent implements OnInit {
 
   ngOnInit(): void {
     this.id = this.route.snapshot.params['id'];
+    this.route.queryParams.subscribe(params => {
+      const t = params['tab'];
+      if (t && ['personal', 'academic', 'financial', 'medical', 'guardians'].includes(t)) {
+        this.activeTab.set(t as any);
+      }
+    });
     this.loadAcademicLookups();
     this.studentsService.getStudentById(this.id).subscribe((res) => {
       if (res && res.success) {
