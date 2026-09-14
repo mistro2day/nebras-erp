@@ -506,6 +506,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       padding: 6px 10px;
       border-radius: 6px;
       border: 1px dashed rgba(239, 68, 68, 0.25);
+      grid-column: 2;
     }
     .remaining-val { font-size: 13px; font-weight: 800; }
     .remaining-val.danger { color: #dc2626; }
@@ -661,6 +662,44 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     .mono { font-family: monospace, sans-serif; }
     .text-center { text-align: center; }
     .text-end { text-align: end; }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm 12mm;
+      }
+      body * {
+        visibility: hidden !important;
+      }
+      #official-print-voucher,
+      #official-print-voucher * {
+        visibility: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      #official-print-voucher {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 16px 20px !important;
+        border: 1.5px solid #cbd5e1 !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        z-index: 999999 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .doc-actions-bar,
+      [drawer-actions],
+      .no-print {
+        display: none !important;
+      }
+    }
   `],
 })
 export class SfDocumentDrawerComponent implements OnInit {
@@ -839,87 +878,399 @@ export class SfDocumentDrawerComponent implements OnInit {
       <head>
         <meta charset="utf-8">
         <title>${this.meta().title}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body {
-            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
-            direction: rtl;
-            background: #ffffff;
+          @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+          }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
+            background: #ffffff !important;
             color: #0f172a;
-            padding: 24px;
+            font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            direction: rtl;
             font-size: 12px;
+            line-height: 1.4;
+            width: 100%;
           }
           .official-voucher-card {
             width: 100%;
-            max-width: 800px;
+            max-width: 100%;
             margin: 0 auto;
-            border: 2px solid #0f172a;
-            border-radius: 12px;
-            padding: 24px;
-            background: #ffffff;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 12px !important;
+            padding: 20px 24px !important;
+            background: #ffffff !important;
+            box-shadow: none !important;
+            position: relative !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
-          .voucher-header { display: flex; justify-content: space-between; align-items: center; }
-          .school-brand-meta .school-name-ar { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-          .school-brand-meta .school-name-en { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
-          .school-brand-meta .accreditation-line { font-size: 11px; color: #334155; }
-          .school-brand-meta .school-contact-line { font-size: 11px; color: #64748b; }
-          .school-logo-wrapper { width: 75px; height: 75px; border-radius: 50%; border: 2px solid #0284c7; padding: 2px; display: flex; align-items: center; justify-content: center; }
-          .school-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-          .school-logo-placeholder { font-size: 32px; }
-          .luxury-divider { position: relative; height: 2px; background: #0284c7; margin: 16px 0; text-align: center; }
-          .divider-diamond { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #ffffff; padding: 0 8px; color: #0284c7; font-size: 12px; }
-          .doc-banner { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; }
-          .doc-main-title { font-size: 17px; font-weight: 800; color: #0f172a; margin: 0; }
-          .doc-sub-title { font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
-          .doc-meta-row { display: flex; align-items: center; gap: 14px; }
-          .meta-item-box { display: flex; align-items: center; gap: 6px; background: #ffffff; padding: 5px 12px; border-radius: 6px; border: 1px solid #cbd5e1; }
-          .meta-item-box .lbl { font-size: 11px; color: #64748b; font-weight: 600; }
-          .meta-item-box .val { font-size: 12px; font-weight: 800; color: #0f172a; }
-          .student-info-section { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; background: #ffffff; }
-          .info-cell { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-          .info-cell .c-label { color: #64748b; width: 140px; font-weight: 600; flex-shrink: 0; }
-          .info-cell .c-val { color: #0f172a; font-weight: 600; }
-          .info-cell .c-val.strong { font-weight: 800; color: #0284c7; }
-          .info-cell.balance-cell { background: #fef2f2; border: 1px dashed #fca5a5; border-radius: 6px; padding: 4px 8px; }
-          .remaining-val { font-size: 12px; font-weight: 800; }
-          .remaining-val.danger { color: #dc2626; }
-          .remaining-val.success { color: #059669; }
-          .section-heading { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
-          .breakdown-section { margin-bottom: 14px; }
-          .voucher-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          .voucher-table th { background: #f1f5f9; color: #334155; font-weight: 700; padding: 8px 12px; border: 1px solid #cbd5e1; text-align: start; }
-          .voucher-table td { padding: 8px 12px; border: 1px solid #cbd5e1; color: #0f172a; }
-          .voucher-table .discount-row td { color: #dc2626; }
-          .voucher-table tfoot .total-row td { background: #f8fafc; border-top: 2px solid #0f172a; font-weight: 800; }
-          .total-label { font-size: 13px; }
-          .total-amount { font-size: 15px; color: #059669; font-weight: 800; }
-          .voucher-table tfoot .remaining-row td { background: #fef2f2; border-top: 1px dashed #fca5a5; border-bottom: 2px solid #dc2626; font-weight: 800; }
-          .remaining-label { font-size: 13px; color: #991b1b; }
-          .remaining-title { font-weight: 800; }
-          .remaining-amount { font-size: 15px; font-weight: 800; }
-          .remaining-amount.has-due { color: #dc2626; }
-          .remaining-amount.cleared { color: #059669; }
-          .tafqeet-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-          .tafqeet-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
-          .tafqeet-title { font-weight: 700; color: #0284c7; }
-          .tafqeet-text { font-weight: 700; color: #0f172a; }
-          .remaining-tafqeet-box { background: #fef2f2; border: 1px solid #fca5a5; }
-          .remaining-tafqeet-title { color: #dc2626; font-weight: 800; }
-          .remaining-tafqeet-text { color: #991b1b; font-weight: 700; }
-          .terms-box { font-size: 11px; color: #64748b; margin-bottom: 18px; line-height: 1.5; }
-          .signatures-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 14px; border-top: 1px solid #cbd5e1; margin-bottom: 14px; }
-          .sig-box { display: flex; flex-direction: column; align-items: center; text-align: center; }
-          .sig-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 30px; }
-          .sig-space { width: 100%; border-bottom: 1px dashed #94a3b8; margin-bottom: 4px; }
-          .sig-hint { font-size: 10px; color: #94a3b8; }
-          .stamp-container { display: flex; align-items: center; justify-content: center; min-height: 70px; }
-          .official-school-stamp-img { max-height: 80px; max-width: 110px; object-fit: contain; transform: rotate(-5deg); }
-          .stamp-circle { width: 70px; height: 70px; border: 1.5px dashed #0284c7; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; color: #0284c7; font-weight: 700; transform: rotate(-5deg); text-align: center; line-height: 1.2; padding: 4px; }
-          .voucher-footer-meta { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 12px; }
+          .voucher-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            gap: 16px !important;
+            margin-bottom: 4px !important;
+          }
+          .school-brand-meta .school-name-ar {
+            font-size: 20px !important;
+            font-weight: 800 !important;
+            color: #0284c7 !important;
+            margin: 0 0 2px !important;
+            line-height: 1.2 !important;
+          }
+          .school-brand-meta .school-name-en {
+            font-size: 12px !important;
+            font-weight: 600 !important;
+            color: #64748b !important;
+            margin: 0 0 4px !important;
+            letter-spacing: 0.5px !important;
+          }
+          .school-brand-meta .accreditation-line {
+            font-size: 11px !important;
+            color: #475569 !important;
+            margin: 0 0 2px !important;
+          }
+          .school-brand-meta .school-contact-line {
+            font-size: 11px !important;
+            color: #64748b !important;
+            margin: 0 !important;
+          }
+          .school-logo-wrapper {
+            width: 76px !important;
+            height: 76px !important;
+            border-radius: 50% !important;
+            border: 2px solid #0284c7 !important;
+            padding: 3px !important;
+            background: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+            flex-shrink: 0 !important;
+          }
+          .school-logo-img {
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
+          }
+          .school-logo-placeholder {
+            font-size: 32px !important;
+          }
+          .luxury-divider {
+            position: relative !important;
+            height: 2px !important;
+            background: linear-gradient(90deg, transparent, #0284c7, transparent) !important;
+            margin: 14px 0 !important;
+            text-align: center !important;
+          }
+          .divider-diamond {
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            background: #ffffff !important;
+            padding: 0 8px !important;
+            color: #0284c7 !important;
+            font-size: 13px !important;
+            font-weight: bold !important;
+          }
+          .doc-banner {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            background: #f8fafc !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            padding: 10px 16px !important;
+            margin-bottom: 14px !important;
+          }
+          .doc-title-box {
+            display: flex !important;
+            flex-direction: column !important;
+          }
+          .doc-main-title {
+            font-size: 18px !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
+          }
+          .doc-sub-title {
+            font-size: 9.5px !important;
+            color: #64748b !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px !important;
+          }
+          .doc-meta-row {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+          }
+          .meta-item-box {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            background: #ffffff !important;
+            padding: 5px 12px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+          }
+          .meta-item-box .lbl {
+            font-size: 11px !important;
+            color: #64748b !important;
+            font-weight: 600 !important;
+          }
+          .meta-item-box .val {
+            font-size: 12px !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+          }
+          .student-info-section {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px 16px !important;
+            background: #ffffff !important;
+            border: 1px dashed #cbd5e1 !important;
+            border-radius: 8px !important;
+            padding: 12px 16px !important;
+            margin-bottom: 14px !important;
+          }
+          .info-cell {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            font-size: 12px !important;
+          }
+          .info-cell .c-label {
+            color: #64748b !important;
+            width: 140px !important;
+            flex-shrink: 0 !important;
+            font-weight: 600 !important;
+          }
+          .info-cell .c-val {
+            color: #1e293b !important;
+            font-weight: 600 !important;
+          }
+          .info-cell .c-val.strong {
+            font-weight: 800 !important;
+            color: #0284c7 !important;
+          }
+          .info-cell.balance-cell {
+            background: #fef2f2 !important;
+            padding: 5px 10px !important;
+            border-radius: 6px !important;
+            border: 1px dashed #fca5a5 !important;
+            grid-column: 2 !important;
+          }
+          .remaining-val {
+            font-size: 12.5px !important;
+            font-weight: 800 !important;
+          }
+          .remaining-val.danger {
+            color: #dc2626 !important;
+          }
+          .remaining-val.success {
+            color: #059669 !important;
+          }
+          .breakdown-section {
+            margin-bottom: 12px !important;
+          }
+          .section-heading {
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            margin: 0 0 8px !important;
+          }
+          .voucher-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 12px !important;
+          }
+          .voucher-table th {
+            background: #f1f5f9 !important;
+            color: #475569 !important;
+            font-weight: 700 !important;
+            padding: 8px 12px !important;
+            border: 1px solid #cbd5e1 !important;
+            text-align: start !important;
+          }
+          .voucher-table td {
+            padding: 8px 12px !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #1e293b !important;
+          }
+          .voucher-table .discount-row td {
+            color: #dc2626 !important;
+            background: rgba(220, 38, 38, 0.03) !important;
+          }
+          .voucher-table tfoot .total-row td {
+            background: #f8fafc !important;
+            border-top: 2px solid #cbd5e1 !important;
+            font-weight: 800 !important;
+          }
+          .total-label {
+            font-size: 13px !important;
+            color: #0f172a !important;
+          }
+          .total-amount {
+            font-size: 14.5px !important;
+            color: #059669 !important;
+            font-weight: 800 !important;
+          }
+          .voucher-table tfoot .remaining-row td {
+            background: #fef2f2 !important;
+            border-top: 1px dashed #fca5a5 !important;
+            border-bottom: 2px solid #ef4444 !important;
+            font-weight: 800 !important;
+          }
+          .remaining-label {
+            font-size: 13px !important;
+            color: #991b1b !important;
+          }
+          .remaining-title {
+            font-weight: 800 !important;
+          }
+          .remaining-amount {
+            font-size: 15px !important;
+            font-weight: 800 !important;
+          }
+          .remaining-amount.has-due {
+            color: #dc2626 !important;
+          }
+          .remaining-amount.cleared {
+            color: #059669 !important;
+          }
+          .tafqeet-container {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 7px !important;
+            margin-bottom: 12px !important;
+          }
+          .tafqeet-box {
+            background: #f0f9ff !important;
+            border: 1px solid #bae6fd !important;
+            border-radius: 6px !important;
+            padding: 7px 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            font-size: 12px !important;
+          }
+          .tafqeet-title {
+            font-weight: 700 !important;
+            color: #0284c7 !important;
+            flex-shrink: 0 !important;
+          }
+          .tafqeet-text {
+            font-weight: 700 !important;
+            color: #0f172a !important;
+          }
+          .remaining-tafqeet-box {
+            background: #fef2f2 !important;
+            border: 1px solid #fca5a5 !important;
+          }
+          .remaining-tafqeet-title {
+            color: #dc2626 !important;
+            font-weight: 800 !important;
+            flex-shrink: 0 !important;
+          }
+          .remaining-tafqeet-text {
+            color: #991b1b !important;
+            font-weight: 700 !important;
+          }
+          .terms-box {
+            font-size: 10.5px !important;
+            color: #64748b !important;
+            margin-bottom: 14px !important;
+            line-height: 1.5 !important;
+          }
+          .terms-box p {
+            margin: 0 !important;
+          }
+          .signatures-section {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 16px !important;
+            padding-top: 12px !important;
+            border-top: 1px solid #cbd5e1 !important;
+            margin-bottom: 12px !important;
+          }
+          .sig-box {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .sig-title {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #475569 !important;
+            margin-bottom: 22px !important;
+          }
+          .sig-space {
+            width: 100% !important;
+            border-bottom: 1px dashed #cbd5e1 !important;
+            margin-bottom: 4px !important;
+          }
+          .sig-hint {
+            font-size: 9.5px !important;
+            color: #94a3b8 !important;
+          }
+          .stamp-container {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 65px !important;
+          }
+          .official-school-stamp-img {
+            max-height: 75px !important;
+            max-width: 105px !important;
+            object-fit: contain !important;
+            transform: rotate(-5deg) !important;
+          }
+          .stamp-circle {
+            width: 68px !important;
+            height: 68px !important;
+            border: 1.5px dashed #0284c7 !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 8px !important;
+            color: #0284c7 !important;
+            font-weight: 700 !important;
+            transform: rotate(-5deg) !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+            padding: 4px !important;
+          }
+          .voucher-footer-meta {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            font-size: 9.5px !important;
+            color: #94a3b8 !important;
+            border-top: 1px solid #f1f5f9 !important;
+            padding-top: 8px !important;
+            margin-top: 8px !important;
+          }
           .mono { font-family: monospace, sans-serif; }
           .text-center { text-align: center; }
           .text-end { text-align: end; }
+          .font-bold { font-weight: 700; }
         </style>
       </head>
       <body>
@@ -932,15 +1283,40 @@ export class SfDocumentDrawerComponent implements OnInit {
     frameDoc.write(html);
     frameDoc.close();
 
-    setTimeout(() => {
-      printFrame.contentWindow?.focus();
-      printFrame.contentWindow?.print();
+    let printed = false;
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+      try {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch (e) {
+        console.error('Error during printing', e);
+      }
       setTimeout(() => {
         if (document.body.contains(printFrame)) {
           document.body.removeChild(printFrame);
         }
-      }, 1500);
-    }, 300);
+      }, 2000);
+    };
+
+    const images = Array.from(frameDoc.images);
+    const imagePromises = images.map((img) => {
+      if (img.complete) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+      });
+    });
+
+    const fontsPromise = (frameDoc as any).fonts?.ready || Promise.resolve();
+
+    Promise.race([
+      Promise.all([...imagePromises, fontsPromise]),
+      new Promise((resolve) => setTimeout(resolve, 800))
+    ]).then(() => {
+      setTimeout(doPrint, 150);
+    });
   }
 
   exportCols(): ExportColumn[] {
