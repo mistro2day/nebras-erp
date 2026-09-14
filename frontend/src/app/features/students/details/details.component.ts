@@ -255,7 +255,6 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                       <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ج.س</span>
                     </div>
                     <div class="fin-actions-row">
-                      <button type="button" class="btn-collect-head" (click)="openReceiptModal()">💵 تحصيل دفعة</button>
                       <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
                     </div>
                   </div>

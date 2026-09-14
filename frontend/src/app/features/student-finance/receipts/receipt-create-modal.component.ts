@@ -695,11 +695,12 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     });
   });
 
-  remainingAfterPay = computed(() => {
+  remainingAfterPay(): number {
     const acc = this.selectedAccount();
-    const currentDue = +acc?.outstanding_balance || 0;
-    return Math.max(0, currentDue - (this.amount || 0));
-  });
+    const currentDue = Number(acc?.outstanding_balance) || 0;
+    const payAmt = Number(this.amount) || 0;
+    return Math.max(0, currentDue - payAmt);
+  }
 
   ngOnInit() {
     this.loadData();
