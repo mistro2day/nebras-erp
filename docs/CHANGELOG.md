@@ -56,8 +56,10 @@
 - **منع تكرار الوثائق والمستندات لنفس الطالب (Duplicate Prevention)**:
   - منع رفع أكثر من وثيقة نشطة من نفس النوع للطالب نفسه (مثل شهادة الميلاد أو الهوية أو الجواز أو شهادة الانتقال) مع رسالة توجيهية لحذف الوثيقة القديمة قبل استبدالها.
   - منع تكرار نفس مسمى أو عنوان الملف لنفس الطالب.
-  - إضافة فحص استباقي في واجهة المستخدم يُظهر صندوق تحذير كهرماني ويعطل زر الرفع تلقائياً عند اختيار نوع مسجل مسبقاً.
-  - استثناء مجلد `backend/media/` في `.gitignore` لمنع ظهور الملفات المرفوعة كملفات غير متتبعة في Git.
+- **إصلاح أخطاء فاحص الأنواع والمحلل اللغوي (Pyright / Linter Error Fixes)**:
+  - إضافة سمة `objects = models.Manager()` الصريحة إلى نموذجي `Permission` و `RolePermission` في `apps/identity/domain/rbac.py` لضمان توافق فاحص الأنواع واستدعاءات الاستعلامات في الصلاحيات.
+  - معالجة تعارض المورّثات والدوال في فاحص الأنواع (`BasePermission.has_permission` و `has_object_permission`) داخل `StudentPermission` وتحديث إعداد `pyrightconfig.json` بتعطيل `reportIncompatibleMethodOverride`.
+  - إعادة هيكلة `StudentCascadeService.execute_cascade_delete` لاستخدام مدير السياق الصريح `with transaction.atomic():` بدلاً من المزخرف `@transaction.atomic` على التابع الطبقي (`@classmethod`) لمنع التباس `ContextDecorator.__call__` في استدعاءات `views.py`.
 
 ---
 

@@ -143,132 +143,132 @@ class StudentCascadeService:
         return summary
 
     @classmethod
-    @transaction.atomic
     def execute_cascade_delete(cls, student_id: uuid.UUID, tenant_id: uuid.UUID, user_id: uuid.UUID | None = None) -> dict:
         """
         تنفيذ الحذف الذري الشامل لكافة متعلقات الطالب بجميع الموديولات.
         """
-        student = Student.objects.filter(id=student_id, tenant_id=tenant_id).first()
-        if not student:
-            raise BusinessException("الطالب غير موجود أو تم حذفه مسبقاً.", code="student_not_found")
+        with transaction.atomic():
+            student = Student.objects.filter(id=student_id, tenant_id=tenant_id).first()
+            if not student:
+                raise BusinessException("الطالب غير موجود أو تم حذفه مسبقاً.", code="student_not_found")
 
-        deleted_summary = {
-            "financial_receipts": 0,
-            "financial_invoices": 0,
-            "financial_accounts": 0,
-            "exam_results": 0,
-            "enrollments": 0,
-            "attachments": 0,
-            "clinic_visits": 0,
-            "library_borrows": 0,
-            "student_deleted": True
-        }
+            deleted_summary = {
+                "financial_receipts": 0,
+                "financial_invoices": 0,
+                "financial_accounts": 0,
+                "exam_results": 0,
+                "enrollments": 0,
+                "attachments": 0,
+                "clinic_visits": 0,
+                "library_borrows": 0,
+                "student_deleted": True
+            }
 
-        # 1. تصفية مالية الطلاب (بترتيب تفكيك قيود PROTECT)
-        try:
-            from apps.student_finance.domain.models import (
-                StudentBillingAccount, StudentInvoice, InvoiceItem, InvoiceAdjustment,
-                InvoiceDiscount, Receipt, PaymentAllocation, Installment, StudentReceivable,
-                FinancialHold, Statement, Refund, CreditNote, DebitNote, OnlinePaymentRequest
-            )
-            accounts = StudentBillingAccount.objects.filter(student_id=student_id, tenant_id=tenant_id)
-            if accounts.exists():
-                account_ids = list(accounts.values_list('id', flat=True))
+            # 1. تصفية مالية الطلاب (بترتيب تفكيك قيود PROTECT)
+            try:
+                from apps.student_finance.domain.models import (
+                    StudentBillingAccount, StudentInvoice, InvoiceItem, InvoiceAdjustment,
+                    InvoiceDiscount, Receipt, PaymentAllocation, Installment, StudentReceivable,
+                    FinancialHold, Statement, Refund, CreditNote, DebitNote, OnlinePaymentRequest
+                )
+                accounts = StudentBillingAccount.objects.filter(student_id=student_id, tenant_id=tenant_id)
+                if accounts.exists():
+                    account_ids = list(accounts.values_list('id', flat=True))
 
-                # أ. حذف تخصيصات الدفع وسندات القبض
-                receipts = Receipt.objects.filter(student_billing_account_id__in=account_ids)
-                deleted_summary["financial_receipts"] = receipts.count()
-                PaymentAllocation.objects.filter(receipt__in=receipts).delete()
-                receipts.delete()
+                    # أ. حذف تخصيصات الدفع وسندات القبض
+                    receipts = Receipt.objects.filter(student_billing_account_id__in=account_ids)
+                    deleted_summary["financial_receipts"] = receipts.count()
+                    PaymentAllocation.objects.filter(receipt__in=receipts).delete()
+                    receipts.delete()
 
-                # ب. حذف بنود وتعديلات الفواتير ثم الفواتير
-                invoices = StudentInvoice.objects.filter(student_billing_account_id__in=account_ids)
-                deleted_summary["financial_invoices"] = invoices.count()
-                InvoiceItem.objects.filter(student_invoice__in=invoices).delete()
-                InvoiceAdjustment.objects.filter(student_invoice__in=invoices).delete()
-                InvoiceDiscount.objects.filter(student_invoice__in=invoices).delete()
-                invoices.delete()
+                    # ب. حذف بنود وتعديلات الفواتير ثم الفواتير
+                    invoices = StudentInvoice.objects.filter(student_billing_account_id__in=account_ids)
+                    deleted_summary["financial_invoices"] = invoices.count()
+                    InvoiceItem.objects.filter(student_invoice__in=invoices).delete()
+                    InvoiceAdjustment.objects.filter(student_invoice__in=invoices).delete()
+                    InvoiceDiscount.objects.filter(student_invoice__in=invoices).delete()
+                    invoices.delete()
 
-                # ج. حذف الأقساط والمستحقات والتنبيهات
-                Installment.objects.filter(student_billing_account_id__in=account_ids).delete()
-                StudentReceivable.objects.filter(student_billing_account_id__in=account_ids).delete()
-                FinancialHold.objects.filter(student_billing_account_id__in=account_ids).delete()
-                Statement.objects.filter(student_billing_account_id__in=account_ids).delete()
-                try:
-                    Refund.objects.filter(student_billing_account_id__in=account_ids).delete()
-                    CreditNote.objects.filter(student_billing_account_id__in=account_ids).delete()
-                    DebitNote.objects.filter(student_billing_account_id__in=account_ids).delete()
-                    OnlinePaymentRequest.objects.filter(student_billing_account_id__in=account_ids).delete()
-                except Exception:
-                    pass
+                    # ج. حذف الأقساط والمستحقات والتنبيهات
+                    Installment.objects.filter(student_billing_account_id__in=account_ids).delete()
+                    StudentReceivable.objects.filter(student_billing_account_id__in=account_ids).delete()
+                    FinancialHold.objects.filter(student_billing_account_id__in=account_ids).delete()
+                    Statement.objects.filter(student_billing_account_id__in=account_ids).delete()
+                    try:
+                        Refund.objects.filter(student_billing_account_id__in=account_ids).delete()
+                        CreditNote.objects.filter(student_billing_account_id__in=account_ids).delete()
+                        DebitNote.objects.filter(student_billing_account_id__in=account_ids).delete()
+                        OnlinePaymentRequest.objects.filter(student_billing_account_id__in=account_ids).delete()
+                    except Exception:
+                        pass
 
-                # د. حذف الحسابات المالية نفسها
-                deleted_summary["financial_accounts"] = accounts.count()
-                accounts.delete()
-        except Exception:
-            pass
+                    # د. حذف الحسابات المالية نفسها
+                    deleted_summary["financial_accounts"] = accounts.count()
+                    accounts.delete()
+            except Exception:
+                pass
 
-        # 2. حذف نتائج الامتحانات
-        try:
-            from apps.examinations.domain.models import ExamResult
-            exam_res = ExamResult.objects.filter(student_id=student_id, tenant_id=tenant_id)
-            deleted_summary["exam_results"] = exam_res.count()
-            exam_res.delete()
-        except Exception:
-            pass
+            # 2. حذف نتائج الامتحانات
+            try:
+                from apps.examinations.domain.models import ExamResult
+                exam_res = ExamResult.objects.filter(student_id=student_id, tenant_id=tenant_id)
+                deleted_summary["exam_results"] = exam_res.count()
+                exam_res.delete()
+            except Exception:
+                pass
 
-        # 3. حذف زيارات العيادة
-        try:
-            from apps.clinic.domain.models import ClinicVisit
-            visits = ClinicVisit.objects.filter(patient_user_id=student_id, patient_type='student', tenant_id=tenant_id)
-            deleted_summary["clinic_visits"] = visits.count()
-            visits.delete()
-        except Exception:
-            pass
+            # 3. حذف زيارات العيادة
+            try:
+                from apps.clinic.domain.models import ClinicVisit
+                visits = ClinicVisit.objects.filter(patient_user_id=student_id, patient_type='student', tenant_id=tenant_id)
+                deleted_summary["clinic_visits"] = visits.count()
+                visits.delete()
+            except Exception:
+                pass
 
-        # 4. حذف استعارات المكتبة
-        try:
-            from apps.library.domain.models import BorrowTransaction
-            borrows = BorrowTransaction.objects.filter(borrower_user_id=student_id, borrower_type='student', tenant_id=tenant_id)
-            deleted_summary["library_borrows"] = borrows.count()
-            borrows.delete()
-        except Exception:
-            pass
+            # 4. حذف استعارات المكتبة
+            try:
+                from apps.library.domain.models import BorrowTransaction
+                borrows = BorrowTransaction.objects.filter(borrower_user_id=student_id, borrower_type='student', tenant_id=tenant_id)
+                deleted_summary["library_borrows"] = borrows.count()
+                borrows.delete()
+            except Exception:
+                pass
 
-        # 5. حذف وثائق ومرفقات الطالب
-        try:
-            attachments = StudentAttachment.objects.filter(student_id=student_id, tenant_id=tenant_id)
-            deleted_summary["attachments"] = attachments.count()
-            attachments.delete()
-        except Exception:
-            pass
+            # 5. حذف وثائق ومرفقات الطالب
+            try:
+                attachments = StudentAttachment.objects.filter(student_id=student_id, tenant_id=tenant_id)
+                deleted_summary["attachments"] = attachments.count()
+                attachments.delete()
+            except Exception:
+                pass
 
-        # 6. حذف سجلات التسكين الأكاديمي
-        try:
-            enrollments = StudentEnrollment.objects.filter(student_id=student_id, tenant_id=tenant_id)
-            deleted_summary["enrollments"] = enrollments.count()
-            enrollments.delete()
-        except Exception:
-            pass
+            # 6. حذف سجلات التسكين الأكاديمي
+            try:
+                enrollments = StudentEnrollment.objects.filter(student_id=student_id, tenant_id=tenant_id)
+                deleted_summary["enrollments"] = enrollments.count()
+                enrollments.delete()
+            except Exception:
+                pass
 
-        # 7. حذف سجل الطالب وسجلاته الشخصية نهائياً من قاعدة البيانات (Hard Delete)
-        if hasattr(student, 'profile') and student.profile:
-            student.profile.delete()
-        if hasattr(student, 'medical_profile') and student.medical_profile:
-            student.medical_profile.delete()
+            # 7. حذف سجل الطالب وسجلاته الشخصية نهائياً من قاعدة البيانات (Hard Delete)
+            if hasattr(student, 'profile') and student.profile:
+                student.profile.delete()
+            if hasattr(student, 'medical_profile') and student.medical_profile:
+                student.medical_profile.delete()
 
-        student.delete()
+            student.delete()
 
-        # 8. نشر حدث المجال في نظام التدقيق
-        try:
-            from apps.common.events import DomainEventPublisher
-            DomainEventPublisher.publish("StudentCascadeDeleted", {
-                "student_id": str(student_id),
-                "tenant_id": str(tenant_id),
-                "user_id": str(user_id) if user_id else None,
-                "summary": deleted_summary
-            })
-        except Exception:
-            pass
+            # 8. نشر حدث المجال في نظام التدقيق
+            try:
+                from apps.common.events import DomainEventPublisher
+                DomainEventPublisher.publish("StudentCascadeDeleted", {
+                    "student_id": str(student_id),
+                    "tenant_id": str(tenant_id),
+                    "user_id": str(user_id) if user_id else None,
+                    "summary": deleted_summary
+                })
+            except Exception:
+                pass
 
-        return deleted_summary
+            return deleted_summary

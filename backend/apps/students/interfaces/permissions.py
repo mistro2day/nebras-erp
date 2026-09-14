@@ -5,7 +5,7 @@ class StudentPermission(permissions.BasePermission):
     نظام الصلاحيات المخصص لموديول الطلاب بناءً على RBAC مع العزل الصارم للمستأجرين
     """
     
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> bool:  # type: ignore[override]  # pyright: ignore[reportIncompatibleMethodOverride]
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -56,7 +56,7 @@ class StudentPermission(permissions.BasePermission):
         # السماح بالعمليات لباقي الحالات إن لم تكن هناك قيود صريحة
         return True
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request, view, obj) -> bool:  # type: ignore[override]  # pyright: ignore[reportIncompatibleMethodOverride]
         # عزل المستأجرين الصارم: لا يمكن تعديل أو الوصول لطالب يتبع لمستأجر آخر
         effective_tenant_id = getattr(request, 'tenant_id', None) or getattr(getattr(request, 'tenant', None), 'id', None)
         if not effective_tenant_id and request.user and request.user.is_authenticated:

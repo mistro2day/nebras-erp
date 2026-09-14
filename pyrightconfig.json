@@ -15,5 +15,6 @@
     }
   ],
   "reportMissingTypeStubs": "none",
-  "reportMissingImports": "none"
+  "reportMissingImports": "none",
+  "reportIncompatibleMethodOverride": "none"
 }
