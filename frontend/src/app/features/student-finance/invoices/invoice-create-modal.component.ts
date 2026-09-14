@@ -9,6 +9,7 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbSearchableSelectComponent, NbSelectItem } from '../../../shared/nebras/nb-searchable-select.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
 
 export interface CustomFeeEntry {
   id: string;
@@ -31,6 +32,7 @@ export interface CustomFeeEntry {
     NbStepperComponent,
     NbDatepickerComponent,
     NbSearchableSelectComponent,
+    SfDocumentDrawerComponent,
   ],
   template: `
     <nb-modal
@@ -349,32 +351,107 @@ export interface CustomFeeEntry {
             </div>
           </div>
         }
+
+        <!-- الخطوة 4: اكتمال الفاتورة والاعتماد والطباعة -->
+        @if (currentStep() === 3) {
+          <div class="success-step">
+            <div class="success-header">
+              <div class="success-icon-badge">
+                <span class="icon-symbol">✓</span>
+              </div>
+              <h3 class="success-title">تم إصدار الفاتورة الدراسية واعتمادها بنجاح!</h3>
+              <p class="success-desc">
+                تم قيد الرسوم على حساب الطالب وترحيل القيد المحاسبي لدفتر الأستاذ العام ويمكنك الآن طباعة الفاتورة الرسمية (A4).
+              </p>
+            </div>
+
+            @if (createdInvoice(); as inv) {
+              <div class="success-receipt-card">
+                <div class="src-ribbon">
+                  <span class="src-status">✓ معتمدة ومرحلة بالمالية</span>
+                  <span class="src-num mono">رقم الفاتورة: <strong>{{ inv.invoice_number || 'INV-قيد الإصدار' }}</strong></span>
+                </div>
+
+                <div class="src-body">
+                  <div class="src-row">
+                    <span class="lbl">اسم الطالب:</span>
+                    <span class="val bold">{{ inv.student_name || getStudentName(selectedAccount()?.student_id) }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">رقم الحساب المالي:</span>
+                    <span class="val mono">{{ inv.account_number || selectedAccount()?.account_number }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">تاريخ الإصدار:</span>
+                    <span class="val mono bold">{{ inv.issue_date || todayDate }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">تاريخ الاستحقاق:</span>
+                    <span class="val mono bold">{{ inv.due_date || dueDate }}</span>
+                  </div>
+                  <div class="src-row highlight">
+                    <span class="lbl">إجمالي مبلغ الفاتورة:</span>
+                    <span class="val bold ok mono font-amount">{{ (inv.total_amount || selectedTotal()) | number:'1.2-2' }} ج.س</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">عدد بنود الرسوم:</span>
+                    <span class="val mono">{{ totalItemsCount() }} بند</span>
+                  </div>
+                </div>
+
+                <div class="tafqeet-box" style="margin-top: 14px;">
+                  <span class="tafqeet-title">المبلغ كتابةً:</span>
+                  <span class="tafqeet-text">{{ getTafqeet(inv.total_amount || selectedTotal()) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
       </div>
 
       <div class="modal-actions" slot="footer">
-        <button type="button" class="btn ghost" (click)="onCancel()" [disabled]="submitting()">
-          إلغاء
-        </button>
-
-        <div class="actions-spacer"></div>
-
-        @if (currentStep() > 0) {
-          <button type="button" class="btn ghost" (click)="prevStep()" [disabled]="submitting()">
-            السابق
+        @if (currentStep() === 3) {
+          <button type="button" class="btn primary print-step-btn" (click)="printInvoice()">
+            🖨️ طباعة الفاتورة الرسمية (A4)
           </button>
-        }
-
-        @if (currentStep() < steps.length - 1) {
-          <button type="button" class="btn primary" (click)="nextStep()" [disabled]="!canProceed()">
-            التالي
+          <div class="actions-spacer"></div>
+          <button type="button" class="btn ghost finish-btn" (click)="finishAndClose()">
+            ✓ إنهاء وإغلاق
           </button>
         } @else {
-          <button type="button" class="btn primary confirm-btn" (click)="submit()" [disabled]="submitting() || !canProceed()">
-            {{ submitting() ? 'جارٍ الإصدار والترحيل…' : '✓ تأكيد وإصدار الفاتورة' }}
+          <button type="button" class="btn ghost" (click)="onCancel()" [disabled]="submitting()">
+            إلغاء
           </button>
+
+          <div class="actions-spacer"></div>
+
+          @if (currentStep() > 0) {
+            <button type="button" class="btn ghost" (click)="prevStep()" [disabled]="submitting()">
+              السابق
+            </button>
+          }
+
+          @if (currentStep() < 2) {
+            <button type="button" class="btn primary" (click)="nextStep()" [disabled]="!canProceed()">
+              التالي
+            </button>
+          } @else {
+            <button type="button" class="btn primary confirm-btn" (click)="submit()" [disabled]="submitting() || !canProceed()">
+              {{ submitting() ? 'جارٍ الإصدار والترحيل…' : '✓ تأكيد وإصدار الفاتورة' }}
+            </button>
+          }
         }
       </div>
     </nb-modal>
+
+    <!-- درج طباعة المستند المالي الرسمي A4 -->
+    <sf-document-drawer
+      [doc]="docForPrint()"
+      [studentName]="createdInvoice()?.student_name || getStudentName(selectedAccount()?.student_id)"
+      [billingAccount]="selectedAccount()"
+      [schoolInfo]="schoolInfo()"
+      (closed)="docForPrint.set(null)"
+    ></sf-document-drawer>
   `,
   styles: [`
     .step-content {
@@ -823,6 +900,128 @@ export interface CustomFeeEntry {
     .confirm-btn:hover:not(:disabled) {
       background: #047857 !important;
     }
+
+    /* الخطوة 4: اكتمال الفاتورة والاعتماد والطباعة */
+    .success-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      animation: nbSuccessIn .25s ease;
+    }
+    @keyframes nbSuccessIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .success-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .success-icon-badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 800;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+    }
+    .success-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 800;
+      color: #065f46;
+    }
+    .success-desc {
+      margin: 0;
+      font-size: 13px;
+      color: var(--nb-text-muted);
+      max-width: 520px;
+      line-height: 1.5;
+    }
+    .success-receipt-card {
+      width: 100%;
+      background: var(--nb-surface);
+      border: 1.5px solid #a7f3d0;
+      border-radius: var(--nb-radius-card, 12px);
+      padding: 16px 20px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.06);
+      box-sizing: border-box;
+    }
+    .src-ribbon {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #d1fae5;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .src-status {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+    .src-num {
+      font-size: 13px;
+      color: var(--nb-text);
+    }
+    .src-num strong {
+      color: var(--nb-primary-700);
+      margin-inline-start: 4px;
+    }
+    .src-body {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .src-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .src-row .lbl {
+      color: var(--nb-text-muted);
+    }
+    .src-row .val {
+      color: var(--nb-text);
+    }
+    .src-row.highlight {
+      grid-column: span 2;
+      background: #f0fdf4;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #bbf7d0;
+    }
+    .src-row .font-amount {
+      font-size: 16px;
+      color: #15803d;
+    }
+    .print-step-btn {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      padding: 0 18px !important;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+    .print-step-btn:hover {
+      background: #1e40af !important;
+    }
+    .finish-btn {
+      font-weight: 700 !important;
+    }
   `]
 })
 export class InvoiceCreateModalComponent implements OnInit, OnChanges {
@@ -840,10 +1039,15 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
     'حساب الطالب والاستحقاق',
     'هياكل وبنود الرسوم',
     'المراجعة والتأكيد',
+    'اكتمال الفاتورة والاعتماد',
   ];
 
   currentStep = signal(0);
   submitting = signal(false);
+  createdInvoice = signal<any>(null);
+  docForPrint = signal<SfDoc>(null);
+  schoolInfo = signal<any>(null);
+  todayDate = new Date().toLocaleDateString('ar-EG');
 
   accounts = signal<any[]>([]);
   studentsMap = signal<Map<string, any>>(new Map());
@@ -938,6 +1142,10 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
         this.feeTypes.set(res?.data ?? []);
       },
     });
+
+    this.studentsSvc.getBranding().subscribe({
+      next: (b) => this.schoolInfo.set(b),
+    });
   }
 
   resetForm() {
@@ -952,6 +1160,8 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
     this.newCustomFeeTypeId = '';
     this.feeTab.set('structures');
     this.submitting.set(false);
+    this.createdInvoice.set(null);
+    this.docForPrint.set(null);
   }
 
   onAccountChange() {
@@ -1074,9 +1284,12 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
 
     this.svc.generateStudentInvoice(payload).subscribe({
       next: (res) => {
+        this.submitting.set(false);
+        const invData = res?.data || res;
+        this.createdInvoice.set(invData);
+        this.currentStep.set(3);
+        this.saved.emit(invData);
         this.notify.success('تم إصدار الفاتورة الدراسية بنجاح وترحيلها إلى دفتر الأستاذ.');
-        this.saved.emit(res?.data || res);
-        this.closed.emit();
       },
       error: (err) => {
         this.submitting.set(false);
@@ -1084,6 +1297,20 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
         this.notify.error(msg);
       },
     });
+  }
+
+  printInvoice() {
+    const inv = this.createdInvoice();
+    if (inv) {
+      this.docForPrint.set({
+        type: 'invoice',
+        data: inv,
+      });
+    }
+  }
+
+  finishAndClose() {
+    this.closed.emit();
   }
 
   onCancel() {

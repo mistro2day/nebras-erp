@@ -1,12 +1,23 @@
-import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, Output, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, Output, inject, signal, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn, exportElementToPdf } from '../../../shared/export';
 import { StudentsService } from '../../students/students.service';
+import { StudentFinanceService } from '../student-finance.service';
 import { TenantService } from '../../../core/services/tenant.service';
 import { environment } from '../../../../environments/environment';
 
 export type SfDoc = { type: 'invoice' | 'receipt' | 'receivable'; data: any } | null;
+
+export const DEFAULT_BRAND = {
+  name: 'مدارس المورد الجديدة للتعليم الخاص',
+  name_ar: 'مدارس المورد الجديدة للتعليم الخاص',
+  name_en: 'Al-Mawred Aljadidah Private Schools',
+  accreditation: 'وزارة التعليم والتربية الوطنية',
+  address: 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54',
+  logo_url: '/media/schools/logos/al-mawred.png',
+  stamp_url: '/media/schools/stamps/al-mawred-stamp.png',
+};
 
 function tafqeetArabic(num: number, currency = 'جنيه'): string {
   if (!num || num <= 0) return 'صفر ' + currency;
@@ -95,9 +106,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
               <h2 class="school-name-ar">{{ getSchoolNameAr() }}</h2>
               <h4 class="school-name-en">{{ getSchoolNameEn() }}</h4>
               <p class="accreditation-line">وزارة التعليم والتربية الوطنية</p>
-              @if (schoolData()?.address) {
-                <p class="school-contact-line">📍 {{ schoolData()?.address }}</p>
-              }
+              <p class="school-contact-line">📍 {{ getSchoolAddress() }}</p>
             </div>
             <div class="school-logo-wrapper">
               @if (getLogoUrl()) {
@@ -119,21 +128,27 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
           <div class="doc-banner">
             <div class="doc-title-box">
               <h1 class="doc-main-title">
-                {{ d.type === 'receipt' ? 'سند قـبـض مـالـي' : (d.type === 'invoice' ? 'فاتورة رسوم دراسية' : 'إشعار مطالبة مالية') }}
+                {{ d.type === 'receipt' ? 'سند قـبـض مـالـي' : (d.type === 'invoice' ? 'فاتـورة رسـوم دراسـيـة رسميـة' : 'إشعار مطالبة مالية') }}
               </h1>
               <span class="doc-sub-title">
-                {{ d.type === 'receipt' ? 'OFFICIAL PAYMENT RECEIPT' : (d.type === 'invoice' ? 'TUITION FEES INVOICE' : 'PAYMENT NOTICE') }}
+                {{ d.type === 'receipt' ? 'OFFICIAL PAYMENT RECEIPT' : (d.type === 'invoice' ? 'OFFICIAL TUITION FEES INVOICE' : 'OFFICIAL PAYMENT NOTICE') }}
               </span>
             </div>
             <div class="doc-meta-row">
               <div class="meta-item-box">
-                <span class="lbl">رقم المستند:</span>
+                <span class="lbl">{{ d.type === 'invoice' ? 'رقم الفاتورة:' : 'رقم السند:' }}</span>
                 <span class="val mono">{{ d.data?.receipt_number || d.data?.invoice_number || '—' }}</span>
               </div>
               <div class="meta-item-box">
-                <span class="lbl">التاريخ:</span>
+                <span class="lbl">{{ d.type === 'invoice' ? 'تاريخ الإصدار:' : 'التاريخ:' }}</span>
                 <span class="val">{{ d.data?.payment_date || d.data?.issue_date || todayDate }}</span>
               </div>
+              @if (d.type === 'invoice' && d.data?.due_date) {
+                <div class="meta-item-box">
+                  <span class="lbl">الاستحقاق:</span>
+                  <span class="val mono">{{ d.data?.due_date }}</span>
+                </div>
+              }
             </div>
           </div>
 
@@ -167,15 +182,26 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
               <span class="c-label">رقم حساب الطالب:</span>
               <span class="c-val mono">{{ getAccountNumber() }}</span>
             </div>
-            <div class="info-cell">
-              <span class="c-label">طريقة السداد:</span>
-              <span class="c-val">{{ d.type === 'receipt' ? (d.data?.payment_method_name || methodName(d.data?.payment_method_id)) : 'حساب بنكي / نقدي' }}</span>
-            </div>
             @if (d.type === 'receipt') {
+              <div class="info-cell">
+                <span class="c-label">طريقة السداد:</span>
+                <span class="c-val">{{ getPaymentMethodText() }}</span>
+              </div>
               <div class="info-cell balance-cell">
                 <span class="c-label">المتبقي من الرسوم:</span>
                 <span class="c-val mono remaining-val" [class.danger]="getRemainingBalance() > 0" [class.success]="getRemainingBalance() <= 0">
                   {{ getRemainingBalance() | number:'1.2-2' }} ج.س
+                </span>
+              </div>
+            } @else if (d.type === 'invoice') {
+              <div class="info-cell">
+                <span class="c-label">تاريخ الاستحقاق:</span>
+                <span class="c-val mono">{{ d.data?.due_date || '—' }}</span>
+              </div>
+              <div class="info-cell balance-cell">
+                <span class="c-label">المتبقي من الفاتورة:</span>
+                <span class="c-val mono remaining-val" [class.danger]="getInvoiceOutstanding() > 0" [class.success]="getInvoiceOutstanding() <= 0">
+                  {{ getInvoiceOutstanding() | number:'1.2-2' }} ج.س
                 </span>
               </div>
             }
@@ -183,30 +209,40 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 
           <!-- 4. جدول بنود الرسوم والمبالغ -->
           <div class="breakdown-section">
-            <h3 class="section-heading">تفاصيل البنود والمبالغ المالية</h3>
+            <h3 class="section-heading">{{ d.type === 'invoice' ? 'تفاصيل الرسوم الدراسية والبنود' : 'تفاصيل البنود والمبالغ المالية' }}</h3>
             <table class="voucher-table">
               <thead>
                 <tr>
                   <th style="width: 45px;">#</th>
-                  <th>بيان الرسوم / تفاصيل القسط</th>
+                  <th>{{ d.type === 'invoice' ? 'بيان الرسوم الدراسية / تفاصيل البند' : 'بيان الرسوم / تفاصيل القسط' }}</th>
                   <th class="text-end" style="width: 140px;">المبلغ</th>
                 </tr>
               </thead>
               <tbody>
-                @if (d.type === 'invoice' && d.data.items?.length) {
-                  @for (it of d.data.items; track it.id; let idx = $index) {
+                @if (d.type === 'invoice') {
+                  @if (d.data.items?.length) {
+                    @for (it of d.data.items; track it.id || $index; let idx = $index) {
+                      <tr>
+                        <td class="text-center">{{ idx + 1 }}</td>
+                        <td class="item-desc">{{ it.description || it.fee_structure_name || 'بند رسوم دراسية' }}</td>
+                        <td class="text-end mono">{{ (it.amount || 0) | number:'1.2-2' }}</td>
+                      </tr>
+                    }
+                  } @else {
                     <tr>
-                      <td class="text-center">{{ idx + 1 }}</td>
-                      <td class="item-desc">{{ it.description || 'بند رسوم دراسية' }}</td>
-                      <td class="text-end mono">{{ it.amount | number:'1.2-2' }}</td>
+                      <td class="text-center">1</td>
+                      <td class="item-desc">
+                        رسوم دراسية وفاتورة مستحقة للطالب — {{ d.data?.notes || d.data?.title || ('فاتورة رقم ' + (d.data?.invoice_number || '')) }}
+                      </td>
+                      <td class="text-end mono font-bold">{{ (d.data?.total_amount || 0) | number:'1.2-2' }}</td>
                     </tr>
                   }
                   @if (d.data.discounts?.length) {
-                    @for (dc of d.data.discounts; track dc.id) {
+                    @for (dc of d.data.discounts; track dc.id || $index) {
                       <tr class="discount-row">
                         <td class="text-center">★</td>
-                        <td class="item-desc">خصم: {{ dc.discount_reason || 'منحة / تخفيض مالي' }}</td>
-                        <td class="text-end mono">- {{ dc.amount | number:'1.2-2' }}</td>
+                        <td class="item-desc">خصم: {{ dc.discount_reason || 'منحة / تخفيض مالي معتمد' }}</td>
+                        <td class="text-end mono">- {{ (dc.amount || 0) | number:'1.2-2' }}</td>
                       </tr>
                     }
                   }
@@ -216,26 +252,55 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
                     <td class="item-desc">
                       سداد رسوم دراسية وتسجيل للطالب — {{ d.data?.notes || 'دفعة سداد معتمدة بموجب إيصال قبض' }}
                     </td>
-                    <td class="text-end mono font-bold">{{ d.data?.amount | number:'1.2-2' }}</td>
+                    <td class="text-end mono font-bold">{{ (d.data?.amount || 0) | number:'1.2-2' }}</td>
                   </tr>
                 } @else {
                   <tr>
                     <td class="text-center">1</td>
                     <td class="item-desc">مستحقات رسوم دراسية مجدولة</td>
-                    <td class="text-end mono">{{ d.data?.amount | number:'1.2-2' }}</td>
+                    <td class="text-end mono">{{ (d.data?.amount || 0) | number:'1.2-2' }}</td>
                   </tr>
                 }
               </tbody>
               <tfoot>
-                <tr class="total-row">
-                  <td colspan="2" class="total-label">
-                    {{ d.type === 'receipt' ? 'إجمالي المبلغ المقبوض والمحصّل بهذا السند:' : 'إجمالي المبلغ المستحق:' }}
-                  </td>
-                  <td class="total-amount mono text-end">
-                    {{ (d.type === 'receipt' ? d.data?.amount : d.data?.total_amount) | number:'1.2-2' }}
-                  </td>
-                </tr>
-                @if (d.type === 'receipt') {
+                @if (d.type === 'invoice') {
+                  @if (getInvoiceDiscount() > 0) {
+                    <tr class="subtotal-row">
+                      <td colspan="2" class="subtotal-label">إجمالي الرسوم (قبل الخصم):</td>
+                      <td class="mono text-end">{{ getInvoiceGross() | number:'1.2-2' }}</td>
+                    </tr>
+                    <tr class="discount-total-row">
+                      <td colspan="2" class="discount-total-label">إجمالي الخصومات والتخفيضات:</td>
+                      <td class="mono text-end text-danger">- {{ getInvoiceDiscount() | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                  <tr class="total-row">
+                    <td colspan="2" class="total-label">إجمالي الفاتورة الصافي المستحق:</td>
+                    <td class="total-amount mono text-end font-bold">{{ (d.data?.total_amount || 0) | number:'1.2-2' }}</td>
+                  </tr>
+                  @if (getPaidAmount() > 0) {
+                    <tr class="paid-row">
+                      <td colspan="2" class="paid-label">المبلغ المسدد والمدفوع حتى تاريخه:</td>
+                      <td class="mono text-end text-success font-bold">{{ getPaidAmount() | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                  <tr class="remaining-row">
+                    <td colspan="2" class="remaining-label">
+                      <span class="remaining-title">المتبقي المستحق من هذه الفاتورة:</span>
+                    </td>
+                    <td class="remaining-amount mono text-end font-bold" [class.has-due]="getInvoiceOutstanding() > 0" [class.cleared]="getInvoiceOutstanding() <= 0">
+                      {{ getInvoiceOutstanding() | number:'1.2-2' }}
+                    </td>
+                  </tr>
+                } @else if (d.type === 'receipt') {
+                  <tr class="total-row">
+                    <td colspan="2" class="total-label">
+                      إجمالي المبلغ المقبوض والمحصّل بهذا السند:
+                    </td>
+                    <td class="total-amount mono text-end font-bold">
+                      {{ (d.data?.amount || 0) | number:'1.2-2' }}
+                    </td>
+                  </tr>
                   <tr class="remaining-row">
                     <td colspan="2" class="remaining-label">
                       <span class="remaining-title">المتبقي من الرسوم الدراسية (الرصيد المستحق):</span>
@@ -244,6 +309,11 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
                       {{ getRemainingBalance() | number:'1.2-2' }}
                     </td>
                   </tr>
+                } @else {
+                  <tr class="total-row">
+                    <td colspan="2" class="total-label">إجمالي المبلغ المستحق:</td>
+                    <td class="total-amount mono text-end">{{ (d.data?.amount || 0) | number:'1.2-2' }}</td>
+                  </tr>
                 }
               </tfoot>
             </table>
@@ -251,34 +321,51 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 
           <!-- 5. التفقيط المالي (المبلغ كتابة باللغة العربية) -->
           <div class="tafqeet-container">
-            <div class="tafqeet-box">
-              <span class="tafqeet-title">المبلغ المقبوض كتابةً:</span>
-              <span class="tafqeet-text">{{ getTafqeetText() }}</span>
-            </div>
-            @if (d.type === 'receipt' && getRemainingBalance() > 0) {
-              <div class="tafqeet-box remaining-tafqeet-box">
-                <span class="tafqeet-title remaining-tafqeet-title">المتبقي من الرسوم كتابةً:</span>
-                <span class="tafqeet-text remaining-tafqeet-text">{{ getRemainingTafqeetText() }}</span>
+            @if (d.type === 'invoice') {
+              <div class="tafqeet-box">
+                <span class="tafqeet-title">إجمالي الفاتورة كتابةً:</span>
+                <span class="tafqeet-text">{{ getInvoiceTafqeetText() }}</span>
               </div>
+              @if (getInvoiceOutstanding() > 0) {
+                <div class="tafqeet-box remaining-tafqeet-box">
+                  <span class="tafqeet-title remaining-tafqeet-title">المتبقي المستحق من الفاتورة كتابةً:</span>
+                  <span class="tafqeet-text remaining-tafqeet-text">{{ getInvoiceOutstandingTafqeetText() }}</span>
+                </div>
+              }
+            } @else {
+              <div class="tafqeet-box">
+                <span class="tafqeet-title">المبلغ المقبوض كتابةً:</span>
+                <span class="tafqeet-text">{{ getTafqeetText() }}</span>
+              </div>
+              @if (getRemainingBalance() > 0) {
+                <div class="tafqeet-box remaining-tafqeet-box">
+                  <span class="tafqeet-title remaining-tafqeet-title">المتبقي من الرسوم كتابةً:</span>
+                  <span class="tafqeet-text remaining-tafqeet-text">{{ getRemainingTafqeetText() }}</span>
+                </div>
+              }
             }
           </div>
 
           <!-- 6. الملاحظات والسياسة المالية -->
           <div class="terms-box">
-            <p><strong>ملاحظات هامة:</strong> الرسوم المدفوعة تخضع للائحة والسياسة المالية للمدرسة. يرجى الاحتفاظ بهذا السند كإثبات رسمي لعملية السداد.</p>
+            @if (d.type === 'invoice') {
+              <p><strong>ملاحظات هامة:</strong> تستحق هذه الفاتورة وتخضع للائحة والسياسة المالية المعتمدة لمدارس المورد الجديدة للتعليم الخاص. يرجى سداد المبلغ المتبقي قبل حلول تاريخ الاستحقاق لتجنب تعليق الخدمات الأكاديمية أو فرض غرامات التأخير.</p>
+            } @else {
+              <p><strong>ملاحظات هامة:</strong> الرسوم المدفوعة تخضع للائحة والسياسة المالية للمدرسة. يرجى الاحتفاظ بهذا السند كإثبات رسمي لعملية السداد.</p>
+            }
           </div>
 
           <!-- 7. التذييل والتوقيعات الرسمية والختم المعتمد -->
           <div class="signatures-section">
             <div class="sig-box">
-              <span class="sig-title">أمين الصندوق / المحاسب</span>
+              <span class="sig-title">{{ d.type === 'invoice' ? 'محاسب المدرسة / شؤون الطلاب المالية' : 'أمين الصندوق / المحاسب' }}</span>
               <div class="sig-space"></div>
               <span class="sig-hint">التوقيع والاعتماد</span>
             </div>
             <div class="sig-box">
-              <span class="sig-title">توقيع ولي الأمر / المسدد</span>
+              <span class="sig-title">{{ d.type === 'invoice' ? 'استلام ولي الأمر / الطالب' : 'توقيع ولي الأمر / المسدد' }}</span>
               <div class="sig-space"></div>
-              <span class="sig-hint">الاسم والتوقيع</span>
+              <span class="sig-hint">{{ d.type === 'invoice' ? 'الاسم والتوقيع بالعلم' : 'الاسم والتوقيع' }}</span>
             </div>
             <div class="sig-box stamp-box">
               <span class="sig-title">ختم الإدارة المالية للمدرسة</span>
@@ -743,9 +830,10 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     }
   `],
 })
-export class SfDocumentDrawerComponent implements OnInit {
+export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   private elRef = inject(ElementRef);
   private studentsService = inject(StudentsService);
+  private studentFinanceService = inject(StudentFinanceService);
   private tenantService = inject(TenantService);
 
   readonly printFn = () => this.printDocument();
@@ -760,6 +848,8 @@ export class SfDocumentDrawerComponent implements OnInit {
   @Output() closed = new EventEmitter<void>();
 
   brandingData = signal<any>(null);
+  resolvedStudent = signal<any>(null);
+  resolvedAccount = signal<any>(null);
   logoFailed = signal(false);
   stampFailed = signal(false);
   todayDate = new Date().toLocaleDateString('ar-EG');
@@ -767,11 +857,52 @@ export class SfDocumentDrawerComponent implements OnInit {
   ngOnInit(): void {
     this.logoFailed.set(false);
     this.stampFailed.set(false);
-    if (!this.schoolInfo) {
+    this.resolveMissingData();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['doc'] || changes['student'] || changes['billingAccount']) {
+      this.resolveMissingData();
+    }
+  }
+
+  private resolveMissingData(): void {
+    const d = this.doc?.data;
+
+    // 1. استرجاع وتحديث بيانات المدرسة والترويسة
+    if (!this.schoolInfo && !this.brandingData()) {
       this.studentsService.getBranding().subscribe({
         next: (res) => {
           if (res) this.brandingData.set(res);
-        }
+        },
+        error: () => {}
+      });
+    }
+
+    if (!d) return;
+
+    // 2. استرجاع بيانات الطالب إذا لم تكن ممررة
+    const studentId = d.student_id || d.student?.id;
+    if (!this.student && studentId && (!this.resolvedStudent() || this.resolvedStudent()?.id !== studentId)) {
+      this.studentsService.getStudentById(studentId).subscribe({
+        next: (res) => {
+          if (res && res.success && res.data) {
+            this.resolvedStudent.set(res.data);
+          }
+        },
+        error: () => {}
+      });
+    }
+
+    // 3. استرجاع بيانات الحساب المالي إذا لم تكن ممررة
+    const accountId = d.student_billing_account_id || (typeof d.student_billing_account === 'string' ? d.student_billing_account : d.student_billing_account?.id);
+    if (!this.billingAccount && accountId && (!this.resolvedAccount() || this.resolvedAccount()?.id !== accountId)) {
+      this.studentFinanceService.listBillingAccounts({ id: accountId }).subscribe({
+        next: (res) => {
+          const acc = res?.data?.[0];
+          if (acc) this.resolvedAccount.set(acc);
+        },
+        error: () => {}
       });
     }
   }
@@ -781,17 +912,21 @@ export class SfDocumentDrawerComponent implements OnInit {
   }
 
   getSchoolNameAr(): string {
-    return this.schoolData()?.school_name_ar || this.schoolData()?.name_ar || this.schoolData()?.name || this.tenantService.currentTenant()?.nameAr || 'مدارس المورد الأهلية النموذجية';
+    return this.schoolData()?.school_name_ar || this.schoolData()?.name_ar || this.schoolData()?.name || DEFAULT_BRAND.name_ar;
   }
 
   getSchoolNameEn(): string {
-    return this.schoolData()?.school_name_en || this.schoolData()?.name_en || this.tenantService.currentTenant()?.nameEn || 'Al-Mawrid Model Private Schools';
+    return this.schoolData()?.school_name_en || this.schoolData()?.name_en || DEFAULT_BRAND.name_en;
+  }
+
+  getSchoolAddress(): string {
+    return this.schoolData()?.address || DEFAULT_BRAND.address;
   }
 
   getLogoUrl(): string {
     if (this.logoFailed()) return '';
     const info = this.schoolData();
-    let url = info?.logo_url || info?.logo || this.tenantService.currentTenant()?.logoUrl || '';
+    let url = info?.logo_url || info?.logo || this.tenantService.currentTenant()?.logoUrl || DEFAULT_BRAND.logo_url;
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
       return url;
@@ -803,7 +938,7 @@ export class SfDocumentDrawerComponent implements OnInit {
   getStampUrl(): string {
     if (this.stampFailed()) return '';
     const info = this.schoolData();
-    let url = info?.stamp_url || info?.stamp || this.tenantService.currentTenant()?.stampUrl || '';
+    let url = info?.stamp_url || info?.stamp || this.tenantService.currentTenant()?.stampUrl || DEFAULT_BRAND.stamp_url;
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
       return url;
@@ -820,6 +955,72 @@ export class SfDocumentDrawerComponent implements OnInit {
     this.stampFailed.set(true);
   }
 
+  getStudentObj(): any {
+    return this.student || this.resolvedStudent() || null;
+  }
+
+  getBillingAccountObj(): any {
+    return this.billingAccount || this.resolvedAccount() || (typeof this.doc?.data?.student_billing_account === 'object' ? this.doc?.data?.student_billing_account : null);
+  }
+
+  getStudentName(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.student_name 
+      || this.studentName 
+      || s?.profile?.arabic_name 
+      || s?.arabic_name 
+      || s?.profile?.english_name 
+      || s?.english_name 
+      || '—';
+  }
+
+  getStudentNumber(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.student_number 
+      || s?.student_number 
+      || '—';
+  }
+
+  getGradeName(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.grade_name 
+      || s?.grade_name 
+      || s?.enrollments?.[0]?.grade_level 
+      || '—';
+  }
+
+  getSectionName(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.section_name 
+      || s?.section_name 
+      || s?.enrollments?.[0]?.section_name 
+      || '—';
+  }
+
+  getGuardianName(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.guardian_name 
+      || s?.guardian_name 
+      || s?.family_relations?.[0]?.full_name 
+      || '—';
+  }
+
+  getGuardianPhone(): string {
+    const s = this.getStudentObj();
+    return this.doc?.data?.guardian_phone 
+      || s?.guardian_phone 
+      || s?.family_relations?.[0]?.phone 
+      || '—';
+  }
+
+  getAccountNumber(): string {
+    if (this.doc?.data?.account_number) return this.doc.data.account_number;
+    const acc = this.getBillingAccountObj();
+    if (acc?.account_number) return acc.account_number;
+    const stdNum = this.getStudentNumber();
+    return stdNum && stdNum !== '—' ? `ACC-${stdNum}` : '—';
+  }
+
   getRemainingBalance(): number {
     const d = this.doc?.data;
     if (d?.remaining_balance !== undefined && d?.remaining_balance !== null) {
@@ -828,11 +1029,9 @@ export class SfDocumentDrawerComponent implements OnInit {
     if (d?.outstanding_balance !== undefined && d?.outstanding_balance !== null) {
       return Number(d.outstanding_balance) || 0;
     }
-    if (this.billingAccount?.outstanding_balance !== undefined && this.billingAccount?.outstanding_balance !== null) {
-      return Number(this.billingAccount.outstanding_balance) || 0;
-    }
-    if (d?.student_billing_account?.outstanding_balance !== undefined && d?.student_billing_account?.outstanding_balance !== null) {
-      return Number(d.student_billing_account.outstanding_balance) || 0;
+    const acc = this.getBillingAccountObj();
+    if (acc?.outstanding_balance !== undefined && acc?.outstanding_balance !== null) {
+      return Number(acc.outstanding_balance) || 0;
     }
     return 0;
   }
@@ -842,8 +1041,58 @@ export class SfDocumentDrawerComponent implements OnInit {
     return tafqeetArabic(rem, 'جنيه');
   }
 
+  getPaymentMethodText(): string {
+    const d = this.doc?.data;
+    if (d?.payment_method_name) return d.payment_method_name;
+    if (d?.payment_method?.name_ar) return d.payment_method.name_ar;
+    if (d?.payment_method_id) {
+      const found = this.methods.find((m) => m.id === d.payment_method_id);
+      if (found) return found.name_ar || found.name;
+    }
+    return 'نقداً / كاش';
+  }
+
   methodName(id: string): string {
-    return this.methods.find((m) => m.id === id)?.name_ar || 'نقداً — الخزينة الرئيسية';
+    return this.methods.find((m) => m.id === id)?.name_ar || 'نقداً / كاش';
+  }
+
+  getInvoiceGross(): number {
+    const d = this.doc?.data;
+    if (!d) return 0;
+    const itemsSum = (d.items || []).reduce((s: number, it: any) => s + (Number(it.amount) || 0), 0);
+    if (itemsSum > 0) return itemsSum;
+    return (Number(d.total_amount) || 0) + this.getInvoiceDiscount();
+  }
+
+  getInvoiceDiscount(): number {
+    const d = this.doc?.data;
+    if (!d?.discounts || !Array.isArray(d.discounts)) return 0;
+    return d.discounts.reduce((s: number, dc: any) => s + (Number(dc.amount) || 0), 0);
+  }
+
+  getInvoiceOutstanding(): number {
+    const d = this.doc?.data;
+    if (!d) return 0;
+    if (d.outstanding_amount !== undefined && d.outstanding_amount !== null) {
+      return Number(d.outstanding_amount) || 0;
+    }
+    const total = Number(d.total_amount) || 0;
+    const paid = Number(d.paid_amount) || 0;
+    return Math.max(0, total - paid);
+  }
+
+  getPaidAmount(): number {
+    return Number(this.doc?.data?.paid_amount) || 0;
+  }
+
+  getInvoiceTafqeetText(): string {
+    const total = Number(this.doc?.data?.total_amount) || 0;
+    return tafqeetArabic(total, 'جنيه');
+  }
+
+  getInvoiceOutstandingTafqeetText(): string {
+    const rem = this.getInvoiceOutstanding();
+    return tafqeetArabic(rem, 'جنيه');
   }
 
   meta(): { title: string; subtitle: string } {
@@ -852,37 +1101,6 @@ export class SfDocumentDrawerComponent implements OnInit {
     if (d.type === 'invoice') return { title: `فاتورة رسوم دراسية ${d.data?.invoice_number || ''}`, subtitle: this.getStudentName() };
     if (d.type === 'receipt') return { title: `سند قبض مالي ${d.data?.receipt_number || ''}`, subtitle: this.getStudentName() };
     return { title: 'مستحق مالي', subtitle: this.getStudentName() };
-  }
-
-  getStudentName(): string {
-    return this.doc?.data?.student_name || this.studentName || this.student?.profile?.arabic_name || this.student?.profile?.english_name || '—';
-  }
-
-  getStudentNumber(): string {
-    return this.doc?.data?.student_number || this.student?.student_number || '—';
-  }
-
-  getGradeName(): string {
-    return this.doc?.data?.grade_name || this.student?.grade_name || this.student?.enrollments?.[0]?.grade_level || '—';
-  }
-
-  getSectionName(): string {
-    return this.doc?.data?.section_name || this.student?.enrollments?.[0]?.section_name || '—';
-  }
-
-  getGuardianName(): string {
-    return this.doc?.data?.guardian_name || this.student?.guardian_name || this.student?.family_relations?.[0]?.full_name || '—';
-  }
-
-  getGuardianPhone(): string {
-    return this.doc?.data?.guardian_phone || this.student?.guardian_phone || this.student?.family_relations?.[0]?.phone || '—';
-  }
-
-  getAccountNumber(): string {
-    if (this.doc?.data?.account_number) return this.doc.data.account_number;
-    if (this.doc?.data?.student_billing_account?.account_number) return this.doc.data.student_billing_account.account_number;
-    const stdNum = this.getStudentNumber();
-    return stdNum && stdNum !== '—' ? `ACC-${stdNum}` : '—';
   }
 
   getTafqeetText(): string {
@@ -925,6 +1143,7 @@ export class SfDocumentDrawerComponent implements OnInit {
       <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8">
+        <base href="${window.location.origin}/">
         <title>${this.meta().title}</title>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -932,7 +1151,7 @@ export class SfDocumentDrawerComponent implements OnInit {
         <style>
           @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 8mm 10mm;
           }
           * {
             box-sizing: border-box;
@@ -1177,6 +1396,18 @@ export class SfDocumentDrawerComponent implements OnInit {
             color: #059669 !important;
             font-weight: 800 !important;
           }
+          .voucher-table tfoot .subtotal-row td {
+            background: #f8fafc !important;
+            font-weight: 600 !important;
+          }
+          .voucher-table tfoot .discount-total-row td {
+            background: #fff5f5 !important;
+            font-weight: 600 !important;
+          }
+          .voucher-table tfoot .paid-row td {
+            background: #f0fdf4 !important;
+            font-weight: 600 !important;
+          }
           .voucher-table tfoot .remaining-row td {
             background: #fef2f2 !important;
             border-top: 1px dashed #fca5a5 !important;
@@ -1319,6 +1550,8 @@ export class SfDocumentDrawerComponent implements OnInit {
           .text-center { text-align: center; }
           .text-end { text-align: end; }
           .font-bold { font-weight: 700; }
+          .text-danger { color: #dc2626 !important; }
+          .text-success { color: #059669 !important; }
         </style>
       </head>
       <body>
@@ -1326,6 +1559,7 @@ export class SfDocumentDrawerComponent implements OnInit {
       </body>
       </html>
     `;
+
 
     frameDoc.open();
     frameDoc.write(html);

@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
+import { StudentsService } from '../../students/students.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -146,7 +147,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
       ></app-send-message-modal>
 
       <!-- ساحبة المستند الرسمي الفاخر للطباعة A4 -->
-      <sf-document-drawer [doc]="doc()" (closed)="doc.set(null)"></sf-document-drawer>
+      <sf-document-drawer [doc]="doc()" [methods]="methods()" [schoolInfo]="schoolInfo()" (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -189,6 +190,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 })
 export class SfInvoicesListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
+  private readonly studentsSvc = inject(StudentsService);
   private readonly snack = inject(MatSnackBar);
 
   // ---- معالج إنشاء فاتورة جديد بنمط الخطوات ----
@@ -199,6 +201,8 @@ export class SfInvoicesListComponent implements OnInit {
   todayDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
 
   readonly doc = signal<SfDoc>(null);
+  readonly schoolInfo = signal<any>(null);
+  readonly methods = signal<any[]>([]);
 
   openDoc(invoice: any) {
     this.doc.set({ type: 'invoice', data: invoice });
@@ -255,7 +259,11 @@ export class SfInvoicesListComponent implements OnInit {
     return this.filtered().slice(start, start + this.pageSize);
   });
 
-  ngOnInit(): void { this.reload(); }
+  ngOnInit(): void {
+    this.reload();
+    this.studentsSvc.getBranding().subscribe((b) => this.schoolInfo.set(b));
+    this.svc.listPaymentMethods().subscribe((r) => this.methods.set(r?.data ?? []));
+  }
 
   reload(): void {
     this.loading.set(true);

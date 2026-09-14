@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentFinanceService } from '../student-finance.service';
+import { StudentsService } from '../../students/students.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
@@ -116,7 +117,7 @@ import { ReceiptCreateModalComponent } from './receipt-create-modal.component';
         </div>
       }
 
-      <sf-document-drawer [doc]="doc()" [methods]="methods()" (closed)="doc.set(null)"></sf-document-drawer>
+      <sf-document-drawer [doc]="doc()" [methods]="methods()" [schoolInfo]="schoolInfo()" (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -158,11 +159,13 @@ import { ReceiptCreateModalComponent } from './receipt-create-modal.component';
 })
 export class SfReceiptsListComponent implements OnInit {
   private readonly svc = inject(StudentFinanceService);
+  private readonly studentsSvc = inject(StudentsService);
   private readonly snack = inject(MatSnackBar);
 
   // ---- معالج استلام الدفعات الجديد بنمط الخطوات ----
   readonly createModalOpen = signal(false);
   readonly methods = signal<any[]>([]);
+  readonly schoolInfo = signal<any>(null);
 
   openCreateModal(): void {
     this.createModalOpen.set(true);
@@ -212,7 +215,11 @@ export class SfReceiptsListComponent implements OnInit {
     return this.filtered().slice(start, start + this.pageSize);
   });
 
-  ngOnInit(): void { this.reload(); }
+  ngOnInit(): void {
+    this.reload();
+    this.svc.listPaymentMethods().subscribe((r) => this.methods.set(r?.data ?? []));
+    this.studentsSvc.getBranding().subscribe((b) => this.schoolInfo.set(b));
+  }
 
   reload(): void {
     this.loading.set(true);

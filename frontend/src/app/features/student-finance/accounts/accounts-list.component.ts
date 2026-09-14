@@ -297,8 +297,13 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
       </nb-drawer>
 
       <!-- نافذة تفاصيل المستند (فاتورة / تحصيل / مستحق) — مشتركة مع صفحة تفاصيل الطالب -->
-      <sf-document-drawer [doc]="doc()" [studentName]="sel() ? studentName(sel().student_id) : ''"
-        [methods]="methods()" (closed)="doc.set(null)"></sf-document-drawer>
+      <sf-document-drawer [doc]="doc()"
+        [student]="drawerStudent()"
+        [studentName]="sel() ? studentName(sel().student_id) : ''"
+        [billingAccount]="sel()"
+        [schoolInfo]="schoolInfo()"
+        [methods]="methods()"
+        (closed)="doc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -442,6 +447,7 @@ export class SfAccountsListComponent implements OnInit {
   methods = signal<any[]>([]);
   cashBoxes = signal<any[]>([]);
   feeStructures = signal<any[]>([]);
+  schoolInfo = signal<any>(null);
 
   // درج الحساب
   sel = signal<any | null>(null);
@@ -533,6 +539,7 @@ export class SfAccountsListComponent implements OnInit {
     if (q) this.search = q;
     this.loadStudents();
     this.reload();
+    this.studentsSvc.getBranding().subscribe((b) => this.schoolInfo.set(b));
     this.svc.listPaymentMethods().subscribe((r) => this.methods.set(r?.data ?? []));
     this.svc.listCashBoxes().subscribe((r) => this.cashBoxes.set(r?.data ?? []));
     this.svc.listFeeStructures().subscribe((r) => this.feeStructures.set((r?.data ?? []).filter((f: any) => f.is_active)));
@@ -566,6 +573,17 @@ export class SfAccountsListComponent implements OnInit {
 
   studentName(id: string): string { const s = this.studentsMap().get(id); return s?.profile?.arabic_name || 'طالب'; }
   studentNumber(id: string): string { return this.studentsMap().get(id)?.student_number || ''; }
+
+  drawerStudent(): any {
+    if (this.sel()?.student_id) {
+      return this.studentsMap().get(this.sel().student_id) || null;
+    }
+    const d = this.doc()?.data;
+    if (d?.student_id) {
+      return this.studentsMap().get(d.student_id) || null;
+    }
+    return null;
+  }
 
   cols(): ExportColumn[] {
     return [

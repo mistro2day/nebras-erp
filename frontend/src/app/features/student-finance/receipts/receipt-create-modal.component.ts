@@ -367,6 +367,8 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
     <sf-document-drawer
       [doc]="docForPrint()"
       [studentName]="createdReceipt()?.student_name || getStudentName(selectedAccount()?.student_id)"
+      [billingAccount]="selectedAccount()"
+      [schoolInfo]="schoolInfo()"
       [methods]="methods()"
       (closed)="docForPrint.set(null)"
     ></sf-document-drawer>
@@ -866,6 +868,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   submitting = signal(false);
   createdReceipt = signal<any | null>(null);
   docForPrint = signal<SfDoc>(null);
+  schoolInfo = signal<any>(null);
   accountMode = signal<'locked' | 'search'>('locked');
 
   accounts = signal<any[]>([]);
@@ -977,6 +980,10 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
         this.bankAccounts.set(res?.data ?? []);
         this.autoSelectDestination();
       },
+    });
+
+    this.studentsSvc.getBranding().subscribe({
+      next: (b) => this.schoolInfo.set(b),
     });
   }
 
