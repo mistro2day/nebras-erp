@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from functools import wraps
 from django.db import transaction
 from django.utils import timezone
@@ -36,7 +36,7 @@ def db_atomic(func):
     """ديكوريتور يحافظ على توقيع الدالة الأصلي ويشغلها داخل معاملة قاعدة بيانات ذرية."""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with transaction.atomic():
+        with transaction.atomic():  # type: ignore
             return func(*args, **kwargs)
     return wrapper
 
@@ -230,7 +230,7 @@ class BillingService:
         # ترحيل القيد
         journal.status = 'approved'
         journal.save(update_fields=['status'])
-        PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+        PostingService.post_journal_entry(tenant_id, journal.id, user_id)  # type: ignore
 
         # ربط القيد المالي بالفاتورة وتحديث حالتها
         invoice.journal_entry_id = journal.id
@@ -362,8 +362,10 @@ class PaymentService:
                 from django.utils.dateparse import parse_date
                 parsed_d = parse_date(payment_date)
                 actual_date = parsed_d if parsed_d else date.today()
-            elif isinstance(payment_date, (datetime, date)):
-                actual_date = payment_date.date() if isinstance(payment_date, datetime) else payment_date
+            elif isinstance(payment_date, datetime):
+                actual_date = payment_date.date()
+            elif isinstance(payment_date, date):
+                actual_date = payment_date
             else:
                 actual_date = date.today()
         else:
@@ -405,7 +407,7 @@ class PaymentService:
         )
 
         # معالجة السند وترحيله بالكامل آلياً
-        CashManagementService.process_voucher(tenant_id, voucher.id, user_id)
+        CashManagementService.process_voucher(tenant_id, voucher.id, user_id)  # type: ignore
 
         # تحديث إيصال القبض برقم السند والحالة المرحلة
         receipt.voucher_id = voucher.id

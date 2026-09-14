@@ -788,9 +788,10 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     }
   }
 
-  onAccountIdChanged(id: string) {
-    this.selectedAccountId.set(id);
-    const found = this.accounts().find((a) => a.id === id);
+  onAccountIdChanged(id: string | number | null) {
+    const strId = id ? String(id) : '';
+    this.selectedAccountId.set(strId);
+    const found = this.accounts().find((a) => a.id === strId);
     this.selectedAccount.set(found || null);
     if (found && +found.outstanding_balance > 0) {
       this.amount = +found.outstanding_balance;
