@@ -10,8 +10,14 @@ For all frontend UI tasks — including building pages, components, layouts, cho
   1. Use `<nb-modal>` with clear title and descriptive subtitle.
   2. Use `<nb-stepper [steps]="steps" [current]="currentStep() + 1"></nb-stepper>`.
   3. Form inputs MUST use Nebras components: `<nb-datepicker>` for dates, and `<nb-searchable-select>` for searchable account/student/vendor dropdowns. Native `<input type="date">` and unsearchable huge `<select>` tags are strictly prohibited.
-  4. The final step MUST ALWAYS be a comprehensive Review & Confirmation step (المراجعة والتأكيد) presenting key details and Sudanese currency formatting (`ج.س` with Arabic tafqeet) with clear confirm button before final persistence.
-  5. Action buttons on tables MUST use authentic Nebras button classes (`btn ghost xs`, `btn primary xs`), never raw square emoji boxes.
+  4. The pre-final step MUST ALWAYS be a comprehensive Review & Confirmation step (المراجعة والتأكيد) presenting key details and Sudanese currency formatting (`ج.س` with Arabic tafqeet) with clear confirm button before final persistence.
+  5. **MANDATORY IN-MODAL FINAL SUCCESS & PRINT STEP (الخطوة الأخيرة الإلزامية لاكتمال التسجيل والاعتماد والطباعة)**:
+     Never close creation wizards abruptly upon submission or rely on background toast messages. The wizard MUST ALWAYS conclude with a dedicated final Success & Completion step (`اكتمال السند والاعتماد` / `اكتمال التسجيل والاعتماد`) displayed inside the modal itself:
+     a. An animated success badge & clear congratulatory message confirming successful persistence and posting to the general ledger/accounts.
+     b. An official document card featuring the generated number (رقم السند/الفاتورة/القيد), student/entity details, financial amounts in Sudanese Pounds (`ج.س`), and Arabic tafqeet.
+     c. Direct A4 print action button (`🖨️ طباعة المستند الرسمي (A4)`) linked to `<sf-document-drawer>` or equivalent print drawer.
+     d. Clear `✓ إنهاء وإغلاق` button.
+  6. Action buttons on tables MUST use authentic Nebras button classes (`btn ghost xs`, `btn primary xs`), never raw square emoji boxes.
 
 ## Git Workflow Rules
 - **Arabic Git Commits**: All `git commit` messages MUST be written in Arabic to maintain context and history consistency.

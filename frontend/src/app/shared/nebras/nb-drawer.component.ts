@@ -33,8 +33,8 @@ import { CommonModule } from '@angular/common';
     }
   `,
   styles: [`
-    .nb-dr-overlay { position: fixed; inset: 0; background: rgba(16,24,40,0.44); z-index: 1200; animation: nbFade .18s ease; }
-    .nb-dr-panel { position: fixed; top: 0; bottom: 0; inset-inline-start: 0; max-width: 94vw; z-index: 1201;
+    .nb-dr-overlay { position: fixed; inset: 0; background: rgba(16,24,40,0.44); z-index: 2500; animation: nbFade .18s ease; }
+    .nb-dr-panel { position: fixed; top: 0; bottom: 0; inset-inline-start: 0; max-width: 94vw; z-index: 2501;
       background: var(--nb-surface); border-inline-end: 1px solid var(--nb-border); box-shadow: 0 8px 40px rgba(16,24,40,0.24);
       display: flex; flex-direction: column; animation: nbSlide .24s cubic-bezier(0.2,0,0,1); }
     @keyframes nbFade { from { opacity: 0; } to { opacity: 1; } }

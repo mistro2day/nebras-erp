@@ -9,6 +9,7 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
 import { NbSearchableSelectComponent, NbSelectItem } from '../../../shared/nebras/nb-searchable-select.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
 
 @Component({
   selector: 'app-receipt-create-modal',
@@ -22,6 +23,7 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
     NbStepperComponent,
     NbSearchableSelectComponent,
     NbDatepickerComponent,
+    SfDocumentDrawerComponent,
   ],
   template: `
     <nb-modal
@@ -266,32 +268,108 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
             </div>
           </div>
         }
+
+        <!-- الخطوة 4: اكتمال السند والاعتماد والطباعة -->
+        @if (currentStep() === 3) {
+          <div class="success-step">
+            <div class="success-header">
+              <div class="success-icon-badge">
+                <span class="icon-symbol">✓</span>
+              </div>
+              <h3 class="success-title">تم استلام الدفعة وتسجيل سند القبض بنجاح!</h3>
+              <p class="success-desc">
+                تم قيد السداد وتحديث مستحقات الطالب وترحيل سند القبض المالي إلى دفتر الأستاذ العام بالمركز المالي.
+              </p>
+            </div>
+
+            @if (createdReceipt(); as r) {
+              <div class="success-receipt-card">
+                <div class="src-ribbon">
+                  <span class="src-status">✓ معتمد ومرحل بالمالية</span>
+                  <span class="src-num mono">رقم السند: <strong>{{ r.receipt_number || 'REC-قيد الإيداع' }}</strong></span>
+                </div>
+
+                <div class="src-body">
+                  <div class="src-row">
+                    <span class="lbl">اسم الطالب:</span>
+                    <span class="val bold">{{ r.student_name || getStudentName(selectedAccount()?.student_id) }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">رقم القيد والحساب المالي:</span>
+                    <span class="val mono">{{ r.account_number || selectedAccount()?.account_number }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">تاريخ التحصيل والسند:</span>
+                    <span class="val mono bold">{{ r.payment_date || paymentDate }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">طريقة الدفع وجهة الإيداع:</span>
+                    <span class="val">{{ getMethodName(paymentMethodId) }} — {{ getDepositDestination() }}</span>
+                  </div>
+                  <div class="src-row highlight">
+                    <span class="lbl">المبلغ المحصل والمسجل:</span>
+                    <span class="val bold ok mono font-amount">{{ (r.amount || amount) | number:'1.2-2' }} ج.س</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">المتبقي على حساب الطالب:</span>
+                    <span class="val mono" [class.due]="getFinalRemaining(r) > 0" [class.ok]="getFinalRemaining(r) <= 0">
+                      {{ getFinalRemaining(r) | number:'1.2-2' }} ج.س
+                    </span>
+                  </div>
+                </div>
+
+                <div class="tafqeet-box" style="margin-top: 14px;">
+                  <span class="tafqeet-title">المبلغ كتابةً:</span>
+                  <span class="tafqeet-text">{{ getTafqeet(r.amount || amount) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
       </div>
 
       <div class="modal-actions" slot="footer">
-        <button type="button" class="btn ghost" (click)="onCancel()" [disabled]="submitting()">
-          إلغاء
-        </button>
-
-        <div class="actions-spacer"></div>
-
-        @if (currentStep() > 0) {
-          <button type="button" class="btn ghost" (click)="prevStep()" [disabled]="submitting()">
-            السابق
+        @if (currentStep() === 3) {
+          <button type="button" class="btn primary print-step-btn" (click)="printReceipt()">
+            🖨️ طباعة سند القبض الرسمي (A4)
           </button>
-        }
-
-        @if (currentStep() < steps.length - 1) {
-          <button type="button" class="btn primary" (click)="nextStep()" [disabled]="!canProceed()">
-            التالي
+          <div class="actions-spacer"></div>
+          <button type="button" class="btn ghost finish-btn" (click)="finishAndClose()">
+            ✓ إنهاء وإغلاق
           </button>
         } @else {
-          <button type="button" class="btn primary confirm-btn" (click)="submit()" [disabled]="submitting() || !canProceed()">
-            {{ submitting() ? 'جارٍ تسجيل السند والتسوية…' : '✓ تأكيد واستلام الدفعة' }}
+          <button type="button" class="btn ghost" (click)="onCancel()" [disabled]="submitting()">
+            إلغاء
           </button>
+
+          <div class="actions-spacer"></div>
+
+          @if (currentStep() > 0) {
+            <button type="button" class="btn ghost" (click)="prevStep()" [disabled]="submitting()">
+              السابق
+            </button>
+          }
+
+          @if (currentStep() < 2) {
+            <button type="button" class="btn primary" (click)="nextStep()" [disabled]="!canProceed()">
+              التالي
+            </button>
+          } @else {
+            <button type="button" class="btn primary confirm-btn" (click)="submit()" [disabled]="submitting() || !canProceed()">
+              {{ submitting() ? 'جارٍ تسجيل السند والتسوية…' : '✓ تأكيد واستلام الدفعة' }}
+            </button>
+          }
         }
       </div>
     </nb-modal>
+
+    <!-- درج طباعة المستند المالي الرسمي A4 -->
+    <sf-document-drawer
+      [doc]="docForPrint()"
+      [studentName]="createdReceipt()?.student_name || getStudentName(selectedAccount()?.student_id)"
+      [methods]="methods()"
+      (closed)="docForPrint.set(null)"
+    ></sf-document-drawer>
   `,
   styles: [`
     .step-content {
@@ -641,6 +719,128 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
     .confirm-btn:hover:not(:disabled) {
       background: #047857 !important;
     }
+
+    /* الخطوة 4: اكتمال السند والاعتماد والطباعة */
+    .success-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      animation: nbSuccessIn .25s ease;
+    }
+    @keyframes nbSuccessIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .success-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .success-icon-badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 800;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+    }
+    .success-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 800;
+      color: #065f46;
+    }
+    .success-desc {
+      margin: 0;
+      font-size: 13px;
+      color: var(--nb-text-muted);
+      max-width: 520px;
+      line-height: 1.5;
+    }
+    .success-receipt-card {
+      width: 100%;
+      background: var(--nb-surface);
+      border: 1.5px solid #a7f3d0;
+      border-radius: var(--nb-radius-card, 12px);
+      padding: 16px 20px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.06);
+      box-sizing: border-box;
+    }
+    .src-ribbon {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #d1fae5;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .src-status {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+    .src-num {
+      font-size: 13px;
+      color: var(--nb-text);
+    }
+    .src-num strong {
+      color: var(--nb-primary-700);
+      margin-inline-start: 4px;
+    }
+    .src-body {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .src-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .src-row .lbl {
+      color: var(--nb-text-muted);
+    }
+    .src-row .val {
+      color: var(--nb-text);
+    }
+    .src-row.highlight {
+      grid-column: span 2;
+      background: #f0fdf4;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #bbf7d0;
+    }
+    .src-row .font-amount {
+      font-size: 16px;
+      color: #15803d;
+    }
+    .print-step-btn {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      padding: 0 18px !important;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+    .print-step-btn:hover {
+      background: #1e40af !important;
+    }
+    .finish-btn {
+      font-weight: 700 !important;
+    }
   `]
 })
 export class ReceiptCreateModalComponent implements OnInit, OnChanges {
@@ -659,10 +859,13 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     'حساب الطالب والمبلغ',
     'وسيلة الدفع وتاريخ التحصيل',
     'المراجعة والتأكيد',
+    'اكتمال السند والاعتماد',
   ];
 
   currentStep = signal(0);
   submitting = signal(false);
+  createdReceipt = signal<any | null>(null);
+  docForPrint = signal<SfDoc>(null);
   accountMode = signal<'locked' | 'search'>('locked');
 
   accounts = signal<any[]>([]);
@@ -772,6 +975,8 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
   resetForm() {
     this.currentStep.set(0);
+    this.createdReceipt.set(null);
+    this.docForPrint.set(null);
     this.paymentDate = new Date().toISOString().slice(0, 10);
     const initialAccount = this.preselectedAccount || null;
     const initialId = initialAccount?.id || this.preselectedAccountId || '';
@@ -891,9 +1096,12 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
     this.svc.receiveStudentPayment(payload).subscribe({
       next: (res) => {
-        this.notify.success('تم تسجيل سند القبض واستلام الدفعة وتسويتها بنجاح.');
-        this.saved.emit(res?.data || res);
-        this.closed.emit();
+        this.submitting.set(false);
+        const receiptData = res?.data || res;
+        this.createdReceipt.set(receiptData);
+        // الانتقال للخطوة الرابعة المخصصة لعرض السند والاعتماد والطباعة
+        this.currentStep.set(3);
+        this.saved.emit(receiptData);
       },
       error: (err) => {
         this.submitting.set(false);
@@ -901,6 +1109,27 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
         this.notify.error(msg);
       },
     });
+  }
+
+  printReceipt() {
+    const r = this.createdReceipt();
+    if (r) {
+      this.docForPrint.set({
+        type: 'receipt',
+        data: r,
+      });
+    }
+  }
+
+  finishAndClose() {
+    this.closed.emit();
+  }
+
+  getFinalRemaining(r: any): number {
+    if (r && r.remaining_balance !== undefined && r.remaining_balance !== null) {
+      return Number(r.remaining_balance) || 0;
+    }
+    return this.remainingAfterPay();
   }
 
   onCancel() {

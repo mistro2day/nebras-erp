@@ -57,8 +57,13 @@ a {
   color: inherit;
 }
 
+.cdk-overlay-container {
+  z-index: 99999 !important;
+}
+
 .mat-mdc-snack-bar-container {
   direction: rtl;
+  z-index: 99999 !important;
 }
 
 /*
