@@ -294,6 +294,7 @@ class Receipt(CombinedSharedModel):
         ('draft', 'مسودة'),
         ('posted', 'مرحل ومقفل في الصندوق'),
         ('cancelled', 'ملغي'),
+        ('reversed', 'معكوس'),
     )
     student_billing_account = models.ForeignKey(StudentBillingAccount, on_delete=models.PROTECT, related_name='receipts')
     receipt_number = models.CharField(max_length=50, db_index=True)
@@ -306,6 +307,12 @@ class Receipt(CombinedSharedModel):
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
     voucher_id = models.UUIDField(null=True, blank=True, help_text="سند القبض المولد في موديول المالية")
+    
+    # حقول عكس/إلغاء السند
+    cancellation_reason = models.TextField(blank=True, null=True, help_text="سبب عكس أو إلغاء السند")
+    reversed_at = models.DateTimeField(null=True, blank=True, help_text="تاريخ ووقت العكس")
+    reversed_by = models.UUIDField(null=True, blank=True, help_text="المستخدم الذي قام بالعكس")
+    reversal_journal_entry_id = models.UUIDField(null=True, blank=True, help_text="القيد العكسي المولد في دفتر الأستاذ")
 
     class Meta:
         db_table = 'nebras_student_receipts'
@@ -315,6 +322,7 @@ class Receipt(CombinedSharedModel):
 
     def __str__(self):
         return self.receipt_number
+
 
 
 # 19. Refund (المبالغ المستردة)

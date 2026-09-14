@@ -131,6 +131,19 @@ graph TD
   - فحص طريقة الدفع المختارة (تطبيقات بنكك / فوري / أوكاش أو سداد نقدي) وتعيين الحساب البنكي النشط أو الخزينة النقدية تلقائياً في حال عدم تحديدها من قبل المستخدم.
   - منع التضارب المحاسبي والتحقق الاستباقي من توفر الحساب المقابل في دفتر الأستاذ العام لمنع استثناءات التحقق (`ValidationError`) وضمان ترحيل القيود والسندات في مسارها الصحيح.
 
+* **عكس/إلغاء سند القبض (`PaymentService.cancel_receipt`):**
+  - خدمة شاملة لعكس سند قبض مرحل مع إعادة جميع التأثيرات المالية على ملف الطالب:
+    1. عكس تخصيصات السداد (`PaymentAllocation`) وإعادة المبالغ المخصصة
+    2. إعادة أرصدة المستحقات (`StudentReceivable`) إلى حالة `outstanding`
+    3. تحديث الفواتير المرتبطة (`StudentInvoice.paid_amount`, `outstanding_amount`)
+    4. إعادة أرصدة حساب الفوترة (`StudentBillingAccount.outstanding_balance`, `current_balance`)
+    5. عكس القيد المحاسبي في دفتر الأستاذ العام عبر `PostingService.reverse_journal_entry`
+    6. تحديث حالة السند المالي (`Voucher`) والإيصال (`Receipt`) إلى `reversed`
+  - **التحقق من الصلاحيات:** يتطلب العكس صلاحية مدير المدرسة (`administrator`) أو مستخدم فائق (`superuser`)
+  - **حقول الإيصال الجديدة:** `cancellation_reason`, `reversed_at`, `reversed_by`, `reversal_journal_entry_id`
+  - **API Endpoint:** `POST /api/v1/student-finance/receipts/{id}/cancel/` مع حقل `reason` إلزامي
+  - **Frontend:** زر «عكس السند» في جدول التحصيلات بنافذة تأكيد + خطوة نجاح نهائية + تحديث AJAX
+
 ---
 
 ## 9. جاهزية الذكاء الاصطناعي والتكاملات المستقبلية (Future Extensions)

@@ -565,6 +565,165 @@ class PaymentService:
 
         return receipt
 
+    @classmethod
+    @db_atomic
+    def cancel_receipt(cls, tenant_id, receipt_id, user_id=None, reason=None):
+        """
+        عكس/إلغاء سند قبض مرحل مع عكس جميع التأثيرات المالية على ملف الطالب.
+        يتطلب صلاحية مدير (administrator) أو مستخدم فائق (superuser).
+        
+        العمليات:
+        1. عكس تخصيصات السداد (PaymentAllocation)
+        2. إعادة أرصدة المستحقات (StudentReceivable)
+        3. تحديث الفواتير (StudentInvoice)
+        4. تحديث حساب الفوترة (StudentBillingAccount)
+        5. عكس القيد المحاسبي في دفتر الأستاذ
+        6. تحديث حالة السند والإيصال
+        """
+        # --- 0. التحقق من صلاحية المستخدم ---
+        if user_id:
+            from apps.identity.domain.models import User
+            from apps.identity.domain.rbac import UserRole
+            try:
+                user = User.objects.get(id=user_id)
+                if not user.is_superuser:
+                    # التحقق من أن المستخدم يملك دور administrator
+                    has_admin_role = UserRole.objects.filter(
+                        user=user, tenant_id=tenant_id, role__code='administrator'
+                    ).exists()
+                    if not has_admin_role:
+                        raise ValidationError(
+                            "عكس سند القبض يتطلب صلاحية مدير المدرسة أو مستخدم فائق. "
+                            "يرجى التواصل مع إدارة النظام للحصول على الموافقة."
+                        )
+            except User.DoesNotExist:
+                raise ValidationError("المستخدم غير موجود.")
+
+        # --- 1. جلب الإيصال والتحقق من حالته ---
+        receipt = Receipt.objects.select_for_update().get(id=receipt_id, tenant_id=tenant_id)
+        if receipt.status != 'posted':
+            raise ValidationError("يمكن فقط عكس سندات القبض المرحلة (posted).")
+
+        account = StudentBillingAccount.objects.select_for_update().get(
+            id=receipt.student_billing_account_id, tenant_id=tenant_id
+        )
+
+        # --- 2. عكس تخصيصات السداد وإعادة أرصدة المستحقات والفواتير ---
+        allocations = PaymentAllocation.objects.filter(receipt=receipt)
+        total_allocated = Decimal('0.0')
+
+        for alloc in allocations:
+            allocated_amount = alloc.amount_allocated
+            total_allocated += allocated_amount
+
+            # إعادة أرصدة المستحق (StudentReceivable)
+            receivable = StudentReceivable.objects.select_for_update().get(id=alloc.receivable_id)
+            receivable.paid_amount = max(Decimal('0.0'), receivable.paid_amount - allocated_amount)
+            receivable.outstanding_amount += allocated_amount
+            if receivable.status == 'paid':
+                receivable.status = 'outstanding'
+            receivable.save(update_fields=['paid_amount', 'outstanding_amount', 'status'])
+
+            # إعادة أرصدة الفاتورة المرتبطة (StudentInvoice)
+            invoice = receivable.invoice
+            invoice.paid_amount = max(Decimal('0.0'), invoice.paid_amount - allocated_amount)
+            invoice.outstanding_amount += allocated_amount
+            invoice.save(update_fields=['paid_amount', 'outstanding_amount'])
+
+        # --- 3. معالجة فائض السداد (Credit Balance) إن وجد ---
+        credit_reversed = receipt.amount - total_allocated
+        if credit_reversed > 0:
+            account.credit_balance = max(Decimal('0.0'), account.credit_balance - credit_reversed)
+
+        # --- 4. تحديث أرصدة حساب الفوترة ---
+        account.outstanding_balance += receipt.amount
+        account.current_balance += receipt.amount
+        account.save(update_fields=['outstanding_balance', 'current_balance', 'credit_balance'])
+
+        # --- 5. عكس القيد المحاسبي في دفتر الأستاذ العام ---
+        reversal_journal = None
+        if receipt.voucher_id:
+            try:
+                voucher = Voucher.objects.get(id=receipt.voucher_id, tenant_id=tenant_id)
+                # البحث عن القيد المرتبط بالسند
+                journal = JournalEntry.objects.filter(
+                    tenant_id=tenant_id,
+                    reference=voucher.voucher_number,
+                    status='posted'
+                ).first()
+                if journal:
+                    reversal_reason = reason or "عكس سند قبض طالب"
+                    reversal_journal = PostingService.reverse_journal_entry(
+                        tenant_id=tenant_id,
+                        journal_entry_id=journal.id,
+                        user_id=user_id,
+                        reversal_reason=reversal_reason
+                    )
+                # تحديث حالة السند المالي
+                voucher.status = 'cancelled'
+                voucher.save(update_fields=['status'])
+            except (Voucher.DoesNotExist, JournalEntry.DoesNotExist):
+                logger.warning(f"لم يتم العثور على السند أو القيد المرتبط بالإيصال {receipt.receipt_number}")
+
+        # --- 6. تحديث حالة الإيصال ---
+        receipt.status = 'reversed'
+        receipt.cancellation_reason = reason or "عكس سند القبض"
+        receipt.reversed_at = timezone.now()
+        receipt.reversed_by = user_id
+        if reversal_journal:
+            receipt.reversal_journal_entry_id = reversal_journal.id
+        receipt.save(update_fields=[
+            'status', 'cancellation_reason', 'reversed_at', 'reversed_by', 'reversal_journal_entry_id'
+        ])
+
+        # --- 7. تسجيل التدقيق ---
+        BillingAudit.objects.create(
+            tenant_id=tenant_id,
+            action_type='cancel_receipt',
+            performed_by=user_id,
+            details={
+                'receipt_id': str(receipt.id),
+                'receipt_number': receipt.receipt_number,
+                'amount': float(receipt.amount),
+                'reason': reason or '',
+                'reversal_journal_id': str(reversal_journal.id) if reversal_journal else None,
+                'allocations_reversed': float(total_allocated),
+                'credit_reversed': float(credit_reversed),
+            }
+        )
+
+        # --- 8. نشر حدث إلغاء الدفعة ---
+        student_name = ""
+        try:
+            from apps.students.domain.models import Student
+            st = Student.objects.filter(id=account.student_id).first()
+            if st:
+                student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
+        except Exception as e:
+            logger.warning(f"Failed to resolve student info for cancellation event: {e}")
+
+        EventBusConsumer.publish(
+            tenant_id=tenant_id,
+            event_type='PaymentCancelled',
+            source_module='student_finance',
+            event_data={
+                'receipt_id': str(receipt.id),
+                'receipt_number': receipt.receipt_number,
+                'student_id': str(account.student_id),
+                'student_name': student_name,
+                'amount': float(receipt.amount),
+                'reason': reason or '',
+                'date': str(timezone.now().date())
+            }
+        )
+
+        logger.info(
+            f"تم عكس سند القبض {receipt.receipt_number} بنجاح — "
+            f"المبلغ: {receipt.amount} ج.س — الطالب: {student_name}"
+        )
+
+        return receipt
+
 
 # ============================================================
 # 3. Scholarship Service — خدمة المنح الدراسية

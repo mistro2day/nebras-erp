@@ -64,6 +64,63 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
         (saved)="onReceiptSaved($event)"
       ></app-receipt-create-modal>
 
+      <!-- نافذة عكس سند القبض -->
+      @if (cancelReceiptModalOpen()) {
+        <div class="modal-backdrop" (click)="closeCancelReceiptModal()">
+          <div class="modal cancel-receipt-modal" (click)="$event.stopPropagation()" dir="rtl">
+            @if (cancelReceiptStep() === 'confirm') {
+              <div class="modal-header danger">
+                <h3>⚠️ عكس سند القبض</h3>
+                <p class="subtitle">هذا الإجراء سيعكس السند المالي ويعيد جميع الأرصدة إلى حالتها السابقة.</p>
+              </div>
+              <div class="modal-body">
+                <div class="cancel-receipt-info">
+                  <div class="info-row"><span class="label">رقم السند:</span><span class="value">{{ cancelReceiptTarget()?.receipt_number }}</span></div>
+                  <div class="info-row"><span class="label">المبلغ:</span><span class="value danger-text">{{ cancelReceiptTarget()?.amount | number:'1.0-0' }} ج.س</span></div>
+                  <div class="info-row"><span class="label">تاريخ التحصيل:</span><span class="value">{{ cancelReceiptTarget()?.payment_date }}</span></div>
+                </div>
+                <div class="form-field">
+                  <label>سبب العكس <span class="required">*</span></label>
+                  <textarea [(ngModel)]="cancelReceiptReason" rows="3" placeholder="يرجى كتابة سبب واضح لعكس هذا السند..."></textarea>
+                </div>
+                <div class="warning-box">
+                  <span>⚠️</span>
+                  <div>
+                    <strong>تنبيه هام:</strong>
+                    سيتم عكس القيد المحاسبي في دفتر الأستاذ العام وإعادة المبالغ المخصصة إلى المستحقات المفتوحة.
+                    هذا الإجراء يتطلب صلاحية مدير المدرسة أو مستخدم فائق.
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn ghost" (click)="closeCancelReceiptModal()">إلغاء</button>
+                <button class="btn danger" [disabled]="cancelReceiptBusy() || !cancelReceiptReason.trim()" (click)="confirmCancelReceipt()">
+                  @if (cancelReceiptBusy()) { <span class="spinner-sm"></span> جاري العكس... } @else { 🔄 تأكيد عكس السند }
+                </button>
+              </div>
+            }
+            @if (cancelReceiptStep() === 'success') {
+              <div class="modal-header success">
+                <div class="success-icon">✓</div>
+                <h3>تم عكس السند بنجاح</h3>
+                <p class="subtitle">تم عكس القيد المحاسبي وتحديث جميع الأرصدة المالية.</p>
+              </div>
+              <div class="modal-body">
+                <div class="success-card">
+                  <div class="info-row"><span class="label">رقم السند المعكوس:</span><span class="value">{{ cancelReceiptTarget()?.receipt_number }}</span></div>
+                  <div class="info-row"><span class="label">المبلغ المعكوس:</span><span class="value danger-text">{{ cancelReceiptTarget()?.amount | number:'1.0-0' }} ج.س</span></div>
+                  <div class="info-row"><span class="label">سبب العكس:</span><span class="value">{{ cancelReceiptReason }}</span></div>
+                  <div class="info-row"><span class="label">الحالة:</span><span class="badge reversed-badge">معكوس</span></div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button class="btn primary" (click)="closeCancelReceiptModal()">✓ إنهاء وإغلاق</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- مؤشرات سريعة -->
       <div class="kpis">
         <div class="kpi"><span class="l">إجمالي المديونية</span><span class="v danger">{{ totalOutstanding() | number:'1.2-2' }} <em>ج.س</em></span></div>
@@ -193,9 +250,16 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
             }
             @if (tab() === 'receipts') {
               @for (r of receipts(); track r.id) {
-                <div class="sub-row clickable" (click)="openDoc('receipt', r)"><span><strong>{{ r.receipt_number }}</strong> <span class="nm">{{ r.payment_date }}</span></span>
-                  <span class="mono success">{{ r.amount | number:'1.0-0' }} ج.س</span>
-                  <span class="badge ok">{{ r.status === 'posted' ? 'مرحل' : r.status }}</span></div>
+                <div class="sub-row clickable" (click)="openDoc('receipt', r)">
+                  <span><strong>{{ r.receipt_number }}</strong> <span class="nm">{{ r.payment_date }}</span></span>
+                  <span class="mono" [class.success]="r.status==='posted'" [class.reversed-amount]="r.status==='reversed'">{{ r.amount | number:'1.0-0' }} ج.س</span>
+                  <span class="receipt-actions">
+                    <span class="badge" [class.ok]="r.status==='posted'" [class.reversed-badge]="r.status==='reversed'">{{ receiptStatusLabel(r.status) }}</span>
+                    @if (r.status === 'posted') {
+                      <button class="btn danger xs" (click)="openCancelReceiptModal(r); $event.stopPropagation()">عكس السند</button>
+                    }
+                  </span>
+                </div>
               } @empty { <div class="empty sm">لا توجد تحصيلات.</div> }
             }
             @if (tab() === 'receivables') {
@@ -323,6 +387,41 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
     .btn.danger { background: var(--nb-danger); color: #fff; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* عكس سند القبض — badge و amount */
+    .reversed-badge { background: #fef3c7 !important; color: #92400e !important; }
+    .reversed-amount { color: var(--nb-text-muted); text-decoration: line-through; }
+    .receipt-actions { display: inline-flex; align-items: center; gap: 6px; }
+
+    /* modal عكس سند القبض */
+    .modal-backdrop { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+    .cancel-receipt-modal { background: var(--nb-surface); border-radius: var(--nb-radius-card); box-shadow: 0 12px 40px rgba(0,0,0,.2); width: 95%; max-width: 500px; overflow: hidden; animation: modalIn .2s ease; }
+    @keyframes modalIn { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .modal-header { padding: 20px 24px 14px; }
+    .modal-header.danger { background: linear-gradient(135deg, #fee2e2, #fef2f2); border-bottom: 1px solid #fecaca; }
+    .modal-header.success { background: linear-gradient(135deg, #dcfce7, #f0fdf4); border-bottom: 1px solid #bbf7d0; text-align: center; }
+    .modal-header h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; color: var(--nb-text); }
+    .modal-header .subtitle { margin: 0; font-size: 12.5px; color: var(--nb-text-muted); }
+    .success-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--nb-success); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; margin: 0 auto 10px; animation: scaleIn .3s ease; }
+    @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+    .modal-body { padding: 16px 24px; }
+    .cancel-receipt-info, .success-card { background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); padding: 14px; margin-bottom: 14px; }
+    .success-card { background: #f0fdf4; border-color: #bbf7d0; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--nb-border-soft); font-size: 13px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { color: var(--nb-text-muted); font-weight: 500; }
+    .info-row .value { color: var(--nb-text); font-weight: 700; }
+    .danger-text { color: var(--nb-danger) !important; }
+    .form-field { margin-bottom: 14px; }
+    .form-field label { font-size: 13px; font-weight: 600; color: var(--nb-text); margin-bottom: 6px; }
+    .form-field .required { color: var(--nb-danger); }
+    .form-field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface); color: var(--nb-text); font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+    .form-field textarea:focus { border-color: var(--nb-primary-500); outline: none; }
+    .warning-box { display: flex; gap: 10px; background: #fffbeb; border: 1px solid #fbbf24; border-radius: var(--nb-radius); padding: 12px 14px; font-size: 12px; color: #92400e; line-height: 1.6; }
+    .warning-box span { font-size: 18px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--nb-border-soft); }
+    .spinner-sm { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   `],
 })
 export class SfAccountsListComponent implements OnInit {
@@ -393,6 +492,13 @@ export class SfAccountsListComponent implements OnInit {
       student_number: this.studentNumber(a.student_id),
     };
   });
+
+  // ---- عكس/إلغاء سند القبض ----
+  cancelReceiptModalOpen = signal(false);
+  cancelReceiptTarget = signal<any>(null);
+  cancelReceiptStep = signal<'confirm' | 'success'>('confirm');
+  cancelReceiptBusy = signal(false);
+  cancelReceiptReason = '';
 
   schForm: any = { name: '', type: 'merit', amount_percentage: 25 };
   holdForm: any = { hold_type: 'exam', reason: '' };
@@ -561,4 +667,42 @@ export class SfAccountsListComponent implements OnInit {
   openStatement(accountId: string) { this.router.navigate(['/student-finance/accounts', accountId, 'statement']); }
   goDashboard() { this.router.navigateByUrl('/student-finance/dashboard'); }
   holdLabel(t: string) { return ({ exam: 'حجب الامتحانات', registration: 'منع التسجيل', certificate: 'منع الشهادات', graduation: 'حظر التخرج', library: 'حظر المكتبة', custom: 'مخصص' } as any)[t] || t; }
+  receiptStatusLabel(s: string) { return ({ draft: 'مسودة', posted: 'مرحل', cancelled: 'ملغي', reversed: 'معكوس' } as any)[s] || s; }
+
+  // ---- عكس/إلغاء سند القبض ----
+  openCancelReceiptModal(receipt: any) {
+    this.cancelReceiptTarget.set(receipt);
+    this.cancelReceiptStep.set('confirm');
+    this.cancelReceiptReason = '';
+    this.cancelReceiptModalOpen.set(true);
+  }
+
+  closeCancelReceiptModal() {
+    this.cancelReceiptModalOpen.set(false);
+    this.cancelReceiptTarget.set(null);
+    this.cancelReceiptReason = '';
+  }
+
+  confirmCancelReceipt() {
+    const receipt = this.cancelReceiptTarget();
+    if (!receipt || !this.cancelReceiptReason.trim()) return;
+
+    this.cancelReceiptBusy.set(true);
+    this.svc.cancelReceipt(receipt.id, this.cancelReceiptReason.trim()).subscribe({
+      next: () => {
+        this.cancelReceiptBusy.set(false);
+        this.cancelReceiptStep.set('success');
+        this.notify.success('تم عكس سند القبض وتحديث الأرصدة المالية بنجاح.');
+        // تحديث البيانات المالية (مثل AJAX)
+        if (this.sel()) {
+          this.refreshAfter(this.sel());
+        }
+      },
+      error: (e) => {
+        this.cancelReceiptBusy.set(false);
+        const msg = e?.error?.error?.message || e?.error?.message || 'تعذّر عكس سند القبض.';
+        this.notify.error(msg);
+      },
+    });
+  }
 }

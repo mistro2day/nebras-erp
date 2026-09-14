@@ -240,6 +240,11 @@ export class StudentFinanceService {
     return this.api.post('student-finance/receipts/receive-payment/', body);
   }
 
+  /** عكس/إلغاء سند قبض مرحل (يعيد الأرصدة ويعكس القيد المحاسبي). */
+  cancelReceipt(receiptId: string, reason: string): Observable<any> {
+    return this.api.post(`student-finance/receipts/${receiptId}/cancel/`, { reason });
+  }
+
   // ---- الربط بالمالية والطلاب: مراجع ومصادر (360° لحساب الطالب) ----
   /** الإعدادات المالية للطلاب (ربط حساب المدينين والإيرادات بشجرة المالية). */
   getSettings(): Observable<PagedResponse<any>> {

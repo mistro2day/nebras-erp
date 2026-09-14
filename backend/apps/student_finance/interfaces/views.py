@@ -1219,6 +1219,37 @@ class ReceiptViewSet(BaseCRUDViewSet):
         except Exception as e:
             return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_receipt(self, request, pk=None):
+        """عكس/إلغاء سند قبض مرحل مع عكس جميع التأثيرات المالية."""
+        tenant_id = request.tenant_id
+        reason = request.data.get('reason', '')
+
+        if not reason or not reason.strip():
+            return Response(
+                {'error': {'message': 'يرجى تحديد سبب عكس السند.'}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            receipt = PaymentService.cancel_receipt(
+                tenant_id=tenant_id,
+                receipt_id=pk,
+                user_id=request.user.id if request.user else None,
+                reason=reason.strip()
+            )
+            serializer = self.get_serializer(receipt)
+            return Response(
+                {'data': serializer.data, 'message': 'تم عكس سند القبض وتحديث الأرصدة المالية بنجاح.'},
+                status=status.HTTP_200_OK
+            )
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+            return Response({'error': {'message': msg}}, status=status.HTTP_400_BAD_REQUEST)
+        except Receipt.DoesNotExist:
+            return Response({'error': {'message': 'سند القبض غير موجود.'}}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
 
 class RefundViewSet(BaseCRUDViewSet):
     model_class = Refund
