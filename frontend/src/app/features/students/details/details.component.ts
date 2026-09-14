@@ -161,7 +161,7 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
 
         <!-- تبويبات التفاصيل المتقدمة -->
         <div class="nb-card tabs-card">
-          <mat-tab-group animationDuration="200ms">
+          <mat-tab-group [(selectedIndex)]="selectedTabIndex" animationDuration="200ms">
             
             <!-- تبويب 1: نظرة عامة -->
             <mat-tab label="نظرة عامة">
@@ -299,9 +299,14 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                   <div style="margin-top: 24px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                       <h3 style="margin: 0;">السندات المالية (سندات القبض)</h3>
-                      <button type="button" class="btn-collect-head" (click)="openReceiptModal()">
-                        💵 استلام دفعة وتسجيل سند
-                      </button>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        @if (financeRefreshing()) {
+                          <span class="refresh-indicator">🔄 جارٍ التحديث اللحظي…</span>
+                        }
+                        <button type="button" class="btn-collect-head" (click)="openReceiptModal()">
+                          💵 استلام دفعة وتسجيل سند
+                        </button>
+                      </div>
                     </div>
                     <div class="tbl" *ngIf="receipts().length > 0; else noReceipts">
                       <div class="tbl-head receipts-tbl">
@@ -941,7 +946,7 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
           [open]="receiptModalOpen()"
           [preselectedAccountId]="billingAccount()?.id"
           [preselectedAccount]="accountForReceiptModal()"
-          (closed)="receiptModalOpen.set(false)"
+          (closed)="onReceiptModalClosed()"
           (saved)="onReceiptSaved($event)"
         ></app-receipt-create-modal>
 
@@ -2080,6 +2085,24 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
     }
 
     .grades-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+
+    .refresh-indicator {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--nb-primary-700);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      animation: nbPulse 1.5s infinite;
+    }
+    @keyframes nbPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(0.98); }
+    }
     
     /* أنماط الطباعة */
     .print-only-container { display: none; }
@@ -2102,6 +2125,8 @@ export class StudentDetailsComponent implements OnInit {
   student = this.studentsService.selectedStudent;
   readonly pageLoading = signal<boolean>(true);
   readonly financeLoading = signal<boolean>(true);
+  readonly financeRefreshing = signal<boolean>(false);
+  readonly selectedTabIndex = signal<number>(0);
   timeline = signal<any[]>([]);
 
   // حالة معالج الحذف الشامل بنظام الخطوات
@@ -2113,7 +2138,61 @@ export class StudentDetailsComponent implements OnInit {
   }
 
   onReceiptSaved(res: any): void {
-    this.reload();
+    // تحديث لحظي للبيانات المالية والسندات والأرصدة (Ajax) دون إعادة تحميل الصفحة
+    this.refreshFinanceData();
+  }
+
+  onReceiptModalClosed(): void {
+    this.receiptModalOpen.set(false);
+    this.refreshFinanceData();
+  }
+
+  /** تحديث جزئي لحظي (Ajax) لقسم الرسوم والمالية والحساب المالي والسندات دون إعادة تحميل الصفحة بالكامل */
+  refreshFinanceData(): void {
+    if (!this.billingAccount()) {
+      this.financeLoading.set(true);
+    } else {
+      this.financeRefreshing.set(true);
+    }
+
+    this.sfService.listBillingAccounts({ page_size: 500 }).subscribe({
+      next: (res) => {
+        const accounts = res?.data || [];
+        const account = accounts.find((a: any) => a.student_id === this.id);
+        if (account) {
+          this.billingAccount.set(account);
+          forkJoin({
+            inv: this.sfService.invoicesForAccount(account.id),
+            rcp: this.sfService.receiptsForAccount(account.id),
+            pm: this.sfService.listPaymentMethods(),
+          }).subscribe({
+            next: ({ inv, rcp, pm }) => {
+              this.invoices.set(inv?.data || []);
+              this.receipts.set(rcp?.data || []);
+              this.paymentMethods.set(pm?.data || []);
+              this.financeLoading.set(false);
+              this.financeRefreshing.set(false);
+            },
+            error: () => {
+              this.financeLoading.set(false);
+              this.financeRefreshing.set(false);
+            },
+          });
+        } else {
+          this.financeLoading.set(false);
+          this.financeRefreshing.set(false);
+        }
+      },
+      error: () => {
+        this.financeLoading.set(false);
+        this.financeRefreshing.set(false);
+      },
+    });
+
+    // تحديث الخط الزمني أيضاً لتوثيق محطة السند المالي
+    this.studentsService.getTimeline(this.id).subscribe((res) => {
+      if (res && res.success) this.timeline.set(res.data || []);
+    });
   }
 
   deleteStudent(s?: any): void {
@@ -2529,6 +2608,13 @@ export class StudentDetailsComponent implements OnInit {
       this.id = params['id'];
       if (this.id) this.reload();
     });
+    this.route.queryParams.subscribe((qp) => {
+      if (qp['tab'] === 'finance' || qp['tab'] === 'fees' || qp['tab'] === '1') {
+        this.selectedTabIndex.set(1);
+      } else if (qp['tab'] === 'documents' || qp['tab'] === '5') {
+        this.selectedTabIndex.set(5);
+      }
+    });
   }
 
   /** فتح لوح الحساب المالي الكامل (360°) في وحدة فوترة الطلاب. */
@@ -2590,32 +2676,8 @@ export class StudentDetailsComponent implements OnInit {
       );
     });
     
-    // جلب الحساب المالي والفواتير الصادرة للطالب
-    this.sfService.listBillingAccounts({ page_size: 500 }).subscribe({
-      next: (res) => {
-        const accounts = res?.data || [];
-        const account = accounts.find((a: any) => a.student_id === this.id);
-        if (account) {
-          this.billingAccount.set(account);
-          forkJoin({
-            inv: this.sfService.invoicesForAccount(account.id),
-            rcp: this.sfService.receiptsForAccount(account.id),
-            pm: this.sfService.listPaymentMethods(),
-          }).subscribe({
-            next: ({ inv, rcp, pm }) => {
-              this.invoices.set(inv?.data || []);
-              this.receipts.set(rcp?.data || []);
-              this.paymentMethods.set(pm?.data || []);
-              this.financeLoading.set(false);
-            },
-            error: () => this.financeLoading.set(false),
-          });
-        } else {
-          this.financeLoading.set(false);
-        }
-      },
-      error: () => this.financeLoading.set(false),
-    });
+    // جلب الحساب المالي والفواتير الصادرة وسندات القبض عبر دالة التحديث المالي الموحدة
+    this.refreshFinanceData();
   }
 
   getBookTitle(copyId: string): string {
