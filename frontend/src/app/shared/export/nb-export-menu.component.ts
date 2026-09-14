@@ -21,7 +21,9 @@ import { exportCsv, exportExcel, exportPdf, printDoc } from './export.functions'
         <span class="ico">▦</span> PDF
       </button>
       <button class="nb-exp-btn" (click)="doCsv()" title="تصدير CSV">CSV</button>
-      <button class="nb-exp-btn" (click)="doPrint()" title="طباعة"><span class="ico">🖨️</span> طباعة</button>
+      @if (showPrint) {
+        <button class="nb-exp-btn" (click)="doPrint()" title="طباعة"><span class="ico">🖨️</span> طباعة</button>
+      }
     </div>
   `,
   styles: [`
@@ -42,13 +44,28 @@ export class NbExportMenuComponent {
   @Input({ required: true }) title = '';
   @Input() subtitle?: string;
   @Input() filename?: string;
+  @Input() showPrint = true;
+  @Input() customPrint?: () => void;
+  @Input() customPdf?: () => void;
 
   readonly busy = signal(false);
 
   private meta() { return { title: this.title, subtitle: this.subtitle, filename: this.filename }; }
 
   doCsv() { exportCsv(this.meta(), this.columns, this.rows); }
-  doPrint() { printDoc(this.meta(), this.columns, this.rows); }
+  doPrint() {
+    if (this.customPrint) {
+      this.customPrint();
+      return;
+    }
+    printDoc(this.meta(), this.columns, this.rows);
+  }
   async doExcel() { this.busy.set(true); try { await exportExcel(this.meta(), this.columns, this.rows); } finally { this.busy.set(false); } }
-  async doPdf() { this.busy.set(true); try { await exportPdf(this.meta(), this.columns, this.rows); } finally { this.busy.set(false); } }
+  async doPdf() {
+    if (this.customPdf) {
+      this.customPdf();
+      return;
+    }
+    this.busy.set(true); try { await exportPdf(this.meta(), this.columns, this.rows); } finally { this.busy.set(false); }
+  }
 }

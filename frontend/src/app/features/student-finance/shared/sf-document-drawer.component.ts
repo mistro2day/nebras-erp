@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject, signal, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, Output, inject, signal, OnInit } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
-import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
+import { NbExportMenuComponent, ExportColumn, exportElementToPdf } from '../../../shared/export';
 import { StudentsService } from '../../students/students.service';
 import { TenantService } from '../../../core/services/tenant.service';
 import { environment } from '../../../../environments/environment';
@@ -304,12 +304,53 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
         </div>
       }
 
-      <div drawer-actions>
-        <nb-export-menu [columns]="exportCols()" [rows]="exportRows()" [title]="meta().title" [subtitle]="meta().subtitle" [filename]="meta().title"></nb-export-menu>
+      <div drawer-actions class="drawer-actions-wrapper">
+        <button type="button" class="btn-print-drawer-primary" (click)="printDocument()">
+          <span>🖨️</span>
+          <span>طباعة المستند الرسمي (A4)</span>
+        </button>
+        <nb-export-menu
+          [columns]="exportCols()"
+          [rows]="exportRows()"
+          [title]="meta().title"
+          [subtitle]="meta().subtitle"
+          [filename]="meta().title"
+          [showPrint]="true"
+          [customPrint]="printFn"
+          [customPdf]="pdfFn">
+        </nb-export-menu>
       </div>
     </nb-drawer>
   `,
   styles: [`
+    .drawer-actions-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 12px;
+    }
+    .btn-print-drawer-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+      transition: all 0.2s ease;
+    }
+    .btn-print-drawer-primary:hover {
+      background: linear-gradient(135deg, #0369a1, #075985);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
     .doc-actions-bar {
       display: flex;
       justify-content: space-between;
@@ -703,8 +744,12 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
   `],
 })
 export class SfDocumentDrawerComponent implements OnInit {
+  private elRef = inject(ElementRef);
   private studentsService = inject(StudentsService);
   private tenantService = inject(TenantService);
+
+  readonly printFn = () => this.printDocument();
+  readonly pdfFn = () => this.exportVoucherPdf();
 
   @Input() doc: SfDoc = null;
   @Input() studentName = '';
@@ -851,7 +896,8 @@ export class SfDocumentDrawerComponent implements OnInit {
   }
 
   printDocument(): void {
-    const printContent = document.getElementById('official-print-voucher');
+    const rootEl = this.elRef.nativeElement as HTMLElement;
+    const printContent = rootEl.querySelector('#official-print-voucher') || document.getElementById('official-print-voucher');
     if (!printContent) {
       window.print();
       return;
@@ -859,11 +905,13 @@ export class SfDocumentDrawerComponent implements OnInit {
 
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'fixed';
-    printFrame.style.right = '0';
-    printFrame.style.bottom = '0';
-    printFrame.style.width = '0';
-    printFrame.style.height = '0';
+    printFrame.style.top = '-10000px';
+    printFrame.style.left = '-10000px';
+    printFrame.style.width = '1000px';
+    printFrame.style.height = '1000px';
     printFrame.style.border = '0';
+    printFrame.style.opacity = '0';
+    printFrame.style.pointerEvents = 'none';
     document.body.appendChild(printFrame);
 
     const frameDoc = printFrame.contentWindow?.document;
@@ -1284,6 +1332,14 @@ export class SfDocumentDrawerComponent implements OnInit {
     frameDoc.close();
 
     let printed = false;
+    const cleanup = () => {
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 60000);
+    };
+
     const doPrint = () => {
       if (printed) return;
       printed = true;
@@ -1293,12 +1349,14 @@ export class SfDocumentDrawerComponent implements OnInit {
       } catch (e) {
         console.error('Error during printing', e);
       }
-      setTimeout(() => {
-        if (document.body.contains(printFrame)) {
-          document.body.removeChild(printFrame);
-        }
-      }, 2000);
+      cleanup();
     };
+
+    printFrame.contentWindow?.addEventListener('afterprint', () => {
+      if (document.body.contains(printFrame)) {
+        document.body.removeChild(printFrame);
+      }
+    });
 
     const images = Array.from(frameDoc.images);
     const imagePromises = images.map((img) => {
@@ -1319,25 +1377,73 @@ export class SfDocumentDrawerComponent implements OnInit {
     });
   }
 
+  async exportVoucherPdf(): Promise<void> {
+    const rootEl = this.elRef.nativeElement as HTMLElement;
+    const el = (rootEl.querySelector('#official-print-voucher') as HTMLElement) || document.getElementById('official-print-voucher');
+    if (!el) {
+      this.printDocument();
+      return;
+    }
+    try {
+      await exportElementToPdf(el, this.meta().title || 'سند-قبض-مالي');
+    } catch (err) {
+      console.warn('exportElementToPdf fallback to print dialog', err);
+      this.printDocument();
+    }
+  }
+
   exportCols(): ExportColumn[] {
-    if (this.doc?.type === 'invoice') return [{ key: 'description', label: 'البند' }, { key: 'amount', label: 'المبلغ', align: 'end' }];
-    return [{ key: 'k', label: 'البيان' }, { key: 'v', label: 'القيمة', align: 'end' }];
+    if (this.doc?.type === 'invoice') {
+      return [
+        { key: 'description', label: 'البيان / تفاصيل البند' },
+        { key: 'amount', label: 'المبلغ (ج.س)', align: 'end' }
+      ];
+    }
+    return [
+      { key: 'field', label: 'البيان المالي / التفاصيل' },
+      { key: 'value', label: 'القيمة / البيان', align: 'end' }
+    ];
   }
 
   exportRows(): any[] {
     const d = this.doc;
     if (!d) return [];
     if (d.type === 'invoice') {
-      const rows = (d.data.items || []).map((i: any) => ({ description: i.description || 'بند رسوم', amount: Number(i.amount).toFixed(2) }));
-      (d.data.discounts || []).forEach((dc: any) => rows.push({ description: dc.discount_reason, amount: '-' + Number(dc.amount).toFixed(2) }));
-      rows.push({ description: 'الإجمالي', amount: Number(d.data.total_amount).toFixed(2) });
+      const rows: any[] = [
+        { description: 'رقم الفاتورة: ' + (d.data?.invoice_number || '—'), amount: '' },
+        { description: 'تاريخ الإصدار: ' + (d.data?.issue_date || '—'), amount: '' },
+        { description: 'اسم الطالب: ' + this.getStudentName(), amount: '' },
+        { description: 'الرقم الأكاديمي: ' + this.getStudentNumber(), amount: '' },
+        { description: 'المرحلة والصف: ' + this.getGradeName(), amount: '' },
+        { description: '--- بنود الفاتورة ---', amount: '' }
+      ];
+      (d.data.items || []).forEach((i: any, idx: number) => {
+        rows.push({ description: `${idx + 1}. ${i.description || 'بند رسوم دراسية'}`, amount: Number(i.amount).toFixed(2) });
+      });
+      (d.data.discounts || []).forEach((dc: any) => {
+        rows.push({ description: `خصم: ${dc.discount_reason || 'منحة / تخفيض'}`, amount: '-' + Number(dc.amount).toFixed(2) });
+      });
+      rows.push({ description: 'إجمالي الفاتورة المستحق', amount: Number(d.data?.total_amount || 0).toFixed(2) });
       return rows;
     }
+    const method = d.data?.payment_method_name || this.methodName(d.data?.payment_method_id);
     return [
-      { k: 'رقم السند', v: d.data?.receipt_number },
-      { k: 'تاريخ الدفع', v: d.data?.payment_date },
-      { k: 'المبلغ', v: d.data?.amount },
-      { k: 'المستلم', v: this.getStudentName() }
+      { field: 'نوع المستند', value: 'سند قبض مالي رسمي' },
+      { field: 'رقم السند', value: d.data?.receipt_number || '—' },
+      { field: 'تاريخ السداد', value: d.data?.payment_date || this.todayDate },
+      { field: 'اسم الطالب/ـة', value: this.getStudentName() },
+      { field: 'الرقم الأكاديمي', value: this.getStudentNumber() },
+      { field: 'المرحلة والصف', value: this.getGradeName() },
+      { field: 'الشعبة / الفصل', value: this.getSectionName() },
+      { field: 'ولي الأمر', value: this.getGuardianName() },
+      { field: 'هاتف ولي الأمر', value: this.getGuardianPhone() },
+      { field: 'رقم حساب الطالب', value: this.getAccountNumber() },
+      { field: 'طريقة السداد', value: method },
+      { field: 'المبلغ المقبوض (ج.س)', value: Number(d.data?.amount || 0).toFixed(2) },
+      { field: 'المبلغ كتابةً (التفقيط)', value: this.getTafqeetText() },
+      { field: 'المتبقي من الرسوم (ج.س)', value: Number(this.getRemainingBalance()).toFixed(2) },
+      { field: 'المتبقي كتابةً', value: this.getRemainingTafqeetText() },
+      { field: 'حالة السند', value: d.data?.status === 'posted' ? 'معتمد ومرحل للحسابات العامة' : 'مسودة' }
     ];
   }
 }
