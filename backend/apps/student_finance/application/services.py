@@ -1,3 +1,4 @@
+import re
 import logging
 from decimal import Decimal
 from datetime import date, datetime
@@ -371,9 +372,38 @@ class PaymentService:
         else:
             actual_date = date.today()
 
-        # 1. إنشاء إيصال التحصيل الداخلي
-        rcp_seq = Receipt.objects.filter(tenant_id=tenant_id).count() + 1
-        receipt_number = f"RCP-{timezone.now().year}-{rcp_seq:04d}"
+        # 1. إنشاء إيصال التحصيل الداخلي وسند القبض برقم متسلسل فريد ومقاوم للتكرار
+        prefix = f"RCP-{timezone.now().year}-"
+        pattern = re.compile(r'^' + re.escape(prefix) + r'(\d+)$')
+        r_mgr = getattr(Receipt, 'all_objects', Receipt.objects)
+        v_mgr = getattr(Voucher, 'all_objects', Voucher.objects)
+
+        max_seq = 0
+        r_existing = r_mgr.filter(tenant_id=tenant_id, receipt_number__startswith=prefix).values_list('receipt_number', flat=True)
+        for val in r_existing:
+            m = pattern.match(val or '')
+            if m:
+                max_seq = max(max_seq, int(m.group(1)))
+
+        v_existing = v_mgr.filter(tenant_id=tenant_id, voucher_number__startswith=prefix).values_list('voucher_number', flat=True)
+        for val in v_existing:
+            m = pattern.match(val or '')
+            if m:
+                max_seq = max(max_seq, int(m.group(1)))
+
+        seq = max_seq + 1
+        receipt_number = None
+        for _ in range(50):
+            candidate = f"{prefix}{seq:04d}"
+            r_exists = r_mgr.filter(tenant_id=tenant_id, receipt_number=candidate).exists()
+            v_exists = v_mgr.filter(tenant_id=tenant_id, voucher_number=candidate).exists()
+            if not r_exists and not v_exists:
+                receipt_number = candidate
+                break
+            seq += 1
+
+        if not receipt_number:
+            receipt_number = f"{prefix}{seq:04d}"
         receipt = Receipt.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,
