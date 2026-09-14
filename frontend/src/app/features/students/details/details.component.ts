@@ -989,7 +989,7 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                     </div>
                     <div class="info-row">
                       <span class="label">الطالبة:</span>
-                      <span class="value">{{ student()?.profile?.arabic_name }}</span>
+                      <span class="value">{{ student().profile.arabic_name }}</span>
                     </div>
                   </div>
 
