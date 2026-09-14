@@ -733,16 +733,16 @@ export class RegistrationFinanceFormComponent implements OnInit {
   planType = signal<string>('standard_sudan');
   installments = signal<InstallmentItem[]>([]);
 
-  isImmediatePayment = signal(true);
-  receiptAmount = signal(300000);
+  isImmediatePayment = signal(false);
+  receiptAmount = signal(0);
   paymentMethodId = signal('');
   cashBoxId = signal('');
   bankAccountId = signal('');
   receiptNotes = signal('سداد رسوم التسجيل والقبول عند التسجيل');
 
   // تفصيل بنود التحصيل الفوري بالإيصال
-  includeRegistrationFee = signal(true);
-  payRegistrationAmount = signal(300000);
+  includeRegistrationFee = signal(false);
+  payRegistrationAmount = signal(0);
 
   includeFirstInstallment = signal(false);
   payFirstInstallmentAmount = signal(0);
@@ -801,8 +801,10 @@ export class RegistrationFinanceFormComponent implements OnInit {
           const tFee = Number(d.annual_tuition);
           if (rFee > 0) {
             this.registrationFee.set(rFee);
-            this.payRegistrationAmount.set(rFee);
-            this.receiptAmount.set(rFee);
+            if (this.isImmediatePayment()) {
+              this.payRegistrationAmount.set(rFee);
+              this.receiptAmount.set(rFee);
+            }
           }
           if (tFee > 0) {
             this.tuitionFee.set(tFee);
@@ -810,13 +812,21 @@ export class RegistrationFinanceFormComponent implements OnInit {
         }
         if (!this.hasCustomConfigPassed) {
           this.recalculateInstallments();
-          this.updateImmediateBreakdown();
+          if (this.isImmediatePayment()) {
+            this.updateImmediateBreakdown();
+          } else {
+            this.notifyParent();
+          }
         }
       },
       error: () => {
         if (!this.hasCustomConfigPassed) {
           this.recalculateInstallments();
-          this.updateImmediateBreakdown();
+          if (this.isImmediatePayment()) {
+            this.updateImmediateBreakdown();
+          } else {
+            this.notifyParent();
+          }
         }
       }
     });
@@ -906,7 +916,11 @@ export class RegistrationFinanceFormComponent implements OnInit {
     if (this.installments().length > 0 && (!this.payFirstInstallmentAmount() || this.payFirstInstallmentAmount() === 0)) {
       this.payFirstInstallmentAmount.set(this.installments()[0].amount);
     }
-    this.updateImmediateBreakdown();
+    if (this.isImmediatePayment()) {
+      this.updateImmediateBreakdown();
+    } else {
+      this.notifyParent();
+    }
   }
 
   selectPlanType(type: string) {
@@ -915,7 +929,11 @@ export class RegistrationFinanceFormComponent implements OnInit {
     if (this.installments().length > 0) {
       this.payFirstInstallmentAmount.set(this.installments()[0].amount);
     }
-    this.updateImmediateBreakdown();
+    if (this.isImmediatePayment()) {
+      this.updateImmediateBreakdown();
+    } else {
+      this.notifyParent();
+    }
   }
 
   recalculateInstallments() {
@@ -1042,13 +1060,19 @@ export class RegistrationFinanceFormComponent implements OnInit {
 
   onReceiptToggle() {
     if (this.isImmediatePayment()) {
+      this.includeRegistrationFee.set(true);
       this.payRegistrationAmount.set(this.registrationFee());
-      if (this.installments().length > 0 && this.payFirstInstallmentAmount() === 0) {
+      if (this.installments().length > 0 && (!this.payFirstInstallmentAmount() || this.payFirstInstallmentAmount() === 0)) {
         this.payFirstInstallmentAmount.set(this.installments()[0].amount);
       }
       this.updateImmediateBreakdown();
+    } else {
+      this.receiptAmount.set(0);
+      this.includeRegistrationFee.set(false);
+      this.includeFirstInstallment.set(false);
+      this.includeCustomPay.set(false);
+      this.notifyParent();
     }
-    this.notifyParent();
   }
 
   onPaymentMethodChange() {
@@ -1068,7 +1092,7 @@ export class RegistrationFinanceFormComponent implements OnInit {
       },
       initial_payment: {
         is_paid: this.isImmediatePayment(),
-        amount: Number(this.receiptAmount()) || 0,
+        amount: this.isImmediatePayment() ? (Number(this.receiptAmount()) || 0) : 0,
         payment_method_id: this.paymentMethodId(),
         cash_box_id: this.cashBoxId() || undefined,
         bank_account_id: this.bankAccountId() || undefined,
