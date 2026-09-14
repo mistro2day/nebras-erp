@@ -77,6 +77,9 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
         'guardian_name': '',
         'guardian_phone': '',
         'account_number': billing_account.account_number or '',
+        'outstanding_balance': float(billing_account.outstanding_balance or 0.0),
+        'current_balance': float(billing_account.current_balance or 0.0),
+        'remaining_balance': float(billing_account.outstanding_balance or 0.0),
     }
     st_id = billing_account.student_id
     if not st_id:
@@ -271,6 +274,11 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     guardian_name = serializers.SerializerMethodField()
     guardian_phone = serializers.SerializerMethodField()
     account_number = serializers.SerializerMethodField()
+    remaining_balance = serializers.SerializerMethodField()
+    outstanding_balance = serializers.SerializerMethodField()
+    total_invoiced = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
+    payment_method_name = serializers.SerializerMethodField()
 
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Receipt
@@ -299,6 +307,40 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
 
     def get_account_number(self, obj):
         return _extract_student_finance_metadata(obj.student_billing_account)['account_number']
+
+    def get_remaining_balance(self, obj):
+        acc = getattr(obj, 'student_billing_account', None)
+        if acc:
+            return float(acc.outstanding_balance or 0.0)
+        return 0.0
+
+    def get_outstanding_balance(self, obj):
+        return self.get_remaining_balance(obj)
+
+    def get_total_invoiced(self, obj):
+        acc = getattr(obj, 'student_billing_account', None)
+        if acc:
+            return float(sum(inv.total_amount for inv in acc.invoices.filter(status='posted')))
+        return 0.0
+
+    def get_total_paid(self, obj):
+        acc = getattr(obj, 'student_billing_account', None)
+        if acc:
+            return float(sum(r.amount for r in acc.receipts.filter(status='posted')))
+        return 0.0
+
+    def get_payment_method_name(self, obj):
+        if hasattr(obj, 'payment_method_name') and obj.payment_method_name:
+            return obj.payment_method_name
+        if obj.payment_method_id:
+            try:
+                from apps.finance.domain.models import PaymentMethod
+                pm = PaymentMethod.objects.filter(id=obj.payment_method_id).first()
+                if pm:
+                    return pm.name_ar or pm.name
+            except Exception:
+                pass
+        return 'تحويل بنكي'
 
 class RefundSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):

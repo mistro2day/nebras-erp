@@ -650,7 +650,7 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
 
         <!-- نافذة تفاصيل المستند (فاتورة / سند قبض) — عرض وطباعة وتصدير -->
         <sf-document-drawer [doc]="doc()" [studentName]="student().profile.arabic_name || ''"
-          [student]="student()" [schoolInfo]="schoolInfo()"
+          [student]="student()" [schoolInfo]="schoolInfo()" [billingAccount]="billingAccount()"
           [methods]="paymentMethods()" (closed)="doc.set(null)"></sf-document-drawer>
 
         <!-- حاوية الطباعة الخاصة بـ A4 (مخفية في المتصفح وتظهر فقط عند الطباعة) -->

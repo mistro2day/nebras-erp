@@ -3,6 +3,8 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { StudentsService } from '../../students/students.service';
+import { TenantService } from '../../../core/services/tenant.service';
+import { environment } from '../../../../environments/environment';
 
 export type SfDoc = { type: 'invoice' | 'receipt' | 'receivable'; data: any } | null;
 
@@ -99,7 +101,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             </div>
             <div class="school-logo-wrapper">
               @if (getLogoUrl()) {
-                <img [src]="getLogoUrl()" alt="شعار المدرسة" class="school-logo-img" />
+                <img [src]="getLogoUrl()" alt="شعار المدرسة" class="school-logo-img" (error)="onLogoError()" />
               } @else {
                 <div class="school-logo-placeholder">
                   <span>🏛️</span>
@@ -167,8 +169,16 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             </div>
             <div class="info-cell">
               <span class="c-label">طريقة السداد:</span>
-              <span class="c-val">{{ d.type === 'receipt' ? methodName(d.data?.payment_method_id) : 'حساب بنكي / نقدي' }}</span>
+              <span class="c-val">{{ d.type === 'receipt' ? (d.data?.payment_method_name || methodName(d.data?.payment_method_id)) : 'حساب بنكي / نقدي' }}</span>
             </div>
+            @if (d.type === 'receipt') {
+              <div class="info-cell balance-cell">
+                <span class="c-label">المتبقي من الرسوم:</span>
+                <span class="c-val mono remaining-val" [class.danger]="getRemainingBalance() > 0" [class.success]="getRemainingBalance() <= 0">
+                  {{ getRemainingBalance() | number:'1.2-2' }} ج.س
+                </span>
+              </div>
+            }
           </div>
 
           <!-- 4. جدول بنود الرسوم والمبالغ -->
@@ -219,20 +229,38 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
               <tfoot>
                 <tr class="total-row">
                   <td colspan="2" class="total-label">
-                    {{ d.type === 'receipt' ? 'إجمالي المبلغ المقبوض والمحصّل:' : 'إجمالي المبلغ المستحق:' }}
+                    {{ d.type === 'receipt' ? 'إجمالي المبلغ المقبوض والمحصّل بهذا السند:' : 'إجمالي المبلغ المستحق:' }}
                   </td>
                   <td class="total-amount mono text-end">
                     {{ (d.type === 'receipt' ? d.data?.amount : d.data?.total_amount) | number:'1.2-2' }}
                   </td>
                 </tr>
+                @if (d.type === 'receipt') {
+                  <tr class="remaining-row">
+                    <td colspan="2" class="remaining-label">
+                      <span class="remaining-title">المتبقي من الرسوم الدراسية (الرصيد المستحق):</span>
+                    </td>
+                    <td class="remaining-amount mono text-end font-bold" [class.has-due]="getRemainingBalance() > 0" [class.cleared]="getRemainingBalance() <= 0">
+                      {{ getRemainingBalance() | number:'1.2-2' }}
+                    </td>
+                  </tr>
+                }
               </tfoot>
             </table>
           </div>
 
           <!-- 5. التفقيط المالي (المبلغ كتابة باللغة العربية) -->
-          <div class="tafqeet-box">
-            <span class="tafqeet-title">المبلغ كتابةً:</span>
-            <span class="tafqeet-text">{{ getTafqeetText() }}</span>
+          <div class="tafqeet-container">
+            <div class="tafqeet-box">
+              <span class="tafqeet-title">المبلغ المقبوض كتابةً:</span>
+              <span class="tafqeet-text">{{ getTafqeetText() }}</span>
+            </div>
+            @if (d.type === 'receipt' && getRemainingBalance() > 0) {
+              <div class="tafqeet-box remaining-tafqeet-box">
+                <span class="tafqeet-title remaining-tafqeet-title">المتبقي من الرسوم كتابةً:</span>
+                <span class="tafqeet-text remaining-tafqeet-text">{{ getRemainingTafqeetText() }}</span>
+              </div>
+            }
           </div>
 
           <!-- 6. الملاحظات والسياسة المالية -->
@@ -256,7 +284,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
               <span class="sig-title">ختم الإدارة المالية للمدرسة</span>
               <div class="stamp-container">
                 @if (getStampUrl()) {
-                  <img [src]="getStampUrl()" alt="الختم الرسمي للمدرسة" class="official-school-stamp-img" />
+                  <img [src]="getStampUrl()" alt="الختم الرسمي للمدرسة" class="official-school-stamp-img" (error)="onStampError()" />
                 } @else {
                   <div class="stamp-circle">
                     <span class="stamp-school-text">{{ getSchoolNameAr() }}</span>
@@ -473,6 +501,15 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     .info-cell .c-label { color: #64748b; width: 140px; flex-shrink: 0; }
     .info-cell .c-val { color: #1e293b; font-weight: 600; }
     .info-cell .c-val.strong { font-weight: 800; color: #0284c7; }
+    .info-cell.balance-cell {
+      background: rgba(239, 68, 68, 0.05);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px dashed rgba(239, 68, 68, 0.25);
+    }
+    .remaining-val { font-size: 13px; font-weight: 800; }
+    .remaining-val.danger { color: #dc2626; }
+    .remaining-val.success { color: #059669; }
 
     /* جدول البنود */
     .breakdown-section {
@@ -514,13 +551,30 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     .total-label { font-size: 13px; color: #0f172a; }
     .total-amount { font-size: 15px; color: #059669; font-weight: 800; }
 
+    .voucher-table tfoot .remaining-row td {
+      background: rgba(254, 242, 242, 0.7);
+      border-top: 1px dashed #fca5a5;
+      border-bottom: 2px solid #ef4444;
+      font-weight: 800;
+    }
+    .remaining-label { font-size: 13px; color: #991b1b; }
+    .remaining-title { font-weight: 800; }
+    .remaining-amount { font-size: 16px; font-weight: 800; }
+    .remaining-amount.has-due { color: #dc2626; }
+    .remaining-amount.cleared { color: #059669; }
+
     /* التفقيط */
+    .tafqeet-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
     .tafqeet-box {
       background: rgba(2, 132, 199, 0.06);
       border: 1px solid rgba(2, 132, 199, 0.2);
       border-radius: 6px;
       padding: 8px 14px;
-      margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -528,6 +582,13 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
     }
     .tafqeet-title { font-weight: 700; color: #0284c7; flex-shrink: 0; }
     .tafqeet-text { font-weight: 700; color: #0f172a; }
+
+    .remaining-tafqeet-box {
+      background: rgba(254, 242, 242, 0.85);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .remaining-tafqeet-title { color: #dc2626; font-weight: 800; }
+    .remaining-tafqeet-text { color: #991b1b; font-weight: 700; }
 
     /* الملاحظات */
     .terms-box {
@@ -604,18 +665,24 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
 })
 export class SfDocumentDrawerComponent implements OnInit {
   private studentsService = inject(StudentsService);
+  private tenantService = inject(TenantService);
 
   @Input() doc: SfDoc = null;
   @Input() studentName = '';
   @Input() student: any = null;
   @Input() schoolInfo: any = null;
+  @Input() billingAccount: any = null;
   @Input() methods: any[] = [];
   @Output() closed = new EventEmitter<void>();
 
   brandingData = signal<any>(null);
+  logoFailed = signal(false);
+  stampFailed = signal(false);
   todayDate = new Date().toLocaleDateString('ar-EG');
 
   ngOnInit(): void {
+    this.logoFailed.set(false);
+    this.stampFailed.set(false);
     if (!this.schoolInfo) {
       this.studentsService.getBranding().subscribe({
         next: (res) => {
@@ -626,23 +693,69 @@ export class SfDocumentDrawerComponent implements OnInit {
   }
 
   schoolData(): any {
-    return this.schoolInfo || this.brandingData() || null;
+    return this.schoolInfo || this.brandingData() || this.tenantService.currentTenant() || null;
   }
 
   getSchoolNameAr(): string {
-    return this.schoolData()?.school_name_ar || this.schoolData()?.name_ar || this.schoolData()?.name || 'مدارس المورد الأهلية النموذجية';
+    return this.schoolData()?.school_name_ar || this.schoolData()?.name_ar || this.schoolData()?.name || this.tenantService.currentTenant()?.nameAr || 'مدارس المورد الأهلية النموذجية';
   }
 
   getSchoolNameEn(): string {
-    return this.schoolData()?.school_name_en || this.schoolData()?.name_en || 'Al-Mawrid Model Private Schools';
+    return this.schoolData()?.school_name_en || this.schoolData()?.name_en || this.tenantService.currentTenant()?.nameEn || 'Al-Mawrid Model Private Schools';
   }
 
   getLogoUrl(): string {
-    return this.schoolData()?.logo_url || this.schoolData()?.logo || '';
+    if (this.logoFailed()) return '';
+    const info = this.schoolData();
+    let url = info?.logo_url || info?.logo || this.tenantService.currentTenant()?.logoUrl || '';
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+      return url;
+    }
+    const backendBase = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
+    return url.startsWith('/') ? `${backendBase}${url}` : `${backendBase}/${url}`;
   }
 
   getStampUrl(): string {
-    return this.schoolData()?.stamp_url || this.schoolData()?.stamp || '';
+    if (this.stampFailed()) return '';
+    const info = this.schoolData();
+    let url = info?.stamp_url || info?.stamp || this.tenantService.currentTenant()?.stampUrl || '';
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+      return url;
+    }
+    const backendBase = environment.apiUrl.replace(/\/api\/v1\/?$/, '');
+    return url.startsWith('/') ? `${backendBase}${url}` : `${backendBase}/${url}`;
+  }
+
+  onLogoError(): void {
+    this.logoFailed.set(true);
+  }
+
+  onStampError(): void {
+    this.stampFailed.set(true);
+  }
+
+  getRemainingBalance(): number {
+    const d = this.doc?.data;
+    if (d?.remaining_balance !== undefined && d?.remaining_balance !== null) {
+      return Number(d.remaining_balance) || 0;
+    }
+    if (d?.outstanding_balance !== undefined && d?.outstanding_balance !== null) {
+      return Number(d.outstanding_balance) || 0;
+    }
+    if (this.billingAccount?.outstanding_balance !== undefined && this.billingAccount?.outstanding_balance !== null) {
+      return Number(this.billingAccount.outstanding_balance) || 0;
+    }
+    if (d?.student_billing_account?.outstanding_balance !== undefined && d?.student_billing_account?.outstanding_balance !== null) {
+      return Number(d.student_billing_account.outstanding_balance) || 0;
+    }
+    return 0;
+  }
+
+  getRemainingTafqeetText(): string {
+    const rem = this.getRemainingBalance();
+    return tafqeetArabic(rem, 'جنيه');
   }
 
   methodName(id: string): string {
@@ -768,6 +881,10 @@ export class SfDocumentDrawerComponent implements OnInit {
           .info-cell .c-label { color: #64748b; width: 140px; font-weight: 600; flex-shrink: 0; }
           .info-cell .c-val { color: #0f172a; font-weight: 600; }
           .info-cell .c-val.strong { font-weight: 800; color: #0284c7; }
+          .info-cell.balance-cell { background: #fef2f2; border: 1px dashed #fca5a5; border-radius: 6px; padding: 4px 8px; }
+          .remaining-val { font-size: 12px; font-weight: 800; }
+          .remaining-val.danger { color: #dc2626; }
+          .remaining-val.success { color: #059669; }
           .section-heading { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
           .breakdown-section { margin-bottom: 14px; }
           .voucher-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -777,9 +894,19 @@ export class SfDocumentDrawerComponent implements OnInit {
           .voucher-table tfoot .total-row td { background: #f8fafc; border-top: 2px solid #0f172a; font-weight: 800; }
           .total-label { font-size: 13px; }
           .total-amount { font-size: 15px; color: #059669; font-weight: 800; }
-          .tafqeet-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+          .voucher-table tfoot .remaining-row td { background: #fef2f2; border-top: 1px dashed #fca5a5; border-bottom: 2px solid #dc2626; font-weight: 800; }
+          .remaining-label { font-size: 13px; color: #991b1b; }
+          .remaining-title { font-weight: 800; }
+          .remaining-amount { font-size: 15px; font-weight: 800; }
+          .remaining-amount.has-due { color: #dc2626; }
+          .remaining-amount.cleared { color: #059669; }
+          .tafqeet-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+          .tafqeet-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
           .tafqeet-title { font-weight: 700; color: #0284c7; }
           .tafqeet-text { font-weight: 700; color: #0f172a; }
+          .remaining-tafqeet-box { background: #fef2f2; border: 1px solid #fca5a5; }
+          .remaining-tafqeet-title { color: #dc2626; font-weight: 800; }
+          .remaining-tafqeet-text { color: #991b1b; font-weight: 700; }
           .terms-box { font-size: 11px; color: #64748b; margin-bottom: 18px; line-height: 1.5; }
           .signatures-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-top: 14px; border-top: 1px solid #cbd5e1; margin-bottom: 14px; }
           .sig-box { display: flex; flex-direction: column; align-items: center; text-align: center; }

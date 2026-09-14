@@ -119,7 +119,16 @@ class TenantViewSet(viewsets.ModelViewSet):
                         ext = 'png'
                         if '/' in header_part:
                             ext = header_part.split(';')[0].split('/')[-1]
-                        tenant.logo.save(f"school_logo_{tenant.id}.{ext}", ContentFile(base64.b64decode(base64_data)), save=False)
+                            if ext.lower() == 'jpeg':
+                                ext = 'jpg'
+                        filename = f"school_logo_{tenant.id}.{ext}"
+                        target_rel = f"tenants/logos/{filename}"
+                        if tenant.logo and tenant.logo.storage.exists(target_rel):
+                            try:
+                                tenant.logo.storage.delete(target_rel)
+                            except Exception:
+                                pass
+                        tenant.logo.save(filename, ContentFile(base64.b64decode(base64_data)), save=False)
                     except Exception:
                         pass
                 elif isinstance(logo_val, str) and (logo_val.startswith('http') or logo_val.startswith('/') or logo_val.startswith('assets/')):
@@ -158,6 +167,15 @@ class TenantViewSet(viewsets.ModelViewSet):
         data['address'] = tenant.address or 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54'
         if tenant.logo:
             try:
+                if not tenant.logo.storage.exists(tenant.logo.name):
+                    import glob, os
+                    from django.conf import settings
+                    pattern = os.path.join(settings.MEDIA_ROOT, 'tenants', 'logos', f"school_logo_{tenant.id}.*")
+                    matches = glob.glob(pattern)
+                    if matches:
+                        rel_path = os.path.relpath(matches[0], settings.MEDIA_ROOT).replace('\\', '/')
+                        tenant.logo.name = rel_path
+                        tenant.save(update_fields=['logo'])
                 data['logo_url'] = request.build_absolute_uri(tenant.logo.url)
             except Exception:
                 data['logo_url'] = feat.get('logo_url') or "/assets/branding/logo-dark.png"
