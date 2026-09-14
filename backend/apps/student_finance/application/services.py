@@ -20,7 +20,7 @@ from apps.student_finance.domain.models import (
 # استيراد خدمات ونماذج موديول المالية
 from apps.finance.domain.models import (
     JournalEntry, JournalEntryLine, Voucher, ChartOfAccount, Currency,
-    FiscalYear, AccountingPeriod, CashBox, BankAccount
+    FiscalYear, AccountingPeriod, CashBox, BankAccount, PaymentMethod
 )
 from apps.finance.application.services import PostingService, CashManagementService
 
@@ -404,6 +404,40 @@ class PaymentService:
 
         if not receipt_number:
             receipt_number = f"{prefix}{seq:04d}"
+
+        # ضمان تحديد صندوق أو حساب بنكي تلقائياً بدقة وفقاً لطريقة الدفع إذا لم يُحدد أحدهما
+        pm = PaymentMethod.objects.filter(id=payment_method_id, tenant_id=tenant_id).first() if payment_method_id else None
+        is_bank_method = False
+        if pm:
+            code_str = (pm.code or '').lower()
+            name_str = f"{pm.name_ar or ''} {pm.name_en or ''}".lower()
+            if any(w in code_str or w in name_str for w in ['bank', 'transfer', 'online', 'cheque', 'card', 'بنك', 'بنكك', 'فوري', 'أوكاش', 'تحويل', 'شيك']):
+                is_bank_method = True
+
+        if not cash_box_id and not bank_account_id:
+            if is_bank_method:
+                default_bank = BankAccount.objects.filter(tenant_id=tenant_id, status='active').first() or BankAccount.objects.filter(tenant_id=tenant_id).first()
+                if default_bank:
+                    bank_account_id = default_bank.id
+                else:
+                    default_box = CashBox.objects.filter(tenant_id=tenant_id, status='active').first() or CashBox.objects.filter(tenant_id=tenant_id).first()
+                    if default_box:
+                        cash_box_id = default_box.id
+            else:
+                default_box = CashBox.objects.filter(tenant_id=tenant_id, status='active').first() or CashBox.objects.filter(tenant_id=tenant_id).first()
+                if default_box:
+                    cash_box_id = default_box.id
+                else:
+                    default_bank = BankAccount.objects.filter(tenant_id=tenant_id, status='active').first() or BankAccount.objects.filter(tenant_id=tenant_id).first()
+                    if default_bank:
+                        bank_account_id = default_bank.id
+        elif cash_box_id and bank_account_id:
+            # منع التناقض: إذا حُدد الاثنان معاً، نرجح الوجهة المناسبة لطريقة الدفع
+            if is_bank_method:
+                cash_box_id = None
+            else:
+                bank_account_id = None
+
         receipt = Receipt.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,

@@ -154,7 +154,7 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
           <div class="form-grid">
             <label class="half-width">
               <span class="fld-title">طريقة السداد / التحصيل *</span>
-              <select class="fld" [(ngModel)]="paymentMethodId">
+              <select class="fld" [ngModel]="paymentMethodId" (ngModelChange)="onPaymentMethodChange($event)">
                 <option value="">اختر طريقة الدفع…</option>
                 @for (m of methods(); track m.id) {
                   <option [value]="m.id">{{ m.name_ar }}</option>
@@ -169,8 +169,8 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 
             <label class="half-width">
               <span class="fld-title">الصندوق / الخزينة النقدية</span>
-              <select class="fld" [(ngModel)]="cashBoxId">
-                <option [ngValue]="null">— بدون (أو خيار بنكي) —</option>
+              <select class="fld" [ngModel]="cashBoxId" (ngModelChange)="onCashBoxChange($event)">
+                <option [ngValue]="null">— بدون (أو إيداع بنكي) —</option>
                 @for (cb of cashBoxes(); track cb.id) {
                   <option [ngValue]="cb.id">{{ cb.name_ar }}</option>
                 }
@@ -179,10 +179,10 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
 
             <label class="half-width">
               <span class="fld-title">الحساب البنكي المودع به (تطبيق بنكك / فوري / أوكاش / حساب مصرفي)</span>
-              <select class="fld" [(ngModel)]="bankAccountId">
+              <select class="fld" [ngModel]="bankAccountId" (ngModelChange)="onBankAccountChange($event)">
                 <option [ngValue]="null">— بدون (إيداع خزينة نقدية) —</option>
                 @for (b of bankAccounts(); track b.id) {
-                  <option [ngValue]="b.id">{{ b.bank_name }} — {{ b.account_number }}</option>
+                  <option [ngValue]="b.id">{{ b.bank_name || 'حساب بنكي' }} — {{ b.account_number }}</option>
                 }
               </select>
             </label>
@@ -961,15 +961,22 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
         if (list.length > 0 && !this.paymentMethodId) {
           this.paymentMethodId = list[0].id;
         }
+        this.autoSelectDestination();
       },
     });
 
     this.svc.listCashBoxes().subscribe({
-      next: (res) => this.cashBoxes.set(res?.data ?? []),
+      next: (res) => {
+        this.cashBoxes.set(res?.data ?? []);
+        this.autoSelectDestination();
+      },
     });
 
     this.svc.listBankAccounts().subscribe({
-      next: (res) => this.bankAccounts.set(res?.data ?? []),
+      next: (res) => {
+        this.bankAccounts.set(res?.data ?? []);
+        this.autoSelectDestination();
+      },
     });
   }
 
@@ -983,10 +990,12 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     this.selectedAccountId.set(initialId);
     this.selectedAccount.set(initialAccount);
     this.amount = initialAccount && +initialAccount.outstanding_balance > 0 ? +initialAccount.outstanding_balance : 0;
-    this.cashBoxId = null;
-    this.bankAccountId = null;
     this.referenceNumber = '';
     this.submitting.set(false);
+    if (this.methods().length > 0 && !this.paymentMethodId) {
+      this.paymentMethodId = this.methods()[0].id;
+    }
+    this.autoSelectDestination();
     if (this.preselectedAccount || this.preselectedAccountId) {
       this.accountMode.set('locked');
     } else {
@@ -1058,12 +1067,54 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     return tafqeetArabic(amount, 'جنيه سوداني');
   }
 
+  onPaymentMethodChange(methodId: string) {
+    this.paymentMethodId = methodId;
+    this.autoSelectDestination();
+  }
+
+  onCashBoxChange(id: string | null) {
+    this.cashBoxId = id;
+    if (id) {
+      this.bankAccountId = null;
+    }
+  }
+
+  onBankAccountChange(id: string | null) {
+    this.bankAccountId = id;
+    if (id) {
+      this.cashBoxId = null;
+    }
+  }
+
+  autoSelectDestination() {
+    const m = this.methods().find((x) => x.id === this.paymentMethodId);
+    const name = (m?.name_ar || m?.name || m?.code || '').toLowerCase();
+    const isBank = ['bank', 'بنك', 'بنكك', 'فوري', 'أوكاش', 'تحويل', 'شيك', 'card', 'pos'].some((w) => name.includes(w));
+    if (isBank) {
+      if (this.bankAccounts().length > 0) {
+        this.bankAccountId = this.bankAccounts()[0].id;
+        this.cashBoxId = null;
+      } else if (this.cashBoxes().length > 0) {
+        this.cashBoxId = this.cashBoxes()[0].id;
+        this.bankAccountId = null;
+      }
+    } else {
+      if (this.cashBoxes().length > 0) {
+        this.cashBoxId = this.cashBoxes()[0].id;
+        this.bankAccountId = null;
+      } else if (this.bankAccounts().length > 0) {
+        this.bankAccountId = this.bankAccounts()[0].id;
+        this.cashBoxId = null;
+      }
+    }
+  }
+
   canProceed(): boolean {
     if (this.currentStep() === 0) {
       return (!!this.selectedAccountId() || !!this.selectedAccount()) && this.amount > 0;
     }
     if (this.currentStep() === 1) {
-      return !!this.paymentMethodId && !!this.paymentDate;
+      return !!this.paymentMethodId && !!this.paymentDate && (!!this.cashBoxId || !!this.bankAccountId);
     }
     return true;
   }
@@ -1105,7 +1156,19 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
       },
       error: (err) => {
         this.submitting.set(false);
-        const msg = err?.error?.error?.message || err?.error?.detail || 'تعذّر تسجيل سند القبض. يرجى مراجعة البيانات.';
+        const errObj = err?.error;
+        let msg = 'تعذّر تسجيل سند القبض. يرجى مراجعة البيانات.';
+        if (typeof errObj === 'string') {
+          msg = errObj;
+        } else if (errObj?.error?.message) {
+          msg = errObj.error.message;
+        } else if (errObj?.error && typeof errObj.error === 'string') {
+          msg = errObj.error;
+        } else if (errObj?.detail) {
+          msg = errObj.detail;
+        } else if (errObj?.message) {
+          msg = errObj.message;
+        }
         this.notify.error(msg);
       },
     });

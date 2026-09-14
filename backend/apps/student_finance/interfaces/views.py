@@ -1200,18 +1200,24 @@ class ReceiptViewSet(BaseCRUDViewSet):
         if not billing_account_id or amount is None or not payment_method_id:
             return Response({'error': 'billing_account_id, amount, and payment_method_id are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        receipt = PaymentService.receive_payment(
-            tenant_id=tenant_id,
-            billing_account_id=billing_account_id,
-            amount=amount,
-            payment_method_id=payment_method_id,
-            bank_account_id=bank_account_id,
-            cash_box_id=cash_box_id,
-            user_id=request.user.id if request.user else None,
-            payment_date=payment_date
-        )
-        serializer = self.get_serializer(receipt)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            receipt = PaymentService.receive_payment(
+                tenant_id=tenant_id,
+                billing_account_id=billing_account_id,
+                amount=amount,
+                payment_method_id=payment_method_id,
+                bank_account_id=bank_account_id,
+                cash_box_id=cash_box_id,
+                user_id=request.user.id if request.user else None,
+                payment_date=payment_date
+            )
+            serializer = self.get_serializer(receipt)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+            return Response({'error': {'message': msg}}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RefundViewSet(BaseCRUDViewSet):
