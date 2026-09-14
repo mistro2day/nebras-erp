@@ -236,7 +236,7 @@ export class StudentFinanceService {
   }
 
   /** استلام دفعة وتوليد سند قبض (يُخصَّص على المستحقات تلقائيًا). */
-  receiveStudentPayment(body: { billing_account_id: string; amount: number; payment_method_id: string; bank_account_id?: string; cash_box_id?: string }): Observable<any> {
+  receiveStudentPayment(body: { billing_account_id: string; amount: number; payment_method_id: string; payment_date?: string; bank_account_id?: string; cash_box_id?: string }): Observable<any> {
     return this.api.post('student-finance/receipts/receive-payment/', body);
   }
 

@@ -343,7 +343,7 @@ class PaymentService:
 
     @classmethod
     @db_atomic
-    def receive_payment(cls, tenant_id, billing_account_id, amount, payment_method_id, bank_account_id=None, cash_box_id=None, user_id=None):
+    def receive_payment(cls, tenant_id, billing_account_id, amount, payment_method_id, bank_account_id=None, cash_box_id=None, user_id=None, payment_date=None):
         """
         استلام دفعة سداد من طالب، وتخصيصها للمستحقات بنظام FIFO وتوليد سند القبض في موديول المالية.
         """
@@ -356,6 +356,19 @@ class PaymentService:
         if not settings:
             raise ValidationError("يرجى ضبط الإعدادات المالية للطلاب أولاً.")
 
+        # تحديد تاريخ التحصيل الفعلي (يدوي أو تاريخ اليوم)
+        if payment_date:
+            if isinstance(payment_date, str):
+                from django.utils.dateparse import parse_date
+                parsed_d = parse_date(payment_date)
+                actual_date = parsed_d if parsed_d else date.today()
+            elif isinstance(payment_date, (datetime, date)):
+                actual_date = payment_date.date() if isinstance(payment_date, datetime) else payment_date
+            else:
+                actual_date = date.today()
+        else:
+            actual_date = date.today()
+
         # 1. إنشاء إيصال التحصيل الداخلي
         rcp_seq = Receipt.objects.filter(tenant_id=tenant_id).count() + 1
         receipt_number = f"RCP-{timezone.now().year}-{rcp_seq:04d}"
@@ -363,7 +376,7 @@ class PaymentService:
             tenant_id=tenant_id,
             student_billing_account=account,
             receipt_number=receipt_number,
-            payment_date=date.today(),
+            payment_date=actual_date,
             amount=pay_amount,
             payment_method_id=payment_method_id,
             bank_account_id=bank_account_id,
@@ -380,7 +393,7 @@ class PaymentService:
             tenant_id=tenant_id,
             voucher_number=receipt.receipt_number,
             voucher_type='receipt',
-            date=date.today(),
+            date=actual_date,
             amount=pay_amount,
             currency=base_currency,
             gl_account=receivables_account,  # الحساب الذي سيتم تخفيضه (دائن بـ Receivables)

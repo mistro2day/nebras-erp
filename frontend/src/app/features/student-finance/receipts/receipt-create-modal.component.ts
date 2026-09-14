@@ -7,6 +7,7 @@ import { NotificationService } from '../../../core/services/notification.service
 import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
 import { NbSearchableSelectComponent, NbSelectItem } from '../../../shared/nebras/nb-searchable-select.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 
 @Component({
@@ -20,6 +21,7 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
     NbModalComponent,
     NbStepperComponent,
     NbSearchableSelectComponent,
+    NbDatepickerComponent,
   ],
   template: `
     <nb-modal
@@ -35,36 +37,77 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
         <!-- الخطوة 1: حساب الطالب والمبلغ المقبوض -->
         @if (currentStep() === 0) {
           <div class="form-grid">
-            <label class="full-width">
-              <span class="fld-title">حساب الطالب المالي *</span>
-              <nb-searchable-select
-                [items]="accountSelectItems()"
-                [(value)]="selectedAccountId"
-                (valueChange)="onAccountChange()"
-                placeholder="ابحث برقم الحساب أو اسم الطالب أو رقم القيد…"
-                searchPlaceholder="اكتب للبحث السريع في الحسابات…"
-              ></nb-searchable-select>
-            </label>
-
-            @if (selectedAccount(); as acc) {
-              <div class="full-width account-info-card">
-                <div class="info-item">
-                  <span class="lbl">اسم الطالب:</span>
-                  <span class="val bold">{{ getStudentName(acc.student_id) }}</span>
+            @if (accountMode() === 'locked' && selectedAccount(); as acc) {
+              <!-- بطاقة الطالب المحدد مباشرة عند فتحه من حسابه المالي -->
+              <div class="full-width locked-student-card">
+                <div class="lsc-header">
+                  <div class="lsc-badge-group">
+                    <span class="lsc-badge ok">✓ الحساب المالي المفتوح</span>
+                    <span class="lsc-account-num mono">{{ acc.account_number }}</span>
+                  </div>
+                  <button type="button" class="btn-switch-search" (click)="accountMode.set('search')" title="اختيار طالب آخر">
+                    🔄 اختيار طالب آخر
+                  </button>
                 </div>
-                <div class="info-item">
-                  <span class="lbl">رقم القيد الأكاديمي:</span>
-                  <span class="val mono">{{ getStudentNumber(acc.student_id) }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="lbl">إجمالي المستحق حالياً:</span>
-                  <span class="val mono due">{{ (+acc.outstanding_balance || 0) | number:'1.2-2' }} ج.س</span>
-                </div>
-                <div class="info-item">
-                  <span class="lbl">الرصيد الدائن المتوفر:</span>
-                  <span class="val mono ok">{{ (+acc.credit_balance || 0) | number:'1.2-2' }} ج.س</span>
+                <div class="lsc-content">
+                  <div class="lsc-avatar">🎓</div>
+                  <div class="lsc-details">
+                    <h3 class="lsc-name">{{ getStudentName(acc.student_id) }}</h3>
+                    <div class="lsc-meta">
+                      <span>رقم القيد الأكاديمي: <strong class="mono">{{ getStudentNumber(acc.student_id) }}</strong></span>
+                      <span class="dot">•</span>
+                      <span>الحالة المالية: <strong [class.due]="acc.financial_hold" [class.ok]="!acc.financial_hold">{{ acc.financial_hold ? 'إيقاف مالي' : 'سليم' }}</strong></span>
+                    </div>
+                  </div>
+                  <div class="lsc-balance-badge">
+                    <span class="lsc-blbl">إجمالي المستحق المطلوب تحصيله</span>
+                    <span class="lsc-bval due mono">{{ (+acc.outstanding_balance || 0) | number:'1.2-2' }} <em>ج.س</em></span>
+                    @if (+acc.credit_balance > 0) {
+                      <span class="lsc-credit ok mono">رصيد دائن متاح: {{ (+acc.credit_balance) | number:'1.2-2' }} ج.س</span>
+                    }
+                  </div>
                 </div>
               </div>
+            } @else {
+              <!-- وضع البحث اليدوي في حال الرغبة في التغيير أو الفتح العام -->
+              <div class="full-width">
+                <div class="search-header-flex">
+                  <span class="fld-title">حساب الطالب المالي *</span>
+                  @if (preselectedAccount || preselectedAccountId) {
+                    <button type="button" class="btn-switch-search" (click)="revertToPreselected()">
+                      ↩ العودة للطالب المختار ({{ getStudentName(selectedAccount()?.student_id) }})
+                    </button>
+                  }
+                </div>
+                <nb-searchable-select
+                  [items]="accountSelectItems()"
+                  [value]="selectedAccountId()"
+                  (valueChange)="onAccountIdChanged($event)"
+                  placeholder="ابحث برقم الحساب أو اسم الطالب أو رقم القيد…"
+                  searchPlaceholder="اكتب للبحث السريع في الحسابات…"
+                ></nb-searchable-select>
+              </div>
+
+              @if (selectedAccount(); as acc) {
+                <div class="full-width account-info-card">
+                  <div class="info-item">
+                    <span class="lbl">اسم الطالب:</span>
+                    <span class="val bold">{{ getStudentName(acc.student_id) }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="lbl">رقم القيد الأكاديمي:</span>
+                    <span class="val mono">{{ getStudentNumber(acc.student_id) }}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="lbl">إجمالي المستحق حالياً:</span>
+                    <span class="val mono due">{{ (+acc.outstanding_balance || 0) | number:'1.2-2' }} ج.س</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="lbl">الرصيد الدائن المتوفر:</span>
+                    <span class="val mono ok">{{ (+acc.credit_balance || 0) | number:'1.2-2' }} ج.س</span>
+                  </div>
+                </div>
+              }
             }
 
             <div class="full-width amount-section">
@@ -72,7 +115,9 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
                 <span class="fld-title">المبلغ المقبوض (ج.س) *</span>
                 @if (selectedAccount() && +selectedAccount()!.outstanding_balance > 0) {
                   <div class="quick-amounts">
-                    <button type="button" class="btn-quick" (click)="setQuickAmount(1)">كامل المستحق</button>
+                    <button type="button" class="btn-quick" (click)="setQuickAmount(1)">
+                      كامل المستحق ({{ (+selectedAccount()!.outstanding_balance) | number:'1.2-2' }} ج.س)
+                    </button>
                     <button type="button" class="btn-quick" (click)="setQuickAmount(0.5)">50% من المستحق</button>
                   </div>
                 }
@@ -98,22 +143,27 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 
           <div class="step-hint-box">
             <span class="hint-icon">💡</span>
-            <span>حدد حساب الطالب والمبلغ المحصل للانتقال إلى تحديد وسيلة القبض وحساب الإيداع.</span>
+            <span>تحقق من المبلغ المحصل للانتقال إلى وسيلة القبض وتاريخ السند وحساب الإيداع.</span>
           </div>
         }
 
-        <!-- الخطوة 2: وسيلة الدفع والخزينة / البنك -->
+        <!-- الخطوة 2: وسيلة الدفع وتاريخ التحصيل والخزينة / البنك -->
         @if (currentStep() === 1) {
           <div class="form-grid">
             <label class="half-width">
               <span class="fld-title">طريقة السداد / التحصيل *</span>
-              <select class="fld" [(ngModel)]="paymentMethodId" (change)="onMethodChange()">
+              <select class="fld" [(ngModel)]="paymentMethodId">
                 <option value="">اختر طريقة الدفع…</option>
                 @for (m of methods(); track m.id) {
                   <option [value]="m.id">{{ m.name_ar }}</option>
                 }
               </select>
             </label>
+
+            <div class="half-width">
+              <span class="fld-title">تاريخ تحصيل الدفعة والسند *</span>
+              <nb-datepicker [(value)]="paymentDate" ariaLabel="تاريخ تحصيل الدفعة"></nb-datepicker>
+            </div>
 
             <label class="half-width">
               <span class="fld-title">الصندوق / الخزينة النقدية</span>
@@ -125,12 +175,12 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
               </select>
             </label>
 
-            <label class="full-width">
+            <label class="half-width">
               <span class="fld-title">الحساب البنكي المودع به (تطبيق بنكك / فوري / أوكاش / حساب مصرفي)</span>
               <select class="fld" [(ngModel)]="bankAccountId">
                 <option [ngValue]="null">— بدون (إيداع خزينة نقدية) —</option>
                 @for (b of bankAccounts(); track b.id) {
-                  <option [ngValue]="b.id">{{ b.bank_name }} — رقم الحساب: {{ b.account_number }}</option>
+                  <option [ngValue]="b.id">{{ b.bank_name }} — {{ b.account_number }}</option>
                 }
               </select>
             </label>
@@ -148,7 +198,7 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 
           <div class="step-hint-box">
             <span class="hint-icon">🏦</span>
-            <span>يدعم نظام نبراس المحافظ والتطبيقات البنكية السودانية المعتمدة (بنكك، فوري، أوكاش) والخزائن النقدية الفرعية.</span>
+            <span>يدعم نظام نبراس المحافظ والتطبيقات البنكية السودانية المعتمدة (بنكك، فوري، أوكاش) والخزائن النقدية، مع إمكانية تعديل تاريخ السند يدوياً لمطابقة الإشعارات الفعلية.</span>
           </div>
         }
 
@@ -171,6 +221,10 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
                   <span class="v bold">{{ getMethodName(paymentMethodId) }}</span>
                 </div>
                 <div class="rc-item">
+                  <span class="k">تاريخ السند والتحصيل:</span>
+                  <span class="v mono bold">{{ paymentDate }}</span>
+                </div>
+                <div class="rc-item">
                   <span class="k">وجهة الإيداع:</span>
                   <span class="v">{{ getDepositDestination() }}</span>
                 </div>
@@ -180,10 +234,6 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
                     <span class="v mono">{{ referenceNumber }}</span>
                   </div>
                 }
-                <div class="rc-item">
-                  <span class="k">تاريخ السند:</span>
-                  <span class="v mono">{{ todayDate }}</span>
-                </div>
               </div>
 
               <div class="rc-section-title">الأثر المالي والتسوية</div>
@@ -211,7 +261,7 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 
               <div class="confirm-notice">
                 <span class="notice-icon">✓</span>
-                <span>سيتم توليد سند قبض رسمي مرقم، وخصم المبلغ فورياً من مستحقات الطالب وتحديث أرصدة الخزينة/البنك في دفتر الأستاذ.</span>
+                <span>سيتم توليد سند قبض رسمي مرقم بتاريخ <strong>{{ paymentDate }}</strong>، وخصم المبلغ فورياً من مستحقات الطالب وتحديث أرصدة الخزينة/البنك في دفتر الأستاذ.</span>
               </div>
             </div>
           </div>
@@ -275,6 +325,141 @@ import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
       font-family: inherit;
       font-size: 13.5px;
       box-sizing: border-box;
+    }
+
+    /* بطاقة الطالب المحدد مسبقاً بطريقة مباشرة وأنيقة */
+    .locked-student-card {
+      background: linear-gradient(135deg, rgba(240, 253, 244, 0.7) 0%, rgba(255, 255, 255, 0.95) 100%);
+      border: 1.5px solid #86efac;
+      border-radius: var(--nb-radius-card, 12px);
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lsc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(134, 239, 172, 0.5);
+      padding-bottom: 8px;
+    }
+    .lsc-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lsc-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .lsc-account-num {
+      font-size: 12px;
+      color: var(--nb-text-muted);
+      direction: ltr;
+    }
+    .btn-switch-search {
+      background: transparent;
+      border: 1px solid var(--nb-border);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--nb-text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn-switch-search:hover {
+      background: var(--nb-surface-raised);
+      border-color: var(--nb-primary-500);
+      color: var(--nb-primary-700);
+    }
+    .lsc-content {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .lsc-avatar {
+      font-size: 28px;
+      width: 46px;
+      height: 46px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .lsc-details {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .lsc-name {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--nb-text);
+    }
+    .lsc-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--nb-text-muted);
+    }
+    .lsc-meta .dot { opacity: 0.5; }
+    .lsc-meta .due { color: var(--nb-danger, #dc2626); }
+    .lsc-meta .ok { color: #15803d; }
+    .lsc-balance-badge {
+      background: var(--nb-surface);
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .lsc-blbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--nb-text-muted);
+    }
+    .lsc-bval {
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .lsc-bval em {
+      font-size: 11px;
+      font-style: normal;
+      color: var(--nb-text-muted);
+      margin-inline-start: 3px;
+    }
+    .lsc-credit {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .search-header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
     }
 
     .amount-section { display: flex; flex-direction: column; gap: 6px; }
@@ -465,18 +650,20 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
   @Input() open = false;
   @Input() preselectedAccountId?: string;
+  @Input() preselectedAccount?: any;
 
   @Output() closed = new EventEmitter<void>();
   @Output() saved = new EventEmitter<any>();
 
   steps: string[] = [
     'حساب الطالب والمبلغ',
-    'وسيلة الدفع والخزينة',
+    'وسيلة الدفع وتاريخ التحصيل',
     'المراجعة والتأكيد',
   ];
 
   currentStep = signal(0);
   submitting = signal(false);
+  accountMode = signal<'locked' | 'search'>('locked');
 
   accounts = signal<any[]>([]);
   studentsMap = signal<Map<string, any>>(new Map());
@@ -484,24 +671,21 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   cashBoxes = signal<any[]>([]);
   bankAccounts = signal<any[]>([]);
 
-  selectedAccountId = '';
+  selectedAccountId = signal<string>('');
+  selectedAccount = signal<any | null>(null);
+
   amount: number = 0;
   paymentMethodId = '';
+  paymentDate: string = new Date().toISOString().slice(0, 10);
   cashBoxId: string | null = null;
   bankAccountId: string | null = null;
   referenceNumber = '';
 
-  todayDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
-
-  selectedAccount = computed(() => {
-    return this.accounts().find((a) => a.id === this.selectedAccountId) || null;
-  });
-
   accountSelectItems = computed<NbSelectItem[]>(() => {
     return this.accounts().map((a) => {
       const s = this.studentsMap().get(a.student_id);
-      const studentName = s?.profile?.arabic_name || 'طالب';
-      const studentNum = s?.student_number || '';
+      const studentName = a.student_name || s?.profile?.arabic_name || 'طالب';
+      const studentNum = a.student_number || s?.student_number || '';
       return {
         id: a.id,
         code: a.account_number,
@@ -524,16 +708,38 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (changes['open'] && this.open) {
       this.resetForm();
-      if (this.preselectedAccountId) {
-        this.selectedAccountId = this.preselectedAccountId;
-        this.onAccountChange();
+      const target = this.preselectedAccount || this.accounts().find((a) => a.id === this.preselectedAccountId);
+      if (target) {
+        this.selectedAccountId.set(target.id);
+        this.selectedAccount.set(target);
+        this.accountMode.set('locked');
+        if (+target.outstanding_balance > 0) {
+          this.amount = +target.outstanding_balance;
+        }
+      } else if (this.preselectedAccountId) {
+        this.selectedAccountId.set(this.preselectedAccountId);
+        this.accountMode.set('locked');
+      } else {
+        this.accountMode.set('search');
       }
     }
   }
 
   loadData() {
     this.svc.listBillingAccounts({ page_size: 500 }).subscribe({
-      next: (res) => this.accounts.set(res?.data ?? []),
+      next: (res) => {
+        const list = res?.data ?? [];
+        this.accounts.set(list);
+        if (!this.selectedAccount() && this.selectedAccountId()) {
+          const found = list.find((a: any) => a.id === this.selectedAccountId());
+          if (found) {
+            this.selectedAccount.set(found);
+            if (!this.amount && +found.outstanding_balance > 0) {
+              this.amount = +found.outstanding_balance;
+            }
+          }
+        }
+      },
     });
 
     this.studentsSvc.getStudents({ page_size: 500 }).subscribe({
@@ -565,23 +771,42 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
   resetForm() {
     this.currentStep.set(0);
-    this.selectedAccountId = this.preselectedAccountId || '';
-    this.amount = 0;
+    this.paymentDate = new Date().toISOString().slice(0, 10);
+    const initialAccount = this.preselectedAccount || null;
+    const initialId = initialAccount?.id || this.preselectedAccountId || '';
+    this.selectedAccountId.set(initialId);
+    this.selectedAccount.set(initialAccount);
+    this.amount = initialAccount && +initialAccount.outstanding_balance > 0 ? +initialAccount.outstanding_balance : 0;
     this.cashBoxId = null;
     this.bankAccountId = null;
     this.referenceNumber = '';
     this.submitting.set(false);
-  }
-
-  onAccountChange() {
-    const acc = this.selectedAccount();
-    if (acc && +acc.outstanding_balance > 0 && this.amount === 0) {
-      this.amount = +acc.outstanding_balance;
+    if (this.preselectedAccount || this.preselectedAccountId) {
+      this.accountMode.set('locked');
+    } else {
+      this.accountMode.set('search');
     }
   }
 
-  onMethodChange() {
-    // optional logic when method changes
+  onAccountIdChanged(id: string) {
+    this.selectedAccountId.set(id);
+    const found = this.accounts().find((a) => a.id === id);
+    this.selectedAccount.set(found || null);
+    if (found && +found.outstanding_balance > 0) {
+      this.amount = +found.outstanding_balance;
+    }
+  }
+
+  revertToPreselected() {
+    const target = this.preselectedAccount || this.accounts().find((a) => a.id === this.preselectedAccountId);
+    if (target) {
+      this.selectedAccountId.set(target.id);
+      this.selectedAccount.set(target);
+      this.accountMode.set('locked');
+      if (+target.outstanding_balance > 0) {
+        this.amount = +target.outstanding_balance;
+      }
+    }
   }
 
   setQuickAmount(ratio: number) {
@@ -592,11 +817,15 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   }
 
   getStudentName(studentId?: string): string {
+    const acc = this.selectedAccount();
+    if (acc?.student_name) return acc.student_name;
     if (!studentId) return '—';
     return this.studentsMap().get(studentId)?.profile?.arabic_name || 'طالب';
   }
 
   getStudentNumber(studentId?: string): string {
+    const acc = this.selectedAccount();
+    if (acc?.student_number) return acc.student_number;
     if (!studentId) return '—';
     return this.studentsMap().get(studentId)?.student_number || '—';
   }
@@ -624,10 +853,10 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
   canProceed(): boolean {
     if (this.currentStep() === 0) {
-      return !!this.selectedAccountId && this.amount > 0;
+      return (!!this.selectedAccountId() || !!this.selectedAccount()) && this.amount > 0;
     }
     if (this.currentStep() === 1) {
-      return !!this.paymentMethodId;
+      return !!this.paymentMethodId && !!this.paymentDate;
     }
     return true;
   }
@@ -648,10 +877,12 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     if (!this.canProceed() || this.submitting()) return;
 
     this.submitting.set(true);
+    const accountId = this.selectedAccount()?.id || this.selectedAccountId();
     const payload: any = {
-      billing_account_id: this.selectedAccountId,
+      billing_account_id: accountId,
       amount: this.amount,
       payment_method_id: this.paymentMethodId,
+      payment_date: this.paymentDate,
     };
     if (this.bankAccountId) payload.bank_account_id = this.bankAccountId;
     if (this.cashBoxId) payload.cash_box_id = this.cashBoxId;

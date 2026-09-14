@@ -25,12 +25,13 @@ import { compressFile, formatFileSize, CompressionResult } from '../../../core/u
 
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-modal.component';
+import { ReceiptCreateModalComponent } from '../../student-finance/receipts/receipt-create-modal.component';
 
 @Component({
   selector: 'app-student-details',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent, FormsModule, StudentCascadeDeleteModalComponent],
+  imports: [DatePipe, CommonModule, RouterLink, MatTabsModule, MatDialogModule, MatSnackBarModule, NbLoadingComponent, SfDocumentDrawerComponent, FormsModule, StudentCascadeDeleteModalComponent, ReceiptCreateModalComponent],
   template: `
     @if (pageLoading() || !student().id) {
       <div class="page" dir="rtl" style="display: flex; align-items: center; justify-content: center; min-height: 480px;">
@@ -246,25 +247,40 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
                       <span class="fin-value text-success">{{ totalCollected() | number:'1.2-2' }} ج.س</span>
                     </div>
                     <div class="fin-stat-card">
+                      <span class="fin-label">الخصومات الممنوحة</span>
+                      <span class="fin-value text-warning">{{ totalDiscounts() | number:'1.2-2' }} ج.س</span>
+                    </div>
+                    <div class="fin-stat-card">
                       <span class="fin-label">الرصيد الدائن</span>
                       <span class="fin-value">{{ billingAccount().credit_balance | number:'1.2-2' }} ج.س</span>
                     </div>
-                    <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
+                    <div class="fin-actions-row">
+                      <button type="button" class="btn-collect-head" (click)="openReceiptModal()">💵 تحصيل دفعة</button>
+                      <a class="fin-link" (click)="openFinanceAccount()">فتح الحساب المالي الكامل (360°) ←</a>
+                    </div>
                   </div>
 
                   <h3 style="margin-top: 20px;">الفواتير الصادرة</h3>
                   <div class="tbl" *ngIf="invoices().length > 0; else noInvoices">
                     <div class="tbl-head finance-tbl">
                       <span>رقم الفاتورة</span>
-                      <span>المبلغ الإجمالي</span>
-                      <span>الرصيد المتبقي</span>
+                      <span>إجمالي الرسوم</span>
+                      <span>الخصم المعتمد</span>
+                      <span>الصافي المستحق</span>
                       <span>حالة الفاتورة</span>
                       <span>تاريخ الاستحقاق</span>
                     </div>
                     @for (inv of invoices(); track inv.id) {
                       <div class="tbl-row finance-tbl clickable" (click)="openDoc('invoice', inv)">
                         <span class="strong">{{ inv.invoice_number }}</span>
-                        <span>{{ inv.total_amount | number:'1.2-2' }} ج.س</span>
+                        <span>{{ getInvoiceGross(inv) | number:'1.2-2' }} ج.س</span>
+                        <span class="text-warning">
+                          @if (getInvoiceDiscount(inv) > 0) {
+                            - {{ getInvoiceDiscount(inv) | number:'1.2-2' }} ج.س
+                          } @else {
+                            <span class="text-muted">—</span>
+                          }
+                        </span>
                         <span class="text-danger">{{ inv.outstanding_amount | number:'1.2-2' }} ج.س</span>
                         <span>
                           <span class="badge" [class.success]="+inv.outstanding_amount === 0" [class.warning]="+inv.outstanding_amount > 0 && +inv.paid_amount > 0" [class.danger]="+inv.outstanding_amount > 0 && +inv.paid_amount === 0">
@@ -282,7 +298,12 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
 
                   <!-- سندات القبض / التحصيلات المالية -->
                   <div style="margin-top: 24px;">
-                    <h3>السندات المالية (سندات القبض)</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                      <h3 style="margin: 0;">السندات المالية (سندات القبض)</h3>
+                      <button type="button" class="btn-collect-head" (click)="openReceiptModal()">
+                        💵 استلام دفعة وتسجيل سند
+                      </button>
+                    </div>
                     <div class="tbl" *ngIf="receipts().length > 0; else noReceipts">
                       <div class="tbl-head receipts-tbl">
                         <span>رقم السند</span>
@@ -916,6 +937,15 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
           (deleted)="onStudentCascadeDeleted()"
         ></app-student-cascade-delete-modal>
 
+        <!-- معالج تحصيل دفعة وتسجيل سند قبض بنظام الخطوات -->
+        <app-receipt-create-modal
+          [open]="receiptModalOpen()"
+          [preselectedAccountId]="billingAccount()?.id"
+          [preselectedAccount]="accountForReceiptModal()"
+          (closed)="receiptModalOpen.set(false)"
+          (saved)="onReceiptSaved($event)"
+        ></app-receipt-create-modal>
+
         </div>
       }
     }
@@ -1212,19 +1242,46 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
       flex-direction: column;
       gap: 4px;
     }
-    .fin-link {
+    .fin-actions-row {
       grid-column: 1 / -1;
-      align-self: start;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 4px;
+    }
+    .fin-link {
       font-size: 13px;
       font-weight: 600;
       color: var(--nb-primary-600);
       cursor: pointer;
     }
     .fin-link:hover { color: var(--nb-primary-700); text-decoration: underline; }
+    .btn-collect-head {
+      background: var(--nb-primary-600);
+      color: #fff;
+      border: none;
+      border-radius: var(--nb-radius, 8px);
+      padding: 0 14px;
+      height: 32px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-collect-head:hover {
+      background: var(--nb-primary-700);
+    }
     .fin-label { font-size: 11.5px; color: var(--nb-text-muted); }
     .fin-value { font-size: 18px; font-weight: 700; color: var(--nb-text); }
     .text-danger { color: #ef4444; }
     .text-success { color: #22c55e; }
+    .text-warning { color: #d97706; font-weight: 600; }
 
     .no-data-box {
       text-align: center;
@@ -1294,7 +1351,7 @@ import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-mod
     .tbl { display: flex; flex-direction: column; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); overflow: hidden; }
     .tbl-head, .tbl-row { display: grid; gap: 12px; padding: 12px 18px; align-items: center; }
     .tbl-head.doc, .tbl-row.doc { grid-template-columns: 1.4fr 1.4fr 1fr; }
-    .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr; }
+    .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; }
     .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr; }
     .tbl-row.clickable { cursor: pointer; }
     .tbl-row.clickable:hover { background: var(--nb-surface-raised); }
@@ -2050,6 +2107,15 @@ export class StudentDetailsComponent implements OnInit {
 
   // حالة معالج الحذف الشامل بنظام الخطوات
   readonly showCascadeDeleteModal = signal<boolean>(false);
+  readonly receiptModalOpen = signal<boolean>(false);
+
+  openReceiptModal(): void {
+    this.receiptModalOpen.set(true);
+  }
+
+  onReceiptSaved(res: any): void {
+    this.reload();
+  }
 
   deleteStudent(s?: any): void {
     this.showCascadeDeleteModal.set(true);
@@ -2060,12 +2126,47 @@ export class StudentDetailsComponent implements OnInit {
     this.router.navigate(['/students/list']);
   }
   billingAccount = signal<any | null>(null);
+
+  accountForReceiptModal = computed(() => {
+    const a = this.billingAccount();
+    if (!a) return null;
+    return {
+      ...a,
+      student_name: this.student()?.profile?.arabic_name,
+      student_number: this.student()?.student_number,
+    };
+  });
   invoices = signal<any[]>([]);
   receipts = signal<any[]>([]);
   paymentMethods = signal<any[]>([]);
   doc = signal<SfDoc>(null);
   totalPaid = computed(() => this.invoices().reduce((s, i) => s + (Number(i.paid_amount) || 0), 0));
   totalCollected = computed(() => this.receipts().reduce((s, r) => s + (Number(r.amount) || 0), 0));
+  totalDiscounts = computed(() => {
+    let total = 0;
+    for (const inv of this.invoices()) {
+      if (inv?.discounts && Array.isArray(inv.discounts)) {
+        for (const d of inv.discounts) {
+          total += Number(d.amount) || 0;
+        }
+      }
+    }
+    return total;
+  });
+
+  getInvoiceDiscount(inv: any): number {
+    if (!inv?.discounts || !Array.isArray(inv.discounts)) return 0;
+    return inv.discounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+  }
+
+  getInvoiceGross(inv: any): number {
+    const net = Number(inv?.total_amount) || 0;
+    const disc = this.getInvoiceDiscount(inv);
+    if (inv?.items && Array.isArray(inv.items) && inv.items.length > 0) {
+      return inv.items.reduce((sum: number, it: any) => sum + (Number(it.amount) || 0), 0);
+    }
+    return net + disc;
+  }
 
   studentVisits = signal<any[]>([]);
   studentBorrows = signal<any[]>([]);

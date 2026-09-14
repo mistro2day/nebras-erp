@@ -59,6 +59,7 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
       <app-receipt-create-modal
         [open]="createReceiptModalOpen()"
         [preselectedAccountId]="modalAccountId()"
+        [preselectedAccount]="accountForReceiptModal()"
         (closed)="createReceiptModalOpen.set(false)"
         (saved)="onReceiptSaved($event)"
       ></app-receipt-create-modal>
@@ -122,6 +123,7 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
           <div class="bal-cards">
             <div class="bal"><span class="bl">الرصيد الحالي</span><span class="bv">{{ a.current_balance | number:'1.2-2' }}</span></div>
             <div class="bal due"><span class="bl">المستحق</span><span class="bv">{{ a.outstanding_balance | number:'1.2-2' }}</span></div>
+            <div class="bal disc"><span class="bl">الخصومات المعتمدة</span><span class="bv warn">{{ totalDiscountsForAccount() | number:'1.2-2' }}</span></div>
             <div class="bal cr"><span class="bl">دائن</span><span class="bv">{{ a.credit_balance | number:'1.2-2' }}</span></div>
             <div class="bal"><span class="bl">الحالة</span><span class="bv sm">{{ a.financial_hold ? 'إيقاف مالي' : 'سليم' }}</span></div>
           </div>
@@ -170,6 +172,7 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
             <button class="stab" [class.on]="tab()==='invoices'" (click)="tab.set('invoices')">الفواتير ({{ invoices().length }})</button>
             <button class="stab" [class.on]="tab()==='receipts'" (click)="tab.set('receipts')">التحصيلات ({{ receipts().length }})</button>
             <button class="stab" [class.on]="tab()==='receivables'" (click)="tab.set('receivables')">المستحقات ({{ receivables().length }})</button>
+            <button class="stab" [class.on]="tab()==='discounts'" (click)="tab.set('discounts')">الخصومات ({{ allDiscounts().length }})</button>
             <button class="stab" [class.on]="tab()==='scholarships'" (click)="tab.set('scholarships')">المنح ({{ scholarships().length }})</button>
             <button class="stab" [class.on]="tab()==='holds'" (click)="tab.set('holds')">الحظر ({{ holds().length }})</button>
           </div>
@@ -178,7 +181,12 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
             @if (tab() === 'invoices') {
               @for (i of invoices(); track i.id) {
                 <div class="sub-row clickable" (click)="openDoc('invoice', i)"><span><strong>{{ i.invoice_number }}</strong> <span class="nm">{{ i.issue_date }}</span></span>
-                  <span class="mono">{{ i.total_amount | number:'1.0-0' }} ج.س</span>
+                  <span class="mono">
+                    {{ i.total_amount | number:'1.0-0' }} ج.س
+                    @if (getInvoiceDiscount(i) > 0) {
+                      <small class="warn" style="display:block; font-size:11px;">(خصم: {{ getInvoiceDiscount(i) | number:'1.0-0' }}-)</small>
+                    }
+                  </span>
                   <span class="mono due" [class.paid]="+i.outstanding_amount===0">متبقٍ {{ i.outstanding_amount | number:'1.0-0' }}</span>
                   <span class="badge" [class.ok]="i.status==='posted'">{{ i.status === 'posted' ? 'مرحلة' : i.status }}</span></div>
               } @empty { <div class="empty sm">لا توجد فواتير.</div> }
@@ -197,6 +205,13 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
                   <span class="mono due" [class.paid]="r.status==='paid'">متبقٍ {{ r.outstanding_amount | number:'1.0-0' }}</span>
                   <span class="badge" [class.ok]="r.status==='paid'" [class.due]="r.status==='outstanding'">{{ r.status === 'paid' ? 'مسدد' : 'مستحق' }}</span></div>
               } @empty { <div class="empty sm">لا توجد مستحقات.</div> }
+            }
+            @if (tab() === 'discounts') {
+              @for (d of allDiscounts(); track d.id) {
+                <div class="sub-row"><span><strong>خصم: {{ d.discount_reason || 'تخفيض مالي معتمد' }}</strong> <span class="nm">فاتورة: {{ d.invoice_number }}</span></span>
+                  <span class="mono warn font-bold">- {{ d.amount | number:'1.2-2' }} ج.س</span>
+                  <span class="badge ok">معتمد</span></div>
+              } @empty { <div class="empty sm">لا توجد خصومات ممنوحة لهذا الحساب.</div> }
             }
             @if (tab() === 'scholarships') {
               @for (s of scholarships(); track s.id) {
@@ -264,11 +279,13 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
     .badge.warn { background: var(--nb-warning-bg); color: var(--nb-warning); }
 
     /* الدرج 360 */
-    .bal-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .bal-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
     .bal { border: 1px solid var(--nb-border-soft); border-radius: var(--nb-radius); padding: 10px 12px; background: var(--nb-surface-raised); display: flex; flex-direction: column; gap: 4px; }
     .bal.due { border-top: 3px solid var(--nb-danger); } .bal.cr { border-top: 3px solid var(--nb-success); }
+    .bal.disc { border-top: 3px solid var(--nb-warning, #d97706); }
     .bl { font-size: 11px; color: var(--nb-text-muted); }
     .bv { font-size: 18px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; } .bv.sm { font-size: 14px; }
+    .bv.warn, .mono.warn, .warn { color: var(--nb-warning, #d97706); }
     .quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .action-box { border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px; margin-bottom: 16px; background: var(--nb-surface-raised); }
     .action-box h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--nb-text); }
@@ -330,7 +347,7 @@ export class SfAccountsListComponent implements OnInit {
   // درج الحساب
   sel = signal<any | null>(null);
   pane = signal<'' | 'invoice' | 'pay' | 'scholarship' | 'hold'>('');
-  tab = signal<'invoices' | 'receipts' | 'receivables' | 'scholarships' | 'holds'>('invoices');
+  tab = signal<'invoices' | 'receipts' | 'receivables' | 'discounts' | 'scholarships' | 'holds'>('invoices');
   busy = signal(false);
   bundleLoading = signal(false);
   invoices = signal<any[]>([]);
@@ -340,11 +357,42 @@ export class SfAccountsListComponent implements OnInit {
   holds = signal<any[]>([]);
   doc = signal<SfDoc>(null);
 
+  allDiscounts = computed(() => {
+    const list: any[] = [];
+    for (const inv of this.invoices()) {
+      if (inv?.discounts && Array.isArray(inv.discounts)) {
+        for (const d of inv.discounts) {
+          list.push({ ...d, invoice_number: inv.invoice_number });
+        }
+      }
+    }
+    return list;
+  });
+
+  totalDiscountsForAccount = computed(() => {
+    return this.allDiscounts().reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  });
+
+  getInvoiceDiscount(inv: any): number {
+    if (!inv?.discounts || !Array.isArray(inv.discounts)) return 0;
+    return inv.discounts.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+  }
+
   // ---- معالجات نبراس متعددة الخطوات المنبثقة ----
   createAccountModalOpen = signal(false);
   createInvoiceModalOpen = signal(false);
   createReceiptModalOpen = signal(false);
   modalAccountId = signal<string | undefined>(undefined);
+
+  accountForReceiptModal = computed(() => {
+    const a = this.sel();
+    if (!a) return null;
+    return {
+      ...a,
+      student_name: this.studentName(a.student_id),
+      student_number: this.studentNumber(a.student_id),
+    };
+  });
 
   schForm: any = { name: '', type: 'merit', amount_percentage: 25 };
   holdForm: any = { hold_type: 'exam', reason: '' };
