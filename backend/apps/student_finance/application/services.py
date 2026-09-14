@@ -640,7 +640,14 @@ class PaymentService:
         account.current_balance += receipt.amount
         account.save(update_fields=['outstanding_balance', 'current_balance', 'credit_balance'])
 
-        # --- 5. عكس القيد المحاسبي في دفتر الأستاذ العام ---
+        # --- 5. تحديث حالة الإيصال أولاً لمنع الازدواجية مع عكس قيود اليومية ---
+        receipt.status = 'reversed'
+        receipt.cancellation_reason = reason or "عكس سند القبض"
+        receipt.reversed_at = timezone.now()
+        receipt.reversed_by = user_id
+        receipt.save(update_fields=['status', 'cancellation_reason', 'reversed_at', 'reversed_by'])
+
+        # --- 6. عكس القيد المحاسبي في دفتر الأستاذ العام ---
         reversal_journal = None
         if receipt.voucher_id:
             try:
@@ -665,16 +672,9 @@ class PaymentService:
             except (Voucher.DoesNotExist, JournalEntry.DoesNotExist):
                 logger.warning(f"لم يتم العثور على السند أو القيد المرتبط بالإيصال {receipt.receipt_number}")
 
-        # --- 6. تحديث حالة الإيصال ---
-        receipt.status = 'reversed'
-        receipt.cancellation_reason = reason or "عكس سند القبض"
-        receipt.reversed_at = timezone.now()
-        receipt.reversed_by = user_id
         if reversal_journal:
             receipt.reversal_journal_entry_id = reversal_journal.id
-        receipt.save(update_fields=[
-            'status', 'cancellation_reason', 'reversed_at', 'reversed_by', 'reversal_journal_entry_id'
-        ])
+            receipt.save(update_fields=['reversal_journal_entry_id'])
 
         # --- 7. تسجيل التدقيق ---
         BillingAudit.objects.create(

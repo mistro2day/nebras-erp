@@ -198,9 +198,118 @@ class PostingService:
         # 5. تحديث القيد الأصلي ليصبح معكوساً
         original.status = 'reversed'
         original.save(update_fields=['status'])
+
+        # 6. المزامنة التلقائية مع مالية الطلاب في حال كان القيد ناتجاً عن سند قبض طالب
+        cls._sync_reverse_student_finance(tenant_id, original, rev_entry, user_id, reversal_reason)
  
         rev_entry.refresh_from_db()
         return rev_entry
+
+    @classmethod
+    def _sync_reverse_student_finance(cls, tenant_id, original, rev_entry, user_id=None, reversal_reason=None):
+        """
+        الربط التلقائي العكسي: إذا كان القيد المعكوس مرتبطاً بسند قبض طالب في مالية الطلاب،
+        يتم عكس السند وتحديث أرصدة الطالب والفواتير والمستحقات تلقائياً.
+        """
+        try:
+            import re
+            from decimal import Decimal
+            from django.utils import timezone
+            from apps.student_finance.domain.models import (
+                Receipt, StudentBillingAccount, StudentReceivable,
+                PaymentAllocation, BillingAudit
+            )
+            from apps.finance.domain.models import Voucher
+
+            receipt = None
+            # 1. البحث عبر رقم الإيصال في الـ reference
+            if original.reference:
+                receipt = Receipt.objects.filter(
+                    tenant_id=tenant_id, receipt_number=original.reference, status='posted'
+                ).first()
+                if not receipt:
+                    v = Voucher.objects.filter(tenant_id=tenant_id, voucher_number=original.reference).first()
+                    if v:
+                        receipt = Receipt.objects.filter(
+                            tenant_id=tenant_id, voucher_id=v.id, status='posted'
+                        ).first()
+
+            # 2. البحث عبر الوصف إذا كان يحتوي على رقم السند
+            if not receipt and original.description:
+                m = re.search(r'RCP-\d{4}-\d+', original.description)
+                if m:
+                    receipt = Receipt.objects.filter(
+                        tenant_id=tenant_id, receipt_number=m.group(0), status='posted'
+                    ).first()
+
+            if not receipt:
+                return
+
+            account = StudentBillingAccount.objects.select_for_update().get(
+                id=receipt.student_billing_account_id, tenant_id=tenant_id
+            )
+
+            allocations = PaymentAllocation.objects.filter(receipt=receipt)
+            total_allocated = Decimal('0.0')
+
+            for alloc in allocations:
+                allocated_amount = alloc.amount_allocated
+                total_allocated += allocated_amount
+
+                receivable = StudentReceivable.objects.select_for_update().get(id=alloc.receivable_id)
+                receivable.paid_amount = max(Decimal('0.0'), receivable.paid_amount - allocated_amount)
+                receivable.outstanding_amount += allocated_amount
+                receivable.status = 'outstanding'
+                receivable.save(update_fields=['paid_amount', 'outstanding_amount', 'status'])
+
+                invoice = receivable.invoice
+                invoice.paid_amount = max(Decimal('0.0'), invoice.paid_amount - allocated_amount)
+                invoice.outstanding_amount += allocated_amount
+                invoice.save(update_fields=['paid_amount', 'outstanding_amount'])
+
+            credit_reversed = receipt.amount - total_allocated
+            if credit_reversed > 0:
+                account.credit_balance = max(Decimal('0.0'), account.credit_balance - credit_reversed)
+
+            account.outstanding_balance += receipt.amount
+            account.current_balance += receipt.amount
+            account.save(update_fields=['outstanding_balance', 'current_balance', 'credit_balance'])
+
+            receipt.status = 'reversed'
+            receipt.cancellation_reason = reversal_reason or "عكس القيد المحاسبي من قيود اليومية"
+            receipt.reversed_at = timezone.now()
+            receipt.reversed_by = user_id
+            receipt.reversal_journal_entry_id = rev_entry.id
+            receipt.save(update_fields=[
+                'status', 'cancellation_reason', 'reversed_at', 'reversed_by', 'reversal_journal_entry_id'
+            ])
+
+            if receipt.voucher_id:
+                try:
+                    v = Voucher.objects.get(id=receipt.voucher_id, tenant_id=tenant_id)
+                    v.status = 'cancelled'
+                    v.save(update_fields=['status'])
+                except Voucher.DoesNotExist:
+                    pass
+
+            BillingAudit.objects.create(
+                tenant_id=tenant_id,
+                action_type='cancel_receipt',
+                performed_by=user_id,
+                details={
+                    'receipt_id': str(receipt.id),
+                    'receipt_number': receipt.receipt_number,
+                    'amount': float(receipt.amount),
+                    'reason': reversal_reason or 'عكس القيد المحاسبي من قيود اليومية',
+                    'reversal_journal_id': str(rev_entry.id),
+                    'allocations_reversed': float(total_allocated),
+                    'credit_reversed': float(credit_reversed),
+                    'source': 'general_ledger_reversal'
+                }
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to auto-sync student finance on journal reversal: {e}")
 
     @classmethod
     def _evaluate_posting_rule(cls, tenant_id, entry):

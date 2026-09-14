@@ -314,16 +314,28 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                         <span>تاريخ الدفع</span>
                         <span>المبلغ المحصّل</span>
                         <span>الحالة</span>
+                        <span>الإجراءات</span>
                       </div>
                       @for (r of receipts(); track r.id) {
                         <div class="tbl-row receipts-tbl clickable" (click)="openDoc('receipt', r)">
                           <span class="strong">{{ r.receipt_number }}</span>
                           <span>{{ r.payment_date }}</span>
-                          <span class="text-success">{{ r.amount | number:'1.2-2' }} ج.س</span>
+                          <span [class.text-success]="r.status === 'posted'" [class.reversed-amount]="r.status === 'reversed'">{{ r.amount | number:'1.2-2' }} ج.س</span>
                           <span>
-                            <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'">
-                              {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
+                            <span class="badge" [class.success]="r.status === 'posted'" [class.warning]="r.status === 'draft'" [class.danger]="r.status === 'cancelled'" [class.reversed-badge]="r.status === 'reversed'">
+                              {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'reversed' ? 'معكوس' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
                             </span>
+                          </span>
+                          <span>
+                            @if (r.status === 'posted') {
+                              <button type="button" class="btn-cancel-receipt" (click)="openCancelReceiptModal(r); $event.stopPropagation()">
+                                ↺ عكس السند
+                              </button>
+                            } @else if (r.status === 'reversed') {
+                              <span class="text-muted" style="font-size: 11px;">تم العكس</span>
+                            } @else {
+                              <span class="text-muted">—</span>
+                            }
                           </span>
                         </div>
                       }
@@ -950,6 +962,102 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
           (saved)="onReceiptSaved($event)"
         ></app-receipt-create-modal>
 
+        <!-- Modal عكس سند القبض في ملف الطالب -->
+        @if (cancelReceiptModalOpen()) {
+          <div class="modal-backdrop" (click)="closeCancelReceiptModal()">
+            <div class="modal-card cancel-receipt-card" (click)="$event.stopPropagation()">
+              @if (cancelReceiptStep() === 'confirm') {
+                <div class="modal-header header-danger">
+                  <div class="modal-title-box">
+                    <span class="modal-header-icon">⚠️</span>
+                    <div>
+                      <h3 class="modal-title">عكس وإلغاء سند القبض</h3>
+                      <p class="modal-subtitle">سيتم إلغاء السند وعكس القيد المحاسبي وإعادة فتح مستحقات الطالب</p>
+                    </div>
+                  </div>
+                  <button type="button" class="close-btn" (click)="closeCancelReceiptModal()">✕</button>
+                </div>
+                <div class="modal-body" style="padding: 18px 20px;">
+                  <div class="cancel-receipt-info">
+                    <div class="info-row">
+                      <span class="label">رقم السند:</span>
+                      <span class="value">{{ cancelReceiptTarget()?.receipt_number }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="label">المبلغ:</span>
+                      <span class="value text-danger" style="font-weight: 800;">{{ cancelReceiptTarget()?.amount | number:'1.2-2' }} ج.س</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="label">الطالبة:</span>
+                      <span class="value">{{ student()?.profile?.arabic_name }}</span>
+                    </div>
+                  </div>
+
+                  <div class="form-field" style="margin-top: 14px;">
+                    <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+                      سبب عكس السند <span style="color: #dc2626;">*</span>
+                    </label>
+                    <textarea
+                      rows="3"
+                      style="width: 100%; padding: 10px; border: 1px solid var(--nb-border); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box;"
+                      placeholder="أدخل سبب عكس السند (مثال: تم تسجيل الدفعة بالخطأ، إلغاء السند بناءً على طلب ولي الأمر...)"
+                      [(ngModel)]="cancelReceiptReason"
+                    ></textarea>
+                  </div>
+
+                  <div class="warn-box-inline" style="margin-top: 14px; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; font-size: 12px; color: #92400e; line-height: 1.6;">
+                    ⚠️ <strong>تنبيه:</strong> يتطلب هذا الإجراء صلاحية مدير المدرسة أو مستخدم فائق. سيؤدي التأكيد إلى توليد قيد عكسي تلقائي في دفتر الأستاذ العام وإعادة فتح رصيد الفاتورة والمستحقات على ملف الطالب فوراً.
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-ghost" (click)="closeCancelReceiptModal()" [disabled]="cancelReceiptBusy()">
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    (click)="confirmCancelReceipt()"
+                    [disabled]="cancelReceiptBusy() || !cancelReceiptReason.trim()"
+                  >
+                    @if (cancelReceiptBusy()) {
+                      <span>جارٍ المعالجة والعكس…</span>
+                    } @else {
+                      <span>تأكيد عكس السند وإعادة فتح الرصيد</span>
+                    }
+                  </button>
+                </div>
+              } @else {
+                <div class="modal-header header-success" style="text-align: center; display: block; padding: 24px 20px 16px;">
+                  <div style="width: 48px; height: 48px; border-radius: 50%; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; margin: 0 auto 10px;">✓</div>
+                  <h3 class="modal-title" style="color: #065f46;">تم عكس السند بنجاح</h3>
+                  <p class="modal-subtitle" style="color: #047857;">تم تحديث الأرصدة المالية لملف الطالب وتوليد القيد العكسي في الأستاذ العام</p>
+                </div>
+                <div class="modal-body" style="padding: 18px 20px;">
+                  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px;">
+                    <div class="info-row">
+                      <span class="label">رقم السند المعكوس:</span>
+                      <span class="value">{{ cancelReceiptTarget()?.receipt_number }}</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="label">المبلغ المعكوس:</span>
+                      <span class="value text-danger" style="text-decoration: line-through;">{{ cancelReceiptTarget()?.amount | number:'1.2-2' }} ج.س</span>
+                    </div>
+                    <div class="info-row">
+                      <span class="label">حالة الرصيد:</span>
+                      <span class="value text-success">تمت إعادة الفاتورة للحالة المستحقة فوراً</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer" style="justify-content: center;">
+                  <button type="button" class="btn btn-primary" (click)="closeCancelReceiptModal()">
+                    ✓ إنهاء وإغلاق
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         </div>
       }
     }
@@ -1356,7 +1464,17 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
     .tbl-head, .tbl-row { display: grid; gap: 12px; padding: 12px 18px; align-items: center; }
     .tbl-head.doc, .tbl-row.doc { grid-template-columns: 1.4fr 1.4fr 1fr; }
     .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; }
-    .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr; }
+    .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 0.9fr; }
+    .reversed-badge { background: #fef3c7 !important; color: #92400e !important; border: 1px solid #fde68a !important; }
+    .reversed-amount { color: var(--nb-text-muted) !important; text-decoration: line-through; }
+    .btn-cancel-receipt { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-cancel-receipt:hover { background: #fecaca; color: #991b1b; }
+    .header-danger { background: linear-gradient(135deg, #fee2e2, #fef2f2) !important; border-bottom: 1px solid #fecaca !important; }
+    .header-success { background: linear-gradient(135deg, #dcfce7, #f0fdf4) !important; border-bottom: 1px solid #bbf7d0 !important; }
+    .cancel-receipt-card { max-width: 480px; }
+    .cancel-receipt-info { background: var(--nb-surface-raised); border: 1px solid var(--nb-border-soft); border-radius: 8px; padding: 12px 14px; }
+    .cancel-receipt-info .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--nb-border-soft); font-size: 13px; }
+    .cancel-receipt-info .info-row:last-child { border-bottom: none; }
     .tbl-row.clickable { cursor: pointer; }
     .tbl-row.clickable:hover { background: var(--nb-surface-raised); }
     .tbl-head.library-tbl, .tbl-row.library-tbl { grid-template-columns: 1.6fr 1fr 1fr 1fr; }
@@ -2219,7 +2337,54 @@ export class StudentDetailsComponent implements OnInit {
   paymentMethods = signal<any[]>([]);
   doc = signal<SfDoc>(null);
   totalPaid = computed(() => this.invoices().reduce((s, i) => s + (Number(i.paid_amount) || 0), 0));
-  totalCollected = computed(() => this.receipts().reduce((s, r) => s + (Number(r.amount) || 0), 0));
+  totalCollected = computed(() =>
+    this.receipts()
+      .filter((r) => r.status === 'posted')
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0)
+  );
+
+  // ---- إلغاء وعكس سند القبض ----
+  readonly cancelReceiptModalOpen = signal<boolean>(false);
+  readonly cancelReceiptTarget = signal<any>(null);
+  readonly cancelReceiptStep = signal<'confirm' | 'success'>('confirm');
+  readonly cancelReceiptBusy = signal<boolean>(false);
+  cancelReceiptReason = '';
+
+  openCancelReceiptModal(receipt: any): void {
+    this.cancelReceiptTarget.set(receipt);
+    this.cancelReceiptStep.set('confirm');
+    this.cancelReceiptReason = '';
+    this.cancelReceiptModalOpen.set(true);
+  }
+
+  closeCancelReceiptModal(): void {
+    this.cancelReceiptModalOpen.set(false);
+    this.cancelReceiptTarget.set(null);
+    this.cancelReceiptReason = '';
+    if (this.cancelReceiptStep() === 'success') {
+      this.refreshFinanceData();
+    }
+  }
+
+  confirmCancelReceipt(): void {
+    const receipt = this.cancelReceiptTarget();
+    if (!receipt || !this.cancelReceiptReason.trim()) return;
+
+    this.cancelReceiptBusy.set(true);
+    this.sfService.cancelReceipt(receipt.id, this.cancelReceiptReason.trim()).subscribe({
+      next: () => {
+        this.cancelReceiptBusy.set(false);
+        this.cancelReceiptStep.set('success');
+        this.snack.open('تم عكس سند القبض وتحديث الأرصدة المالية بنجاح.', 'إغلاق', { duration: 4000 });
+        this.refreshFinanceData();
+      },
+      error: (e) => {
+        this.cancelReceiptBusy.set(false);
+        const msg = e?.error?.error?.message || e?.error?.message || 'تعذّر عكس سند القبض.';
+        this.snack.open(msg, 'إغلاق', { duration: 5000 });
+      },
+    });
+  }
   totalDiscounts = computed(() => {
     let total = 0;
     for (const inv of this.invoices()) {

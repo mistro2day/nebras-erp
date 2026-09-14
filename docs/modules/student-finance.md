@@ -139,10 +139,15 @@ graph TD
     4. إعادة أرصدة حساب الفوترة (`StudentBillingAccount.outstanding_balance`, `current_balance`)
     5. عكس القيد المحاسبي في دفتر الأستاذ العام عبر `PostingService.reverse_journal_entry`
     6. تحديث حالة السند المالي (`Voucher`) والإيصال (`Receipt`) إلى `reversed`
-  - **التحقق من الصلاحيات:** يتطلب العكس صلاحية مدير المدرسة (`administrator`) أو مستخدم فائق (`superuser`)
-  - **حقول الإيصال الجديدة:** `cancellation_reason`, `reversed_at`, `reversed_by`, `reversal_journal_entry_id`
-  - **API Endpoint:** `POST /api/v1/student-finance/receipts/{id}/cancel/` مع حقل `reason` إلزامي
-  - **Frontend:** زر «عكس السند» في جدول التحصيلات بنافذة تأكيد + خطوة نجاح نهائية + تحديث AJAX
+  - **المزامنة الثنائية التلقائية (Bidirectional Reversal Synchronization):**
+    * عند عكس القيد من دفتر الأستاذ العام وقيود اليومية عبر `PostingService.reverse_journal_entry`، تقوم الخدمة تلقائياً باستدعاء `_sync_reverse_student_finance` للتحقق مما إذا كان القيد ناتجاً عن سند قبض طالب، وتقوم فوراً بعكس تخصيصات السداد وإعادة فتح المستحقات والفواتير وإرجاع الرصيد المستحق على حساب الطالب دون تدخل يدوي.
+    * عند عكس السند من واجهات مالية الطلاب أو ملف الطالب، يتم فحص وتحديث الأرصدة أولاً ثم توليد القيد العكسي في الأستاذ العام لمنع أي ازدواجية.
+  - **التحقق من الصلاحيات:** يتطلب العكس صلاحية مدير المدرسة (`administrator`) أو مستخدم فائق (`superuser`).
+  - **حقول الإيصال:** `cancellation_reason`, `reversed_at`, `reversed_by`, `reversal_journal_entry_id`.
+  - **واجهات المستخدم:** زر «عكس السند» متوفر في كل من:
+    1. شاشة حساب الطالب المالي 360° (`accounts-list.component.ts`).
+    2. شاشة الملف الشخصي للطالب - تبويب «الرسوم والمالية» (`details.component.ts`).
+    3. كلاهما يعتمد نافذة Nebras OS المنبثقة مع طلب سبب الإلغاء، وخطوة النجاح النهائية، والتحديث اللحظي للأرصدة (Ajax).
 
 ---
 
