@@ -253,7 +253,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                 <div class="mock-header">
                   <div class="mock-side right">
                     <div class="country">جمهورية السودان</div>
-                    <div class="state">ولاية الخرطوم — وزارة التربية والتعليم</div>
+                    <div class="state">ولاية الخرطوم — وزارة التعليم والتربية الوطنية</div>
                     <div class="school-ar">{{ nameAr() || 'مدارس المورد النموذجية الخاصة' }}</div>
                   </div>
 

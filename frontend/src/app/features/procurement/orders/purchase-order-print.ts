@@ -304,7 +304,7 @@ export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: str
     <!-- الترويسة الرسمية -->
     <header class="tenant-header">
       <div class="org-meta">
-        <div class="country-line">جمهورية السودان • وزارة التربية والتعليم</div>
+        <div class="country-line">جمهورية السودان • وزارة التعليم والتربية الوطنية</div>
         <h2 class="org-name-ar">${schoolNameAr}</h2>
         <div class="org-name-en">${schoolNameEn}</div>
       </div>

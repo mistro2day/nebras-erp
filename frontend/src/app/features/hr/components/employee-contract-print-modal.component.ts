@@ -34,7 +34,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
             <div class="nebras-doc-header">
               <div class="header-right">
                 <p class="country">جمهورية السودان</p>
-                <p class="ministry">وزارة التربية والتعليم والتربية الخاصة</p>
+                <p class="ministry">وزارة التعليم والتربية الوطنية</p>
                 <p class="school-name">مؤسسات المورد الجديدة للتعليم الخاص</p>
               </div>
 

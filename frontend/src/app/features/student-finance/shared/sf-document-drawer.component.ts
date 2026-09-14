@@ -94,7 +94,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
             <div class="school-brand-meta">
               <h2 class="school-name-ar">{{ getSchoolNameAr() }}</h2>
               <h4 class="school-name-en">{{ getSchoolNameEn() }}</h4>
-              <p class="accreditation-line">وزارة التربية والتعليم — قطاع التعليم الأهلي والأجنبي</p>
+              <p class="accreditation-line">وزارة التعليم والتربية الوطنية</p>
               @if (schoolData()?.address) {
                 <p class="school-contact-line">📍 {{ schoolData()?.address }}</p>
               }

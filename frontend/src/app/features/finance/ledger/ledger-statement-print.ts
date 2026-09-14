@@ -130,7 +130,7 @@ export function printLedgerStatement(account: any, entries: any[], tenantInfo?: 
   <div class="print-sheet">
     <header class="tenant-header">
       <div>
-        <p class="country-line">جمهورية السودان • وزارة التربية والتعليم • قطاع التعليم الخاص</p>
+        <p class="country-line">جمهورية السودان • وزارة التعليم والتربية الوطنية</p>
         <h2 class="org-name-ar">${schoolNameAr}</h2>
         <h4 class="org-name-en">${schoolNameEn}</h4>
         <p class="contact-line">📍 ${address} • هاتف: ${phone}</p>

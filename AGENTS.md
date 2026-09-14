@@ -27,6 +27,7 @@ For all frontend UI tasks — including building pages, components, layouts, cho
 - **PROHIBITION OF NON-SUDANESE DATA**: Never use Saudi, Gulf, or non-Sudanese names, currencies, banks, or terminology anywhere.
 - **Currency**: Always use Sudanese Pound (`ج.س` / SDG / الجنيه السوداني). Never use `ر.س` or SAR.
 - **Banking**: Always reference Sudanese banks and payment systems (e.g. تطبيق بنكك - بنك الخرطوم, فوري - بنك فيصل الإسلامي, أوكاش - بنك أمدرمان الوطني). Never use Al Rajhi, Al Ahli, etc.
+- **Ministry & Accreditation (الوزارة والاعتماد الأكاديمي)**: Always use the official Sudanese ministry name: **«وزارة التعليم والتربية الوطنية»**. Never use «وزارة التربية والتعليم» or non-Sudanese variations.
 - **Names & Locations**: All sample/mock/test names MUST be authentic Sudanese names (e.g., عثمان دفع الله, الفاتح بابكر, إخلاص ميرغني, مزمل الكباشي, التاج إبراهيم, نزار المجذوب, فاطمة البدوي). Locations must be Sudanese states/cities (الخرطوم, أم درمان, بحري, الجزيرة, بورتسودان, إلخ).
 
 ## Mandatory Documentation in Docs Rules (قاعدة التوثيق الإلزامي في مجلد docs)

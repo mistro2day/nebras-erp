@@ -490,7 +490,7 @@ export interface DistSection {
               <div class="roster-header">
                 <div class="header-side rep-right">
                   <h4 class="gov-country">جمهورية السودان</h4>
-                  <h5 class="gov-ministry">وزارة التربية والتعليم</h5>
+                  <h5 class="gov-ministry">وزارة التعليم والتربية الوطنية</h5>
                   <p class="gov-dept">إدارة التعليم الخاص والنوعي</p>
                   <h3 class="tenant-school-title">{{ tenantName() }}</h3>
                 </div>
