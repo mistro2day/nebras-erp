@@ -162,6 +162,7 @@ export class StudentFinanceDashboardComponent implements OnInit {
     { key: 'outstanding', title: 'المستحقات والقبض', desc: 'الأرصدة المستحقة غير المدفوعة.', icon: '⏳', route: '/student-finance/outstanding' },
     { key: 'online-payments', title: 'مدفوعات أولياء الأمور', desc: 'مراجعة تحويلات أولياء الأمور واعتمادها.', icon: '🏦', route: '/student-finance/online-payments' },
     { key: 'calendar', title: 'تقويم الدفعات والأقساط', desc: 'استعراض زمني ذكي لمواعيد استحقاق الأقساط ومن حان وقت سداده.', icon: '📅', route: '/student-finance/calendar' },
+    { key: 'reports', title: 'التقارير المالية للطلاب', desc: 'تحليل شامل للإيرادات، السندات، الفواتير، المسددين، والمتأخرين.', icon: '📊', route: '/student-finance/reports' },
   ];
 
   ngOnInit() { this.load(); }

@@ -55,6 +55,14 @@ export class StudentFinanceService {
     return this.api.get<PagedResponse<any>>('student-finance/receivables/', params);
   }
 
+  listInstallments(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/installments/', params);
+  }
+
+  listFinancialHolds(params?: ListParams): Observable<PagedResponse<any>> {
+    return this.api.get<PagedResponse<any>>('student-finance/financial-holds/', params);
+  }
+
   // ---- تقويم الدفعات والأقساط الذكي ----
   getInstallmentsCalendar(params?: {
     month?: number;

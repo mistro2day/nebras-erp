@@ -1275,6 +1275,7 @@ export class DashboardLayoutComponent {
             { label: 'سندات القبض والمدفوعات', link: '/student-finance/receipts' },
             { label: 'مدفوعات أولياء الأمور', link: '/student-finance/online-payments' },
             { label: 'الأرصدة المستحقة', link: '/student-finance/outstanding' },
+            { label: 'تقارير مالية الطلاب', link: '/student-finance/reports' },
           ],
         },
         {
