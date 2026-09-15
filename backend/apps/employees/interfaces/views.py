@@ -39,9 +39,120 @@ class EmployeeViewSet(BaseCRUDViewSet):
         return super().create(request, *args, **kwargs)
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'advances', 'create_advance', 'all_advances']:
+        if self.action in ['list', 'retrieve', 'advances', 'create_advance', 'all_advances', 'download_template', 'validate_import', 'bulk_import', 'purge_mock_data']:
             return []
         return super().get_permissions()
+
+    def _get_request_tenant_id(self, request):
+        if hasattr(request, 'tenant') and request.tenant and hasattr(request.tenant, 'id'):
+            return request.tenant.id
+        if hasattr(request, 'tenant_id') and request.tenant_id:
+            return request.tenant_id
+        if request.user and getattr(request.user, 'tenant_id', None):
+            return request.user.tenant_id
+        if request.user and request.user.is_authenticated:
+            from apps.identity.domain.rbac import UserRole
+            ur = UserRole.objects.filter(user=request.user).first()
+            if ur and ur.tenant_id:
+                return ur.tenant_id
+        from apps.tenants.domain.models import Tenant
+        active = list(Tenant.objects.filter(is_active=True)[:2])
+        if len(active) == 1:
+            return active[0].id
+        import uuid
+        return uuid.uuid4()
+
+    @action(detail=False, methods=['get'], url_path='download-template')
+    def download_template(self, request):
+        """تنزيل نموذج إكسل (.xlsx) الرسمي لكشوفات المعلمين والموظفين وعقود 2026م"""
+        from django.http import HttpResponse
+        from apps.employees.application.bulk_import import EmployeeBulkImportService
+
+        tenant_id = self._get_request_tenant_id(request)
+        template_stream = EmployeeBulkImportService.generate_excel_template(tenant_id=tenant_id)
+
+        response = HttpResponse(
+            template_stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="employee_roster_template_2026.xlsx"'
+        response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        return response
+
+    @action(detail=False, methods=['post'], url_path='validate-import')
+    def validate_import(self, request):
+        """معاينة وفحص ملف كشف الموظفين بالذاكرة واكتشاف خلايا الهيدر والمطابقة والتدقيق"""
+        import json
+        from apps.employees.application.bulk_import import EmployeeBulkImportService
+
+        file = request.FILES.get('file')
+        if not file:
+            return StandardResponse(None, message="يجب إرفاق ملف إكسل أو CSV للمعالجة.", status_code=400)
+
+        custom_mapping_raw = request.data.get('header_mapping')
+        custom_mapping = None
+        if custom_mapping_raw:
+            try:
+                custom_mapping = json.loads(custom_mapping_raw) if isinstance(custom_mapping_raw, str) else custom_mapping_raw
+            except Exception:
+                pass
+
+        tenant_id = self._get_request_tenant_id(request)
+        preview_report = EmployeeBulkImportService.validate_and_preview(
+            file,
+            tenant_id=tenant_id,
+            custom_mapping=custom_mapping
+        )
+        return StandardResponse(preview_report, message="تم فحص كشف المعلمين والموظفين بنجاح.")
+
+    @action(detail=False, methods=['post'], url_path='bulk-import')
+    def bulk_import(self, request):
+        """استيراد جماعي للموظفين وتسكينهم وتوليد عقود 2026م مع خيار تصفير التجريبيين"""
+        import json
+        from apps.employees.application.bulk_import import EmployeeBulkImportService
+
+        tenant_id = self._get_request_tenant_id(request)
+        user_id = request.user.id if request.user else None
+
+        file = request.FILES.get('file')
+        confirmed_rows = request.data.get('rows')
+        purge_mock = request.data.get('purge_mock_employees') in [True, 'true', '1', 1]
+
+        if file:
+            preview = EmployeeBulkImportService.validate_and_preview(file, tenant_id=tenant_id)
+            valid_rows = [r['data'] for r in preview['rows'] if r['is_valid']]
+            result = EmployeeBulkImportService.execute_bulk_import(
+                valid_rows,
+                tenant_id=tenant_id,
+                purge_mock_employees=purge_mock,
+                user_id=user_id
+            )
+        elif confirmed_rows:
+            if isinstance(confirmed_rows, str):
+                try:
+                    confirmed_rows = json.loads(confirmed_rows)
+                except Exception:
+                    return StandardResponse(None, message="صيغة بيانات الأسطر غير صالحة.", status_code=400)
+            result = EmployeeBulkImportService.execute_bulk_import(
+                confirmed_rows,
+                tenant_id=tenant_id,
+                purge_mock_employees=purge_mock,
+                user_id=user_id
+            )
+        else:
+            return StandardResponse(None, message="يجب إرفاق ملف إكسل أو إرسال السجلات المعتمدة للاستيراد.", status_code=400)
+
+        imported_count = result.get('imported_count', 0)
+        return StandardResponse(result, message=f"تم استيراد واعتماد {imported_count} موظف ومعلم بنجاح.")
+
+    @action(detail=False, methods=['post'], url_path='purge-mock-data')
+    def purge_mock_data(self, request):
+        """تصفير وحذف سجلات الموظفين التجريبيين الحاليين للمستأجر والبدء بسجل نظيف"""
+        from apps.employees.application.bulk_import import EmployeeBulkImportService
+
+        tenant_id = self._get_request_tenant_id(request)
+        result = EmployeeBulkImportService.purge_mock_employees(tenant_id=tenant_id)
+        return StandardResponse(result, message=result.get('message', 'تم تصفير الموظفين التجريبيين بنجاح.'))
 
     @action(detail=True, methods=['post'], url_path='promote')
     def promote(self, request, pk=None):

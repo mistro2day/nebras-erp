@@ -10,6 +10,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { environment } from '../../../environments/environment';
 import { SendMessageModalComponent } from '../communications/components/send-message-modal.component';
 import { EmployeeContractPrintModalComponent } from './components/employee-contract-print-modal.component';
+import { EmployeeBulkImportModalComponent } from './components/employee-bulk-import-modal.component';
 
 interface Employee {
   id: string;
@@ -54,11 +55,14 @@ interface LeaveRequest {
     NbPageHeaderComponent, 
     NbPanelComponent, 
     SendMessageModalComponent,
-    EmployeeContractPrintModalComponent
+    EmployeeContractPrintModalComponent,
+    EmployeeBulkImportModalComponent
   ],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header title="الموارد البشرية والعقود" subtitle="إدارة الموظفين والمعلمين، السلفيات، العقود الرسمية 2026م، والخدمة الذاتية.">
+        <button class="nb-btn-danger-ghost" (click)="showPurgeModal.set(true)" title="تصفير وحذف الكادر التجريبي">🧹 تصفير التجريبيين</button>
+        <button class="nb-btn-secondary" (click)="showBulkImportModal.set(true)">📥 استيراد كشف موظفين (Excel)</button>
         <button class="nb-btn-secondary" (click)="activeTab.set('advances')">السلفيات والخصومات</button>
         <button class="nb-btn-primary" (click)="navigateToCreate()">+ استمارة وتوظيف معلم جديد</button>
       </nb-page-header>
@@ -118,6 +122,11 @@ interface LeaveRequest {
           <div class="dashboard-sections animate-fade">
             <nb-panel title="إجراءات سريعة للموارد البشرية" [flush]="true">
               <div class="quick-actions">
+                <button class="action-card" (click)="showBulkImportModal.set(true)">
+                  <span class="icon">📥</span>
+                  <span class="title">استيراد كشف موظفين (Excel)</span>
+                  <span class="desc">رفع الكشف وتعديل الهيدر وعقود 2026م</span>
+                </button>
                 <button class="action-card" (click)="navigateToCreate()">
                   <span class="icon">📜</span>
                   <span class="title">استمارة عقد معلم 2026</span>
@@ -129,7 +138,7 @@ interface LeaveRequest {
                   <span class="desc">صرف ومتابعة أقساط السلفيات</span>
                 </button>
                 <button class="action-card" (click)="exportPayrollReport()">
-                  <span class="icon">📥</span>
+                  <span class="icon">📊</span>
                   <span class="title">مسيرات الرواتب</span>
                   <span class="desc">تحميل شيت مفردات الرواتب</span>
                 </button>
@@ -315,6 +324,35 @@ interface LeaveRequest {
         [allowedCategories]="['hr']"
       ></app-send-message-modal>
 
+      <!-- مودال استيراد كشوفات الموظفين عبر الإكسل وتعديل الهيدر وتصفير التجريبيين -->
+      <app-employee-bulk-import-modal
+        [open]="showBulkImportModal()"
+        (close)="onBulkImportClosed($event)"
+        (imported)="onBulkImportSuccess($event)"
+      ></app-employee-bulk-import-modal>
+
+      <!-- نافذة تأكيد تصفير الموظفين التجريبيين المخصصة (Nebras Custom Confirmation Modal) -->
+      @if (showPurgeModal()) {
+        <div class="confirm-overlay" (click)="showPurgeModal.set(false)">
+          <div class="confirm-box" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-warn">⚠️</div>
+            <h4 class="confirm-title">تنبيه: تصفير وحذف الموظفين التجريبيين</h4>
+            <p class="confirm-desc">
+              أنت على وشك حذف كافة سجلات الموظفين والمعلمين التجريبيين الحالية <strong>({{ employees().length }} موظف)</strong> لبدء كشف نظيف خالٍ من البيانات الوهمية.
+              هل ترغب في التأكيد؟
+            </p>
+            <div class="confirm-actions">
+              <button class="nb-btn-danger" (click)="confirmPurgeMockEmployees()">
+                نعم، تصفير وحذف التجريبيين الآن
+              </button>
+              <button class="nb-btn-secondary" (click)="showPurgeModal.set(false)">
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
     </div>
   `,
   styles: [`
@@ -402,6 +440,25 @@ interface LeaveRequest {
     .emp-cell.clickable:hover .font-link { color: #2563eb; text-decoration: underline; }
     .btn-action.view { background: #f0fdf4; color: #166534; }
 
+    .nb-btn-danger { background: #dc2626; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .nb-btn-danger:hover { background: #b91c1c; }
+    .nb-btn-danger-ghost { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .nb-btn-danger-ghost:hover { background: #fee2e2; }
+
+    .confirm-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px); z-index: 1050; display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .confirm-box {
+      background: #fff; border-radius: 16px; max-width: 440px; padding: 26px;
+      text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    .confirm-icon-warn { font-size: 40px; margin-bottom: 12px; }
+    .confirm-title { font-size: 17px; font-weight: 800; color: #0f172a; margin: 0 0 8px; }
+    .confirm-desc { font-size: 13.5px; color: #475569; margin: 0 0 22px; line-height: 1.5; }
+    .confirm-actions { display: flex; flex-direction: column; gap: 8px; }
+
     .animate-fade { animation: fadeIn 0.3s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   `]
@@ -415,6 +472,8 @@ export class HRComponent implements OnInit {
 
   showMsgModal = false;
   showContractModal = false;
+  readonly showBulkImportModal = signal<boolean>(false);
+  readonly showPurgeModal = signal<boolean>(false);
 
   selectedEmployee = signal<Employee | null>(null);
   selectedContractEmployee = signal<any>(null);
@@ -583,5 +642,34 @@ export class HRComponent implements OnInit {
 
   exportPayrollReport(): void {
     this.notify.success('تم تصدير شيت الرواتب ومفردات عقود 2026م بنجاح.');
+  }
+
+  onBulkImportClosed(refresh: boolean): void {
+    this.showBulkImportModal.set(false);
+    if (refresh) {
+      this.loadEmployees();
+    }
+  }
+
+  onBulkImportSuccess(summary: any): void {
+    this.loadEmployees();
+    this.activeTab.set('directory');
+  }
+
+  confirmPurgeMockEmployees(): void {
+    this.showPurgeModal.set(false);
+    this.loading.set(true);
+    const url = this.cleanApiUrl('v1/employees/employees/purge-mock-data/');
+    this.http.post<any>(url, {}).subscribe({
+      next: (res) => {
+        this.loading.set(false);
+        this.notify.success(res?.message || 'تم تصفير الموظفين التجريبيين بنجاح.');
+        this.loadEmployees();
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.notify.error(err?.error?.message || 'حدث خطأ أثناء محاولة تصفير البيانات.');
+      }
+    });
   }
 }
