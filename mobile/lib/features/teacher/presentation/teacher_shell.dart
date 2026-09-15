@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../parent/presentation/tabs/profile_tab.dart';
 import 'tabs/classes_tab.dart';
+import 'tabs/teacher_attendance_tab.dart';
+import 'tabs/teacher_requests_tab.dart';
 
-/// قشرة بوابة المعلّم: تبويبات (فصولي، حسابي).
+/// قشرة بوابة المعلّم: تبويبات (فصولي، البصمة الذكية، طلباتي، حسابي).
 class TeacherShell extends ConsumerStatefulWidget {
   const TeacherShell({super.key});
 
@@ -16,7 +18,12 @@ class TeacherShell extends ConsumerStatefulWidget {
 class _TeacherShellState extends ConsumerState<TeacherShell> {
   int _index = 0;
 
-  static const _tabs = [ClassesTab(), ProfileTab()];
+  static const _tabs = [
+    ClassesTab(),
+    TeacherAttendanceTab(),
+    TeacherRequestsTab(),
+    ProfileTab(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +39,8 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
           unselectedItemColor: NebrasTheme.textMuted,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.class_outlined), label: 'فصولي'),
+            BottomNavigationBarItem(icon: Icon(Icons.fingerprint), label: 'البصمة الذكية'),
+            BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), label: 'طلباتي'),
             BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'حسابي'),
           ],
         ),

@@ -8,9 +8,9 @@ class AttendancePolicy(CombinedSharedModel):
     name = models.CharField(max_length=100)
     grace_period_minutes = models.IntegerField(default=15)
     half_day_late_minutes = models.IntegerField(default=120)
-    latitude = models.FloatField(default=24.7136, help_text="إحداثيات خط العرض للمدرسة")
-    longitude = models.FloatField(default=46.6753, help_text="إحداثيات خط الطول للمدرسة")
-    radius_meters = models.IntegerField(default=150, help_text="نصف قطر النطاق المسموح بالمتر")
+    latitude = models.FloatField(default=15.5007, help_text="إحداثيات خط العرض للمدرسة (الخرطوم)")
+    longitude = models.FloatField(default=32.5599, help_text="إحداثيات خط الطول للمدرسة (الخرطوم)")
+    radius_meters = models.IntegerField(default=250, help_text="نصف قطر النطاق المسموح بالمتر")
     is_active = models.BooleanField(default=True)
 
     class Meta:

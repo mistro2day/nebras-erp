@@ -199,6 +199,15 @@ class EmergencyContactViewSet(BaseCRUDViewSet):
 class MedicalLeaveViewSet(BaseCRUDViewSet):
     model_class = MedicalLeave
     serializer_class = MedicalLeaveSerializer
+    permission_classes = []
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        patient_user_id = self.request.query_params.get('patient_user_id') or self.request.query_params.get('employee')
+        if patient_user_id:
+            qs = qs.filter(patient_user_id=patient_user_id)
+        return qs.order_by('-start_date')
 
     @action(detail=True, methods=['post'], url_path='approve')
     def approve(self, request, pk=None):

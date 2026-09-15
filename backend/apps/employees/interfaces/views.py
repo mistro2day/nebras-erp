@@ -168,6 +168,7 @@ class EmployeeViewSet(BaseCRUDViewSet):
         employee = self.get_object()
         amount = request.data.get('amount')
         reason = request.data.get('reason', '')
+        repayment_months = int(request.data.get('repayment_months', 2))
         
         if not amount:
             return StandardResponse(status_code=400, message="يرجى إدخال مبلغ السلفية.")
@@ -176,9 +177,11 @@ class EmployeeViewSet(BaseCRUDViewSet):
             tenant_id=employee.tenant_id,
             employee=employee,
             amount=amount,
-            reason=reason
+            reason=reason,
+            repayment_months=repayment_months,
+            status='pending'
         )
-        return StandardResponse(EmployeeAdvanceSerializer(advance).data, message="تم تقييم واعتماد طلب السلفية المالية بنجاح.")
+        return StandardResponse(EmployeeAdvanceSerializer(advance).data, message="تم إرسال طلب السلفية المالية بنجاح وبانتظار اعتماد الإدارة.")
 
     @action(detail=False, methods=['get'], url_path='all-advances')
     def all_advances(self, request):
@@ -284,6 +287,15 @@ class EmployeeStatusHistoryViewSet(BaseCRUDViewSet):
 class EmployeeAdvanceViewSet(BaseCRUDViewSet):
     model_class = EmployeeAdvance
     serializer_class = EmployeeAdvanceSerializer
+    permission_classes = []
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs.order_by('-request_date')
 
 class EmployeeDependentViewSet(BaseCRUDViewSet):
     model_class = EmployeeDependent

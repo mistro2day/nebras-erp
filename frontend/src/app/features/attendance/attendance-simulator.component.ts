@@ -338,22 +338,22 @@ export class AttendanceSimulatorComponent implements OnInit {
   loadRealEmployees() {
     this.http.get<any>('/api/v1/employees/employees/').subscribe({
       next: (res) => {
-        const list = res?.results || res?.data || res;
+        const list = res?.data?.results || res?.results || res?.data || res;
         if (Array.isArray(list) && list.length > 0) {
           this.employees.set(list);
         } else {
           this.employees.set([
-            { id: 1, full_name_ar: 'محمد مهدي محمد سيف', position: 'شيف الحلويات', department: 'الفرع الرئيسي - الرياض' },
-            { id: 2, full_name_ar: 'RUMON AHMED MAFIJUL', position: 'باريستا', department: 'حي السلامة' },
-            { id: 3, full_name_ar: 'SHAHIDUL ISLAM', position: 'عامل نظافة', department: 'حي الياسمين' }
+            { id: '30eb8610-4410-462b-94ef-ab128b0ad491', full_name_ar: 'حيدر محمد محجوب صديق', position: 'معلم أول لغة عربية وتربية إسلامية', department: 'قسم اللغة العربية والتربية الإسلامية - الخرطوم' },
+            { id: '0c5ee88e-498c-4dd3-b6f5-1de014ea90a9', full_name_ar: 'مريم إبراهيم عبد الله', position: 'معلمة لغة إنجليزية', department: 'مجمع الخرطوم التعليمي' },
+            { id: '772e5445-b462-493b-9a48-6f4d9a21417a', full_name_ar: 'عثمان العوض دفع الله', position: 'معلم رياضيات وفيزياء', department: 'قسم العلوم والرياضيات - الخرطوم' }
           ]);
         }
       },
       error: () => {
         this.employees.set([
-          { id: 1, full_name_ar: 'محمد مهدي محمد سيف', position: 'شيف الحلويات', department: 'الفرع الرئيسي - الرياض' },
-          { id: 2, full_name_ar: 'RUMON AHMED MAFIJUL', position: 'باريستا', department: 'حي السلامة' },
-          { id: 3, full_name_ar: 'SHAHIDUL ISLAM', position: 'عامل نظافة', department: 'حي الياسمين' }
+          { id: '30eb8610-4410-462b-94ef-ab128b0ad491', full_name_ar: 'حيدر محمد محجوب صديق', position: 'معلم أول لغة عربية وتربية إسلامية', department: 'قسم اللغة العربية والتربية الإسلامية - الخرطوم' },
+          { id: '0c5ee88e-498c-4dd3-b6f5-1de014ea90a9', full_name_ar: 'مريم إبراهيم عبد الله', position: 'معلمة لغة إنجليزية', department: 'مجمع الخرطوم التعليمي' },
+          { id: '772e5445-b462-493b-9a48-6f4d9a21417a', full_name_ar: 'عثمان العوض دفع الله', position: 'معلم رياضيات وفيزياء', department: 'قسم العلوم والرياضيات - الخرطوم' }
         ]);
       }
     });
@@ -384,14 +384,14 @@ export class AttendanceSimulatorComponent implements OnInit {
 
     const payload = {
       employee: emp.id,
-      latitude: this.userLocation() === 'inside' ? 24.7136 : 24.8136,
-      longitude: this.userLocation() === 'inside' ? 46.6753 : 46.7753,
+      latitude: this.userLocation() === 'inside' ? 15.5007 : 15.6007,
+      longitude: this.userLocation() === 'inside' ? 32.5599 : 32.6599,
       location_simulation: this.userLocation()
     };
 
     if (!this.isGeoInside()) {
       this.isSuccess.set(false);
-      this.resultMessage.set('🚨 تم رفض البصمة! أنت خارج النطاق الجغرافي للفرع المعتمد.');
+      this.resultMessage.set('🚨 تم رفض البصمة! أنت خارج النطاق الجغرافي للمدرسة المعتمد (الخرطوم).');
     } else if (!this.isTimeInside()) {
       this.isSuccess.set(false);
       this.resultMessage.set('🚨 تم رفض البصمة! خارج النافذة الزمنية لتسجيل الحضور والانصراف.');
@@ -399,7 +399,7 @@ export class AttendanceSimulatorComponent implements OnInit {
       this.http.post<any>('/api/v1/attendance/records/check-in/', payload).subscribe({
         next: (res) => {
           this.isSuccess.set(true);
-          this.resultMessage.set('✅ تم إرسال البصمة وحفظها في قاعدة البيانات بنجاح.');
+          this.resultMessage.set('✅ تم إرسال البصمة الجغرافية والزمنية وحفظها بنجاح.');
         },
         error: (err) => {
           this.isSuccess.set(false);

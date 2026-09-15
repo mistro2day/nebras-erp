@@ -56,9 +56,9 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
         
         # البحث عن سياسة الحضور النشطة أو استخدام قيم الفرع الافتراضية
         policy = AttendancePolicy.objects.filter(is_active=True).first()
-        branch_lat = policy.latitude if policy else 24.7136
-        branch_lng = policy.longitude if policy else 46.6753
-        max_radius = policy.radius_meters if policy else 150
+        branch_lat = policy.latitude if policy else 15.5007
+        branch_lng = policy.longitude if policy else 32.5599
+        max_radius = policy.radius_meters if policy else 250
         
         # حساب المسافة التقريبية (Haversine)
         from math import radians, cos, sin, asin, sqrt
@@ -179,6 +179,15 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
 class CorrectionRequestViewSet(BaseCRUDViewSet):
     model_class = CorrectionRequest
     serializer_class = CorrectionRequestSerializer
+    permission_classes = []
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        employee_id = self.request.query_params.get('employee')
+        if employee_id:
+            qs = qs.filter(employee_id=employee_id)
+        return qs.order_by('-date')
 
 class AttendanceSheetViewSet(BaseCRUDViewSet):
     model_class = AttendanceSheet
