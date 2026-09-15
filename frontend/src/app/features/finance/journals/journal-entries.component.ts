@@ -111,6 +111,36 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
             </tbody>
           </table>
         </div>
+
+        <!-- شريط ترقيم الصفحات (Nebras OS Pagination) -->
+        @if (totalCount() > 0) {
+          <div class="pagination-bar">
+            <div class="page-info">
+              <span>عرض <strong>{{ rangeStart() }}</strong>–<strong>{{ rangeEnd() }}</strong> من إجمالي <strong>{{ totalCount() }}</strong> قيد محاسبي</span>
+              <div class="page-size-wrap">
+                <label for="pageSizeSelect">القيود في الصفحة:</label>
+                <select id="pageSizeSelect" class="page-size-select" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+                  <option [ngValue]="10">10</option>
+                  <option [ngValue]="20">20</option>
+                  <option [ngValue]="50">50</option>
+                  <option [ngValue]="100">100</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pager">
+              <button class="pg-btn" [disabled]="currentPage() === 1 || loading()" (click)="goToPage(1)" title="الصفحة الأولى">«</button>
+              <button class="pg-btn" [disabled]="currentPage() === 1 || loading()" (click)="goToPage(currentPage() - 1)" title="الصفحة السابقة">‹</button>
+              
+              @for (p of pageNumbers(); track p) {
+                <button class="pg-btn num" [class.active]="p === currentPage()" [disabled]="loading()" (click)="goToPage(p)">{{ p }}</button>
+              }
+
+              <button class="pg-btn" [disabled]="currentPage() === totalPages() || loading()" (click)="goToPage(currentPage() + 1)" title="الصفحة التالية">›</button>
+              <button class="pg-btn" [disabled]="currentPage() === totalPages() || loading()" (click)="goToPage(totalPages())" title="الصفحة الأخيرة">»</button>
+            </div>
+          </div>
+        }
       </nb-panel>
 
       <!-- درج تفاصيل القيد المحاسبي المعمق (Deep Drawer View) -->
@@ -355,6 +385,76 @@ interface Line { account: string; debit: number; credit: number; cost_center: st
     .btn.danger { background: var(--nb-danger); color: #fff; }
     .btn.ghost { background: var(--nb-surface-raised); border: 1px solid var(--nb-border); color: var(--nb-text); }
     .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* ترقيم الصفحات (Pagination) */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--nb-border-soft);
+      background: var(--nb-surface);
+      flex-wrap: wrap;
+    }
+    .page-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12.5px;
+      color: var(--nb-text-secondary);
+      flex-wrap: wrap;
+    }
+    .page-info strong { color: var(--nb-text); font-weight: 700; }
+    .page-size-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-inline-start: 8px;
+    }
+    .page-size-wrap label { font-size: 12px; color: var(--nb-text-muted); }
+    .page-size-select {
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-sm, 6px);
+      background: var(--nb-surface-raised);
+      color: var(--nb-text);
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .page-size-select:focus { border-color: var(--nb-primary-600); }
+    .pager { display: flex; gap: 4px; align-items: center; }
+    .pg-btn {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 6px;
+      border: 1px solid var(--nb-border);
+      background: var(--nb-surface);
+      border-radius: var(--nb-radius-sm, 6px);
+      font-size: 12.5px;
+      cursor: pointer;
+      color: var(--nb-text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .pg-btn:hover:not(:disabled) {
+      border-color: var(--nb-primary-600);
+      color: var(--nb-primary-600);
+      background: var(--nb-surface-raised);
+    }
+    .pg-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+    .pg-btn.num.active {
+      background: var(--nb-primary-600);
+      color: #ffffff;
+      border-color: var(--nb-primary-600);
+      font-weight: 700;
+    }
   `],
 })
 export class JournalEntriesComponent implements OnInit {
@@ -378,6 +478,27 @@ export class JournalEntriesComponent implements OnInit {
   actionTarget = signal<any | null>(null);
   actionMode = signal<JournalActionMode>('approve');
   actionSubmitting = signal(false);
+
+  // إشارات الترقيم الخادمي (Server-side Pagination Signals)
+  currentPage = signal<number>(1);
+  pageSize = signal<number>(20);
+  totalCount = signal<number>(0);
+  totalPages = signal<number>(1);
+
+  rangeStart = computed(() => this.totalCount() === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1);
+  rangeEnd = computed(() => Math.min(this.currentPage() * this.pageSize(), this.totalCount()));
+
+  pageNumbers = computed(() => {
+    const total = this.totalPages();
+    const cur = this.currentPage();
+    const nums: number[] = [];
+    const from = Math.max(1, cur - 2);
+    const to = Math.min(total, from + 4);
+    for (let i = Math.max(1, to - 4); i <= to; i++) {
+      if (i <= total) nums.push(i);
+    }
+    return nums;
+  });
 
   detailDebit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0));
   detailCredit = computed(() => (this.detail()?.lines || []).reduce((s: number, l: any) => s + (Number(l.credit) || 0), 0));
@@ -440,14 +561,58 @@ export class JournalEntriesComponent implements OnInit {
     });
   }
 
-  setStatus(s: string) { this.statusFilter.set(s); this.load(); }
+  setStatus(s: string) {
+    this.statusFilter.set(s);
+    this.currentPage.set(1);
+    this.load();
+  }
+
   load() {
     this.loading.set(true);
-    const params = this.statusFilter() ? { status: this.statusFilter() } : undefined;
+    const params: Record<string, any> = {
+      page: this.currentPage(),
+      page_size: this.pageSize(),
+    };
+    if (this.statusFilter()) {
+      params['status'] = this.statusFilter();
+    }
+
     this.service.getJournals(params).subscribe({
-      next: (r) => { if (r?.success) this.journals.set(r.data); this.loading.set(false); },
+      next: (r) => {
+        if (r?.success) {
+          const list = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+          this.journals.set(list);
+
+          if (r.metadata) {
+            this.totalCount.set(r.metadata.count ?? list.length);
+            this.totalPages.set(r.metadata.total_pages ?? Math.max(1, Math.ceil((r.metadata.count || list.length) / this.pageSize())));
+            if (r.metadata.current_page) {
+              this.currentPage.set(r.metadata.current_page);
+            }
+          } else {
+            this.totalCount.set(list.length);
+            this.totalPages.set(1);
+          }
+        }
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
+  }
+
+  goToPage(page: number) {
+    const target = Math.min(Math.max(1, page), this.totalPages());
+    if (target !== this.currentPage()) {
+      this.currentPage.set(target);
+      this.load();
+    }
+  }
+
+  onPageSizeChange(newSize: number) {
+    const size = Number(newSize) || 20;
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+    this.load();
   }
 
   /**
