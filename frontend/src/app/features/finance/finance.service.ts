@@ -185,4 +185,15 @@ export class FinanceService {
   postVoucher(id: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/vouchers/${id}/post/`, {});
   }
+
+  // 12. التقارير المالية والختامية (Financial Reports)
+  getRevenueReport(params?: Record<string, any>): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/ledger-entries/${this.qs({ ...params, account__account_type__code: 'revenue' })}`);
+  }
+  getExpenseReport(params?: Record<string, any>): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/ledger-entries/${this.qs({ ...params, account__account_type__code: 'expense' })}`);
+  }
+  getTrialBalance(params?: Record<string, any>): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/ledger-entries/${this.qs(params)}`);
+  }
 }

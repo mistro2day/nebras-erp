@@ -1248,7 +1248,21 @@ export class DashboardLayoutComponent {
       icon: '💰',
       permission: 'finance:read',
       items: [
-        { label: 'المالية', icon: '🏦', link: '/finance' },
+        {
+          label: 'المالية العامة ودفتر الأستاذ',
+          icon: '🏦',
+          match: '/finance',
+          link: '/finance/dashboard',
+          children: [
+            { label: 'لوحة التحكم المالية', link: '/finance/dashboard' },
+            { label: 'قيود اليومية والاعتمادات', link: '/finance/journals' },
+            { label: 'دفتر الأستاذ العام', link: '/finance/ledger' },
+            { label: 'سندات الصرف والقبض', link: '/finance/vouchers' },
+            { label: 'شجرة الحسابات', link: '/finance/coa' },
+            { label: 'الموازنات التقديرية', link: '/finance/budgets' },
+            { label: 'التقارير المالية والختامية', link: '/finance/reports' },
+          ],
+        },
         {
           label: 'حسابات الطلاب المالية',
           icon: '💳',

@@ -55,4 +55,8 @@ export const FINANCE_ROUTES: Routes = [
     path: 'setup',
     loadComponent: () => import('./setup/finance-setup.component').then((m) => m.FinanceSetupComponent),
   },
+  {
+    path: 'reports',
+    loadComponent: () => import('./reports/finance-reports.component').then((m) => m.FinanceReportsComponent),
+  },
 ];

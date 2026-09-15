@@ -45,19 +45,19 @@ interface FinanceModule {
           <div class="term assets">
             <span class="term-label">الأصول</span>
             <span class="term-value">{{ fmt(stats().total_assets) }}</span>
-            <span class="term-unit">ر.س</span>
+            <span class="term-unit">ج.س</span>
           </div>
           <span class="op">=</span>
           <div class="term liab">
             <span class="term-label">الخصوم</span>
             <span class="term-value">{{ fmt(stats().total_liabilities) }}</span>
-            <span class="term-unit">ر.س</span>
+            <span class="term-unit">ج.س</span>
           </div>
           <span class="op">+</span>
           <div class="term equity">
             <span class="term-label">حقوق الملكية</span>
             <span class="term-value">{{ fmt(equity()) }}</span>
-            <span class="term-unit">ر.س</span>
+            <span class="term-unit">ج.س</span>
           </div>
         </div>
 
@@ -77,19 +77,19 @@ interface FinanceModule {
         <div class="rk">
           <span class="rk-label">الإيرادات</span>
           <span class="rk-value pos">{{ fmt(stats().revenue) }}</span>
-          <span class="rk-unit">ر.س</span>
+          <span class="rk-unit">ج.س</span>
         </div>
         <span class="minus">−</span>
         <div class="rk">
           <span class="rk-label">المصروفات</span>
           <span class="rk-value neg">{{ fmt(stats().expenses) }}</span>
-          <span class="rk-unit">ر.س</span>
+          <span class="rk-unit">ج.س</span>
         </div>
         <span class="eq">=</span>
         <div class="rk net" [class.profit]="netResult() >= 0" [class.loss]="netResult() < 0">
           <span class="rk-label">{{ netResult() >= 0 ? 'صافي الربح' : 'صافي الخسارة' }}</span>
           <span class="rk-value">{{ fmt(abs(netResult())) }}</span>
-          <span class="rk-unit">ر.س</span>
+          <span class="rk-unit">ج.س</span>
         </div>
       </div>
 
@@ -97,16 +97,16 @@ interface FinanceModule {
       <div class="insight-row">
         <nb-panel title="السيولة والخزائن" subtitle="توزيع النقد بين الصناديق والحسابات البنكية.">
           <div class="liquidity">
-            <div class="liq-item"><span class="lbl">الخزينة النقدية</span><span class="val">{{ fmt(stats().cash_balance) }} <em>ر.س</em></span></div>
-            <div class="liq-item"><span class="lbl">الحسابات البنكية</span><span class="val">{{ fmt(stats().bank_balance) }} <em>ر.س</em></span></div>
+            <div class="liq-item"><span class="lbl">الخزينة النقدية</span><span class="val">{{ fmt(stats().cash_balance) }} <em>ج.س</em></span></div>
+            <div class="liq-item"><span class="lbl">الحسابات البنكية</span><span class="val">{{ fmt(stats().bank_balance) }} <em>ج.س</em></span></div>
             <div class="bar"><span class="fill" [style.width.%]="40"></span></div>
           </div>
         </nb-panel>
 
         <nb-panel title="استهلاك الموازنة التقديرية" subtitle="نسبة المنفَق من إجمالي المرصود المعتمد.">
           <div class="liquidity">
-            <div class="liq-item"><span class="lbl">المنفَق</span><span class="val">{{ fmt(stats().budget_consumed) }} <em>ر.س</em></span></div>
-            <div class="liq-item"><span class="lbl">المرصود</span><span class="val">{{ fmt(stats().budget_allocated) }} <em>ر.س</em></span></div>
+            <div class="liq-item"><span class="lbl">المنفَق</span><span class="val">{{ fmt(stats().budget_consumed) }} <em>ج.س</em></span></div>
+            <div class="liq-item"><span class="lbl">المرصود</span><span class="val">{{ fmt(stats().budget_allocated) }} <em>ج.س</em></span></div>
             <div class="bar"><span class="fill" [class.warn]="(stats().budget_utilization_rate || 0) > 85" [style.width.%]="clamp(stats().budget_utilization_rate)"></span></div>
             <span class="rate">نسبة الاستهلاك: <strong>{{ fmt(stats().budget_utilization_rate) }}%</strong></span>
           </div>
@@ -304,11 +304,12 @@ export class FinanceDashboardComponent implements OnInit {
   });
 
   readonly operations: FinanceModule[] = [
+    { key: 'reports', title: 'التقارير المالية والختامية', desc: 'الإيرادات حسب التاريخ، ميزان المراجعة، وقوائم الدخل.', icon: '📊', route: '/finance/reports' },
     { key: 'coa', title: 'شجرة الحسابات', desc: 'دليل الحسابات والتصنيفات المحاسبية.', icon: '🗂️', route: '/finance/coa' },
     { key: 'journals', title: 'قيود اليومية', desc: 'إنشاء واعتماد وترحيل القيود المزدوجة.', icon: '📝', route: '/finance/journals' },
     { key: 'ledger', title: 'دفتر الأستاذ العام', desc: 'استعراض حركات وأرصدة الحسابات.', icon: '📚', route: '/finance/ledger' },
     { key: 'vouchers', title: 'سندات الصرف والقبض', desc: 'السندات المالية وترحيلها للدفاتر.', icon: '🧾', route: '/finance/vouchers' },
-    { key: 'budgets', title: 'الموازنات التقديرية', desc: 'رصد واعتماد الموازنات ومتابعة الاستهلاك.', icon: '📊', route: '/finance/budgets' },
+    { key: 'budgets', title: 'الموازنات التقديرية', desc: 'رصد واعتماد الموازنات ومتابعة الاستهلاك.', icon: '📈', route: '/finance/budgets' },
     { key: 'fiscal', title: 'الفترات والإغلاق', desc: 'السنوات المالية وإغلاق الفترات.', icon: '🔒', route: '/finance/fiscal' },
   ];
   readonly setup: FinanceModule[] = [
