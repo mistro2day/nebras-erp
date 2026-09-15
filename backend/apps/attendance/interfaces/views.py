@@ -96,6 +96,7 @@ class AttendanceRecordViewSet(BaseCRUDViewSet):
             employee=employee,
             date=today,
             defaults={
+                'tenant_id': employee.tenant_id,
                 'check_in': timezone.now().time(),
                 'check_in_lat': user_lat,
                 'check_in_lng': user_lng,
