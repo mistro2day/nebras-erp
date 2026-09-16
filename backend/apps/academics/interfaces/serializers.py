@@ -89,6 +89,7 @@ class SubjectCategorySerializer(serializers.ModelSerializer):
 
 
 class SubjectSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
     grade_name = serializers.CharField(source='grade.name', read_only=True)
     stage_id = serializers.UUIDField(source='grade.stage_id', read_only=True)
     stage_name = serializers.CharField(source='grade.stage.name', read_only=True)
@@ -99,6 +100,9 @@ class SubjectSerializer(serializers.ModelSerializer):
         model = Subject
         fields = '__all__'
         read_only_fields = ['id', 'tenant_id']
+
+    def get_name(self, obj) -> str:
+        return obj.arabic_name or obj.english_name or 'مادة دراسية'
 
 
 class CurriculumSerializer(serializers.ModelSerializer):

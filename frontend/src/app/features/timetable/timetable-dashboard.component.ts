@@ -1194,7 +1194,7 @@ interface DayOption {
                   <label>المادة الدراسية</label>
                   <select [(ngModel)]="addForm.subject_id">
                     <option value="">— اختر المادة —</option>
-                    @for (s of subjects(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+                    @for (s of subjects(); track s.id) { <option [value]="s.id">{{ s.arabic_name || s.name || s.english_name }}</option> }
                   </select>
                 </div>
                 <div class="fld full">
@@ -1810,7 +1810,8 @@ export class TimetableDashboardComponent implements OnInit {
   }
 
   subjectName(id: string): string {
-    return this.subjectMap().get(String(id))?.name ?? 'مادة دراسية';
+    const s = this.subjectMap().get(String(id));
+    return s?.arabic_name || s?.name || s?.name_ar || s?.english_name || 'مادة دراسية';
   }
 
   teacherName(id: string): string {
