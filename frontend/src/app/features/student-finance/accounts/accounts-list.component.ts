@@ -195,16 +195,27 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
             <a class="btn ghost sm" (click)="openStudent(a.student_id)">👤 ملف الطالب</a>
           </div>
 
-          <!-- نماذج الإجراءات الفرعية -->
           @if (pane() === 'scholarship') {
             <div class="action-box">
-              <h4>إضافة منحة</h4>
-              <div class="grid3">
-                <label>اسم المنحة<input class="fld" [(ngModel)]="schForm.name" placeholder="منحة تفوق" /></label>
-                <label>النوع<select class="fld" [(ngModel)]="schForm.type"><option value="merit">تفوق</option><option value="need">حاجة</option><option value="partial">جزئية</option><option value="full">كاملة</option></select></label>
-                <label>النسبة %<input class="fld num" type="number" [(ngModel)]="schForm.amount_percentage" /></label>
+              <div class="action-box-header">
+                <h4>إضافة منحة أو تخفيض مالي</h4>
+                <div class="calc-toggle">
+                  <button type="button" class="calc-btn" [class.on]="schForm.calc_type === 'percentage'" (click)="schForm.calc_type = 'percentage'">نسبة مئوية (%)</button>
+                  <button type="button" class="calc-btn" [class.on]="schForm.calc_type === 'fixed'" (click)="schForm.calc_type = 'fixed'">مبلغ مقطوع (ج.س)</button>
+                </div>
               </div>
-              <button class="btn primary" [disabled]="busy() || !schForm.name" (click)="applyScholarship(a)">{{ busy() ? 'جارٍ…' : 'اعتماد المنحة' }}</button>
+              <div class="grid3">
+                <label>اسم المنحة / التخفيض<input class="fld" [(ngModel)]="schForm.name" placeholder="مثال: منحة تفوق / تخفيض إدارة" /></label>
+                <label>النوع<select class="fld" [(ngModel)]="schForm.type"><option value="merit">تفوق</option><option value="need">حاجة</option><option value="partial">جزئية</option><option value="full">كاملة</option></select></label>
+                @if (schForm.calc_type === 'percentage') {
+                  <label>النسبة %<input class="fld num" type="number" min="1" max="100" [(ngModel)]="schForm.amount_percentage" placeholder="25" /></label>
+                } @else {
+                  <label>المبلغ المالي (ج.س)<input class="fld num" type="number" min="1" [(ngModel)]="schForm.fixed_amount" placeholder="مثال: 300000" /></label>
+                }
+              </div>
+              <button class="btn primary" [disabled]="busy() || !schForm.name || (schForm.calc_type === 'percentage' ? !schForm.amount_percentage : !schForm.fixed_amount)" (click)="applyScholarship(a)">
+                {{ busy() ? 'جارٍ الاعتماد…' : 'اعتماد التخفيض' }}
+              </button>
             </div>
           }
           @if (pane() === 'hold') {
@@ -357,6 +368,11 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
     .bv.warn, .mono.warn, .warn { color: var(--nb-warning, #d97706); }
     .quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .action-box { border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card); padding: 14px; margin-bottom: 16px; background: var(--nb-surface-raised); }
+    .action-box-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+    .action-box-header h4 { margin: 0; font-size: 13px; font-weight: 700; color: var(--nb-text); }
+    .calc-toggle { display: inline-flex; border: 1px solid var(--nb-border); border-radius: var(--nb-radius-sm, 6px); overflow: hidden; background: var(--nb-surface); }
+    .calc-btn { border: none; background: transparent; padding: 4px 10px; font-size: 11.5px; font-family: inherit; font-weight: 600; color: var(--nb-text-muted); cursor: pointer; }
+    .calc-btn.on { background: var(--nb-primary-600); color: #fff; }
     .action-box h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--nb-text); }
     .fee-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
     .chk { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--nb-text); }
@@ -506,7 +522,7 @@ export class SfAccountsListComponent implements OnInit {
   cancelReceiptBusy = signal(false);
   cancelReceiptReason = '';
 
-  schForm: any = { name: '', type: 'merit', amount_percentage: 25 };
+  schForm: any = { name: '', type: 'merit', calc_type: 'percentage', amount_percentage: 25, fixed_amount: null };
   holdForm: any = { hold_type: 'exam', reason: '' };
 
   search = '';
@@ -663,15 +679,24 @@ export class SfAccountsListComponent implements OnInit {
 
   applyScholarship(a: any) {
     this.busy.set(true);
-    this.svc.applyScholarshipApi({ billing_account_id: a.id, name: this.schForm.name, type: this.schForm.type, amount_percentage: +this.schForm.amount_percentage || 0, start_date: new Date().toISOString().slice(0, 10) }).subscribe({
+    const isPct = this.schForm.calc_type === 'percentage';
+    const payload = {
+      billing_account_id: a.id,
+      name: this.schForm.name,
+      type: this.schForm.type,
+      amount_percentage: isPct ? (+this.schForm.amount_percentage || 0) : 0,
+      fixed_amount: !isPct ? (+this.schForm.fixed_amount || 0) : 0,
+      start_date: new Date().toISOString().slice(0, 10)
+    };
+    this.svc.applyScholarshipApi(payload).subscribe({
       next: (res: any) => {
         this.busy.set(false);
-        this.notify.success('تم اعتماد المنحة وتطبيق الخصم على الفاتورة والحساب المالي بنجاح.');
+        this.notify.success('تم اعتماد التخفيض وتطبيقه على الفاتورة والحساب المالي بنجاح.');
         this.pane.set('');
         this.tab.set('discounts');
         this.refreshAfter(a);
       },
-      error: (e) => { this.busy.set(false); this.notify.error(e?.error?.message || 'تعذّر اعتماد المنحة.'); },
+      error: (e) => { this.busy.set(false); this.notify.error(e?.error?.message || 'تعذّر اعتماد التخفيض.'); },
     });
   }
   applyHold(a: any) {
