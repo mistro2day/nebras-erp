@@ -259,10 +259,46 @@ class TimetableOrchestratorService:
         return available
 
     @classmethod
+    def ensure_default_periods(cls, tenant_id=None):
+        """
+        التأكد من وجود الحصص الدراسية المعتمدة لليوم المدرسي:
+        7 حصص دراسية (45 دقيقة لكل حصة) + فسحة إفطار واستراحة بعد الحصة الثالثة.
+        """
+        existing = ClassPeriod.objects.filter(deleted_at__isnull=True)
+        if tenant_id:
+            existing = existing.filter(tenant_id=tenant_id)
+
+        if existing.exists():
+            return list(existing.order_by('period_number'))
+
+        default_specs = [
+            {'period_number': 1, 'start_time': '07:30:00', 'end_time': '08:15:00', 'is_break': False},
+            {'period_number': 2, 'start_time': '08:15:00', 'end_time': '09:00:00', 'is_break': False},
+            {'period_number': 3, 'start_time': '09:00:00', 'end_time': '09:45:00', 'is_break': False},
+            {'period_number': 0, 'start_time': '09:45:00', 'end_time': '10:15:00', 'is_break': True}, # فسحة الإفطار
+            {'period_number': 4, 'start_time': '10:15:00', 'end_time': '11:00:00', 'is_break': False},
+            {'period_number': 5, 'start_time': '11:00:00', 'end_time': '11:45:00', 'is_break': False},
+            {'period_number': 6, 'start_time': '11:45:00', 'end_time': '12:30:00', 'is_break': False},
+            {'period_number': 7, 'start_time': '12:30:00', 'end_time': '13:15:00', 'is_break': False},
+        ]
+        created = []
+        for s in default_specs:
+            p = ClassPeriod.objects.create(
+                tenant_id=tenant_id,
+                period_number=s['period_number'],
+                start_time=s['start_time'],
+                end_time=s['end_time'],
+                is_break=s['is_break']
+            )
+            created.append(p)
+        return created
+
+    @classmethod
     def auto_generate_school_timetable(cls, tenant_id, timetable_id, clear_existing=False):
         """
         محرك التوليد الآلي الذكي للجدول المدرسي الكامل (Master AI-Assisted Scheduler):
-        يوزع أنصبة المواد على فصول المدرسة وفق قيود المعلمين والقاعات والأيام المعتمدة (الأحد-الخميس).
+        يوزع الحصص الدراسية على كافة فصول المدرسة وفق قيود المعلمين والقاعات والأيام المعتمدة (الأحد-الخميس).
+        إذا لم توجد خطة توزيع مسبقة، يقوم المحرك بربط المواد والمعلمين بالشعب تلقائياً وتوزيع الحصص بعدالة.
         """
         try:
             timetable = AcademicTimetable.objects.get(id=timetable_id)
@@ -271,25 +307,66 @@ class TimetableOrchestratorService:
 
         if clear_existing:
             TimetableEntry.objects.filter(timetable_id=timetable_id).delete()
-            # تصفير أحمال المعلمين
             TeachingLoad.objects.filter(tenant_id=tenant_id).update(assigned_weekly_hours=0)
+
+        # 1. التأكد من وجود فترات الحصص
+        cls.ensure_default_periods(tenant_id)
+        periods = list(ClassPeriod.objects.filter(is_break=False, deleted_at__isnull=True).order_by('period_number'))
+        if not periods:
+            return {'success': False, 'message': 'تعذّر إيجاد أو تهيئة الحصص الدراسية.'}
 
         # أيام الأسبوع المعتمدة في السودان: 6=الأحد، 0=الاثنين، 1=الثلاثاء، 2=الأربعاء، 3=الخميس
         sudan_days = [6, 0, 1, 2, 3]
 
-        # جلب الحصص الدراسية غير الاستراحات مرتبة
-        periods = list(ClassPeriod.objects.filter(is_break=False, deleted_at__isnull=True).order_by('period_number'))
-        if not periods:
-            return {'success': False, 'message': 'يرجى تعريف الحصص الزمنية أولاً.'}
-
-        # جلب مهام التدريس أو خطط التوزيع
+        # 2. جلب مهام التدريس إن وجدت، أو بناؤها تلقائياً من الشعب والمواد والمعلمين
         assignments = list(TeachingAssignment.objects.filter(deleted_at__isnull=True))
         if tenant_id:
             assignments = [a for a in assignments if getattr(a, 'tenant_id', None) == tenant_id or not getattr(a, 'tenant_id', None)]
 
+        # إذا لم تكن هناك خطة تكليفات مسبقة، نقوم ببناء خطة ذكية مباشرة من بيانات المدرسة
+        plan_items = []
+        if assignments:
+            for a in assignments:
+                plan_items.append({
+                    'teacher': a.teacher,
+                    'subject_id': str(a.subject_id),
+                    'section_id': str(a.grade_section_id),
+                    'weekly_periods': a.weekly_periods or 4
+                })
+        else:
+            from apps.academics.domain.models import Section
+            from apps.academics.domain.subjects import Subject
+            school_sections = list(Section.objects.filter(deleted_at__isnull=True))
+            school_subjects = list(Subject.objects.filter(deleted_at__isnull=True))
+            school_faculty = list(FacultyMember.objects.filter(deleted_at__isnull=True))
+
+            if tenant_id:
+                school_sections = [s for s in school_sections if getattr(s, 'tenant_id', None) == tenant_id]
+                school_subjects = [s for s in school_subjects if getattr(s, 'tenant_id', None) == tenant_id]
+                school_faculty = [f for f in school_faculty if getattr(f, 'tenant_id', None) == tenant_id]
+
+            if not school_faculty:
+                school_faculty = list(FacultyMember.objects.all()[:10])
+            if not school_subjects:
+                school_subjects = list(Subject.objects.all()[:15])
+
+            if school_sections and school_subjects and school_faculty:
+                f_idx = 0
+                for sec in school_sections:
+                    # نختار لكل شعبة 6 إلى 7 مواد رئيسية
+                    selected_subs = school_subjects[:7]
+                    for sub in selected_subs:
+                        teacher = school_faculty[f_idx % len(school_faculty)]
+                        f_idx += 1
+                        plan_items.append({
+                            'teacher': teacher,
+                            'subject_id': str(sub.id),
+                            'section_id': str(sec.id),
+                            'weekly_periods': 5 # 5 حصص لكل مادة أسبوعياً
+                        })
+
         placed_count = 0
         unplaced = []
-
         occupied_teachers = set()
         occupied_sections = set()
 
@@ -299,19 +376,19 @@ class TimetableOrchestratorService:
             occupied_teachers.add((ee.day_of_week, str(ee.period_id), str(ee.teacher_id)))
             occupied_sections.add((ee.day_of_week, str(ee.period_id), str(ee.grade_section_id)))
 
-        # خوارزمية التوزيع الذكي
-        for assign in assignments:
-            req_periods = assign.weekly_periods or 4
-            teacher = assign.teacher
-            section_id = str(assign.grade_section_id)
-            subject_id = str(assign.subject_id)
+        # خوارزمية التوزيع الذكي ومنع التعارضات
+        for item in plan_items:
+            req_periods = item['weekly_periods']
+            teacher = item['teacher']
+            section_id = item['section_id']
+            subject_id = item['subject_id']
 
-            placed_for_assign = 0
+            placed_for_item = 0
             shuffled_days = sudan_days.copy()
             random.shuffle(shuffled_days)
 
             for day in shuffled_days:
-                if placed_for_assign >= req_periods:
+                if placed_for_item >= req_periods:
                     break
 
                 for period in periods:
@@ -331,16 +408,16 @@ class TimetableOrchestratorService:
                         )
                         occupied_teachers.add(t_key)
                         occupied_sections.add(s_key)
-                        placed_for_assign += 1
+                        placed_for_item += 1
                         placed_count += 1
                         break
 
-            if placed_for_assign < req_periods:
+            if placed_for_item < req_periods:
                 unplaced.append({
                     'subject_id': subject_id,
                     'section_id': section_id,
                     'teacher_name': teacher.full_name_ar,
-                    'remaining': req_periods - placed_for_assign
+                    'remaining': req_periods - placed_for_item
                 })
 
         # إعادة احتساب وتحديث أحمال المعلمين
@@ -358,5 +435,6 @@ class TimetableOrchestratorService:
             'success': True,
             'placed_count': placed_count,
             'unplaced': unplaced,
-            'message': f'تم توليد {placed_count} حصة بنجاح لكافة فصول المدرسة.'
-        }
+            'message': f'تمت جدولة وتوزيع {placed_count} حصة بنجاح وفق الخطة الدراسية المعتمدة لكافة فصول المدرسة.'
+        }
+

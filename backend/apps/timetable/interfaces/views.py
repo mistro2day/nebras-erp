@@ -77,6 +77,14 @@ class ClassPeriodViewSet(BaseCRUDViewSet):
     model_class = ClassPeriod
     serializer_class = ClassPeriodSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not qs.exists():
+            tenant_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
+            TimetableOrchestratorService.ensure_default_periods(tenant_id)
+            qs = super().get_queryset()
+        return qs.order_by('period_number')
+
 
 class TimetableEntryViewSet(BaseCRUDViewSet):
     model_class = TimetableEntry

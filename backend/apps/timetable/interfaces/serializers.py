@@ -18,101 +18,106 @@ from apps.timetable.domain.models import (
     TimetableSubstitution
 )
 
-class AcademicTimetableSerializer(serializers.ModelSerializer):
-
+class BaseTimetableModelSerializer(serializers.ModelSerializer):
     class Meta:
+        read_only_fields = ('id', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at')
+
+
+class AcademicTimetableSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = AcademicTimetable
         fields = '__all__'
 
 
-class TimetableVersionSerializer(serializers.ModelSerializer):
-    class Meta:
+class TimetableVersionSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TimetableVersion
         fields = '__all__'
 
 
-class TimetableTemplateSerializer(serializers.ModelSerializer):
-    class Meta:
+class TimetableTemplateSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TimetableTemplate
         fields = '__all__'
 
 
-class ClassPeriodSerializer(serializers.ModelSerializer):
-    class Meta:
+class ClassPeriodSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = ClassPeriod
         fields = '__all__'
 
 
-class TimetableEntrySerializer(serializers.ModelSerializer):
-    class Meta:
+class TimetableEntrySerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TimetableEntry
         fields = '__all__'
 
 
-class TeachingLoadSerializer(serializers.ModelSerializer):
-    class Meta:
+class TeachingLoadSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TeachingLoad
         fields = '__all__'
 
 
-class TeachingAssignmentSerializer(serializers.ModelSerializer):
-    class Meta:
+class TeachingAssignmentSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TeachingAssignment
         fields = '__all__'
 
 
-class SubjectDistributionSerializer(serializers.ModelSerializer):
-    class Meta:
+class SubjectDistributionSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = SubjectDistribution
         fields = '__all__'
 
 
-class ClassScheduleSerializer(serializers.ModelSerializer):
-    class Meta:
+class ClassScheduleSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = ClassSchedule
         fields = '__all__'
 
 
-class TeacherScheduleSerializer(serializers.ModelSerializer):
-    class Meta:
+class TeacherScheduleSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TeacherSchedule
         fields = '__all__'
 
 
-class RoomScheduleSerializer(serializers.ModelSerializer):
-    class Meta:
+class RoomScheduleSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = RoomSchedule
         fields = '__all__'
 
 
-class ScheduleApprovalSerializer(serializers.ModelSerializer):
-    class Meta:
+class ScheduleApprovalSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = ScheduleApproval
         fields = '__all__'
 
 
-class ScheduleHistorySerializer(serializers.ModelSerializer):
-    class Meta:
+class ScheduleHistorySerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = ScheduleHistory
         fields = '__all__'
 
 
-class SchedulePublishSerializer(serializers.ModelSerializer):
-    class Meta:
+class SchedulePublishSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = SchedulePublish
         fields = '__all__'
 
 
-class ScheduleStatisticsSerializer(serializers.ModelSerializer):
-    class Meta:
+class ScheduleStatisticsSerializer(BaseTimetableModelSerializer):
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = ScheduleStatistics
         fields = '__all__'
 
 
-class TimetableSubstitutionSerializer(serializers.ModelSerializer):
+class TimetableSubstitutionSerializer(BaseTimetableModelSerializer):
     original_teacher_name = serializers.ReadOnlyField(source='original_teacher.full_name_ar')
     substitute_teacher_name = serializers.ReadOnlyField(source='substitute_teacher.full_name_ar')
 
-    class Meta:
+    class Meta(BaseTimetableModelSerializer.Meta):
         model = TimetableSubstitution
-        fields = '__all__'
+        fields = '__all__'
+

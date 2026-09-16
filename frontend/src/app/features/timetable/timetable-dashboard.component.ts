@@ -41,7 +41,6 @@ interface DayOption {
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     NbPageHeaderComponent,
     NbPanelComponent,
     NbLoadingComponent,
@@ -166,6 +165,15 @@ interface DayOption {
           <div class="switch-tabs" role="tablist">
             <button
               class="tab-btn"
+              [class.active]="viewMode() === 'section'"
+              (click)="viewMode.set('section')"
+              role="tab"
+            >
+              <span class="t-icon">📖</span>
+              <span class="t-txt">الجدول المدرسي المعتاد (جدول الفصل الأسبوعي)</span>
+            </button>
+            <button
+              class="tab-btn"
               [class.active]="viewMode() === 'master'"
               (click)="viewMode.set('master')"
               role="tab"
@@ -191,22 +199,13 @@ interface DayOption {
               <span class="t-icon">🧪</span>
               <span class="t-txt">إشغال المعامل والقاعات التخصصية</span>
             </button>
-            <button
-              class="tab-btn"
-              [class.active]="viewMode() === 'section'"
-              (click)="viewMode.set('section')"
-              role="tab"
-            >
-              <span class="t-icon">📖</span>
-              <span class="t-txt">جدول الفصل الفردي (أسبوع كامل)</span>
-            </button>
           </div>
 
           <!-- فلاتر التحكم اللحظية -->
           <div class="quick-filters">
             <div class="f-group">
-              <label>الجدول</label>
-              <select [ngModel]="selectedTimetableId()" (ngModelChange)="selectedTimetableId.set($event)">
+              <label>الجدول الأكاديمي</label>
+              <select [ngModel]="selectedTimetableId()" (ngModelChange)="onSelectTimetable($event)">
                 @for (tt of timetables(); track tt.id) {
                   <option [value]="tt.id">{{ tt.name }} ({{ tt.academic_year }})</option>
                 }
@@ -230,30 +229,35 @@ interface DayOption {
               </div>
             }
 
-            @if (viewMode() === 'master') {
-              <div class="f-group">
-                <label>تصفية المرحلة</label>
-                <select [ngModel]="selectedStageId()" (ngModelChange)="selectedStageId.set($event)">
-                  <option value="all">كافة المراحل المدرسية</option>
-                  @for (st of stages(); track st.id) {
-                    <option [value]="st.id">{{ st.name }}</option>
-                  }
-                </select>
-              </div>
-            }
+            <div class="f-group">
+              <label>تصفية المرحلة</label>
+              <select [ngModel]="selectedStageId()" (ngModelChange)="selectedStageId.set($event)">
+                <option value="all">كافة المراحل المدرسية</option>
+                @for (st of stages(); track st.id) {
+                  <option [value]="st.id">{{ st.name }}</option>
+                }
+              </select>
+            </div>
 
             @if (viewMode() === 'section') {
               <div class="f-group">
-                <label>الشعبة الدراسية</label>
+                <label>الشعبة / الفصل</label>
                 <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)">
-                  @for (s of sections(); track s.id) {
+                  @for (s of filteredSections(); track s.id) {
                     <option [value]="s.id">{{ s.name }} ({{ gradeName(s.grade) }})</option>
                   }
                 </select>
               </div>
             }
+
+            <div class="filters-actions">
+              <button class="nb-btn-primary xs-btn auto-action-btn" (click)="openAutoGenModal()">
+                ⚡ توليد وتوزيع الحصص آلياً
+              </button>
+            </div>
           </div>
         </div>
+
 
         <!-- ======================================================== -->
         <!-- نمط 1: مصفوفة المدرسة بالكامل (Master School-Wide Grid) -->
@@ -466,27 +470,97 @@ interface DayOption {
         }
 
         <!-- ======================================================== -->
-        <!-- نمط 4: جدول الشعبة الفردي (Single Class Full Week View)   -->
+        <!-- نمط 4: الجدول الأسبوعي للشعبة (الجدول المدرسي المعتاد)     -->
         <!-- ======================================================== -->
         @if (viewMode() === 'section') {
-          <nb-panel [title]="'الجدول الأسبوعي لشعبة: ' + activeSectionName()">
-            <div class="matrix-header-info">
-              <span class="hint-text">عرض تفصيلي لأيام الأسبوع الدراسي (الأحد إلى الخميس) للفصل المختار مع جاهزية الطباعة الفورية.</span>
-              <button class="nb-btn-secondary xs-btn" (click)="openPrintDrawer('section')">🖨️ طباعة جدول حائط الفصل (A4)</button>
+          <nb-panel [title]="'الجدول الأسبوعي المعتاد: ' + activeSectionName()">
+            <!-- شريط الشرائح السريعة لكافة الشعب الدراسية -->
+            <div class="sections-quick-pills">
+              <span class="pills-title">الفصول والشعب:</span>
+              <div class="pills-scroll">
+                @for (s of filteredSections(); track s.id) {
+                  <button
+                    class="sec-pill-btn"
+                    [class.active]="selectedSectionId() === s.id"
+                    (click)="selectedSectionId.set(s.id)"
+                  >
+                    <span class="sp-name">{{ s.name }}</span>
+                    <span class="sp-grade">{{ gradeName(s.grade) }}</span>
+                    <span class="sp-count mono" [class.full]="sectionEntriesCount(s.id) >= 30">
+                      {{ sectionEntriesCount(s.id) }} حصة
+                    </span>
+                  </button>
+                }
+              </div>
             </div>
 
+            <!-- رأس الجدول مع التلميحات والأزرار -->
+            <div class="matrix-header-info">
+              <div class="hint-text">
+                💡 اسحب أي حصة لنقلها أو إسقاطها فوق حصة أخرى للتبديل الفوري (Smart Swap)، أو انقر فوق أي خانة فارغة لحجز حصة جديدة.
+              </div>
+              <div class="sec-actions-top">
+                <button class="nb-btn-secondary xs-btn" (click)="openPrintDrawer('section')">
+                  🖨️ طباعة جدول الفصل الرسمي (A4)
+                </button>
+                <button class="nb-btn-primary xs-btn auto-action-btn" (click)="openAutoGenModal()">
+                  ⚡ توليد وتوزيع الحصص آلياً
+                </button>
+              </div>
+            </div>
+
+            <!-- بانر التنبيه إذا كان الفصل فارغاً من الحصص -->
+            @if (sectionEntriesCount(selectedSectionId()) === 0) {
+              <div class="empty-schedule-banner">
+                <div class="esb-icon">📅</div>
+                <div class="esb-content">
+                  <h4>جدول هذا الفصل الدراسي فارغ حالياً</h4>
+                  <p>لم يتم تسجيل حصص لهذا الفصل بعد في الجدول المختار. يمكنك إضافة الحصص يدوياً بالنقر على الخانات، أو الاستفادة من محرك الجدولة الذكي لتوزيع الحصص والمواد والمعلمين فورياً.</p>
+                </div>
+                <div class="esb-actions">
+                  <button class="nb-btn-primary" (click)="openAutoGenModal()">
+                    ⚡ توليد وتوزيع الحصص آلياً الآن
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- جدول الحصص الأسبوعي الكلاسيكي المعتاد -->
             <div class="table-container matrix-scroll">
-              <table class="matrix-table single-sec-table" dir="rtl">
+              <table class="matrix-table weekly-classic-table" dir="rtl">
                 <thead>
                   <tr>
                     <th class="col-day">اليوم الدراسي</th>
+                    <!-- الحصص الصباحية 1 و 2 و 3 -->
                     @for (p of teachingPeriods(); track p.id) {
-                      <th class="col-period">
-                        <div class="p-head">
-                          <span class="p-num">الحصة {{ p.period_number }}</span>
-                          <span class="p-time mono">{{ fmt(p.start_time) }} - {{ fmt(p.end_time) }}</span>
-                        </div>
-                      </th>
+                      @if (p.period_number <= 3) {
+                        <th class="col-period">
+                          <div class="p-head">
+                            <span class="p-num">الحصة {{ p.period_number }}</span>
+                            <span class="p-time mono">{{ fmt(p.start_time) }} - {{ fmt(p.end_time) }}</span>
+                          </div>
+                        </th>
+                      }
+                    }
+
+                    <!-- عمود الفسحة والاستراحة المدرسية الرسمية -->
+                    <th class="col-break">
+                      <div class="p-head break-head">
+                        <span class="p-num">🥪 الفسحة المدرسية</span>
+                        <span class="p-time mono">{{ fmt(breakPeriod().start_time) }} - {{ fmt(breakPeriod().end_time) }}</span>
+                      </div>
+                    </th>
+
+                    <!-- الحصص التالية 4 و 5 و 6 و 7 -->
+                    @for (p of teachingPeriods(); track p.id) {
+                      @if (p.period_number > 3) {
+                        <th class="col-period">
+                          <div class="p-head">
+                            <span class="p-num">الحصة {{ p.period_number }}</span>
+                            <span class="p-time mono">{{ fmt(p.start_time) }} - {{ fmt(p.end_time) }}</span>
+                          </div>
+                        </th>
+                      }
                     }
                   </tr>
                 </thead>
@@ -494,25 +568,106 @@ interface DayOption {
                   @for (d of days; track d.idx) {
                     <tr>
                       <td class="day-cell">
-                        <strong>{{ d.label }}</strong>
+                        <strong class="day-ar">{{ d.label }}</strong>
                         <span class="day-sub mono">{{ d.en }}</span>
                       </td>
+
+                      <!-- الحصص الصباحية 1 و 2 و 3 -->
                       @for (p of teachingPeriods(); track p.id) {
-                        <td class="slot-cell">
-                          @if (cellEntryFor(d.idx, selectedSectionId(), p.id); as entry) {
-                            <div class="lesson-card" [style.--tone]="toneFor(entry.subject_id)">
-                              <div class="l-top">
-                                <span class="l-sub-name">{{ subjectName(entry.subject_id) }}</span>
-                                <button class="act-btn del-btn" title="حذف الحصة" (click)="removeEntry(entry)">×</button>
+                        @if (p.period_number <= 3) {
+                          <td
+                            class="slot-cell"
+                            [class.drag-over]="isDragOver(selectedSectionId(), p.id)"
+                            (dragover)="onDragOver($event, selectedSectionId(), p.id)"
+                            (dragleave)="onDragLeave()"
+                            (drop)="onDrop(selectedSectionId(), p.id)"
+                          >
+                            @if (cellEntryFor(d.idx, selectedSectionId(), p.id); as entry) {
+                              <div
+                                class="lesson-card"
+                                draggable="true"
+                                (dragstart)="onDragStart(entry)"
+                                [style.--tone]="toneFor(entry.subject_id)"
+                              >
+                                <div class="l-top">
+                                  <span class="l-sub-name" [title]="subjectName(entry.subject_id)">
+                                    {{ subjectName(entry.subject_id) }}
+                                  </span>
+                                  <div class="l-actions">
+                                    <button class="act-btn sub-btn" title="تكليف معلم بديل (احتياط)" (click)="openSubstituteForEntry(entry)">⚡</button>
+                                    <button class="act-btn del-btn" title="حذف الحصة" (click)="removeEntry(entry)">×</button>
+                                  </div>
+                                </div>
+                                <div class="l-meta">
+                                  <span class="l-teach" [title]="teacherName(entry.teacher)">
+                                    👨‍🏫 {{ teacherName(entry.teacher) }}
+                                  </span>
+                                  @if (entry.room_id && entry.room_id !== '00000000-0000-0000-0000-000000000000') {
+                                    <span class="l-room">📍 {{ roomName(entry.room_id) }}</span>
+                                  }
+                                </div>
                               </div>
-                              <span class="l-teach">👤 {{ teacherName(entry.teacher) }}</span>
-                            </div>
-                          } @else {
-                            <div class="empty-slot" (click)="openAdd(d.idx, p.id, selectedSectionId())">
-                              <span class="plus-sign">+</span>
-                            </div>
-                          }
-                        </td>
+                            } @else {
+                              <div class="empty-slot" (click)="openAdd(d.idx, p.id, selectedSectionId())">
+                                <span class="plus-sign">+</span>
+                                <span class="add-hint">حجز حصة</span>
+                              </div>
+                            }
+                          </td>
+                        }
+                      }
+
+                      <!-- خانة عمود الفسحة والاستراحة المدرسية -->
+                      <td class="break-cell">
+                        <div class="break-box">
+                          <span class="break-icon">🥪</span>
+                          <span class="break-title">إفطار واستراحة</span>
+                        </div>
+                      </td>
+
+                      <!-- الحصص التالية 4 و 5 و 6 و 7 -->
+                      @for (p of teachingPeriods(); track p.id) {
+                        @if (p.period_number > 3) {
+                          <td
+                            class="slot-cell"
+                            [class.drag-over]="isDragOver(selectedSectionId(), p.id)"
+                            (dragover)="onDragOver($event, selectedSectionId(), p.id)"
+                            (dragleave)="onDragLeave()"
+                            (drop)="onDrop(selectedSectionId(), p.id)"
+                          >
+                            @if (cellEntryFor(d.idx, selectedSectionId(), p.id); as entry) {
+                              <div
+                                class="lesson-card"
+                                draggable="true"
+                                (dragstart)="onDragStart(entry)"
+                                [style.--tone]="toneFor(entry.subject_id)"
+                              >
+                                <div class="l-top">
+                                  <span class="l-sub-name" [title]="subjectName(entry.subject_id)">
+                                    {{ subjectName(entry.subject_id) }}
+                                  </span>
+                                  <div class="l-actions">
+                                    <button class="act-btn sub-btn" title="تكليف معلم بديل (احتياط)" (click)="openSubstituteForEntry(entry)">⚡</button>
+                                    <button class="act-btn del-btn" title="حذف الحصة" (click)="removeEntry(entry)">×</button>
+                                  </div>
+                                </div>
+                                <div class="l-meta">
+                                  <span class="l-teach" [title]="teacherName(entry.teacher)">
+                                    👨‍🏫 {{ teacherName(entry.teacher) }}
+                                  </span>
+                                  @if (entry.room_id && entry.room_id !== '00000000-0000-0000-0000-000000000000') {
+                                    <span class="l-room">📍 {{ roomName(entry.room_id) }}</span>
+                                  }
+                                </div>
+                              </div>
+                            } @else {
+                              <div class="empty-slot" (click)="openAdd(d.idx, p.id, selectedSectionId())">
+                                <span class="plus-sign">+</span>
+                                <span class="add-hint">حجز حصة</span>
+                              </div>
+                            }
+                          </td>
+                        }
                       }
                     </tr>
                   }
@@ -521,6 +676,7 @@ interface DayOption {
             </div>
           </nb-panel>
         }
+
 
         <!-- صف التحليلات والأنصبة السفلية -->
         <div class="bento-grid">
@@ -1181,11 +1337,43 @@ interface DayOption {
     .t-load-pill.warn { background: #fee2e2; color: #dc2626; }
 
     .day-cell { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; }
+    .day-ar { font-size: 14px; font-weight: 800; color: #1e3a8a; }
     .day-sub { font-size: 11px; color: var(--nb-text-muted); text-transform: uppercase; }
+
+    /* Sections Quick Pills Bar */
+    .sections-quick-pills { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
+    .pills-title { font-size: 12.5px; font-weight: 800; color: #1e3a8a; white-space: nowrap; }
+    .pills-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; flex: 1; }
+    .sec-pill-btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .sec-pill-btn:hover { background: #eff6ff; border-color: #93c5fd; }
+    .sec-pill-btn.active { background: #1e40af; border-color: #1e40af; color: #fff; box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25); }
+    .sp-name { font-size: 13px; font-weight: 800; }
+    .sp-grade { font-size: 11px; opacity: 0.8; }
+    .sp-count { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: #f1f5f9; color: #475569; }
+    .sec-pill-btn.active .sp-count { background: rgba(255,255,255,0.22); color: #fff; }
+    .sp-count.full { background: #dcfce7; color: #166534; }
+
+    /* Break & Recess Column (عمود الفسحة والاستراحة المدرسية) */
+    .col-break { width: 90px; background: #fefce8 !important; border-inline: 2px solid #fef08a !important; }
+    .break-head { align-items: center; color: #854d0e; }
+    .break-cell { background: #fefce8; border-inline: 2px solid #fef08a; vertical-align: middle !important; text-align: center; }
+    .break-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px 2px; }
+    .break-icon { font-size: 20px; }
+    .break-title { font-size: 11px; font-weight: 800; color: #854d0e; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); }
+
+    /* Empty Schedule Banner */
+    .empty-schedule-banner { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+    .esb-icon { font-size: 36px; }
+    .esb-content { flex: 1; }
+    .esb-content h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: #1e3a8a; }
+    .esb-content p { margin: 0; font-size: 13px; color: #334155; line-height: 1.4; }
+    .esb-actions { display: flex; gap: 10px; }
+    .auto-action-btn { background: linear-gradient(135deg, #2563eb, #1d4ed8); font-weight: 800; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25); }
 
     /* Lesson Card on Grid */
     .slot-cell { position: relative; min-height: 68px; background: #fff; transition: background 0.15s; }
     .slot-cell.drag-over { background: #eff6ff !important; outline: 2px dashed #2563eb; }
+
     .lesson-card {
       border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
       background: color-mix(in srgb, var(--tone, #2563eb) 12%, #fff);
@@ -1361,8 +1549,8 @@ export class TimetableDashboardComponent implements OnInit {
   readonly stages = signal<any[]>([]);
   readonly substitutions = signal<any[]>([]);
 
-  // View Mode: 'master' | 'teachers' | 'rooms' | 'section'
-  readonly viewMode = signal<'master' | 'teachers' | 'rooms' | 'section'>('master');
+  // View Mode: 'section' | 'master' | 'teachers' | 'rooms' (الوضع الافتراضي: الجدول المدرسي المعتاد)
+  readonly viewMode = signal<'section' | 'master' | 'teachers' | 'rooms'>('section');
   readonly selectedTimetableId = signal<string>('');
   readonly selectedDay = signal<number>(6); // الأحد
   readonly selectedStageId = signal<string>('all');
@@ -1414,6 +1602,7 @@ export class TimetableDashboardComponent implements OnInit {
     start_time: '07:30',
     period_duration: 45,
     break_duration: 30,
+    auto_generate: true, // تفعيل التوليد الآلي الذكي افتراضياً
   };
 
   // Add Single Lesson Modal State
@@ -1422,6 +1611,18 @@ export class TimetableDashboardComponent implements OnInit {
   readonly conflicts = signal<any[]>([]);
   readonly addError = signal<string>('');
   addForm: any = { day_of_week: 6, period_id: '', teacher_id: '', subject_id: '', section_id: '' };
+
+  // الحصص الدراسية الافتراضية المعتمدة في حال عدم ورودها من الخادم
+  private readonly defaultPeriods = [
+    { id: 'dp-1', period_number: 1, start_time: '07:30:00', end_time: '08:15:00', is_break: false },
+    { id: 'dp-2', period_number: 2, start_time: '08:15:00', end_time: '09:00:00', is_break: false },
+    { id: 'dp-3', period_number: 3, start_time: '09:00:00', end_time: '09:45:00', is_break: false },
+    { id: 'dp-0', period_number: 0, start_time: '09:45:00', end_time: '10:15:00', is_break: true },
+    { id: 'dp-4', period_number: 4, start_time: '10:15:00', end_time: '11:00:00', is_break: false },
+    { id: 'dp-5', period_number: 5, start_time: '11:00:00', end_time: '11:45:00', is_break: false },
+    { id: 'dp-6', period_number: 6, start_time: '11:45:00', end_time: '12:30:00', is_break: false },
+    { id: 'dp-7', period_number: 7, start_time: '12:30:00', end_time: '13:15:00', is_break: false },
+  ];
 
   // الأيام الدراسية السودانية (الأحد إلى الخميس)
   readonly days: DayOption[] = [
@@ -1449,9 +1650,22 @@ export class TimetableDashboardComponent implements OnInit {
     this.timetables()[0] ?? null
   );
 
+  readonly effectivePeriods = computed(() => {
+    const list = this.periods();
+    if (list && list.length > 0) return list;
+    return this.defaultPeriods;
+  });
+
   readonly teachingPeriods = computed(() =>
-    this.periods().filter((p) => !p.is_break).sort((a, b) => a.period_number - b.period_number)
+    this.effectivePeriods().filter((p) => !p.is_break).sort((a, b) => a.period_number - b.period_number)
   );
+
+  readonly breakPeriod = computed(() =>
+    this.effectivePeriods().find((p) => p.is_break) ?? {
+      id: 'dp-0', period_number: 0, start_time: '09:45:00', end_time: '10:15:00', is_break: true
+    }
+  );
+
 
   readonly activeTeachers = computed(() =>
     new Set(this.entries().map((e) => e.teacher).filter(Boolean)).size
@@ -1546,6 +1760,18 @@ export class TimetableDashboardComponent implements OnInit {
     });
   }
 
+  onSelectTimetable(id: string): void {
+    this.selectedTimetableId.set(id);
+  }
+
+  sectionEntriesCount(sectionId: string): number {
+    const tt = this.selectedTimetableId();
+    return this.entries().filter((e) =>
+      (!tt || String(e.timetable) === String(tt) || String(e.timetable_id) === String(tt)) &&
+      (String(e.grade_section_id) === String(sectionId) || String(e.section_id) === String(sectionId))
+    ).length;
+  }
+
   // ---------- Helpers & Lookups ----------
   entriesForTimetable(id: string): any[] {
     return this.entries().filter((e) => String(e.timetable) === String(id));
@@ -1553,13 +1779,15 @@ export class TimetableDashboardComponent implements OnInit {
 
   cellEntryFor(dayIdx: number, sectionId: string, periodId: string): any | null {
     const tt = this.selectedTimetableId();
-    return this.entries().find((e) =>
-      String(e.timetable) === String(tt) &&
-      String(e.grade_section_id) === String(sectionId) &&
-      e.day_of_week === dayIdx &&
-      String(e.period) === String(periodId)
-    ) ?? null;
+    return this.entries().find((e) => {
+      const matchTt = !tt || String(e.timetable) === String(tt) || String(e.timetable_id) === String(tt);
+      const matchSec = String(e.grade_section_id) === String(sectionId) || String(e.section_id) === String(sectionId);
+      const matchDay = Number(e.day_of_week) === Number(dayIdx);
+      const matchPeriod = String(e.period) === String(periodId) || String(e.period_id) === String(periodId);
+      return matchTt && matchSec && matchDay && matchPeriod;
+    }) ?? null;
   }
+
 
   teacherEntryFor(teacherId: string, dayIdx: number, periodId: string): any | null {
     const tt = this.selectedTimetableId();
@@ -1589,6 +1817,12 @@ export class TimetableDashboardComponent implements OnInit {
     const t = this.teacherMap().get(String(id));
     return t?.full_name_ar ?? t?.full_name_en ?? 'معلم';
   }
+
+  roomName(id: string): string {
+    const f = this.facilitiesList.find((x) => x.id === String(id));
+    return f ? f.name : 'قاعة دراسية';
+  }
+
 
   sectionName(id: string): string {
     return this.sectionMap().get(String(id))?.name ?? 'شعبة';
@@ -1885,13 +2119,29 @@ export class TimetableDashboardComponent implements OnInit {
 
     this.svc.createTimetable(body).subscribe({
       next: (res) => {
-        this.wizardSubmitting.set(false);
         const data = res?.data || res;
         this.wizardCreatedData.set(data);
         this.timetables.update((list) => [data, ...list]);
         this.selectedTimetableId.set(data.id);
-        // الانتقال إلى خطوة النجاح والاعتماد داخل المودال نفسه
-        this.wizardCurrentStep.set(4);
+
+        if (this.wizardForm.auto_generate) {
+          this.svc.autoGenerate(data.id, true).subscribe({
+            next: () => {
+              this.wizardSubmitting.set(false);
+              this.load();
+              this.wizardCurrentStep.set(4);
+            },
+            error: () => {
+              this.wizardSubmitting.set(false);
+              this.load();
+              this.wizardCurrentStep.set(4);
+            }
+          });
+        } else {
+          this.wizardSubmitting.set(false);
+          this.load();
+          this.wizardCurrentStep.set(4);
+        }
       },
       error: () => {
         this.wizardSubmitting.set(false);
@@ -1899,6 +2149,7 @@ export class TimetableDashboardComponent implements OnInit {
       }
     });
   }
+
 
   wizardFinish(): void {
     this.wizardOpen.set(false);
