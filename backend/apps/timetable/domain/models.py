@@ -179,3 +179,25 @@ class ScheduleStatistics(CombinedSharedModel):
 
     class Meta:
         db_table = 'nebras_timetable_statistics'
+
+
+# 16. Timetable Substitution (حصص الاحتياط والبدائل للمعلمين)
+class TimetableSubstitution(CombinedSharedModel):
+    STATUS_CHOICES = (
+        ('pending', 'قيد الاعتماد'),
+        ('confirmed', 'معتمد ومؤكد'),
+        ('completed', 'منفذ ومكتمل'),
+        ('cancelled', 'ملغي'),
+    )
+
+    entry = models.ForeignKey(TimetableEntry, on_delete=models.CASCADE, related_name='substitutions')
+    original_teacher = models.ForeignKey(FacultyMember, on_delete=models.CASCADE, related_name='original_substitutions')
+    substitute_teacher = models.ForeignKey(FacultyMember, on_delete=models.CASCADE, related_name='substitute_assignments')
+    substitution_date = models.DateField(help_text="تاريخ يوم حصة الاحتياط الفعلي")
+    reason = models.CharField(max_length=255, default='غياب المعلم الأصلي')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='confirmed')
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'nebras_timetable_substitutions'
+        ordering = ['-substitution_date']

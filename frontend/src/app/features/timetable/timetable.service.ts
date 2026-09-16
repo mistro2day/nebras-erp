@@ -42,8 +42,33 @@ export class TimetableService {
   // ---- إحصائيات الجدول ----
   getStatistics(params?: any): Observable<any> { return this.api.get('timetable/statistics/', { page_size: 100, ...(params ?? {}) }); }
 
-  // ---- موارد مرتبطة (معلمون، مواد، شعب) ----
+  // ---- الجدولة الذكية المتقدمة ومصفوفة المدرسة بالكامل ----
+  /** التوليد الآلي لكامل جدول المدرسة وتوزيع الحصص والأنصبة بضغطة زر واحدة */
+  autoGenerate(timetableId: string, clearExisting = false): Observable<any> {
+    return this.api.post(`timetable/timetables/${timetableId}/auto-generate/`, { clear_existing: clearExisting });
+  }
+
+  /** التبديل الذكي التبادلي بين حصتين (Smart Swap) مع فحص التعارضات */
+  swapEntries(entry1Id: string, entry2Id: string): Observable<any> {
+    return this.api.post('timetable/entries/swap/', { entry1_id: entry1Id, entry2_id: entry2Id });
+  }
+
+  /** استخراج المعلمين المتفرغين لحصة معينة لتغطية الاحتياط */
+  getAvailableSubstitutes(params: { day_of_week: number; period_id: string; timetable_id: string; teacher_id?: string }): Observable<any> {
+    return this.api.get('timetable/entries/available-substitutes/', params);
+  }
+
+  // ---- حصص الاحتياط والبدائل اليومية ----
+  getSubstitutions(params?: any): Observable<any> { return this.api.get('timetable/substitutions/', { page_size: 500, ...(params ?? {}) }); }
+  createSubstitution(body: any): Observable<any> { return this.api.post('timetable/substitutions/', body); }
+  deleteSubstitution(id: string): Observable<any> { return this.api.delete(`timetable/substitutions/${id}/`); }
+
+  // ---- موارد مرتبطة (معلمون، مواد، شعب، صفوف، مراحل) ----
   getFacultyMembers(params?: any): Observable<any> { return this.api.get('faculty/members/', { page_size: 500, ...(params ?? {}) }); }
   getSubjects(params?: any): Observable<any> { return this.api.get('academics/subjects/', { page_size: 200, ...(params ?? {}) }); }
   getSections(params?: any): Observable<any> { return this.api.get('academics/sections/', { page_size: 200, ...(params ?? {}) }); }
+  getGrades(params?: any): Observable<any> { return this.api.get('academics/grades/', { page_size: 100, ...(params ?? {}) }); }
+  getStages(params?: any): Observable<any> { return this.api.get('academics/stages/', { page_size: 50, ...(params ?? {}) }); }
+  getAcademicYears(params?: any): Observable<any> { return this.api.get('academics/years/', { page_size: 50, ...(params ?? {}) }); }
 }
+

@@ -14,10 +14,12 @@ from apps.timetable.domain.models import (
     ScheduleApproval,
     ScheduleHistory,
     SchedulePublish,
-    ScheduleStatistics
+    ScheduleStatistics,
+    TimetableSubstitution
 )
 
 class AcademicTimetableSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = AcademicTimetable
         fields = '__all__'
@@ -105,3 +107,12 @@ class ScheduleStatisticsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScheduleStatistics
         fields = '__all__'
+
+
+class TimetableSubstitutionSerializer(serializers.ModelSerializer):
+    original_teacher_name = serializers.ReadOnlyField(source='original_teacher.full_name_ar')
+    substitute_teacher_name = serializers.ReadOnlyField(source='substitute_teacher.full_name_ar')
+
+    class Meta:
+        model = TimetableSubstitution
+        fields = '__all__'

@@ -18,7 +18,8 @@ from apps.timetable.domain.models import (
     ScheduleApproval,
     ScheduleHistory,
     SchedulePublish,
-    ScheduleStatistics
+    ScheduleStatistics,
+    TimetableSubstitution
 )
 from apps.timetable.interfaces.serializers import (
     AcademicTimetableSerializer,
@@ -35,7 +36,8 @@ from apps.timetable.interfaces.serializers import (
     ScheduleApprovalSerializer,
     ScheduleHistorySerializer,
     SchedulePublishSerializer,
-    ScheduleStatisticsSerializer
+    ScheduleStatisticsSerializer,
+    TimetableSubstitutionSerializer
 )
 from apps.timetable.application.services import TimetableOrchestratorService
 from apps.faculty.domain.models import FacultyMember
@@ -44,6 +46,21 @@ from apps.faculty.domain.models import FacultyMember
 class AcademicTimetableViewSet(BaseCRUDViewSet):
     model_class = AcademicTimetable
     serializer_class = AcademicTimetableSerializer
+
+    @action(detail=True, methods=['post'], url_path='auto-generate')
+    def auto_generate(self, request, pk=None):
+        """التوليد الآلي الذكي لكامل جدول المدرسة وتوزيع أنصبة المعلمين والمواد"""
+        clear_existing = request.data.get('clear_existing', False)
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+        res = TimetableOrchestratorService.auto_generate_school_timetable(
+            tenant_id=tenant_id,
+            timetable_id=pk,
+            clear_existing=clear_existing
+        )
+        if not res.get('success'):
+            return StandardResponse(data=res, message=res.get('message', 'تعذّر التوليد.'), status=status.HTTP_400_BAD_REQUEST)
+        return StandardResponse(data=res, message=res.get('message', 'تم التوليد بنجاح.'))
+
 
 
 class TimetableVersionViewSet(BaseCRUDViewSet):
@@ -110,6 +127,41 @@ class TimetableEntryViewSet(BaseCRUDViewSet):
             message="تمت إضافة الحصة بنجاح."
         )
 
+    @action(detail=False, methods=['post'], url_path='swap')
+    def swap_entries(self, request):
+        """التبديل الذكي بين حصتين مع الفحص الصارم للتعارضات"""
+        entry1_id = request.data.get('entry1_id')
+        entry2_id = request.data.get('entry2_id')
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+
+        success, msg = TimetableOrchestratorService.swap_entries(tenant_id, entry1_id, entry2_id)
+        if not success:
+            return StandardResponse(
+                data={'conflicts': msg, 'success': False},
+                message="تعذّر التبديل لوجود تعارضات.",
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return StandardResponse(data={'success': True}, message=msg)
+
+    @action(detail=False, methods=['get'], url_path='available-substitutes')
+    def available_substitutes(self, request):
+        """استخراج المعلمين المتفرغين لتغطية حصة احتياط"""
+        day_of_week = int(request.query_params.get('day_of_week', 6))
+        period_id = request.query_params.get('period_id')
+        timetable_id = request.query_params.get('timetable_id')
+        teacher_id = request.query_params.get('teacher_id')
+        tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else None
+
+        subs = TimetableOrchestratorService.get_available_substitutes(
+            tenant_id=tenant_id,
+            timetable_id=timetable_id,
+            day_of_week=day_of_week,
+            period_id=period_id,
+            exclude_teacher_id=teacher_id
+        )
+        return StandardResponse(data=subs, message="تم استرجاع قائمة المعلمين المتاحين للاحتياط بنجاح.")
+
+
 
 class TeachingLoadViewSet(BaseCRUDViewSet):
     model_class = TeachingLoad
@@ -159,3 +211,8 @@ class SchedulePublishViewSet(BaseCRUDViewSet):
 class ScheduleStatisticsViewSet(BaseCRUDViewSet):
     model_class = ScheduleStatistics
     serializer_class = ScheduleStatisticsSerializer
+
+
+class TimetableSubstitutionViewSet(BaseCRUDViewSet):
+    model_class = TimetableSubstitution
+    serializer_class = TimetableSubstitutionSerializer

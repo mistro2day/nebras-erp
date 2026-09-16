@@ -15,7 +15,8 @@ from apps.timetable.interfaces.views import (
     ScheduleApprovalViewSet,
     ScheduleHistoryViewSet,
     SchedulePublishViewSet,
-    ScheduleStatisticsViewSet
+    ScheduleStatisticsViewSet,
+    TimetableSubstitutionViewSet
 )
 
 router = DefaultRouter()
@@ -34,7 +35,8 @@ router.register('approvals', ScheduleApprovalViewSet, basename='approval')
 router.register('histories', ScheduleHistoryViewSet, basename='history')
 router.register('publications', SchedulePublishViewSet, basename='publication')
 router.register('statistics', ScheduleStatisticsViewSet, basename='statistic')
+router.register('substitutions', TimetableSubstitutionViewSet, basename='substitution')
 
 urlpatterns = [
     path('', include(router.urls)),
-]
+]
