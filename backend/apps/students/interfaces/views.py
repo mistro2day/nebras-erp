@@ -286,6 +286,9 @@ class StudentViewSet(viewsets.ModelViewSet):
         medical_data = request.data.get('medical_profile', {})
         academic_data = request.data.get('academic_data', {})
         financial_config = request.data.get('financial_config', None)
+
+        if not academic_data or not academic_data.get('grade_id'):
+            raise ValidationError("اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.")
         
         full_data = {**profile_data, **medical_data}
         

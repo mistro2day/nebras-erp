@@ -271,12 +271,12 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                 </div>
 
                 <div class="field-separator full-width">
-                  <span class="sep-title">التسكين الأكاديمي المبدئي في الصف والفصل (اختياري)</span>
+                  <span class="sep-title">التسكين الأكاديمي في الصف والفصل (إجباري)</span>
                 </div>
                 <div class="field">
-                  <label>الصف الدراسي</label>
-                  <select [ngModel]="manualAcademic.grade_id" (ngModelChange)="onManualGradeChange($event)" name="manual_grade">
-                    <option value="">-- اختر الصف لتسكين الطالب --</option>
+                  <label>الصف الدراسي <span class="required-star">*</span> (إجباري)</label>
+                  <select [ngModel]="manualAcademic.grade_id" (ngModelChange)="onManualGradeChange($event)" name="manual_grade" required>
+                    <option value="">-- اختر الصف لتسكين الطالب (إجباري) --</option>
                     @for (g of grades(); track g.id) {
                       <option [value]="g.id">{{ g.name }}</option>
                     }
@@ -710,6 +710,11 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
         font-weight: 700;
         color: var(--nb-text-secondary);
       }
+      .required-star {
+        color: #ef4444;
+        font-weight: 700;
+        margin-inline-start: 2px;
+      }
       .field-badge-value {
         height: 36px;
         display: flex;
@@ -942,6 +947,12 @@ export class StudentCreateComponent implements OnInit {
     const applicant = this.selectedApplicant();
     if (!applicant) return;
 
+    const gradeId = applicant.applying_grade_id || applicant.grade_id;
+    if (!gradeId) {
+      this.snack.open('طلب القبول لا يحتوي على صف دراسي، يجب تحديد الصف أولاً لتسجيل الطالب.', 'إغلاق', { duration: 5000 });
+      return;
+    }
+
     this.submitting.set(true);
     const config = {
       ...(this.financialConfig() || {}),
@@ -974,6 +985,12 @@ export class StudentCreateComponent implements OnInit {
     if (!this.personalForm.arabic_name || !this.personalForm.date_of_birth) {
       this.errorMessage.set('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
       this.snack.open('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)', 'إغلاق', { duration: 4000 });
+      return;
+    }
+
+    if (!this.manualAcademic.grade_id) {
+      this.errorMessage.set('اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.');
+      this.snack.open('يرجى اختيار الصف الدراسي أولاً (حقل إجباري لتسجيل الطالب)', 'إغلاق', { duration: 5000 });
       return;
     }
 

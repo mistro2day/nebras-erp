@@ -83,6 +83,10 @@ class StudentApplicationService:
         if applicant.status != 'accepted':
             raise BusinessException("لا يمكن تسجيل طالب إلا إذا كان طلب التقديم 'مقبول'.", code="invalid_applicant_status")
             
+        # التحقق من وجود صف دراسي محدد للمتقدم
+        if not applicant.applying_grade_id:
+            raise BusinessException("طلب التقديم لا يحتوي على صف دراسي محدد، يرجى تحديد الصف أولاً.", code="grade_required")
+
         # التحقق من عدم تسجيل الطالب مسبقاً
         if Student.objects.filter(student_number=applicant.application_number).exists():
             raise BusinessException("هذا الطالب مسجل بالفعل في النظام.", code="student_already_registered")
@@ -252,6 +256,11 @@ class StudentApplicationService:
         إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأكاديمية والمالية
         """
         cls._enforce_student_limit(tenant_id)
+
+        # التحقق الإلزامي من اختيار الصف الدراسي
+        grade_id = (academic_data or {}).get('grade_id')
+        if not grade_id:
+            raise BusinessException("اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.", code="grade_required")
 
         # 1. توليد رقم الطالب الأكاديمي
         student_number = StudentNumberGenerator.generate(
