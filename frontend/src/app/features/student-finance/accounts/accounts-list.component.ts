@@ -292,7 +292,11 @@ import { ReceiptCreateModalComponent } from '../receipts/receipt-create-modal.co
               @for (s of scholarships(); track s.id) {
                 <div class="sub-row"><span><strong>{{ s.name }}</strong></span>
                   <span>{{ s.amount_percentage > 0 ? s.amount_percentage + '%' : (s.fixed_amount | number:'1.0-0') + ' ج.س' }}</span>
-                  <span class="badge" [class.ok]="s.status==='approved'">{{ s.status === 'approved' ? 'نشطة' : s.status }}</span></div>
+                  <span class="badge" [class.ok]="s.status==='approved'" [class.warn]="s.status==='cancelled'">{{ s.status === 'approved' ? 'نشطة' : (s.status === 'cancelled' ? 'ملغاة' : s.status) }}</span>
+                  @if (s.status === 'approved') {
+                    <button class="btn danger xs" (click)="cancelScholarship(a, s)">إلغاء وعكس</button>
+                  }
+                </div>
               } @empty { <div class="empty sm">لا توجد منح.</div> }
             }
             @if (tab() === 'holds') {
@@ -697,6 +701,20 @@ export class SfAccountsListComponent implements OnInit {
         this.refreshAfter(a);
       },
       error: (e) => { this.busy.set(false); this.notify.error(e?.error?.message || 'تعذّر اعتماد التخفيض.'); },
+    });
+  }
+  cancelScholarship(a: any, s: any) {
+    this.busy.set(true);
+    this.svc.cancelScholarship(s.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.notify.success(`تم إلغاء المنحة «${s.name}» وعكس الخصم واستعادة رصيد الفاتورة بنجاح.`);
+        this.refreshAfter(a);
+      },
+      error: (e) => {
+        this.busy.set(false);
+        this.notify.error(e?.error?.message || 'تعذّر إلغاء المنحة.');
+      }
     });
   }
   applyHold(a: any) {

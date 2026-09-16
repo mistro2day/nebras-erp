@@ -860,6 +860,80 @@ class ScholarshipService:
 
         return scholarship
 
+    @classmethod
+    @db_atomic
+    def cancel_scholarship(cls, tenant_id, scholarship_id, user_id=None):
+        """
+        إلغاء المنحة الدراسية وعكس الخصم المالي المترتب عليها وإعادة رصيد الفاتورة والمستحقات وحساب الطالب.
+        """
+        scholarship = Scholarship.objects.get(id=scholarship_id, tenant_id=tenant_id)
+        account = scholarship.student_billing_account
+
+        # البحث عن الخصومات المرتبطة بهذه المنحة في فواتير هذا الحساب
+        linked_discounts = InvoiceDiscount.objects.filter(
+            tenant_id=tenant_id,
+            invoice__student_billing_account=account,
+            discount_reason__icontains=scholarship.name
+        )
+
+        total_reversed = Decimal('0.0')
+        for disc in linked_discounts:
+            inv = disc.invoice
+            disc_amt = disc.amount
+            total_reversed += disc_amt
+            disc.delete()
+
+            # إعادة الرصيد إلى الفاتورة
+            inv.outstanding_amount += disc_amt
+            if inv.paid_amount == Decimal('0.0'):
+                inv.total_amount += disc_amt
+                inv.save(update_fields=['total_amount', 'outstanding_amount'])
+            else:
+                inv.save(update_fields=['outstanding_amount'])
+
+            # تحديث المستحقات
+            receivable = StudentReceivable.objects.filter(tenant_id=tenant_id, invoice=inv).first()
+            if receivable:
+                receivable.outstanding_amount = inv.outstanding_amount
+                if inv.paid_amount == Decimal('0.0'):
+                    receivable.amount = inv.total_amount
+                receivable.status = 'outstanding'
+                receivable.save(update_fields=['amount', 'outstanding_amount', 'status'])
+
+        # إعادة الأقساط إذا وُجدت
+        if total_reversed > Decimal('0.0'):
+            unpaid_installments = Installment.objects.filter(
+                tenant_id=tenant_id,
+                installment_plan__student_billing_account=account,
+                status__in=['pending', 'due', 'overdue', 'paid']
+            ).order_by('due_date')
+
+            if unpaid_installments.exists():
+                inst_count = unpaid_installments.count()
+                portion_rev = (total_reversed / Decimal(str(inst_count))).quantize(Decimal('0.01'))
+                for inst in unpaid_installments:
+                    inst.outstanding_amount += portion_rev
+                    inst.amount += portion_rev
+                    if inst.status == 'paid' and inst.outstanding_amount > 0:
+                        inst.status = 'pending'
+                    inst.save(update_fields=['amount', 'outstanding_amount', 'status'])
+
+        # تحديث رصيد الحساب المالي الإجمالي
+        all_invoices = StudentInvoice.objects.filter(
+            tenant_id=tenant_id,
+            student_billing_account=account,
+            status__in=['posted', 'draft']
+        )
+        total_remaining = all_invoices.aggregate(s=Sum('outstanding_amount'))['s'] or Decimal('0.0')
+        account.outstanding_balance = total_remaining
+        account.current_balance = total_remaining
+        account.save(update_fields=['outstanding_balance', 'current_balance'])
+
+        scholarship.status = 'cancelled'
+        scholarship.save(update_fields=['status'])
+
+        return scholarship
+
 
 # ============================================================
 # 4. Hold Service — خدمة إدارة الحظر المالي للطلاب

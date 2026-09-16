@@ -286,6 +286,9 @@ export class StudentFinanceService {
   applyScholarshipApi(body: { billing_account_id: string; name: string; type: string; amount_percentage?: number; fixed_amount?: number; start_date: string; end_date?: string }): Observable<any> {
     return this.api.post('student-finance/scholarships/apply-scholarship/', body);
   }
+  cancelScholarship(scholarshipId: string): Observable<any> {
+    return this.api.post(`student-finance/scholarships/${scholarshipId}/cancel/`, {});
+  }
   applyHoldApi(body: { billing_account_id: string; hold_type: string; reason: string }): Observable<any> {
     return this.api.post('student-finance/financial-holds/apply-hold/', body);
   }

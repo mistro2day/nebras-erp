@@ -499,6 +499,17 @@ class ScholarshipViewSet(BaseCRUDViewSet):
         serializer = self.get_serializer(sc)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel_scholarship(self, request, pk=None):
+        tenant_id = request.tenant_id
+        sc = ScholarshipService.cancel_scholarship(
+            tenant_id=tenant_id,
+            scholarship_id=pk,
+            user_id=request.user.id if request.user else None
+        )
+        serializer = self.get_serializer(sc)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class ScholarshipRuleViewSet(BaseCRUDViewSet):
     model_class = ScholarshipRule
