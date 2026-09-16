@@ -142,6 +142,25 @@ class InvoiceItem(CombinedSharedModel):
         db_table = 'nebras_student_invoice_items'
         verbose_name = "بند الفاتورة"
         verbose_name_plural = "بنود الفواتير"
+        base_manager_name = 'objects'
+
+    def save(self, *args, **kwargs):
+        # منع تكرار نفس بند الرسوم لنفس الفاتورة — في حال وجوده يتم تحديث قيمته بدلاً من إدراج بند مكرر
+        if not self.pk and self.invoice_id and self.fee_type_id:
+            existing = InvoiceItem.objects.filter(
+                invoice_id=self.invoice_id,
+                fee_type_id=self.fee_type_id,
+                deleted_at__isnull=True
+            ).first()
+            if existing:
+                existing.amount = self.amount
+                if self.description:
+                    existing.description = self.description
+                existing.save(update_fields=['amount', 'description', 'updated_at'])
+                self.pk = existing.pk
+                self.id = existing.id
+                return
+        super().save(*args, **kwargs)
 
 
 # 9. InvoiceAdjustment (تسويات الفواتير)

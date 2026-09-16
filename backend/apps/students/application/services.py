@@ -176,7 +176,17 @@ class StudentApplicationService:
                 
         # 6b. إنشاء التسجيل الدراسي وتعيين الفصل / الشعبة
         if applicant.academic_year_id and applicant.applying_grade_id:
-            branch = resolve_branch_for_gender(tenant_id, applicant.gender)
+            branch_id_override = financial_config.get('branch_id') if financial_config else None
+            branch = None
+            if branch_id_override:
+                try:
+                    from apps.organization.domain.models import Branch
+                    branch = Branch.objects.filter(tenant_id=tenant_id, id=uuid.UUID(str(branch_id_override))).first()
+                except Exception:
+                    branch = None
+            if not branch:
+                branch = resolve_branch_for_gender(tenant_id, applicant.gender)
+
             chosen_section_id = (financial_config.get('section_id') if financial_config else None) or applicant.applying_section_id
             if chosen_section_id:
                 try:
@@ -190,7 +200,7 @@ class StudentApplicationService:
                 academic_year_id=applicant.academic_year_id,
                 grade_id=applicant.applying_grade_id,
                 section_id=chosen_section_id,
-                branch_id=branch.id,
+                branch_id=branch.id if branch else None,
                 enrollment_date=datetime.date.today(),
                 enrollment_type='new',
                 status='active',
@@ -302,15 +312,39 @@ class StudentApplicationService:
         )
 
         # 4b. تسكين الطالب دراسياً إن توفرت البيانات الأكاديمية
-        if academic_data and academic_data.get('grade_id') and academic_data.get('academic_year_id'):
-            branch = resolve_branch_for_gender(tenant_id, profile_data.get('gender', 'male'))
+        gender = profile_data.get('gender', 'male')
+        branch_id_override = (academic_data or {}).get('branch_id') or (financial_config or {}).get('branch_id')
+        branch = None
+        if branch_id_override:
+            try:
+                from apps.organization.domain.models import Branch
+                branch = Branch.objects.filter(tenant_id=tenant_id, id=uuid.UUID(str(branch_id_override))).first()
+            except Exception:
+                branch = None
+        if not branch:
+            branch = resolve_branch_for_gender(tenant_id, gender)
+
+        ac_year_id = (academic_data or {}).get('academic_year_id')
+        grade_id = (academic_data or {}).get('grade_id')
+        section_id = (academic_data or {}).get('section_id')
+
+        # استنتاج العام الأكاديمي النشط تلقائياً إن لم يُمرر صراحة
+        if not ac_year_id:
+            from apps.academics.domain.models import AcademicYear
+            active_year = AcademicYear.objects.filter(tenant_id=tenant_id, is_active=True).first()
+            if not active_year:
+                active_year = AcademicYear.objects.filter(tenant_id=tenant_id).order_by('-start_date').first()
+            if active_year:
+                ac_year_id = active_year.id
+
+        if ac_year_id and grade_id:
             StudentEnrollment.objects.create(
                 tenant_id=tenant_id,
                 student=student,
-                academic_year_id=uuid.UUID(str(academic_data['academic_year_id'])),
-                grade_id=uuid.UUID(str(academic_data['grade_id'])),
-                section_id=uuid.UUID(str(academic_data['section_id'])) if academic_data.get('section_id') else None,
-                branch_id=branch.id,
+                academic_year_id=uuid.UUID(str(ac_year_id)),
+                grade_id=uuid.UUID(str(grade_id)),
+                section_id=uuid.UUID(str(section_id)) if section_id else None,
+                branch_id=branch.id if branch else None,
                 enrollment_date=datetime.date.today(),
                 enrollment_type='new',
                 status='active',
@@ -319,13 +353,13 @@ class StudentApplicationService:
         
         # 5. معالجة الإعدادات المالية والأقساط والإيصالات
         if financial_config:
-            grade_id = academic_data.get('grade_id') if academic_data else None
-            academic_year_id = academic_data.get('academic_year_id') if academic_data else None
+            fin_grade_id = grade_id or (academic_data.get('grade_id') if academic_data else None)
+            fin_ac_year_id = ac_year_id or (academic_data.get('academic_year_id') if academic_data else None)
             cls.process_student_registration_finance(
                 tenant_id=tenant_id,
                 student_id=student.id,
-                grade_id=uuid.UUID(str(grade_id)) if grade_id else None,
-                academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else None,
+                grade_id=uuid.UUID(str(fin_grade_id)) if fin_grade_id else None,
+                academic_year_id=uuid.UUID(str(fin_ac_year_id)) if fin_ac_year_id else None,
                 financial_config=financial_config,
                 user_id=user_id
             )
@@ -390,9 +424,9 @@ class StudentApplicationService:
         # البحث عن فاتورة قائمة أو إنشاء فاتورة جديدة
         invoice = StudentInvoice.objects.filter(tenant_id=tenant_id, student_billing_account=account).first()
         if invoice:
-            # تنظيف البنود والخصومات القديمة لإعادة بنائها بالقيم المعدلة بدقة ودون تكرار
-            invoice.items.all().delete()
-            invoice.discounts.all().delete()
+            # تنظيف تام وحاسم للبنود والخصومات السابقة لمنع أي تراكم أو تكرار لبنود الفاتورة
+            InvoiceItem.all_objects.filter(invoice=invoice).delete()
+            InvoiceDiscount.all_objects.filter(invoice=invoice).delete()
         else:
             inv_seq = StudentInvoice.objects.filter(tenant_id=tenant_id).count() + 1
             inv_num = f"INV-{timezone.now().year}-{inv_seq:04d}"
@@ -417,20 +451,26 @@ class StudentApplicationService:
         invoice.outstanding_amount = max(Decimal('0.0'), final_total - invoice.paid_amount)
         invoice.save()
 
-        # إضافة البنود
+        # إضافة البنود مع ضمان عدم التكرار الصارم عبر update_or_create
         if reg_fee > 0:
             reg_type = FeeType.objects.filter(tenant_id=tenant_id, code='registration').first()
             if not reg_type:
                 cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='registration', defaults={'name_ar': 'رسوم التسجيل', 'name_en': 'Registration'})
                 reg_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='registration', name_ar='رسوم التسجيل والقبول', name_en='Registration & Admission')
-            InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=reg_type, amount=reg_fee, description='رسوم التسجيل والقبول المعدلة')
+            InvoiceItem.objects.update_or_create(
+                tenant_id=tenant_id, invoice=invoice, fee_type=reg_type,
+                defaults={'amount': reg_fee, 'description': 'رسوم التسجيل والقبول'}
+            )
 
         if tuition_fee > 0:
             tuition_type = FeeType.objects.filter(tenant_id=tenant_id, code='tuition_annual').first()
             if not tuition_type:
                 cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='tuition', defaults={'name_ar': 'الرسوم الدراسية', 'name_en': 'Tuition'})
                 tuition_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='tuition_annual', name_ar='الرسوم الدراسية السنوية', name_en='Annual Tuition')
-            InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=tuition_type, amount=tuition_fee, description='الرسوم الدراسية السنوية المعدلة')
+            InvoiceItem.objects.update_or_create(
+                tenant_id=tenant_id, invoice=invoice, fee_type=tuition_type,
+                defaults={'amount': tuition_fee, 'description': 'الرسوم الدراسية السنوية'}
+            )
 
         for c_item in custom_items:
             c_name = c_item.get('name', 'رسوم مخصصة')
@@ -440,7 +480,10 @@ class StudentApplicationService:
                 if not generic_type:
                     cat, _ = FeeCategory.objects.get_or_create(tenant_id=tenant_id, code='activities', defaults={'name_ar': 'أنشطة ورسوم أخرى', 'name_en': 'Activities'})
                     generic_type = FeeType.objects.create(tenant_id=tenant_id, fee_category=cat, code='activities', name_ar='رسوم أخرى', name_en='Other Fees')
-                InvoiceItem.objects.create(tenant_id=tenant_id, invoice=invoice, fee_type=generic_type, amount=c_amt, description=c_name)
+                InvoiceItem.objects.update_or_create(
+                    tenant_id=tenant_id, invoice=invoice, fee_type=generic_type,
+                    defaults={'amount': c_amt, 'description': c_name}
+                )
 
         if discount_amt > 0:
             InvoiceDiscount.objects.create(

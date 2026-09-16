@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StudentsService } from '../students.service';
@@ -160,6 +160,15 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   </div>
 
                   <div class="field">
+                    <label>الفرع المدرسي (تحديد تلقائي)</label>
+                    <div class="branch-badge-auto">
+                      <span class="branch-icon">{{ a.gender === 'male' ? '👦' : '👧' }}</span>
+                      <span class="branch-text">{{ selectedBranchName() }}</span>
+                      <span class="auto-badge">تلقائي ({{ a.gender === 'male' ? 'بنين' : 'بنات' }})</span>
+                    </div>
+                  </div>
+
+                  <div class="field">
                     <label>الفصل الدراسي (توزيع فوري)</label>
                     <select [ngModel]="selectedSectionId()" (ngModelChange)="selectedSectionId.set($event)" class="section-select-control">
                       <option value="">{{ availableSections().length > 0 ? '-- اختر الفصل لتسكين الطالب --' : '-- لا توجد فصول معرفة لهذا الصف حالياً --' }}</option>
@@ -213,10 +222,18 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                 </div>
                 <div class="field">
                   <label>الجنس</label>
-                  <select [(ngModel)]="personalForm.gender" name="gender">
+                  <select [ngModel]="personalForm.gender" (ngModelChange)="onGenderChange($event)" name="gender">
                     <option value="male">ذكر</option>
                     <option value="female">أنثى</option>
                   </select>
+                </div>
+                <div class="field">
+                  <label>الفرع المدرسي (تحديد تلقائي)</label>
+                  <div class="branch-pill-manual">
+                    <span class="branch-icon">{{ personalForm.gender === 'male' ? '👦' : '👧' }}</span>
+                    <span class="branch-name">{{ selectedBranchName() }}</span>
+                    <span class="auto-tag">تلقائي ({{ personalForm.gender === 'male' ? 'بنين' : 'بنات' }})</span>
+                  </div>
                 </div>
                 <div class="field">
                   <label>تاريخ الميلاد</label>
@@ -250,6 +267,28 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                     <option value="O-">O-</option>
                     <option value="AB+">AB+</option>
                     <option value="AB-">AB-</option>
+                  </select>
+                </div>
+
+                <div class="field-separator full-width">
+                  <span class="sep-title">التسكين الأكاديمي المبدئي في الصف والفصل (اختياري)</span>
+                </div>
+                <div class="field">
+                  <label>الصف الدراسي</label>
+                  <select [ngModel]="manualAcademic.grade_id" (ngModelChange)="onManualGradeChange($event)" name="manual_grade">
+                    <option value="">-- اختر الصف لتسكين الطالب --</option>
+                    @for (g of grades(); track g.id) {
+                      <option [value]="g.id">{{ g.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field">
+                  <label>الفصل الدراسي</label>
+                  <select [(ngModel)]="manualAcademic.section_id" name="manual_section" [disabled]="!manualAcademic.grade_id">
+                    <option value="">{{ manualAvailableSections().length > 0 ? '-- اختر الفصل --' : (manualAcademic.grade_id ? '-- لا توجد فصول معرفة --' : '-- اختر الصف أولاً --') }}</option>
+                    @for (s of manualAvailableSections(); track s.id) {
+                      <option [value]="s.id">{{ s.name }} (السعة: {{ s.capacity }})</option>
+                    }
                   </select>
                 </div>
               </div>
@@ -611,12 +650,65 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
       }
       .distribution-controls {
         display: grid;
-        grid-template-columns: 1fr 2fr;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 14px;
         background: var(--nb-surface);
         border: 1px solid var(--nb-border);
         border-radius: var(--nb-radius);
         padding: 12px 16px;
+      }
+      .branch-badge-auto {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        background: rgba(16, 185, 129, 0.08);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-radius: var(--nb-radius);
+        font-weight: 700;
+        font-size: 13px;
+        color: #065f46;
+      }
+      .auto-badge {
+        font-size: 11px;
+        background: #10b981;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+        margin-right: auto;
+      }
+      .branch-pill-manual {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        background: var(--nb-surface-raised);
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--nb-primary-700);
+      }
+      .branch-pill-manual .auto-tag {
+        font-size: 10.5px;
+        background: rgba(37, 99, 235, 0.1);
+        color: var(--nb-primary-600);
+        padding: 2px 7px;
+        border-radius: 10px;
+        margin-right: auto;
+      }
+      .field-separator {
+        border-top: 1px dashed var(--nb-border);
+        margin: 10px 0 5px;
+        padding-top: 10px;
+      }
+      .sep-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--nb-text-secondary);
       }
       .field-badge-value {
         height: 36px;
@@ -671,6 +763,31 @@ export class StudentCreateComponent implements OnInit {
   errorMessage = signal('');
   financialConfig = signal<FinancialConfig | null>(null);
 
+  // الفروع والتسكين الأكاديمي
+  branches = signal<any[]>([]);
+  selectedBranchId = signal<string>('');
+  grades = signal<any[]>([]);
+
+  // اسم الفرع المحدد تلقائياً بناءً على جنس الطالب
+  selectedBranchName = computed(() => {
+    const id = this.selectedBranchId();
+    const branch = this.branches().find(b => b.id === id);
+    if (branch) {
+      return branch.name_ar || branch.name;
+    }
+    const gender = this.regMode() === 'admission' 
+      ? (this.selectedApplicant()?.gender || 'male')
+      : (this.personalForm.gender || 'male');
+    return gender === 'male' ? 'فرع البنين' : 'فرع البنات';
+  });
+
+  // التسكين الأكاديمي للنموذج اليدوي
+  manualAcademic = {
+    grade_id: '',
+    section_id: '',
+  };
+  manualAvailableSections = signal<any[]>([]);
+
   // حقول النموذج اليدوي
   personalForm = {
     arabic_name: '',
@@ -693,7 +810,77 @@ export class StudentCreateComponent implements OnInit {
   };
 
   ngOnInit() {
+    this.loadBranches();
     this.loadAcceptedApplicants();
+    this.loadGrades();
+  }
+
+  loadBranches() {
+    this.studentsService.getBranches().subscribe({
+      next: (res) => {
+        const list = res?.data?.results || res?.data || res || [];
+        this.branches.set(Array.isArray(list) ? list : []);
+        const currentGender = this.selectedApplicant()?.gender || this.personalForm.gender || 'male';
+        this.autoSelectBranch(currentGender);
+      },
+      error: () => {}
+    });
+  }
+
+  loadGrades() {
+    this.admissionsService.getGrades().subscribe({
+      next: (res) => {
+        const list = res?.data?.results || res?.data || res || [];
+        this.grades.set(Array.isArray(list) ? list : []);
+      },
+      error: () => {}
+    });
+  }
+
+  /**
+   * التحديد التلقائي لفرع البنين للذكور وفرع البنات للإناث
+   */
+  autoSelectBranch(gender: string) {
+    const list = this.branches();
+    if (!list || list.length === 0) return;
+    const isMale = gender === 'male';
+    const targetType = isMale ? 'boys' : 'girls';
+    const targetCode = isMale ? 'BR-BOYS' : 'BR-GIRLS';
+    const targetWord = isMale ? 'بنين' : 'بنات';
+
+    const matched = list.find((b: any) => 
+      b.school_gender_type === targetType ||
+      (b.code && b.code.toUpperCase().includes(targetCode)) ||
+      (b.name_ar && b.name_ar.includes(targetWord)) ||
+      (b.name && b.name.includes(targetWord))
+    ) || list[0];
+
+    if (matched) {
+      this.selectedBranchId.set(matched.id);
+    }
+  }
+
+  onGenderChange(newGender: string) {
+    this.personalForm.gender = newGender;
+    this.autoSelectBranch(newGender);
+  }
+
+  onManualGradeChange(gradeId: string) {
+    this.manualAcademic.grade_id = gradeId;
+    this.manualAcademic.section_id = '';
+    if (!gradeId) {
+      this.manualAvailableSections.set([]);
+      return;
+    }
+    this.admissionsService.getSections(gradeId).subscribe({
+      next: (res) => {
+        let secs = res?.data?.results || res?.data || res || [];
+        if (Array.isArray(secs)) {
+          secs = secs.filter((s: any) => s.grade === gradeId || s.grade_id === gradeId || s.grade?.id === gradeId);
+        }
+        this.manualAvailableSections.set(secs as any[]);
+      }
+    });
   }
 
   loadAcceptedApplicants() {
@@ -715,6 +902,9 @@ export class StudentCreateComponent implements OnInit {
     this.selectedApplicant.set(null);
     this.selectedSectionId.set('');
     this.availableSections.set([]);
+    if (mode === 'manual') {
+      this.autoSelectBranch(this.personalForm.gender || 'male');
+    }
   }
 
   getInitials(name?: string): string {
@@ -730,6 +920,7 @@ export class StudentCreateComponent implements OnInit {
     const applicant = this.applicants().find(a => a.id === id);
     this.selectedApplicant.set(applicant || null);
     if (applicant) {
+      this.autoSelectBranch(applicant.gender || 'male');
       this.selectedSectionId.set(applicant.applying_section_id || '');
       const gradeId = applicant.applying_grade_id || applicant.grade_id;
       this.admissionsService.getSections(gradeId).subscribe({
@@ -754,6 +945,7 @@ export class StudentCreateComponent implements OnInit {
     this.submitting.set(true);
     const config = {
       ...(this.financialConfig() || {}),
+      branch_id: this.selectedBranchId() || null,
       section_id: this.selectedSectionId() || null
     };
 
@@ -762,7 +954,7 @@ export class StudentCreateComponent implements OnInit {
         this.submitting.set(false);
         const studentId = res?.data?.id || res?.id;
         if (studentId) {
-          this.snack.open('تم تسجيل الطالب وتسكينه في الفصل وإصدار السندات بنجاح!', 'إغلاق', { duration: 5000 });
+          this.snack.open('تم تسجيل الطالب وتسكينه في الفرع والفصل بنجاح!', 'إغلاق', { duration: 5000 });
           this.router.navigate(['/students/details', studentId]);
         } else {
           this.snack.open('تم تسجيل الطالب بنجاح.', 'إغلاق', { duration: 4000 });
@@ -809,7 +1001,15 @@ export class StudentCreateComponent implements OnInit {
         doctor: this.medicalForm.doctor,
         medical_notes: this.medicalForm.medical_notes
       },
-      financial_config: this.financialConfig()
+      academic_data: {
+        branch_id: this.selectedBranchId() || null,
+        grade_id: this.manualAcademic.grade_id || null,
+        section_id: this.manualAcademic.section_id || null
+      },
+      financial_config: {
+        ...(this.financialConfig() || {}),
+        branch_id: this.selectedBranchId() || null
+      }
     };
 
     this.studentsService.createStudent(payload).subscribe({
@@ -817,7 +1017,7 @@ export class StudentCreateComponent implements OnInit {
         this.submitting.set(false);
         const studentId = res?.data?.id || res?.id;
         if (studentId) {
-          this.snack.open('تم حفظ وتسجيل الطالب يدوياً بنجاح!', 'إغلاق', { duration: 5000 });
+          this.snack.open('تم حفظ وتسجيل الطالب يدوياً وتسكينه في الفرع بنجاح!', 'إغلاق', { duration: 5000 });
           this.router.navigate(['/students/details', studentId]);
         } else {
           this.snack.open('تم حفظ الطالب بنجاح.', 'إغلاق', { duration: 4000 });

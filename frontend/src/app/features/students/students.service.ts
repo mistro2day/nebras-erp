@@ -286,6 +286,11 @@ export class StudentsService {
     return this.apiClient.post('students/students/', studentData);
   }
 
+  /** جلب فروع المدرسة التابعة للمستأجر (بنين / بنات) */
+  getBranches(): Observable<any> {
+    return this.apiClient.get('organization/branches/');
+  }
+
   uploadPhoto(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);

@@ -2405,10 +2405,14 @@ export class StudentDetailsComponent implements OnInit {
   getInvoiceGross(inv: any): number {
     const net = Number(inv?.total_amount) || 0;
     const disc = this.getInvoiceDiscount(inv);
+    // القيمة المعتمدة الأساسية لإجمالي الفاتورة هي (صافي الفاتورة + الخصم المعتمد) لمطابقة القيود والأرصدة
+    if (net > 0) {
+      return net + disc;
+    }
     if (inv?.items && Array.isArray(inv.items) && inv.items.length > 0) {
       return inv.items.reduce((sum: number, it: any) => sum + (Number(it.amount) || 0), 0);
     }
-    return net + disc;
+    return 0;
   }
 
   studentVisits = signal<any[]>([]);
