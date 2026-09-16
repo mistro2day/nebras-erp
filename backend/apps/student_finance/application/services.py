@@ -818,21 +818,20 @@ class ScholarshipService:
         if total_discount_applied > Decimal('0.0'):
             unpaid_installments = Installment.objects.filter(
                 tenant_id=tenant_id,
-                installment_plan__student_billing_account=account,
-                status__in=['pending', 'due', 'overdue'],
-                outstanding_amount__gt=Decimal('0.0')
+                student_billing_account=account,
+                status__in=['pending', 'overdue']
             ).order_by('due_date')
 
             if unpaid_installments.exists():
                 inst_count = unpaid_installments.count()
                 portion_disc = (total_discount_applied / Decimal(str(inst_count))).quantize(Decimal('0.01'))
                 for inst in unpaid_installments:
-                    new_outstanding = max(Decimal('0.0'), inst.outstanding_amount - portion_disc)
-                    inst.outstanding_amount = new_outstanding
-                    inst.amount = max(Decimal('0.0'), inst.amount - portion_disc)
-                    if new_outstanding <= Decimal('0.0'):
+                    rem_due = max(Decimal('0.0'), inst.amount - inst.paid_amount)
+                    new_rem = max(Decimal('0.0'), rem_due - portion_disc)
+                    inst.amount = inst.paid_amount + new_rem
+                    if new_rem <= Decimal('0.0'):
                         inst.status = 'paid'
-                    inst.save(update_fields=['amount', 'outstanding_amount', 'status'])
+                    inst.save(update_fields=['amount', 'status'])
 
         # 4. تحديث رصيد حساب الطالب المالي الإجمالي
         all_invoices = StudentInvoice.objects.filter(
@@ -904,19 +903,18 @@ class ScholarshipService:
         if total_reversed > Decimal('0.0'):
             unpaid_installments = Installment.objects.filter(
                 tenant_id=tenant_id,
-                installment_plan__student_billing_account=account,
-                status__in=['pending', 'due', 'overdue', 'paid']
+                student_billing_account=account,
+                status__in=['pending', 'overdue', 'paid']
             ).order_by('due_date')
 
             if unpaid_installments.exists():
                 inst_count = unpaid_installments.count()
                 portion_rev = (total_reversed / Decimal(str(inst_count))).quantize(Decimal('0.01'))
                 for inst in unpaid_installments:
-                    inst.outstanding_amount += portion_rev
                     inst.amount += portion_rev
-                    if inst.status == 'paid' and inst.outstanding_amount > 0:
+                    if inst.status == 'paid' and inst.amount > inst.paid_amount:
                         inst.status = 'pending'
-                    inst.save(update_fields=['amount', 'outstanding_amount', 'status'])
+                    inst.save(update_fields=['amount', 'status'])
 
         # تحديث رصيد الحساب المالي الإجمالي
         all_invoices = StudentInvoice.objects.filter(
