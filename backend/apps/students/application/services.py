@@ -387,12 +387,13 @@ class StudentApplicationService:
         discount_reason = financial_config.get('discount_reason', 'خصم مالي مخصص')
         custom_items = financial_config.get('custom_fee_items', []) or []
 
-        # البحث عن فاتورة قائمة أو إحلال فاتورة مسودة
+        # البحث عن فاتورة قائمة أو إنشاء فاتورة جديدة
         invoice = StudentInvoice.objects.filter(tenant_id=tenant_id, student_billing_account=account).first()
-        if invoice and invoice.status == 'draft':
+        if invoice:
+            # تنظيف البنود والخصومات القديمة لإعادة بنائها بالقيم المعدلة بدقة ودون تكرار
             invoice.items.all().delete()
             invoice.discounts.all().delete()
-        elif not invoice:
+        else:
             inv_seq = StudentInvoice.objects.filter(tenant_id=tenant_id).count() + 1
             inv_num = f"INV-{timezone.now().year}-{inv_seq:04d}"
             invoice = StudentInvoice.objects.create(

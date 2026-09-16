@@ -737,23 +737,115 @@ class ScholarshipService:
     @db_atomic
     def apply_scholarship(cls, tenant_id, billing_account_id, name, scholarship_type, amount_percentage, fixed_amount, start_date, end_date=None, user_id=None):
         """
-        إضافة منحة جديدة للطالب وتفعيلها بمجرد الاعتماد.
+        إضافة منحة جديدة للطالب وتفعيلها واعتماد خصمها فوراً على الفواتير المفتوحة والأقساط وحساب الطالب.
         """
         account = StudentBillingAccount.objects.get(id=billing_account_id, tenant_id=tenant_id)
         
+        amount_percentage = Decimal(str(amount_percentage or 0))
+        fixed_amount = Decimal(str(fixed_amount or 0))
+
         scholarship = Scholarship.objects.create(
             tenant_id=tenant_id,
             student_billing_account=account,
             name=name,
             type=scholarship_type,
-            amount_percentage=Decimal(str(amount_percentage)),
-            fixed_amount=Decimal(str(fixed_amount)),
-            status='approved',  # يفترض الاعتماد التلقائي أو استهلاك مسار العمل
-            start_date=start_date,
+            amount_percentage=amount_percentage,
+            fixed_amount=fixed_amount,
+            status='approved',
+            start_date=start_date or date.today(),
             end_date=end_date
         )
 
-        # إطلاق حدث منصة الاتصالات
+        # 2. تطبيق الخصم فورياً على الفواتير القائمة المفتوحة للطالب
+        open_invoices = StudentInvoice.objects.filter(
+            tenant_id=tenant_id,
+            student_billing_account=account,
+            status__in=['posted', 'draft'],
+            outstanding_amount__gt=Decimal('0.0')
+        ).order_by('issue_date', 'id')
+
+        total_discount_applied = Decimal('0.0')
+
+        for inv in open_invoices:
+            # حساب الخصم
+            if amount_percentage > Decimal('0.0'):
+                # حساب إجمالي الفاتورة الأساسي قبل الخصومات السابقة إن وجدت
+                existing_disc = inv.discounts.aggregate(s=Sum('amount'))['s'] or Decimal('0.0')
+                gross_base = inv.total_amount + existing_disc
+                if gross_base <= Decimal('0.0'):
+                    gross_base = inv.outstanding_amount
+                disc_amount = (gross_base * (amount_percentage / Decimal('100.0'))).quantize(Decimal('0.01'))
+            else:
+                disc_amount = fixed_amount.quantize(Decimal('0.01'))
+
+            # لا يتجاوز الخصم الرصيد المستحق على الفاتورة
+            disc_amount = min(disc_amount, inv.outstanding_amount)
+
+            if disc_amount > Decimal('0.0'):
+                # إنشاء سجل الخصم الرسمي في الفاتورة
+                InvoiceDiscount.objects.create(
+                    tenant_id=tenant_id,
+                    invoice=inv,
+                    discount_type='percentage' if amount_percentage > Decimal('0.0') else 'fixed',
+                    amount=disc_amount,
+                    discount_reason=f"منحة معتمدة: {name}"
+                )
+
+                # تحديث مبالغ الفاتورة
+                inv.outstanding_amount = max(Decimal('0.0'), inv.outstanding_amount - disc_amount)
+                if inv.paid_amount == Decimal('0.0'):
+                    inv.total_amount = max(Decimal('0.0'), inv.total_amount - disc_amount)
+                    inv.save(update_fields=['total_amount', 'outstanding_amount'])
+                else:
+                    inv.save(update_fields=['outstanding_amount'])
+
+                total_discount_applied += disc_amount
+
+                # تحديث سجل المستحقات StudentReceivable
+                receivable = StudentReceivable.objects.filter(
+                    tenant_id=tenant_id,
+                    invoice=inv
+                ).first()
+                if receivable:
+                    receivable.outstanding_amount = inv.outstanding_amount
+                    if inv.paid_amount == Decimal('0.0'):
+                        receivable.amount = inv.total_amount
+                    if receivable.outstanding_amount <= Decimal('0.0'):
+                        receivable.status = 'settled'
+                    receivable.save(update_fields=['amount', 'outstanding_amount', 'status'])
+
+        # 3. إعادة جدولة وتخفيض الأقساط المتبقية غير المسددة
+        if total_discount_applied > Decimal('0.0'):
+            unpaid_installments = Installment.objects.filter(
+                tenant_id=tenant_id,
+                installment_plan__student_billing_account=account,
+                status__in=['pending', 'due', 'overdue'],
+                outstanding_amount__gt=Decimal('0.0')
+            ).order_by('due_date')
+
+            if unpaid_installments.exists():
+                inst_count = unpaid_installments.count()
+                portion_disc = (total_discount_applied / Decimal(str(inst_count))).quantize(Decimal('0.01'))
+                for inst in unpaid_installments:
+                    new_outstanding = max(Decimal('0.0'), inst.outstanding_amount - portion_disc)
+                    inst.outstanding_amount = new_outstanding
+                    inst.amount = max(Decimal('0.0'), inst.amount - portion_disc)
+                    if new_outstanding <= Decimal('0.0'):
+                        inst.status = 'paid'
+                    inst.save(update_fields=['amount', 'outstanding_amount', 'status'])
+
+        # 4. تحديث رصيد حساب الطالب المالي الإجمالي
+        all_invoices = StudentInvoice.objects.filter(
+            tenant_id=tenant_id,
+            student_billing_account=account,
+            status__in=['posted', 'draft']
+        )
+        total_remaining = all_invoices.aggregate(s=Sum('outstanding_amount'))['s'] or Decimal('0.0')
+        account.outstanding_balance = total_remaining
+        account.current_balance = total_remaining
+        account.save(update_fields=['outstanding_balance', 'current_balance'])
+
+        # 5. إطلاق حدث منصة الاتصالات
         EventBusConsumer.publish(
             tenant_id=tenant_id,
             event_type='ScholarshipApproved',
@@ -761,7 +853,8 @@ class ScholarshipService:
             event_data={
                 'scholarship_id': str(scholarship.id),
                 'student_id': str(account.student_id),
-                'name': name
+                'name': name,
+                'discount_applied': float(total_discount_applied)
             }
         )
 

@@ -664,7 +664,13 @@ export class SfAccountsListComponent implements OnInit {
   applyScholarship(a: any) {
     this.busy.set(true);
     this.svc.applyScholarshipApi({ billing_account_id: a.id, name: this.schForm.name, type: this.schForm.type, amount_percentage: +this.schForm.amount_percentage || 0, start_date: new Date().toISOString().slice(0, 10) }).subscribe({
-      next: () => { this.busy.set(false); this.notify.success('تم اعتماد المنحة.'); this.pane.set(''); this.tab.set('scholarships'); this.refreshAfter(a); },
+      next: (res: any) => {
+        this.busy.set(false);
+        this.notify.success('تم اعتماد المنحة وتطبيق الخصم على الفاتورة والحساب المالي بنجاح.');
+        this.pane.set('');
+        this.tab.set('discounts');
+        this.refreshAfter(a);
+      },
       error: (e) => { this.busy.set(false); this.notify.error(e?.error?.message || 'تعذّر اعتماد المنحة.'); },
     });
   }
