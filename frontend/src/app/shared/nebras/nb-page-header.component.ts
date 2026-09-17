@@ -26,14 +26,14 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
       .nb-ph {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
         margin-bottom: 16px;
       }
-      .nb-ph-text { display: flex; flex-direction: column; gap: 4px; }
+      .nb-ph-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
       .nb-ph-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--nb-text); }
       .nb-ph-sub { margin: 0; font-size: 12px; color: var(--nb-text-muted); }
-      .nb-ph-spacer { flex: 1; }
-      .nb-ph-actions { display: flex; align-items: center; gap: 8px; }
+      .nb-ph-spacer { flex: 1; min-width: 8px; }
+      .nb-ph-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     `,
   ],
 })

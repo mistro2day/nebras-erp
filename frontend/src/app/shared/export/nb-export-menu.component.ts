@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, Input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ExportColumn } from './export.types';
-import { exportCsv, exportExcel, exportPdf, printDoc } from './export.functions';
+import { exportExcel, exportPdf, printDoc } from './export.functions';
 
 /**
- * قائمة تصدير موحّدة (Excel / PDF / CSV / طباعة) — لغة تصميم نبراس، عربية RTL.
+ * قائمة تصدير موحّدة (Excel / PDF / طباعة) — لغة تصميم نبراس، عربية RTL.
  * تُوضع في ترويسة أي صفحة: <nb-export-menu [columns]="cols" [rows]="data" title="…" />
  */
 @Component({
@@ -20,17 +20,17 @@ import { exportCsv, exportExcel, exportPdf, printDoc } from './export.functions'
       <button class="nb-exp-btn pdf" [disabled]="busy()" (click)="doPdf()" title="تصدير PDF">
         <span class="ico">▦</span> PDF
       </button>
-      <button class="nb-exp-btn" (click)="doCsv()" title="تصدير CSV">CSV</button>
       @if (showPrint) {
         <button class="nb-exp-btn" (click)="doPrint()" title="طباعة"><span class="ico">🖨️</span> طباعة</button>
       }
     </div>
   `,
   styles: [`
-    .nb-exp { display: inline-flex; gap: 6px; }
+    .nb-exp { display: inline-flex; align-items: center; gap: 6px; }
     .nb-exp-btn { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px;
       font-family: var(--nb-font-family); font-size: 12px; font-weight: 600; cursor: pointer;
-      border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface-raised); color: var(--nb-text); }
+      border: 1px solid var(--nb-border); border-radius: var(--nb-radius); background: var(--nb-surface-raised); color: var(--nb-text);
+      white-space: nowrap; transition: all 0.15s ease; }
     .nb-exp-btn:hover:not(:disabled) { border-color: var(--nb-primary-400); color: var(--nb-primary-700); }
     .nb-exp-btn:disabled { opacity: .55; cursor: not-allowed; }
     .nb-exp-btn .ico { font-size: 13px; line-height: 1; }
@@ -52,7 +52,6 @@ export class NbExportMenuComponent {
 
   private meta() { return { title: this.title, subtitle: this.subtitle, filename: this.filename }; }
 
-  doCsv() { exportCsv(this.meta(), this.columns, this.rows); }
   doPrint() {
     if (this.customPrint) {
       this.customPrint();

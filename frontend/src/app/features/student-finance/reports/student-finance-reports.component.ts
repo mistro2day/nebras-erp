@@ -106,6 +106,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
             [columns]="activeExportColumns()"
             [rows]="activeExportRows()"
             [title]="activeReportTitle()"
+            [showPrint]="false"
           />
         </div>
       </nb-page-header>
@@ -742,28 +743,35 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 8px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
     }
 
     .preset-group {
       display: inline-flex;
+      align-items: center;
       background: var(--nb-surface-raised, #f3f4f6);
       border: 1px solid var(--nb-border, #e5e7eb);
       border-radius: var(--nb-radius, 8px);
       padding: 2px;
+      height: 34px;
+      box-sizing: border-box;
     }
 
     .btn-sm {
       border: none;
       background: transparent;
-      padding: 5px 12px;
+      padding: 0 10px;
+      height: 28px;
+      line-height: 28px;
       font-size: 12px;
       font-weight: 600;
       color: var(--nb-text-muted, #6b7280);
       cursor: pointer;
       border-radius: 6px;
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
     .btn-sm.active {
       background: var(--nb-surface, #ffffff);
@@ -782,10 +790,10 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     }
 
     .btn {
-      height: 36px;
-      padding: 0 14px;
+      height: 34px;
+      padding: 0 12px;
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       border-radius: var(--nb-radius, 8px);
       cursor: pointer;
@@ -796,6 +804,8 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       background: var(--nb-surface, #ffffff);
       color: var(--nb-text, #111827);
       transition: all 0.15s ease;
+      white-space: nowrap;
+      box-sizing: border-box;
     }
     .btn:hover:not(:disabled) {
       border-color: var(--nb-primary-400, #93c5fd);
