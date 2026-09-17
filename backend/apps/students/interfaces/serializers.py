@@ -346,7 +346,17 @@ class StudentEnrollmentMinimalSerializer(serializers.ModelSerializer):
 
     def get_branch_name(self, obj):
         from apps.organization.domain.models import Branch
-        return _resolve_lookup(self.context, 'branches', obj.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+        b_name = _resolve_lookup(self.context, 'branches', obj.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+        if b_name:
+            return b_name
+        # استنتاج فرع البنين أو البنات تلقائياً من جنس الطالب
+        student = getattr(obj, 'student', None)
+        gender = getattr(getattr(student, 'profile', None), 'gender', None)
+        if gender and getattr(obj, 'tenant_id', None):
+            from apps.students.application.services import resolve_branch_for_gender
+            b = resolve_branch_for_gender(obj.tenant_id, gender)
+            return (b.name_ar or b.name) if b else ('فرع البنات' if gender == 'female' else 'فرع البنين')
+        return None
 
     def get_grade_name(self, obj):
         from apps.academics.domain.models import Grade
@@ -417,6 +427,12 @@ class StudentListSerializer(serializers.ModelSerializer):
         if enr and enr.branch_id:
             from apps.organization.domain.models import Branch
             return _resolve_lookup(self.context, 'branches', enr.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+        # استنتاج فرع البنين أو البنات تلقائياً من جنس الطالب
+        gender = getattr(getattr(obj, 'profile', None), 'gender', None)
+        if gender and getattr(obj, 'tenant_id', None):
+            from apps.students.application.services import resolve_branch_for_gender
+            b = resolve_branch_for_gender(obj.tenant_id, gender)
+            return (b.name_ar or b.name) if b else ('فرع البنات' if gender == 'female' else 'فرع البنين')
         return None
 
     def get_section_name(self, obj):
@@ -494,6 +510,12 @@ class StudentSerializer(serializers.ModelSerializer):
         if enr and enr.branch_id:
             from apps.organization.domain.models import Branch
             return _resolve_lookup(self.context, 'branches', enr.branch_id, lambda: Branch, lambda b: b.name_ar or b.name)
+        # استنتاج فرع البنين أو البنات تلقائياً من جنس الطالب
+        gender = getattr(getattr(obj, 'profile', None), 'gender', None)
+        if gender and getattr(obj, 'tenant_id', None):
+            from apps.students.application.services import resolve_branch_for_gender
+            b = resolve_branch_for_gender(obj.tenant_id, gender)
+            return (b.name_ar or b.name) if b else ('فرع البنات' if gender == 'female' else 'فرع البنين')
         return None
 
     def get_section_name(self, obj):

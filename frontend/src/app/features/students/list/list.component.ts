@@ -318,7 +318,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
           <span class="active-filters-label">الفلاتر المطبقة:</span>
           
           <span class="active-chip" *ngIf="genderFilter() !== 'all'">
-            الجنس: {{ genderFilter() === 'male' ? 'البنين 👦' : 'البنات 👧' }}
+            الجنس: {{ genderFilter() === 'male' ? 'ذكر (بنين) 👦' : 'أنثى (بنات) 👧' }}
             <button type="button" (click)="setGenderFilter('all')">✕</button>
           </span>
 
@@ -415,13 +415,13 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
 
                   <!-- الفرع / المدرسة -->
                   <span class="branch-text col-branch">
-                    {{ element.branch_name || element.enrollments?.[0]?.branch_name || '—' }}
+                    {{ getStudentBranch(element) }}
                   </span>
 
                   <!-- الجنس -->
                   <div class="col-gender">
                     <span class="gender-pill" [class.male]="element.profile.gender === 'male'" [class.female]="element.profile.gender === 'female'">
-                      {{ element.profile.gender === 'male' ? 'بنين' : element.profile.gender === 'female' ? 'بنات' : '—' }}
+                      {{ getGenderText(element.profile.gender) }}
                     </span>
                   </div>
 
@@ -475,7 +475,7 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
                   {{ getInitials(student.profile.arabic_name) }}
                 </div>
                 <span class="gender-mini-tag" [class.male]="student.profile.gender === 'male'" [class.female]="student.profile.gender === 'female'">
-                  {{ student.profile.gender === 'male' ? '👦 بنين' : '👧 بنات' }}
+                  {{ student.profile.gender === 'male' ? '👦 ذكر' : '👧 أنثى' }}
                 </span>
               </div>
               
@@ -497,8 +497,8 @@ import { StudentBulkImportModalComponent } from '../shared/student-bulk-import-m
                   <span class="meta-item" *ngIf="student.guardian_phone || student.family_relations[0]?.phone">
                     📞 {{ student.guardian_phone || student.family_relations[0]?.phone }}
                   </span>
-                  <span class="meta-item" *ngIf="student.branch_name || student.enrollments?.[0]?.branch_name">
-                    🏢 {{ student.branch_name || student.enrollments?.[0]?.branch_name }}
+                  <span class="meta-item">
+                    🏢 {{ getStudentBranch(student) }}
                   </span>
                 </div>
               </div>
@@ -1320,8 +1320,12 @@ export class StudentsListComponent implements OnInit {
 
       // 3. فرز الفرع / المدرسة
       if (bf) {
+        const branchObj = this.branches().find(b => String(b.id) === String(bf));
+        const branchName = branchObj ? (branchObj.name_ar || branchObj.name) : '';
+        const studentBranch = this.getStudentBranch(student);
         const branchMatch = (student.enrollments || []).some((e: any) => String(e.branch_id) === String(bf)) ||
-                            (student.branch_name && this.branches().find(b => String(b.id) === String(bf))?.name === student.branch_name);
+                            (studentBranch && branchName && studentBranch === branchName) ||
+                            (student.branch_name && branchName && student.branch_name === branchName);
         if (!branchMatch) return false;
       }
 
@@ -1568,6 +1572,22 @@ export class StudentsListComponent implements OnInit {
   openMessageModal(student: any) {
     this.selectedStudent.set(student);
     this.showMsgModal = true;
+  }
+
+  getStudentBranch(student: any): string {
+    if (student.branch_name) return student.branch_name;
+    const enrBranch = student.enrollments?.[0]?.branch_name;
+    if (enrBranch) return enrBranch;
+    const gender = student.profile?.gender;
+    if (gender === 'female') return 'فرع البنات';
+    if (gender === 'male') return 'فرع البنين';
+    return '—';
+  }
+
+  getGenderText(gender?: string): string {
+    if (gender === 'male') return 'ذكر';
+    if (gender === 'female') return 'أنثى';
+    return '—';
   }
 
   getInitials(name?: string): string {

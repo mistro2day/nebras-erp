@@ -164,7 +164,7 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                     <div class="branch-badge-auto">
                       <span class="branch-icon">{{ a.gender === 'male' ? '👦' : '👧' }}</span>
                       <span class="branch-text">{{ selectedBranchName() }}</span>
-                      <span class="auto-badge">تلقائي ({{ a.gender === 'male' ? 'بنين' : 'بنات' }})</span>
+                      <span class="auto-badge">تلقائي (بحسب الجنس: {{ a.gender === 'male' ? 'ذكر' : 'أنثى' }})</span>
                     </div>
                   </div>
 
@@ -232,7 +232,7 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   <div class="branch-pill-manual">
                     <span class="branch-icon">{{ personalForm.gender === 'male' ? '👦' : '👧' }}</span>
                     <span class="branch-name">{{ selectedBranchName() }}</span>
-                    <span class="auto-tag">تلقائي ({{ personalForm.gender === 'male' ? 'بنين' : 'بنات' }})</span>
+                    <span class="auto-tag">تلقائي (بحسب الجنس: {{ personalForm.gender === 'male' ? 'ذكر' : 'أنثى' }})</span>
                   </div>
                 </div>
                 <div class="field">
