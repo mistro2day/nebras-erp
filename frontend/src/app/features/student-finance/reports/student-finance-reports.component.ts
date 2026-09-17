@@ -9,10 +9,13 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbExportMenuComponent } from '../../../shared/export/nb-export-menu.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
+import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { ExportColumn } from '../../../shared/export/export.types';
 import {
   printStudentFinanceReport,
@@ -37,7 +40,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
   selector: 'app-student-finance-reports',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent, NbLoadingComponent],
   template: `
     <div class="page" dir="rtl">
       <!-- ترويسة الصفحة -->
@@ -315,10 +318,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       <!-- محتوى الجداول حسب التبويب -->
       <div class="table-container">
         @if (loading()) {
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>جارٍ تحميل بيانات التقرير المالي...</p>
-          </div>
+          <nb-loading message="جارٍ استرجاع وتحديث سندات القبض والتقارير المالية المعتمدة…"></nb-loading>
         } @else {
           <!-- 1. تقرير إيرادات الرسوم -->
           @if (activeTab() === 'revenue') {
@@ -1260,7 +1260,7 @@ export class StudentFinanceReportsComponent implements OnInit {
   // الحالة النشطة
   activeTab = signal<ReportTab>('revenue');
   datePreset = signal<DatePreset>('today');
-  loading = signal<boolean>(false);
+  loading = signal<boolean>(true);
 
   // تاريخ اليوم الثابت للمقارنة والفلترة
   readonly todayStr: string = '2026-09-17';
@@ -1409,62 +1409,51 @@ export class StudentFinanceReportsComponent implements OnInit {
   loadAllData() {
     this.loading.set(true);
 
-    // جلب متزامن لكافة البيانات مع استكمال بالعينات السودانية الواقعية
-    this.svc.listFeeStructures().subscribe({
-      next: (res) => {
-        const fees = res?.data || [];
-        this.buildRevenueData(fees);
-      },
-      error: () => this.buildRevenueData([]),
-    });
+    // جلب متزامن لكافة البيانات مع إبقاء مؤشر التحميل المعتمد نشطاً حتى اكتمال الوصول
+    forkJoin({
+      fees: this.svc.listFeeStructures().pipe(catchError(() => of({ data: [] }))),
+      receipts: this.svc.listReceipts({ page_size: 100, ordering: '-payment_date' }).pipe(
+        catchError((err) => {
+          console.error('Error loading receipts:', err);
+          return of([]);
+        })
+      ),
+      invoices: this.svc.listInvoices({ page_size: 100 }).pipe(
+        catchError((err) => {
+          console.error('Error loading invoices:', err);
+          return of([]);
+        })
+      ),
+      accounts: this.svc.listBillingAccounts({ page_size: 100 }).pipe(catchError(() => of({ data: [] }))),
+      calendar: this.svc.getInstallmentsCalendar().pipe(catchError(() => of({ data: {} }))),
+      scholarships: this.svc.listScholarships({ page_size: 100 }).pipe(catchError(() => of({ data: [] }))),
+    }).pipe(
+      finalize(() => this.loading.set(false))
+    ).subscribe({
+      next: ({ fees, receipts, invoices, accounts, calendar, scholarships }) => {
+        const feesData = (fees as any)?.data || [];
+        this.buildRevenueData(feesData);
 
-    this.svc.listReceipts({ page_size: 100, ordering: '-payment_date' }).subscribe({
-      next: (res: any) => {
-        const receipts = Array.isArray(res) ? res : (res?.data || res?.results || []);
-        this.buildReceiptsData(receipts);
-      },
-      error: (err) => {
-        console.error('Error loading receipts:', err);
-        this.buildReceiptsData([]);
-      },
-    });
+        const receiptsData = Array.isArray(receipts) ? receipts : ((receipts as any)?.data || (receipts as any)?.results || []);
+        this.buildReceiptsData(receiptsData);
 
-    this.svc.listInvoices({ page_size: 100 }).subscribe({
-      next: (res: any) => {
-        const invoices = Array.isArray(res) ? res : (res?.data || res?.results || []);
-        this.buildInvoicesData(invoices);
-      },
-      error: (err) => {
-        console.error('Error loading invoices:', err);
-        this.buildInvoicesData([]);
-      },
-    });
+        const invoicesData = Array.isArray(invoices) ? invoices : ((invoices as any)?.data || (invoices as any)?.results || []);
+        this.buildInvoicesData(invoicesData);
 
-    this.svc.listBillingAccounts({ page_size: 100 }).subscribe({
-      next: (res) => {
-        const accounts = res?.data || [];
-        this.buildAccountsData(accounts);
-      },
-      error: () => this.buildAccountsData([]),
-    });
+        const accs = (accounts as any)?.data || [];
+        this.buildAccountsData(accs);
 
-    this.svc.getInstallmentsCalendar().subscribe({
-      next: (res) => {
-        const inst = res?.data?.installments || [];
+        const inst = (calendar as any)?.data?.installments || [];
         this.buildInstallmentsData(inst);
-      },
-      error: () => this.buildInstallmentsData([]),
-    });
 
-    this.svc.listScholarships({ page_size: 100 }).subscribe({
-      next: (res) => {
-        const sc = res?.data || [];
+        const sc = (scholarships as any)?.data || [];
         this.buildScholarshipsData(sc);
       },
-      error: () => this.buildScholarshipsData([]),
+      error: (err) => {
+        console.error('Error loading reports data:', err);
+        this.loading.set(false);
+      }
     });
-
-    setTimeout(() => this.loading.set(false), 500);
   }
 
   // ---- بناء البيانات والتحويل المحاسبي ----

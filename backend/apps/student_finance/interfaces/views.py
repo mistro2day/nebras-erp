@@ -411,7 +411,7 @@ class StudentInvoiceViewSet(BaseCRUDViewSet):
     search_fields = ['invoice_number']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('student_billing_account')
         account = self.request.query_params.get('student_billing_account')
         status_param = self.request.query_params.get('status')
         if account:
@@ -1192,7 +1192,7 @@ class ReceiptViewSet(BaseCRUDViewSet):
     search_fields = ['receipt_number']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('student_billing_account')
         account = self.request.query_params.get('student_billing_account')
         if account:
             qs = qs.filter(student_billing_account_id=account)

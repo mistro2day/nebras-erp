@@ -58,6 +58,25 @@ class InvoiceAdjustmentSerializer(BaseStudentFinanceSerializer):
         model = InvoiceAdjustment
         fields = '__all__'
 
+_STUDENT_META_CACHE = {}
+_ACC_TOTALS_CACHE = {}
+_PAYMENT_METHOD_CACHE = {}
+
+def _get_payment_method_name(pm_id):
+    if not pm_id:
+        return 'تحويل بنكي'
+    pm_key = str(pm_id)
+    if pm_key in _PAYMENT_METHOD_CACHE:
+        return _PAYMENT_METHOD_CACHE[pm_key]
+    try:
+        from apps.finance.domain.models import PaymentMethod
+        pm = PaymentMethod.objects.filter(id=pm_id).first()
+        name = (pm.name_ar or pm.name) if pm else 'تحويل بنكي'
+        _PAYMENT_METHOD_CACHE[pm_key] = name
+        return name
+    except Exception:
+        return 'تحويل بنكي'
+
 def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None):
     if not billing_account:
         return {
@@ -65,6 +84,10 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
             'grade_name': '', 'section_name': '', 'guardian_name': '',
             'guardian_phone': '', 'account_number': '',
         }
+    acc_id = getattr(billing_account, 'id', None)
+    if acc_id and acc_id in _STUDENT_META_CACHE:
+        return _STUDENT_META_CACHE[acc_id]
+
     if hasattr(billing_account, '_cached_finance_meta'):
         return billing_account._cached_finance_meta
 
@@ -173,6 +196,8 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
         pass
 
     billing_account._cached_finance_meta = data
+    if acc_id:
+        _STUDENT_META_CACHE[acc_id] = data
     return data
 
 
@@ -379,27 +404,39 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     def get_total_invoiced(self, obj):
         acc = getattr(obj, 'student_billing_account', None)
         if acc:
-            return float(sum(inv.total_amount for inv in acc.invoices.filter(status='posted')))
+            acc_id = getattr(acc, 'id', None)
+            if acc_id and acc_id in _ACC_TOTALS_CACHE:
+                return _ACC_TOTALS_CACHE[acc_id][0]
+            try:
+                inv_total = float(sum(inv.total_amount for inv in acc.invoices.filter(status='posted')))
+                rec_total = float(sum(r.amount for r in acc.receipts.filter(status='posted')))
+            except Exception:
+                inv_total, rec_total = 0.0, 0.0
+            if acc_id:
+                _ACC_TOTALS_CACHE[acc_id] = (inv_total, rec_total)
+            return inv_total
         return 0.0
 
     def get_total_paid(self, obj):
         acc = getattr(obj, 'student_billing_account', None)
         if acc:
-            return float(sum(r.amount for r in acc.receipts.filter(status='posted')))
+            acc_id = getattr(acc, 'id', None)
+            if acc_id and acc_id in _ACC_TOTALS_CACHE:
+                return _ACC_TOTALS_CACHE[acc_id][1]
+            try:
+                inv_total = float(sum(inv.total_amount for inv in acc.invoices.filter(status='posted')))
+                rec_total = float(sum(r.amount for r in acc.receipts.filter(status='posted')))
+            except Exception:
+                inv_total, rec_total = 0.0, 0.0
+            if acc_id:
+                _ACC_TOTALS_CACHE[acc_id] = (inv_total, rec_total)
+            return rec_total
         return 0.0
 
     def get_payment_method_name(self, obj):
         if hasattr(obj, 'payment_method_name') and obj.payment_method_name:
             return obj.payment_method_name
-        if obj.payment_method_id:
-            try:
-                from apps.finance.domain.models import PaymentMethod
-                pm = PaymentMethod.objects.filter(id=obj.payment_method_id).first()
-                if pm:
-                    return pm.name_ar or pm.name
-            except Exception:
-                pass
-        return 'تحويل بنكي'
+        return _get_payment_method_name(getattr(obj, 'payment_method_id', None))
 
 class RefundSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
