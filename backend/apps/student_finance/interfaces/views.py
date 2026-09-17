@@ -76,6 +76,57 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['account_number']
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        accounts_list = list(page if page is not None else queryset)
+
+        student_ids = {
+            acc.student_id
+            for acc in accounts_list
+            if getattr(acc, 'student_id', None)
+        }
+        if student_ids:
+            from apps.students.domain.models import Student
+            from apps.academics.domain.models import Grade, Section
+            from apps.organization.domain.models import Branch
+            from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+
+            students_qs = Student.objects.filter(id__in=student_ids).select_related('profile').prefetch_related(
+                'enrollments', 'family_relations'
+            )
+            student_map = {s.id: s for s in students_qs}
+
+            grade_ids = set()
+            section_ids = set()
+            branch_ids = set()
+            for s in students_qs:
+                for e in s.enrollments.all():
+                    if getattr(e, 'grade_id', None):
+                        grade_ids.add(e.grade_id)
+                    if getattr(e, 'section_id', None):
+                        section_ids.add(e.section_id)
+                    if getattr(e, 'branch_id', None):
+                        branch_ids.add(e.branch_id)
+
+            grade_map = {g.id: (getattr(g, 'name_ar', '') or getattr(g, 'name', '')) for g in Grade.objects.filter(id__in=grade_ids).select_related('stage')} if grade_ids else {}
+            section_map = {sec.id: (getattr(sec, 'name_ar', '') or getattr(sec, 'name', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
+            branch_map = {br.id: (getattr(br, 'name_ar', '') or getattr(br, 'name', '')) for br in Branch.objects.filter(id__in=branch_ids)} if branch_ids else {}
+
+            for acc in accounts_list:
+                _extract_student_finance_metadata(
+                    acc,
+                    student_map=student_map,
+                    grade_map=grade_map,
+                    section_map=section_map,
+                    branch_map=branch_map
+                )
+
+        serializer = self.get_serializer(accounts_list, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['get'], url_path='dashboard-stats')
     def get_dashboard_stats(self, request):
         """جلب إحصائيات لوحة التحكم المالية للطلاب."""
@@ -420,6 +471,58 @@ class StudentInvoiceViewSet(BaseCRUDViewSet):
             qs = qs.filter(status=status_param)
         return qs
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        invoices_list = list(page if page is not None else queryset)
+
+        student_ids = {
+            inv.student_billing_account.student_id
+            for inv in invoices_list
+            if getattr(inv, 'student_billing_account', None) and getattr(inv.student_billing_account, 'student_id', None)
+        }
+        if student_ids:
+            from apps.students.domain.models import Student
+            from apps.academics.domain.models import Grade, Section
+            from apps.organization.domain.models import Branch
+            from apps.student_finance.interfaces.serializers import _extract_student_finance_metadata
+
+            students_qs = Student.objects.filter(id__in=student_ids).select_related('profile').prefetch_related(
+                'enrollments', 'family_relations'
+            )
+            student_map = {s.id: s for s in students_qs}
+
+            grade_ids = set()
+            section_ids = set()
+            branch_ids = set()
+            for s in students_qs:
+                for e in s.enrollments.all():
+                    if getattr(e, 'grade_id', None):
+                        grade_ids.add(e.grade_id)
+                    if getattr(e, 'section_id', None):
+                        section_ids.add(e.section_id)
+                    if getattr(e, 'branch_id', None):
+                        branch_ids.add(e.branch_id)
+
+            grade_map = {g.id: (getattr(g, 'name_ar', '') or getattr(g, 'name', '')) for g in Grade.objects.filter(id__in=grade_ids).select_related('stage')} if grade_ids else {}
+            section_map = {sec.id: (getattr(sec, 'name_ar', '') or getattr(sec, 'name', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
+            branch_map = {br.id: (getattr(br, 'name_ar', '') or getattr(br, 'name', '')) for br in Branch.objects.filter(id__in=branch_ids)} if branch_ids else {}
+
+            for inv in invoices_list:
+                if inv.student_billing_account:
+                    _extract_student_finance_metadata(
+                        inv.student_billing_account,
+                        student_map=student_map,
+                        grade_map=grade_map,
+                        section_map=section_map,
+                        branch_map=branch_map
+                    )
+
+        serializer = self.get_serializer(invoices_list, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], url_path='generate-invoice')
     def generate_invoice(self, request):
         tenant_id = request.tenant_id
@@ -550,12 +653,13 @@ def _sync_invoices_to_installments(tenant_id):
             is_active=True
         )
 
+    new_installments = []
     for inv in invoices:
         due = inv.due_date or inv.issue_date or timezone.localdate()
         amt = inv.total_amount or 0
         paid = inv.paid_amount or 0
         is_paid = (paid >= amt and amt > 0)
-        Installment.objects.create(
+        new_installments.append(Installment(
             tenant_id=tenant_id,
             student_billing_account=inv.student_billing_account,
             invoice=inv,
@@ -565,7 +669,9 @@ def _sync_invoices_to_installments(tenant_id):
             paid_amount=paid,
             status='paid' if is_paid else 'pending',
             created_by=inv.created_by
-        )
+        ))
+    if new_installments:
+        Installment.objects.bulk_create(new_installments, ignore_conflicts=True)
 
 
 class InstallmentViewSet(BaseCRUDViewSet):

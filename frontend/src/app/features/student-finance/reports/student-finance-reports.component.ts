@@ -1419,51 +1419,98 @@ export class StudentFinanceReportsComponent implements OnInit {
   loadAllData() {
     this.loading.set(true);
 
-    // جلب متزامن لكافة البيانات مع إبقاء مؤشر التحميل المعتمد نشطاً حتى اكتمال الوصول
-    forkJoin({
-      fees: this.svc.listFeeStructures().pipe(catchError(() => of({ data: [] }))),
-      receipts: this.svc.listReceipts({ page_size: 100, ordering: '-payment_date' }).pipe(
-        catchError((err) => {
-          console.error('Error loading receipts:', err);
-          return of([]);
-        })
-      ),
-      invoices: this.svc.listInvoices({ page_size: 100 }).pipe(
-        catchError((err) => {
-          console.error('Error loading invoices:', err);
-          return of([]);
-        })
-      ),
-      accounts: this.svc.listBillingAccounts({ page_size: 100 }).pipe(catchError(() => of({ data: [] }))),
-      calendar: this.svc.getInstallmentsCalendar().pipe(catchError(() => of({ data: {} }))),
-      scholarships: this.svc.listScholarships({ page_size: 100 }).pipe(catchError(() => of({ data: [] }))),
-    }).pipe(
-      finalize(() => this.loading.set(false))
-    ).subscribe({
-      next: ({ fees, receipts, invoices, accounts, calendar, scholarships }) => {
-        const feesData = (fees as any)?.data || [];
-        this.buildRevenueData(feesData);
-
-        const receiptsData = Array.isArray(receipts) ? receipts : ((receipts as any)?.data || (receipts as any)?.results || []);
-        this.buildReceiptsData(receiptsData);
-
-        const invoicesData = Array.isArray(invoices) ? invoices : ((invoices as any)?.data || (invoices as any)?.results || []);
-        this.buildInvoicesData(invoicesData);
-
-        const accs = (accounts as any)?.data || [];
-        this.buildAccountsData(accs);
-
-        const inst = (calendar as any)?.data?.installments || [];
-        this.buildInstallmentsData(inst);
-
-        const sc = (scholarships as any)?.data || [];
-        this.buildScholarshipsData(sc);
-      },
-      error: (err) => {
-        console.error('Error loading reports data:', err);
+    let loadedCount = 0;
+    const totalRequests = 6;
+    const checkFinish = () => {
+      loadedCount++;
+      if (loadedCount >= totalRequests) {
         this.loading.set(false);
       }
+    };
+
+    // 1. جلب سندات القبض المباشرة (الأولوية العظمى - عرض فوري ومباشر لتقارير اليوم)
+    this.svc.listReceipts({ page_size: 100, ordering: '-payment_date' }).pipe(
+      catchError((err) => {
+        console.error('Error loading receipts:', err);
+        return of([]);
+      })
+    ).subscribe((receipts) => {
+      const receiptsData = Array.isArray(receipts) ? receipts : ((receipts as any)?.data || (receipts as any)?.results || []);
+      this.buildReceiptsData(receiptsData);
+      // فك الحجب فوراً إذا كان المستخدم في تبويب السندات
+      if (this.activeTab() === 'receipts') {
+        this.loading.set(false);
+      }
+      checkFinish();
     });
+
+    // 2. جلب هياكل الرسوم والإيرادات
+    this.svc.listFeeStructures().pipe(
+      catchError(() => of({ data: [] }))
+    ).subscribe((fees) => {
+      const feesData = (fees as any)?.data || [];
+      this.buildRevenueData(feesData);
+      if (this.activeTab() === 'revenue') {
+        this.loading.set(false);
+      }
+      checkFinish();
+    });
+
+    // 3. جلب فواتير الطلاب
+    this.svc.listInvoices({ page_size: 100 }).pipe(
+      catchError((err) => {
+        console.error('Error loading invoices:', err);
+        return of([]);
+      })
+    ).subscribe((invoices) => {
+      const invoicesData = Array.isArray(invoices) ? invoices : ((invoices as any)?.data || (invoices as any)?.results || []);
+      this.buildInvoicesData(invoicesData);
+      if (this.activeTab() === 'invoices') {
+        this.loading.set(false);
+      }
+      checkFinish();
+    });
+
+    // 4. جلب حسابات الفوترة (للطلاب المسددين والمتعثرين)
+    this.svc.listBillingAccounts({ page_size: 100 }).pipe(
+      catchError(() => of({ data: [] }))
+    ).subscribe((accounts) => {
+      const accs = (accounts as any)?.data || [];
+      this.buildAccountsData(accs);
+      if (this.activeTab() === 'paid' || this.activeTab() === 'overdue') {
+        this.loading.set(false);
+      }
+      checkFinish();
+    });
+
+    // 5. تقويم الأقساط المجدولة
+    this.svc.getInstallmentsCalendar().pipe(
+      catchError(() => of({ data: {} }))
+    ).subscribe((calendar) => {
+      const inst = (calendar as any)?.data?.installments || [];
+      this.buildInstallmentsData(inst);
+      if (this.activeTab() === 'installments') {
+        this.loading.set(false);
+      }
+      checkFinish();
+    });
+
+    // 6. المنح والمساعدات
+    this.svc.listScholarships({ page_size: 100 }).pipe(
+      catchError(() => of({ data: [] }))
+    ).subscribe((scholarships) => {
+      const sc = (scholarships as any)?.data || [];
+      this.buildScholarshipsData(sc);
+      if (this.activeTab() === 'scholarships') {
+        this.loading.set(false);
+      }
+      checkFinish();
+    });
+
+    // صمام أمان زمني لضمان إغلاق شاشة التحميل دائماً حتى عند بطء الاتصال الخارجي
+    setTimeout(() => {
+      this.loading.set(false);
+    }, 1200);
   }
 
   // ---- بناء البيانات والتحويل المحاسبي ----
