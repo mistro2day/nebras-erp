@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbExportMenuComponent } from '../../../shared/export/nb-export-menu.component';
+import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { ExportColumn } from '../../../shared/export/export.types';
 import {
   printStudentFinanceReport,
@@ -36,7 +37,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
   selector: 'app-student-finance-reports',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent],
   template: `
     <div class="page" dir="rtl">
       <!-- ترويسة الصفحة -->
@@ -257,14 +258,24 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
             </select>
           </div>
 
-          <div class="filter-input-wrap date">
+          <div class="filter-input-wrap date-picker-wrap">
             <label>من تاريخ:</label>
-            <input type="date" [ngModel]="dateFrom()" (ngModelChange)="onDateFromChange($event)" />
+            <nb-datepicker
+              [value]="dateFrom()"
+              (valueChange)="onDateFromChange($event)"
+              placeholder="من تاريخ"
+              ariaLabel="من تاريخ"
+            ></nb-datepicker>
           </div>
 
-          <div class="filter-input-wrap date">
+          <div class="filter-input-wrap date-picker-wrap">
             <label>إلى تاريخ:</label>
-            <input type="date" [ngModel]="dateTo()" (ngModelChange)="onDateToChange($event)" />
+            <nb-datepicker
+              [value]="dateTo()"
+              (valueChange)="onDateToChange($event)"
+              placeholder="إلى تاريخ"
+              ariaLabel="إلى تاريخ"
+            ></nb-datepicker>
           </div>
         }
 
@@ -963,6 +974,20 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       font-size: 12.5px;
       color: var(--nb-text, #111827);
       cursor: pointer;
+    }
+    .filter-input-wrap.date-picker-wrap {
+      background: transparent;
+      border: none;
+      padding: 0;
+      gap: 6px;
+    }
+    .filter-input-wrap.date-picker-wrap label {
+      font-size: 12px;
+      color: var(--nb-text-muted, #6b7280);
+      white-space: nowrap;
+    }
+    .filter-input-wrap.date-picker-wrap nb-datepicker {
+      display: inline-block;
     }
 
     /* الجدول */
