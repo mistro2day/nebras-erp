@@ -1196,6 +1196,27 @@ class ReceiptViewSet(BaseCRUDViewSet):
         account = self.request.query_params.get('student_billing_account')
         if account:
             qs = qs.filter(student_billing_account_id=account)
+
+        # فلترة التاريخ (تاريخ اليوم أو تاريخ محدد)
+        p_date = self.request.query_params.get('payment_date')
+        if p_date:
+            if p_date == 'today':
+                from django.utils import timezone
+                p_date = timezone.now().date()
+            qs = qs.filter(payment_date=p_date)
+
+        d_from = self.request.query_params.get('date_from')
+        if d_from:
+            qs = qs.filter(payment_date__gte=d_from)
+
+        d_to = self.request.query_params.get('date_to')
+        if d_to:
+            qs = qs.filter(payment_date__lte=d_to)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+
         return qs
 
     @action(detail=False, methods=['post'], url_path='receive-payment')

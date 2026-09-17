@@ -17,6 +17,7 @@ import {
   printStudentFinanceReport,
   printClearanceCertificate,
   printDemandNotice,
+  printReceiptVoucher,
   tafqeet,
 } from './student-finance-report-print';
 
@@ -28,6 +29,8 @@ export type ReportTab =
   | 'overdue'
   | 'installments'
   | 'scholarships';
+
+export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 @Component({
   selector: 'app-student-finance-reports',
@@ -44,18 +47,25 @@ export type ReportTab =
         <div class="header-actions">
           <div class="preset-group">
             <button
-              class="btn-sm"
-              [class.active]="datePreset() === 'all'"
-              (click)="setDatePreset('all')"
+              class="btn-sm today-btn"
+              [class.active]="datePreset() === 'today'"
+              (click)="setDatePreset('today')"
             >
-              الكل
+              📅 سندات اليوم
             </button>
             <button
               class="btn-sm"
-              [class.active]="datePreset() === 'year'"
-              (click)="setDatePreset('year')"
+              [class.active]="datePreset() === 'week'"
+              (click)="setDatePreset('week')"
             >
-              العام الدراسي
+              هذا الأسبوع
+            </button>
+            <button
+              class="btn-sm"
+              [class.active]="datePreset() === 'month'"
+              (click)="setDatePreset('month')"
+            >
+              هذا الشهر
             </button>
             <button
               class="btn-sm"
@@ -66,10 +76,17 @@ export type ReportTab =
             </button>
             <button
               class="btn-sm"
-              [class.active]="datePreset() === 'month'"
-              (click)="setDatePreset('month')"
+              [class.active]="datePreset() === 'year'"
+              (click)="setDatePreset('year')"
             >
-              هذا الشهر
+              العام الدراسي
+            </button>
+            <button
+              class="btn-sm"
+              [class.active]="datePreset() === 'all'"
+              (click)="setDatePreset('all')"
+            >
+              الكل
             </button>
           </div>
 
@@ -189,29 +206,41 @@ export type ReportTab =
           <span class="ico">🔍</span>
           <input
             type="text"
-            placeholder="بحث باسم الطالب، الرقم الأكاديمي، رقم السند أو الفاتورة..."
+            placeholder="بحث باسم الطالب، الرقم الأكاديمي، رقم السند أو العملية..."
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
           />
         </div>
 
+        @if (activeTab() === 'receipts') {
+          <div class="filter-input-wrap select">
+            <label>الفرع:</label>
+            <select [ngModel]="selectedBranch()" (ngModelChange)="selectedBranch.set($event)">
+              <option value="all">جميع الفروع</option>
+              <option value="فرع البنين">فرع البنين 👦</option>
+              <option value="فرع البنات">فرع البنات 👧</option>
+            </select>
+          </div>
+
+          <div class="filter-input-wrap select">
+            <label>المرحلة التعليمية:</label>
+            <select [ngModel]="selectedStage()" (ngModelChange)="onStageChange($event)">
+              <option value="all">جميع المراحل</option>
+              <option value="رياض الأطفال">رياض الأطفال</option>
+              <option value="المرحلة الابتدائية">المرحلة الابتدائية</option>
+              <option value="المرحلة المتوسطة">المرحلة المتوسطة</option>
+              <option value="المرحلة الثانوية">المرحلة الثانوية</option>
+            </select>
+          </div>
+        }
+
         <div class="filter-input-wrap select">
-          <label>المرحلة / الصف:</label>
+          <label>الصف الدراسي:</label>
           <select [ngModel]="selectedGrade()" (ngModelChange)="selectedGrade.set($event)">
-            <option value="all">جميع الصفوف والمراحل</option>
-            <option value="رياض الأطفال">رياض الأطفال</option>
-            <option value="الابتدائي - الصف الأول">الابتدائي - الصف الأول</option>
-            <option value="الابتدائي - الصف الثاني">الابتدائي - الصف الثاني</option>
-            <option value="الابتدائي - الصف الثالث">الابتدائي - الصف الثالث</option>
-            <option value="الابتدائي - الصف الرابع">الابتدائي - الصف الرابع</option>
-            <option value="الابتدائي - الصف الخامس">الابتدائي - الصف الخامس</option>
-            <option value="الابتدائي - الصف السادس">الابتدائي - الصف السادس</option>
-            <option value="المتوسط - الصف الأول">المتوسط - الصف الأول</option>
-            <option value="المتوسط - الصف الثاني">المتوسط - الصف الثاني</option>
-            <option value="المتوسط - الصف الثالث">المتوسط - الصف الثالث</option>
-            <option value="الثانوي - الصف الأول">الثانوي - الصف الأول</option>
-            <option value="الثانوي - الصف الثاني">الثانوي - الصف الثاني</option>
-            <option value="الثانوي - الصف الثالث">الثانوي - الصف الثالث</option>
+            <option value="all">جميع الصفوف</option>
+            @for (g of filteredGradeOptions(); track g) {
+              <option [value]="g">{{ g }}</option>
+            }
           </select>
         </div>
 
@@ -226,6 +255,16 @@ export type ReportTab =
               <option value="أوكاش - بنك أمدرمان">أوكاش (بنك أمدرمان)</option>
               <option value="شيك بنكي">شيك بنكي مصرفي</option>
             </select>
+          </div>
+
+          <div class="filter-input-wrap date">
+            <label>من تاريخ:</label>
+            <input type="date" [ngModel]="dateFrom()" (ngModelChange)="onDateFromChange($event)" />
+          </div>
+
+          <div class="filter-input-wrap date">
+            <label>إلى تاريخ:</label>
+            <input type="date" [ngModel]="dateTo()" (ngModelChange)="onDateToChange($event)" />
           </div>
         }
 
@@ -255,7 +294,7 @@ export type ReportTab =
           </div>
         }
 
-        @if (searchQuery() || selectedGrade() !== 'all' || selectedMethod() !== 'all' || selectedStatus() !== 'all' || selectedAging() !== 'all') {
+        @if (hasActiveFilters()) {
           <button class="btn ghost clear-btn" (click)="resetFilters()">
             إلغاء الفلاتر
           </button>
@@ -309,46 +348,97 @@ export type ReportTab =
             </table>
           }
 
-          <!-- 2. تقرير سندات القبض والتحصيلات -->
+          <!-- 2. تقرير سندات القبض والتحصيلات المفصلة -->
           @if (activeTab() === 'receipts') {
             <table class="nb-table">
               <thead>
                 <tr>
                   <th>رقم السند</th>
-                  <th>التاريخ</th>
-                  <th>اسم الطالب</th>
-                  <th>الصف</th>
+                  <th>تاريخ السند</th>
+                  <th>اسم الطالب والرقم الأكاديمي</th>
+                  <th>الفرع</th>
+                  <th>المرحلة الدراسية</th>
+                  <th>الصف والشعبة</th>
                   <th>طريقة الدفع والبنك</th>
                   <th>رقم المرجع / العملية</th>
                   <th class="num">المبلغ</th>
                   <th>المحصّل</th>
-                  <th>إجراءات</th>
+                  <th>إجراءات رسمية</th>
                 </tr>
               </thead>
               <tbody>
                 @for (r of filteredReceipts(); track r.id) {
                   <tr [class.total-row]="r._isTotal">
                     @if (r._isTotal) {
-                      <td colspan="6" class="font-bold">الإجمالي العام للتحصيلات:</td>
-                      <td class="num font-bold">{{ fmt(r.amount) }} <small>ج.س</small></td>
+                      <td colspan="8" class="font-bold">
+                        إجمالي سندات التحصيل المعروضة ({{ filteredReceipts().length - 1 }} سند):
+                      </td>
+                      <td class="num font-bold success-text" style="font-size: 15px;">
+                        {{ fmt(r.amount) }} <small>ج.س</small>
+                      </td>
                       <td colspan="2"></td>
                     } @else {
-                      <td class="mono font-bold">{{ r.receipt_number }}</td>
-                      <td>{{ r.receipt_date }}</td>
-                      <td class="font-bold">{{ r.student_name }}</td>
-                      <td>{{ r.grade_name }}</td>
+                      <td class="mono font-bold">
+                        <span class="receipt-num-badge">{{ r.receipt_number }}</span>
+                      </td>
+                      <td>
+                        <div class="date-cell">
+                          <span class="date-main">{{ r.receipt_date }}</span>
+                          @if (r.receipt_date === todayStr) {
+                            <span class="today-tag">اليوم</span>
+                          }
+                        </div>
+                      </td>
+                      <td>
+                        <div class="user-cell">
+                          <span class="avatar-sm" [class.girls]="r.gender === 'بنات' || r.branch_name?.includes('بنات')">
+                            {{ r.gender === 'بنات' || r.branch_name?.includes('بنات') ? '👧' : '👦' }}
+                          </span>
+                          <div class="user-details">
+                            <span class="student-name font-bold">{{ r.student_name }}</span>
+                            <small class="student-no mono muted">{{ r.student_number || 'ST-2026' }}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="branch-tag" [class.girls]="r.branch_name?.includes('بنات')">
+                          {{ r.branch_name || (r.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين') }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="stage-tag" [class]="getStageClass(r.stage_name)">
+                          {{ r.stage_name }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="grade-cell">
+                          <span>{{ r.grade_name }}</span>
+                          @if (r.section_name) {
+                            <small class="section-sub">({{ r.section_name }})</small>
+                          }
+                        </div>
+                      </td>
                       <td>
                         <span class="payment-method-tag" [class]="getMethodClass(r.payment_method)">
                           {{ r.payment_method }}
                         </span>
                       </td>
-                      <td class="mono">{{ r.reference_number || '—' }}</td>
-                      <td class="num font-bold success-text">{{ fmt(r.amount) }} <small>ج.س</small></td>
-                      <td>{{ r.collector || 'محاسب الطلاب' }}</td>
+                      <td class="mono font-sm">{{ r.reference_number || '—' }}</td>
+                      <td class="num font-bold success-text">
+                        {{ fmt(r.amount) }} <small>ج.س</small>
+                      </td>
                       <td>
-                        <button class="btn xs ghost" (click)="viewAccount(r.account_id)">
-                          كشف الحساب
-                        </button>
+                        <span class="collector-name">{{ r.collector || 'محاسب الخزينة' }}</span>
+                      </td>
+                      <td>
+                        <div class="row-actions-group">
+                          <button class="btn xs print-btn" title="طباعة سند القبض الرسمي A4" (click)="printReceipt(r)">
+                            🖨️ سند A4
+                          </button>
+                          <button class="btn xs ghost" title="عرض كشف حساب الطالب" (click)="viewAccount(r.account_id)">
+                            كشف الحساب
+                          </button>
+                        </div>
                       </td>
                     }
                   </tr>
@@ -670,6 +760,15 @@ export type ReportTab =
       font-weight: 700;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
+    .btn-sm.today-btn {
+      color: #059669;
+      font-weight: 700;
+    }
+    .btn-sm.today-btn.active {
+      background: #059669;
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(5, 150, 105, 0.25);
+    }
 
     .btn {
       height: 36px;
@@ -985,15 +1084,126 @@ export type ReportTab =
       gap: 8px;
     }
     .avatar-sm {
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       background: #e0e7ff;
       display: grid;
       place-items: center;
-      font-size: 12px;
+      font-size: 13px;
     }
     .avatar-sm.danger { background: #fee2e2; }
+    .avatar-sm.girls { background: #fce7f3; }
+
+    .branch-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+    .branch-tag.girls {
+      background: #fce7f3;
+      color: #9d174d;
+      border-color: #fbcfe8;
+    }
+
+    .stage-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #334155;
+    }
+    .stage-tag.secondary {
+      background: #f3e8ff;
+      color: #6b21a8;
+      border: 1px solid #e9d5ff;
+    }
+    .stage-tag.intermediate {
+      background: #e0e7ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+    }
+    .stage-tag.primary {
+      background: #ccfbf1;
+      color: #115e59;
+      border: 1px solid #99f6e4;
+    }
+    .stage-tag.kindergarten {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .receipt-num-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .today-tag {
+      display: inline-block;
+      font-size: 10px;
+      background: #dcfce7;
+      color: #15803d;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-inline-start: 5px;
+    }
+
+    .date-cell {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .grade-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .section-sub {
+      font-size: 11px;
+      color: var(--nb-text-muted, #6b7280);
+    }
+
+    .user-details {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .student-no {
+      font-size: 11px;
+    }
+
+    .row-actions-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .btn.print-btn {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+    .btn.print-btn:hover {
+      background: #1d4ed8;
+      color: #ffffff;
+    }
 
     .actions-cell {
       display: flex;
@@ -1024,15 +1234,22 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   // الحالة النشطة
   activeTab = signal<ReportTab>('revenue');
-  datePreset = signal<'all' | 'year' | 'quarter' | 'month'>('all');
+  datePreset = signal<DatePreset>('today');
   loading = signal<boolean>(false);
+
+  // تاريخ اليوم الثابت للمقارنة والفلترة
+  readonly todayStr: string = '2026-09-17';
 
   // الفلاتر
   searchQuery = signal<string>('');
+  selectedBranch = signal<string>('all');
+  selectedStage = signal<string>('all');
   selectedGrade = signal<string>('all');
   selectedMethod = signal<string>('all');
   selectedStatus = signal<string>('all');
   selectedAging = signal<string>('all');
+  dateFrom = signal<string>('2026-09-17');
+  dateTo = signal<string>('2026-09-17');
 
   // البيانات
   revenueData = signal<any[]>([]);
@@ -1043,13 +1260,90 @@ export class StudentFinanceReportsComponent implements OnInit {
   installmentsData = signal<any[]>([]);
   scholarshipsData = signal<any[]>([]);
 
+  // خيارات الصفوف الديناميكية بناء على المرحلة التعليمية المختارة
+  readonly filteredGradeOptions = computed<string[]>(() => {
+    const stg = this.selectedStage();
+    if (stg === 'المرحلة الثانوية') {
+      return ['الثانوي - الصف الأول', 'الثانوي - الصف الثاني', 'الثانوي - الصف الثالث'];
+    }
+    if (stg === 'المرحلة المتوسطة') {
+      return ['المتوسط - الصف الأول', 'المتوسط - الصف الثاني', 'المتوسط - الصف الثالث'];
+    }
+    if (stg === 'المرحلة الابتدائية') {
+      return [
+        'الابتدائي - الصف الأول',
+        'الابتدائي - الصف الثاني',
+        'الابتدائي - الصف الثالث',
+        'الابتدائي - الصف الرابع',
+        'الابتدائي - الصف الخامس',
+        'الابتدائي - الصف السادس',
+      ];
+    }
+    if (stg === 'رياض الأطفال') {
+      return ['رياض الأطفال - تمهيدي أول', 'رياض الأطفال - تمهيدي ثاني'];
+    }
+    return [
+      'رياض الأطفال - تمهيدي أول',
+      'رياض الأطفال - تمهيدي ثاني',
+      'الابتدائي - الصف الأول',
+      'الابتدائي - الصف الثاني',
+      'الابتدائي - الصف الثالث',
+      'الابتدائي - الصف الرابع',
+      'الابتدائي - الصف الخامس',
+      'الابتدائي - الصف السادس',
+      'المتوسط - الصف الأول',
+      'المتوسط - الصف الثاني',
+      'المتوسط - الصف الثالث',
+      'الثانوي - الصف الأول',
+      'الثانوي - الصف الثاني',
+      'الثانوي - الصف الثالث',
+    ];
+  });
+
   ngOnInit() {
     this.loadAllData();
   }
 
-  setDatePreset(preset: 'all' | 'year' | 'quarter' | 'month') {
+  setDatePreset(preset: DatePreset) {
     this.datePreset.set(preset);
+    if (preset === 'today') {
+      this.dateFrom.set(this.todayStr);
+      this.dateTo.set(this.todayStr);
+    } else if (preset === 'week') {
+      this.dateFrom.set('2026-09-13');
+      this.dateTo.set('2026-09-17');
+    } else if (preset === 'month') {
+      this.dateFrom.set('2026-09-01');
+      this.dateTo.set('2026-09-30');
+    } else if (preset === 'quarter') {
+      this.dateFrom.set('2026-07-01');
+      this.dateTo.set('2026-09-30');
+    } else if (preset === 'year') {
+      this.dateFrom.set('2026-01-01');
+      this.dateTo.set('2026-12-31');
+    } else {
+      this.dateFrom.set('');
+      this.dateTo.set('');
+    }
     this.loadAllData();
+  }
+
+  onDateFromChange(val: string) {
+    this.dateFrom.set(val);
+    this.datePreset.set('all');
+  }
+
+  onDateToChange(val: string) {
+    this.dateTo.set(val);
+    this.datePreset.set('all');
+  }
+
+  onStageChange(stage: string) {
+    this.selectedStage.set(stage);
+    const available = this.filteredGradeOptions();
+    if (this.selectedGrade() !== 'all' && !available.includes(this.selectedGrade())) {
+      this.selectedGrade.set('all');
+    }
   }
 
   switchTab(tab: ReportTab) {
@@ -1057,12 +1351,34 @@ export class StudentFinanceReportsComponent implements OnInit {
     this.resetFilters();
   }
 
+  hasActiveFilters(): boolean {
+    return (
+      !!this.searchQuery() ||
+      this.selectedBranch() !== 'all' ||
+      this.selectedStage() !== 'all' ||
+      this.selectedGrade() !== 'all' ||
+      this.selectedMethod() !== 'all' ||
+      this.selectedStatus() !== 'all' ||
+      this.selectedAging() !== 'all' ||
+      (this.activeTab() === 'receipts' && this.datePreset() !== 'today')
+    );
+  }
+
   resetFilters() {
     this.searchQuery.set('');
+    this.selectedBranch.set('all');
+    this.selectedStage.set('all');
     this.selectedGrade.set('all');
     this.selectedMethod.set('all');
     this.selectedStatus.set('all');
     this.selectedAging.set('all');
+    if (this.activeTab() === 'receipts') {
+      this.setDatePreset('today');
+    } else {
+      this.datePreset.set('all');
+      this.dateFrom.set('');
+      this.dateTo.set('');
+    }
   }
 
   loadAllData() {
@@ -1160,28 +1476,195 @@ export class StudentFinanceReportsComponent implements OnInit {
       list = receipts.map((r: any) => ({
         id: r.id,
         receipt_number: r.receipt_number || `REC-${r.id.substring(0, 6)}`,
-        receipt_date: r.receipt_date || r.created_at?.split('T')[0] || '2026-09-15',
-        student_name: r.billing_account?.student?.full_name || r.student_name || 'طالب مجهول',
-        grade_name: r.billing_account?.student?.grade?.name || r.grade_name || 'الثانوي - الصف الأول',
-        payment_method: r.payment_method?.name_ar || r.payment_method || 'تطبيق بنكك - بنك الخرطوم',
+        receipt_date: r.receipt_date || r.payment_date || r.created_at?.split('T')[0] || this.todayStr,
+        student_name: r.student_name || r.billing_account?.student?.full_name || 'طالب',
+        student_number: r.student_number || 'ST-2026',
+        branch_name: r.branch_name || (r.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين'),
+        gender: r.gender || (r.branch_name?.includes('بنات') ? 'بنات' : 'بنين'),
+        stage_name: r.stage_name || this.inferStage(r.grade_name || r.billing_account?.student?.grade?.name),
+        grade_name: r.grade_name || r.billing_account?.student?.grade?.name || 'الثانوي - الصف الأول',
+        section_name: r.section_name || 'أ',
+        payment_method: r.payment_method_name || r.payment_method?.name_ar || r.payment_method || 'تطبيق بنكك - بنك الخرطوم',
         reference_number: r.reference_number || r.bank_reference || 'BOK-948271',
         amount: Number(r.amount || 0),
-        collector: r.created_by?.name || 'محاسب شؤون الطلاب',
+        collector: r.collector || r.created_by?.name || 'محاسب الخزينة',
         account_id: r.billing_account_id || r.billing_account?.id,
       }));
     } else {
-      // عينات سندات تحصيل واقعية بالبنوك السودانية
+      // عينات سندات تحصيل واقعية ومفصلة بالبنوك السودانية مع التركيز على سندات اليوم
       list = [
-        { id: '1', receipt_number: 'REC-26-0811', receipt_date: '2026-09-15', student_name: 'عثمان دفع الله إدريس', grade_name: 'الثانوي - الصف الثالث', payment_method: 'تطبيق بنكك - بنك الخرطوم', reference_number: 'BOK-9847120', amount: 350000, collector: 'مزمل الكباشي' },
-        { id: '2', receipt_number: 'REC-26-0810', receipt_date: '2026-09-14', student_name: 'إخلاص ميرغني التوم', grade_name: 'المتوسط - الصف الثاني', payment_method: 'فوري - بنك فيصل الإسلامي', reference_number: 'FWR-338192', amount: 240000, collector: 'التاج إبراهيم' },
-        { id: '3', receipt_number: 'REC-26-0809', receipt_date: '2026-09-14', student_name: 'الفاتح بابكر عبد الله', grade_name: 'الابتدائي - الصف الرابع', payment_method: 'نقدي - خزينة المدرسة', reference_number: 'CSH-00291', amount: 180000, collector: 'فاطمة البدوي' },
-        { id: '4', receipt_number: 'REC-26-0808', receipt_date: '2026-09-13', student_name: 'نزار المجذوب البدوي', grade_name: 'الثانوي - الصف الأول', payment_method: 'تطبيق بنكك - بنك الخرطوم', reference_number: 'BOK-7729104', amount: 420000, collector: 'مزمل الكباشي' },
-        { id: '5', receipt_number: 'REC-26-0807', receipt_date: '2026-09-12', student_name: 'آمنة الصديق كمال', grade_name: 'الابتدائي - الصف السادس', payment_method: 'أوكاش - بنك أمدرمان', reference_number: 'OKS-192847', amount: 150000, collector: 'التاج إبراهيم' },
-        { id: '6', receipt_number: 'REC-26-0806', receipt_date: '2026-09-11', student_name: 'مهند تاج السر حسن', grade_name: 'المتوسط - الصف الثالث', payment_method: 'تطبيق بنكك - بنك الخرطوم', reference_number: 'BOK-6192834', amount: 280000, collector: 'مزمل الكباشي' },
-        { id: '7', receipt_number: 'REC-26-0805', receipt_date: '2026-09-10', student_name: 'ريان السر الهادي', grade_name: 'الابتدائي - الصف الأول', payment_method: 'نقدي - خزينة المدرسة', reference_number: 'CSH-00289', amount: 210000, collector: 'فاطمة البدوي' },
+        {
+          id: '1',
+          receipt_number: 'REC-26-0917-01',
+          receipt_date: '2026-09-17',
+          student_name: 'عثمان دفع الله إدريس',
+          student_number: 'ST-2026-0041',
+          branch_name: 'فرع البنين',
+          gender: 'بنين',
+          stage_name: 'المرحلة الثانوية',
+          grade_name: 'الثانوي - الصف الثالث',
+          section_name: 'أ (علمي)',
+          payment_method: 'تطبيق بنكك - بنك الخرطوم',
+          reference_number: 'BOK-9847120',
+          amount: 450000,
+          collector: 'مزمل الكباشي',
+        },
+        {
+          id: '2',
+          receipt_number: 'REC-26-0917-02',
+          receipt_date: '2026-09-17',
+          student_name: 'إخلاص ميرغني التوم',
+          student_number: 'ST-2026-0052',
+          branch_name: 'فرع البنات',
+          gender: 'بنات',
+          stage_name: 'المرحلة المتوسطة',
+          grade_name: 'المتوسط - الصف الثاني',
+          section_name: 'ب',
+          payment_method: 'فوري - بنك فيصل الإسلامي',
+          reference_number: 'FWR-338192',
+          amount: 320000,
+          collector: 'فاطمة البدوي',
+        },
+        {
+          id: '3',
+          receipt_number: 'REC-26-0917-03',
+          receipt_date: '2026-09-17',
+          student_name: 'الفاتح بابكر عبد الله',
+          student_number: 'ST-2026-0089',
+          branch_name: 'فرع البنين',
+          gender: 'بنين',
+          stage_name: 'المرحلة الابتدائية',
+          grade_name: 'الابتدائي - الصف الرابع',
+          section_name: 'ج',
+          payment_method: 'نقدي - خزينة المدرسة',
+          reference_number: 'CSH-00291',
+          amount: 220000,
+          collector: 'التاج إبراهيم',
+        },
+        {
+          id: '4',
+          receipt_number: 'REC-26-0917-04',
+          receipt_date: '2026-09-17',
+          student_name: 'فاطمة البدوي الزبير',
+          student_number: 'ST-2026-0144',
+          branch_name: 'فرع البنات',
+          gender: 'بنات',
+          stage_name: 'المرحلة الثانوية',
+          grade_name: 'الثانوي - الصف الثاني',
+          section_name: 'أ',
+          payment_method: 'تطبيق بنكك - بنك الخرطوم',
+          reference_number: 'BOK-7729104',
+          amount: 480000,
+          collector: 'فاطمة البدوي',
+        },
+        {
+          id: '5',
+          receipt_number: 'REC-26-0917-05',
+          receipt_date: '2026-09-17',
+          student_name: 'مهند تاج السر حسن',
+          student_number: 'ST-2026-0105',
+          branch_name: 'فرع البنين',
+          gender: 'بنين',
+          stage_name: 'المرحلة المتوسطة',
+          grade_name: 'المتوسط - الصف الثالث',
+          section_name: 'أ',
+          payment_method: 'أوكاش - بنك أمدرمان',
+          reference_number: 'OKS-192847',
+          amount: 280000,
+          collector: 'التاج إبراهيم',
+        },
+        {
+          id: '6',
+          receipt_number: 'REC-26-0917-06',
+          receipt_date: '2026-09-17',
+          student_name: 'آمنة الصديق كمال',
+          student_number: 'ST-2026-0211',
+          branch_name: 'فرع البنات',
+          gender: 'بنات',
+          stage_name: 'المرحلة الابتدائية',
+          grade_name: 'الابتدائي - الصف السادس',
+          section_name: 'ب',
+          payment_method: 'تطبيق بنكك - بنك الخرطوم',
+          reference_number: 'BOK-6192834',
+          amount: 260000,
+          collector: 'مزمل الكباشي',
+        },
+        {
+          id: '7',
+          receipt_number: 'REC-26-0917-07',
+          receipt_date: '2026-09-17',
+          student_name: 'يوسف عمر الصديق',
+          student_number: 'ST-2026-0399',
+          branch_name: 'فرع البنين',
+          gender: 'بنين',
+          stage_name: 'رياض الأطفال',
+          grade_name: 'رياض الأطفال - تمهيدي ثاني',
+          section_name: 'زهور',
+          payment_method: 'نقدي - خزينة المدرسة',
+          reference_number: 'CSH-00295',
+          amount: 190000,
+          collector: 'التاج إبراهيم',
+        },
+        {
+          id: '8',
+          receipt_number: 'REC-26-0917-08',
+          receipt_date: '2026-09-17',
+          student_name: 'ريان السر الهادي',
+          student_number: 'ST-2026-0312',
+          branch_name: 'فرع البنات',
+          gender: 'بنات',
+          stage_name: 'رياض الأطفال',
+          grade_name: 'رياض الأطفال - تمهيدي أول',
+          section_name: 'براعم',
+          payment_method: 'فوري - بنك فيصل الإسلامي',
+          reference_number: 'FWR-918231',
+          amount: 210000,
+          collector: 'فاطمة البدوي',
+        },
+        {
+          id: '9',
+          receipt_number: 'REC-26-0916-01',
+          receipt_date: '2026-09-16',
+          student_name: 'نزار المجذوب البدوي',
+          student_number: 'ST-2026-0082',
+          branch_name: 'فرع البنين',
+          gender: 'بنين',
+          stage_name: 'المرحلة الثانوية',
+          grade_name: 'الثانوي - الصف الأول',
+          section_name: 'ب',
+          payment_method: 'تطبيق بنكك - بنك الخرطوم',
+          reference_number: 'BOK-5519283',
+          amount: 420000,
+          collector: 'مزمل الكباشي',
+        },
+        {
+          id: '10',
+          receipt_number: 'REC-26-0915-01',
+          receipt_date: '2026-09-15',
+          student_name: 'تسنيم طارق عبد الرحمن',
+          student_number: 'ST-2026-0166',
+          branch_name: 'فرع البنات',
+          gender: 'بنات',
+          stage_name: 'المرحلة المتوسطة',
+          grade_name: 'المتوسط - الصف الأول',
+          section_name: 'أ',
+          payment_method: 'شيك بنكي',
+          reference_number: 'CHK-00192',
+          amount: 300000,
+          collector: 'فاطمة البدوي',
+        },
       ];
     }
     this.receiptsData.set(list);
+  }
+
+  inferStage(gradeName?: string): string {
+    if (!gradeName) return 'المرحلة الأساسية';
+    if (gradeName.includes('متوسط')) return 'المرحلة المتوسطة';
+    if (gradeName.includes('ثانوي')) return 'المرحلة الثانوية';
+    if (gradeName.includes('ابتدائي')) return 'المرحلة الابتدائية';
+    if (gradeName.includes('رياض') || gradeName.includes('روض')) return 'رياض الأطفال';
+    return 'المرحلة الأساسية';
   }
 
   private buildInvoicesData(invoices: any[]) {
@@ -1415,12 +1898,55 @@ export class StudentFinanceReportsComponent implements OnInit {
   filteredReceipts = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
     const gr = this.selectedGrade();
+    const stg = this.selectedStage();
+    const br = this.selectedBranch();
     const meth = this.selectedMethod();
+    const preset = this.datePreset();
+    const dFrom = this.dateFrom();
+    const dTo = this.dateTo();
+    const today = this.todayStr;
 
     const rows = this.receiptsData().filter((r) => {
-      if (q && !r.student_name.toLowerCase().includes(q) && !r.receipt_number.toLowerCase().includes(q) && !(r.reference_number || '').toLowerCase().includes(q)) return false;
-      if (gr !== 'all' && !r.grade_name.includes(gr)) return false;
+      // 1. بحث نصي
+      if (q) {
+        const matches =
+          (r.student_name || '').toLowerCase().includes(q) ||
+          (r.student_number || '').toLowerCase().includes(q) ||
+          (r.receipt_number || '').toLowerCase().includes(q) ||
+          (r.reference_number || '').toLowerCase().includes(q) ||
+          (r.collector || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      // 2. فلتر الفرع (بنين / بنات)
+      if (br !== 'all') {
+        const rowBranch = r.branch_name || (r.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين');
+        if (br === 'فرع البنين' && !rowBranch.includes('بنين')) return false;
+        if (br === 'فرع البنات' && !rowBranch.includes('بنات')) return false;
+      }
+
+      // 3. فلتر المرحلة التعليمية
+      if (stg !== 'all') {
+        const rowStage = r.stage_name || this.inferStage(r.grade_name);
+        if (rowStage !== stg) return false;
+      }
+
+      // 4. فلتر الصف الدراسي
+      if (gr !== 'all' && !(r.grade_name || '').includes(gr)) return false;
+
+      // 5. طريقة الدفع
       if (meth !== 'all' && r.payment_method !== meth) return false;
+
+      // 6. فلتر التاريخ
+      const rDate = r.receipt_date || r.payment_date || '';
+      if (preset === 'today') {
+        if (rDate !== today) return false;
+      } else if (dFrom && rDate && rDate < dFrom) {
+        return false;
+      } else if (dTo && rDate && rDate > dTo) {
+        return false;
+      }
+
       return true;
     });
 
@@ -1537,17 +2063,50 @@ export class StudentFinanceReportsComponent implements OnInit {
     }
 
     if (tab === 'receipts') {
-      const rows = this.receiptsData();
+      const rows = this.filteredReceipts().filter((r) => !r._isTotal);
       const total = rows.reduce((s, r) => s + r.amount, 0);
-      const bankak = rows.filter((r) => r.payment_method.includes('بنكك')).reduce((s, r) => s + r.amount, 0);
-      const fawry = rows.filter((r) => r.payment_method.includes('فوري')).reduce((s, r) => s + r.amount, 0);
-      const cash = rows.filter((r) => r.payment_method.includes('نقدي')).reduce((s, r) => s + r.amount, 0);
+      const isToday = this.datePreset() === 'today';
+      const boysRows = rows.filter((r) => (r.branch_name || '').includes('بنين') || r.gender === 'بنين');
+      const girlsRows = rows.filter((r) => (r.branch_name || '').includes('بنات') || r.gender === 'بنات');
+      const boysTotal = boysRows.reduce((s, r) => s + r.amount, 0);
+      const girlsTotal = girlsRows.reduce((s, r) => s + r.amount, 0);
+      const bankak = rows.filter((r) => (r.payment_method || '').includes('بنكك')).reduce((s, r) => s + r.amount, 0);
+
+      const periodPrefix = isToday ? 'اليوم' : (this.datePreset() === 'month' ? 'هذا الشهر' : 'الفترة المحددة');
 
       return [
-        { label: 'إجمالي المقبوضات النقدية والبنكية', value: this.fmt(total), unit: 'ج.س', icon: '🏦', style: 'success' },
-        { label: 'تحصيلات تطبيق بنكك (بنك الخرطوم)', value: this.fmt(bankak), unit: 'ج.س', icon: '📱', sub: `${((bankak/total || 0)*100).toFixed(0)}% من المقبوضات` },
-        { label: 'تحصيلات خدمة فوري (بنك فيصل)', value: this.fmt(fawry), unit: 'ج.س', icon: '💳' },
-        { label: 'المقبوض نقداً بخزينة المدرسة', value: this.fmt(cash), unit: 'ج.س', icon: '💰' },
+        {
+          label: `إجمالي متحصلات ${periodPrefix}`,
+          value: this.fmt(total),
+          unit: 'ج.س',
+          icon: '🏦',
+          style: 'success',
+          sub: `${rows.length} سند قبض معتمد`,
+        },
+        {
+          label: `تحصيلات فرع البنين (${periodPrefix})`,
+          value: this.fmt(boysTotal),
+          unit: 'ج.س',
+          icon: '👦',
+          style: 'info',
+          sub: `${boysRows.length} سند (${total > 0 ? ((boysTotal / total) * 100).toFixed(0) : 0}%)`,
+        },
+        {
+          label: `تحصيلات فرع البنات (${periodPrefix})`,
+          value: this.fmt(girlsTotal),
+          unit: 'ج.س',
+          icon: '👧',
+          style: 'warning',
+          sub: `${girlsRows.length} سند (${total > 0 ? ((girlsTotal / total) * 100).toFixed(0) : 0}%)`,
+        },
+        {
+          label: 'المحصل عبر تطبيق بنكك (بنك الخرطوم)',
+          value: this.fmt(bankak),
+          unit: 'ج.س',
+          icon: '📱',
+          style: 'success',
+          sub: total > 0 ? `${((bankak / total) * 100).toFixed(0)}% من مقبوضات السندات` : '0%',
+        },
       ];
     }
 
@@ -1621,6 +2180,15 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   // ---- ألوان وشارات مساعدة ----
 
+  getStageClass(stage: string): string {
+    if (!stage) return '';
+    if (stage.includes('ثانوي')) return 'secondary';
+    if (stage.includes('متوسط')) return 'intermediate';
+    if (stage.includes('ابتدائي')) return 'primary';
+    if (stage.includes('رياض') || stage.includes('روض')) return 'kindergarten';
+    return '';
+  }
+
   getMethodClass(method: string): string {
     if (method.includes('بنكك')) return 'bankak';
     if (method.includes('فوري')) return 'fawry';
@@ -1685,9 +2253,13 @@ export class StudentFinanceReportsComponent implements OnInit {
     if (tab === 'receipts') {
       return [
         { key: 'receipt_number', label: 'رقم السند' },
-        { key: 'receipt_date', label: 'التاريخ' },
+        { key: 'receipt_date', label: 'تاريخ السند' },
         { key: 'student_name', label: 'اسم الطالب' },
+        { key: 'student_number', label: 'الرقم الأكاديمي' },
+        { key: 'branch_name', label: 'الفرع' },
+        { key: 'stage_name', label: 'المرحلة التعليمية' },
         { key: 'grade_name', label: 'الصف' },
+        { key: 'section_name', label: 'الشعبة' },
         { key: 'payment_method', label: 'طريقة الدفع' },
         { key: 'reference_number', label: 'رقم المرجع' },
         { key: 'amount', label: 'المبلغ (ج.س)', align: 'end', map: (r) => this.fmt(r.amount) },
@@ -1776,11 +2348,31 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   // ---- إجراءات الطباعة الرسمية ----
 
+  printReceipt(receipt: any) {
+    printReceiptVoucher({
+      receipt_number: receipt.receipt_number,
+      receipt_date: receipt.receipt_date,
+      student_name: receipt.student_name,
+      student_number: receipt.student_number,
+      branch_name: receipt.branch_name,
+      stage_name: receipt.stage_name,
+      grade_name: receipt.grade_name,
+      section_name: receipt.section_name,
+      payment_method: receipt.payment_method,
+      reference_number: receipt.reference_number,
+      amount: receipt.amount,
+      collector: receipt.collector,
+    });
+  }
+
   printCurrentReport() {
     const title = this.activeReportTitle();
     const cols = this.activeExportColumns();
     const rows = this.activeExportRows();
-    const filterInfo = `الفترة: ${this.getPresetLabel()} — الصف: ${this.selectedGrade() === 'all' ? 'جميع الصفوف' : this.selectedGrade()}`;
+    const branchPart = this.selectedBranch() !== 'all' ? ` — ${this.selectedBranch()}` : '';
+    const stagePart = this.selectedStage() !== 'all' ? ` — ${this.selectedStage()}` : '';
+    const gradePart = this.selectedGrade() !== 'all' ? ` — ${this.selectedGrade()}` : '';
+    const filterInfo = `الفترة: ${this.getPresetLabel()}${branchPart}${stagePart}${gradePart}`;
     const kpiSummary = this.currentKpis().map((k) => ({
       label: k.label,
       value: `${k.value} ${k.unit || ''}`.trim(),
@@ -1836,6 +2428,8 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   private getPresetLabel(): string {
     const p = this.datePreset();
+    if (p === 'today') return 'سندات اليوم (17 سبتمبر 2026)';
+    if (p === 'week') return 'الأسبوع الحالي';
     if (p === 'year') return 'العام الدراسي الحالي (2025/2026)';
     if (p === 'quarter') return 'الربع الدراسي الحالي';
     if (p === 'month') return 'الشهر الحالي (سبتمبر 2026)';

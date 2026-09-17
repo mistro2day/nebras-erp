@@ -439,3 +439,139 @@ export function printDemandNotice(student: {
   w.document.write(html);
   w.document.close();
 }
+
+/**
+ * طباعة إيصال / سند قبض مالي رسمي A4 للطالب بهوية وزارة التعليم والتربية الوطنية
+ */
+export function printReceiptVoucher(receipt: {
+  receipt_number: string;
+  receipt_date: string;
+  student_name: string;
+  student_number?: string;
+  branch_name?: string;
+  stage_name?: string;
+  grade_name?: string;
+  section_name?: string;
+  payment_method: string;
+  reference_number?: string;
+  amount: number;
+  collector?: string;
+  notes?: string;
+}): void {
+  const amountStr = (Number(receipt.amount) || 0).toLocaleString('en-US');
+  const tafqeetStr = tafqeet(Number(receipt.amount) || 0);
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8">
+  <title>سند قبض رسمي — ${receipt.receipt_number}</title>
+  <style>
+    * { font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; color: #111827; padding: 20px; }
+    @page { size: A4 portrait; margin: 15mm 20mm; }
+    .voucher { max-width: 210mm; margin: 0 auto; border: 2px solid #0057B8; border-radius: 8px; padding: 25px; position: relative; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0057B8; padding-bottom: 15px; margin-bottom: 20px; }
+    .header .title-area h2 { font-size: 13px; color: #4B5563; }
+    .header .title-area h1 { font-size: 22px; color: #0057B8; font-weight: 800; margin: 4px 0; }
+    .header .meta { text-align: left; font-size: 12px; color: #374151; }
+    .receipt-badge { background: #EEF3FB; border: 1px solid #0057B8; color: #0057B8; font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 6px; display: inline-block; margin-top: 4px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; background: #F9FAFB; padding: 15px; border-radius: 6px; border: 1px solid #E5E7EB; font-size: 13px; }
+    .grid-row { display: flex; gap: 8px; }
+    .label { color: #6B7280; font-weight: 600; min-width: 110px; }
+    .val { color: #111827; font-weight: 700; }
+    .amount-box { background: #F0FDF4; border: 2px solid #16A34A; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 25px; }
+    .amount-title { font-size: 12px; color: #15803D; font-weight: 600; }
+    .amount-num { font-size: 26px; font-weight: 800; color: #16A34A; margin: 4px 0; }
+    .amount-words { font-size: 14px; color: #166534; font-weight: 600; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 45px; text-align: center; font-size: 12px; }
+    .sig-box { width: 170px; }
+    .sig-line { border-top: 1px solid #374151; margin-top: 40px; padding-top: 6px; font-weight: 700; }
+    .footer { text-align: center; margin-top: 30px; font-size: 11px; color: #9CA3AF; border-top: 1px dashed #E5E7EB; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="voucher">
+    <div class="header">
+      <div class="title-area">
+        <h2>${MINISTRY}</h2>
+        <h1>سند قبض وتحصيل مالي</h1>
+        <div style="font-size:12px; color:#4B5563;">حسابات الرسوم والقبض المدرسية</div>
+      </div>
+      <div class="meta">
+        <div>التاريخ: <strong>${receipt.receipt_date}</strong></div>
+        <div class="receipt-badge">${receipt.receipt_number}</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="grid-row">
+        <span class="label">اسم الطالب:</span>
+        <span class="val">${receipt.student_name}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">الرقم الأكاديمي:</span>
+        <span class="val">${receipt.student_number || '—'}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">الفرع:</span>
+        <span class="val">${receipt.branch_name || 'فرع البنين'}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">المرحلة الدراسية:</span>
+        <span class="val">${receipt.stage_name || 'المرحلة المتوسطة'}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">الصف والشعبة:</span>
+        <span class="val">${receipt.grade_name || '—'} ${receipt.section_name ? '(' + receipt.section_name + ')' : ''}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">طريقة السداد:</span>
+        <span class="val">${receipt.payment_method}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">رقم المرجع / الإشعار:</span>
+        <span class="val" style="font-family:monospace;">${receipt.reference_number || '—'}</span>
+      </div>
+      <div class="grid-row">
+        <span class="label">المحصّل المسؤول:</span>
+        <span class="val">${receipt.collector || 'محاسب الخزينة'}</span>
+      </div>
+    </div>
+
+    <div class="amount-box">
+      <div class="amount-title">المبلغ المحصل نقداً / بنكياً</div>
+      <div class="amount-num">${amountStr} <span style="font-size:16px;">جنيه سوداني (ج.س)</span></div>
+      <div class="amount-words">فقط وقدره: ${tafqeetStr}</div>
+    </div>
+
+    <div class="signatures">
+      <div class="sig-box">
+        <div>توقيع المودع / ولي الأمر</div>
+        <div class="sig-line">الاسم والتوقيع</div>
+      </div>
+      <div class="sig-box">
+        <div>توقيع المحصّل / أمين الخزينة</div>
+        <div class="sig-line">${receipt.collector || 'أمين الصندوق'}</div>
+      </div>
+      <div class="sig-box">
+        <div>الاعتماد المالي والختم</div>
+        <div class="sig-line">المدير المالي</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      نبراس لإدارة المؤسسات التعليمية &nbsp;•&nbsp; مستند تحصيل رسمي معتمد &nbsp;•&nbsp; تاريخ الطباعة: ${timestamp()}
+    </div>
+  </div>
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=900,height=750');
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+

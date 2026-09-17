@@ -74,6 +74,9 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
         'student_name': '',
         'grade_name': '',
         'section_name': '',
+        'stage_name': '',
+        'branch_name': '',
+        'gender': '',
         'guardian_name': '',
         'guardian_phone': '',
         'account_number': billing_account.account_number or '',
@@ -100,21 +103,40 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
             data['student_id'] = str(student.id)
             data['student_number'] = student.student_number or ''
             prof = getattr(student, 'profile', None)
+            gender_val = 'male'
             if prof:
                 data['student_name'] = prof.arabic_name or prof.english_name or ''
+                gender_val = getattr(prof, 'gender', 'male')
+                data['gender'] = 'بنات' if gender_val == 'female' else 'بنين'
 
             enrs = list(student.enrollments.all())
             enrollment = next((e for e in enrs if e.status == 'active'), enrs[0] if enrs else None)
             if enrollment:
+                # Branch
+                bid = getattr(enrollment, 'branch_id', None)
+                if bid:
+                    try:
+                        from apps.organization.domain.models import Branch
+                        br = Branch.objects.filter(id=bid).first()
+                        if br:
+                            data['branch_name'] = getattr(br, 'name_ar', '') or getattr(br, 'name', '') or ''
+                    except Exception:
+                        pass
+                if not data['branch_name']:
+                    data['branch_name'] = 'فرع البنات' if gender_val == 'female' else 'فرع البنين'
+
                 gid = getattr(enrollment, 'grade_id', None)
                 if gid:
                     if grade_map is not None and gid in grade_map:
                         data['grade_name'] = grade_map[gid]
                     else:
                         from apps.academics.domain.models import Grade
-                        g = Grade.objects.filter(id=gid).first()
+                        g = Grade.objects.filter(id=gid).select_related('stage').first()
                         if g:
                             data['grade_name'] = getattr(g, 'name_ar', '') or getattr(g, 'name', '') or ''
+                            if getattr(g, 'stage', None):
+                                data['stage_name'] = getattr(g.stage, 'name', '')
+
                 sid = getattr(enrollment, 'section_id', None)
                 if sid:
                     if section_map is not None and sid in section_map:
@@ -124,6 +146,23 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
                         sec = Section.objects.filter(id=sid).first()
                         if sec:
                             data['section_name'] = getattr(sec, 'name_ar', '') or getattr(sec, 'name', '') or ''
+
+            if not data['branch_name']:
+                data['branch_name'] = 'فرع البنات' if gender_val == 'female' else 'فرع البنين'
+
+            # Fallback for stage_name if not retrieved from grade relation
+            if not data['stage_name'] and data['grade_name']:
+                gname = data['grade_name']
+                if 'متوسط' in gname:
+                    data['stage_name'] = 'المرحلة المتوسطة'
+                elif 'ثانوي' in gname:
+                    data['stage_name'] = 'المرحلة الثانوية'
+                elif 'ابتدائي' in gname:
+                    data['stage_name'] = 'المرحلة الابتدائية'
+                elif 'رياض' in gname or 'روض' in gname:
+                    data['stage_name'] = 'رياض الأطفال'
+                else:
+                    data['stage_name'] = 'المرحلة الأساسية'
 
             f_list = list(student.family_relations.all())
             if f_list:
@@ -271,6 +310,10 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     student_name = serializers.SerializerMethodField()
     grade_name = serializers.SerializerMethodField()
     section_name = serializers.SerializerMethodField()
+    stage_name = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    receipt_date = serializers.SerializerMethodField()
     guardian_name = serializers.SerializerMethodField()
     guardian_phone = serializers.SerializerMethodField()
     account_number = serializers.SerializerMethodField()
@@ -283,6 +326,22 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Receipt
         fields = '__all__'
+
+    def get_stage_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account).get('stage_name', '')
+
+    def get_branch_name(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account).get('branch_name', '')
+
+    def get_gender(self, obj):
+        return _extract_student_finance_metadata(obj.student_billing_account).get('gender', '')
+
+    def get_receipt_date(self, obj):
+        if getattr(obj, 'payment_date', None):
+            return str(obj.payment_date)
+        if getattr(obj, 'created_at', None):
+            return str(obj.created_at).split('T')[0]
+        return ''
 
     def get_student_id(self, obj):
         return _extract_student_finance_metadata(obj.student_billing_account)['student_id']
