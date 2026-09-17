@@ -11,6 +11,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
+import { StudentsService } from '../../students/students.service';
+import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbExportMenuComponent } from '../../../shared/export/nb-export-menu.component';
@@ -21,7 +23,6 @@ import {
   printStudentFinanceReport,
   printClearanceCertificate,
   printDemandNotice,
-  printReceiptVoucher,
   tafqeet,
 } from './student-finance-report-print';
 
@@ -40,7 +41,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
   selector: 'app-student-finance-reports',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent, NbLoadingComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent, NbLoadingComponent, SfDocumentDrawerComponent],
   template: `
     <div class="page" dir="rtl">
       <!-- ترويسة الصفحة -->
@@ -444,8 +445,8 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                       </td>
                       <td>
                         <div class="row-actions-group">
-                          <button class="btn xs print-btn" title="طباعة سند القبض الرسمي A4" (click)="printReceipt(r)">
-                            🖨️ سند A4
+                          <button class="btn xs print-btn" title="طباعة سند القبض الرسمي" (click)="openReceiptDrawer(r)">
+                            🖨️ طباعة السند
                           </button>
                           <button class="btn xs ghost" title="عرض كشف حساب الطالب" (click)="viewAccount(r.account_id)">
                             كشف الحساب
@@ -726,6 +727,9 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
           }
         }
       </div>
+
+      <!-- درج عرض وطباعة السند الرسمي (نفس شكل سند ملف الطالب) -->
+      <sf-document-drawer [doc]="receiptDoc()" [methods]="receiptMethods()" [schoolInfo]="receiptSchoolInfo()" (closed)="receiptDoc.set(null)"></sf-document-drawer>
     </div>
   `,
   styles: [`
@@ -1265,7 +1269,13 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
 })
 export class StudentFinanceReportsComponent implements OnInit {
   private svc = inject(StudentFinanceService);
+  private studentsSvc = inject(StudentsService);
   private router = inject(Router);
+
+  // درج عرض السند الرسمي
+  readonly receiptDoc = signal<SfDoc>(null);
+  readonly receiptSchoolInfo = signal<any>(null);
+  readonly receiptMethods = signal<any[]>([]);
 
   // الحالة النشطة
   activeTab = signal<ReportTab>('revenue');
@@ -1337,6 +1347,9 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   ngOnInit() {
     this.loadAllData();
+    // تحميل بيانات المدرسة وطرق الدفع لدرج السند
+    this.studentsSvc.getBranding().subscribe((b) => this.receiptSchoolInfo.set(b));
+    this.svc.listPaymentMethods().subscribe((r) => this.receiptMethods.set(r?.data ?? []));
   }
 
   setDatePreset(preset: DatePreset) {
@@ -2431,20 +2444,28 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   // ---- إجراءات الطباعة الرسمية ----
 
-  printReceipt(receipt: any) {
-    printReceiptVoucher({
-      receipt_number: receipt.receipt_number,
-      receipt_date: receipt.receipt_date,
-      student_name: receipt.student_name,
-      student_number: receipt.student_number,
-      branch_name: receipt.branch_name,
-      stage_name: receipt.stage_name,
-      grade_name: receipt.grade_name,
-      section_name: receipt.section_name,
-      payment_method: receipt.payment_method,
-      reference_number: receipt.reference_number,
-      amount: receipt.amount,
-      collector: receipt.collector,
+  /** فتح درج السند الرسمي بنفس شكل سند ملف الطالب */
+  openReceiptDrawer(receipt: any) {
+    this.receiptDoc.set({
+      type: 'receipt',
+      data: {
+        receipt_number: receipt.receipt_number,
+        payment_date: receipt.receipt_date,
+        student_name: receipt.student_name,
+        student_number: receipt.student_number,
+        grade_name: receipt.grade_name,
+        section_name: receipt.section_name,
+        guardian_name: receipt.guardian_name || '—',
+        guardian_phone: receipt.guardian_phone || '—',
+        account_number: receipt.account_number || `ACC-${receipt.student_number || 'ST-2026'}`,
+        payment_method_name: receipt.payment_method,
+        reference_number: receipt.reference_number,
+        amount: receipt.amount,
+        remaining_balance: receipt.remaining_balance ?? 0,
+        notes: receipt.notes || 'دفعة سداد معتمدة بموجب إيصال قبض',
+        status: receipt.status || 'posted',
+        collector: receipt.collector,
+      },
     });
   }
 
