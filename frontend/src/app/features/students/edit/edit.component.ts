@@ -545,6 +545,12 @@ export class StudentEditComponent implements OnInit {
   }
 
   save(): void {
+    if (!this.personalForm.arabic_name?.trim()) {
+      this.error.set('اسم الطالب بالعربية إلزامي.');
+      this.snack.open('اسم الطالب بالعربية إلزامي.', 'إغلاق', { duration: 4000 });
+      return;
+    }
+
     this.saving.set(true);
     this.error.set(null);
 
@@ -582,7 +588,16 @@ export class StudentEditComponent implements OnInit {
       },
       error: (e) => {
         this.saving.set(false);
-        this.error.set(e?.error?.error?.message || 'تعذّر حفظ التعديلات. تحقّق من الحقول والصلاحيات.');
+        const details = e?.error?.error?.details || e?.error?.details || e?.error?.error?.message || e?.error?.message;
+        let errMsg = 'تعذّر حفظ التعديلات. تحقّق من الحقول والصلاحيات.';
+        if (typeof details === 'string') {
+          errMsg = details;
+        } else if (typeof details === 'object' && details !== null) {
+          const msgs = Object.entries(details).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+          if (msgs) errMsg = msgs;
+        }
+        this.error.set(errMsg);
+        this.snack.open(errMsg, 'إغلاق', { duration: 6000 });
       },
     });
   }

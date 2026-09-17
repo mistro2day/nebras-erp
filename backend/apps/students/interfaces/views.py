@@ -186,7 +186,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         return StandardResponse(None, message="تم حذف الطالب بنجاح.", status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop('partial', True)
         instance = self.get_object()
         tenant_id = getattr(instance, 'tenant_id', None) or (request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4())
         user_id = request.user.id if request.user else uuid.uuid4()
@@ -194,14 +194,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         # 1. تحديث البروفايل الشخصي
         profile_data = request.data.get('profile', {})
         if profile_data and hasattr(instance, 'profile'):
-            profile_serializer = StudentProfileSerializer(instance.profile, data=profile_data, partial=partial)
+            profile_serializer = StudentProfileSerializer(instance.profile, data=profile_data, partial=True)
             profile_serializer.is_valid(raise_exception=True)
             profile_serializer.save()
             
         # 2. تحديث الملف الطبي
         medical_data = request.data.get('medical_profile', {})
         if medical_data and hasattr(instance, 'medical_profile'):
-            medical_serializer = StudentMedicalProfileSerializer(instance.medical_profile, data=medical_data, partial=partial)
+            medical_serializer = StudentMedicalProfileSerializer(instance.medical_profile, data=medical_data, partial=True)
             medical_serializer.is_valid(raise_exception=True)
             medical_serializer.save()
 
@@ -246,13 +246,32 @@ class StudentViewSet(viewsets.ModelViewSet):
                 if grade_id:
                     try:
                         from apps.students.domain.models import StudentEnrollment
+                        from apps.organization.domain.models import resolve_branch_for_gender
+                        from apps.academics.domain.models import AcademicYear
                         from datetime import date
+
+                        resolved_year_id = academic_year_id
+                        if not resolved_year_id:
+                            act_year = (
+                                AcademicYear.objects.filter(tenant_id=tenant_id, current_flag=True).first()
+                                or AcademicYear.objects.filter(tenant_id=tenant_id, status='active').first()
+                                or AcademicYear.objects.filter(tenant_id=tenant_id).order_by('-start_date').first()
+                                or AcademicYear.objects.filter(current_flag=True).first()
+                                or AcademicYear.objects.first()
+                            )
+                            if act_year:
+                                resolved_year_id = act_year.id
+
+                        gender = getattr(getattr(instance, 'profile', None), 'gender', 'male')
+                        branch = resolve_branch_for_gender(tenant_id, gender)
+
                         StudentEnrollment.objects.create(
                             tenant_id=tenant_id,
                             student=instance,
                             grade_id=uuid.UUID(str(grade_id)),
                             section_id=uuid.UUID(str(section_id)) if section_id else None,
-                            academic_year_id=uuid.UUID(str(academic_year_id)) if academic_year_id else uuid.uuid4(),
+                            academic_year_id=uuid.UUID(str(resolved_year_id)) if resolved_year_id else uuid.uuid4(),
+                            branch_id=branch.id if branch else None,
                             enrollment_date=date.today(),
                             status='active'
                         )
