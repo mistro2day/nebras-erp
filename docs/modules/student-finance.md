@@ -228,5 +228,7 @@ graph TD
   - تطبيق التجميع الجماعي (Batch Prefetching) في كل من `ReceiptViewSet` و `StudentInvoiceViewSet` و `StudentBillingAccountViewSet` لتحميل بيانات الطلاب والمراحل والصفوف والفروع في استعلام واحد بدلاً من مئات الاستعلامات المنفردة عبر الشبكة السحابية.
   - ترقية دالة مزامنة الأقساط `_sync_invoices_to_installments` لتستخدم `Installment.objects.bulk_create` دفعة واحدة.
   - اعتماد قواميس تخزين مؤقت في الذاكرة (`_STUDENT_META_CACHE`, `_PAYMENT_METHOD_CACHE`, `_ACC_TOTALS_CACHE`) لتقليص زمن معالجة وإرجاع السندات بنسبة 90% وضمان استجابة لحظية للواجهة.
+  - مرونة وأمان استخراج البيانات الوصفية (`_extract_student_finance_metadata`): دعم استلام وسيط `branch_map` و `**kwargs` لمنع أي أخطاء `TypeError` غير متوقعة عند جلب الفروع دفعياً، مع التحويل الصريح للأرقام والهواتف لضمان سلامة بيانات الحسابات والفواتير في كافة واجهات النظام وملفات الطلاب.
+
 
 

@@ -506,14 +506,28 @@ class StudentViewSet(viewsets.ModelViewSet):
         timeline_events = []
         
         # 1. تاريخ التسجيل والتسكين الأكاديمي
+        from apps.academics.domain.models import Grade, Section, AcademicYear
         for enr in student.enrollments.all().order_by('-created_at'):
+            grade_name = getattr(enr, 'grade_name', None)
+            if not grade_name and enr.grade_id:
+                g_obj = Grade.objects.filter(id=enr.grade_id).first()
+                grade_name = (getattr(g_obj, 'name_ar', None) or getattr(g_obj, 'name', None)) if g_obj else str(enr.grade_id)
+            sec_name = getattr(enr, 'section_name', None)
+            if not sec_name and enr.section_id:
+                s_obj = Section.objects.filter(id=enr.section_id).first()
+                sec_name = (getattr(s_obj, 'name_ar', None) or getattr(s_obj, 'name', None)) if s_obj else str(enr.section_id)
+            ay_name = getattr(enr, 'academic_year_name', None)
+            if not ay_name and enr.academic_year_id:
+                ay_obj = AcademicYear.objects.filter(id=enr.academic_year_id).first()
+                ay_name = (getattr(ay_obj, 'name_ar', None) or getattr(ay_obj, 'name', None)) if ay_obj else '2025/2026'
+
             timeline_events.append({
                 'id': str(enr.id),
                 'type': 'enrollment',
                 'title': f"التسكين الأكاديمي ({enr.get_status_display() if hasattr(enr, 'get_status_display') else enr.status})",
                 'date': enr.enrollment_date or enr.created_at,
                 'user': str(enr.created_by or 'النظام'),
-                'comments': f"السنة الدراسية: {enr.academic_year_name or '—'} · الصف: {enr.grade_name or '—'} · الفصل: {enr.section_name or '—'}"
+                'comments': f"السنة الدراسية: {ay_name or '—'} · الصف: {grade_name or '—'} · الفصل: {sec_name or '—'}"
             })
 
         # 2. تاريخ الحالات

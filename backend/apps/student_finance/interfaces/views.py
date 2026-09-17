@@ -1097,11 +1097,11 @@ class InstallmentViewSet(BaseCRUDViewSet):
         for idx, ins in enumerate(qs, start=1):
             ac = ins.student_billing_account
             meta = _extract_student_finance_metadata(ac) if ac else {}
-            st_num = meta.get('student_number') or (ac.account_number if ac else '-')
-            st_name = meta.get('student_name') or 'طالب'
-            grade = (meta.get('grade_name') or '') + (' - ' + meta.get('section_name') if meta.get('section_name') else '')
-            g_name = meta.get('guardian_name') or '-'
-            g_phone = meta.get('guardian_phone') or '-'
+            st_num = str(meta.get('student_number') or (ac.account_number if ac else '-'))
+            st_name = str(meta.get('student_name') or 'طالب')
+            grade = str(meta.get('grade_name') or '') + (' - ' + str(meta.get('section_name')) if meta.get('section_name') else '')
+            g_name = str(meta.get('guardian_name') or '-')
+            g_phone = str(meta.get('guardian_phone') or '-')
 
             amt = float(ins.amount or 0.0)
             paid = float(ins.paid_amount or 0.0)

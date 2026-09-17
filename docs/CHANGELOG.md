@@ -48,6 +48,14 @@
     - حذف زر CSV وتجريد كود التصدير الخاص به من المكون المشترك `NbExportMenuComponent` والاكتفاء بالتصدير المعتمد إلى Excel و PDF لضمان مظهر نظيف ومحكم.
   * **تصدير متكامل**: دعم تصدير تقرير السندات المفصل إلى ملفات Excel و PDF متضمنة كافة الفروع والمراحل وتفاصيل المحصلين.
 
+### Fixed
+- **حل مشكلة اختفاء الرسوم المالية في ملف الطالب وإصلاح واجهة الخط الزمني (`student_finance` & `students`)**:
+  * **معالجة خطأ وسائط استخراج البيانات المالية (`serializers.py` & `views.py`)**:
+    - توسيع توقيع دالة `_extract_student_finance_metadata` لتقبل المعامل `branch_map=None` و `**kwargs` وتفادي خطأ `TypeError: unexpected keyword argument 'branch_map'` الذي كان يتسبب في تعطل مسار `/api/v1/student-finance/billing-accounts/` بـ HTTP 500 واختفاء بيانات الرسوم في ملف الطالب.
+    - تحويل حقول الأرقام والهواتف وأسماء الصفوف صراحة إلى نصوص (`str()`) لتفادي أي أخطاء نوعية غير متوقعة أثناء معالجة بيانات الأقساط.
+  * **معالجة خطأ استعلام العام الأكاديمي والصف في الخط الزمني للطالب (`StudentViewSet.timeline`)**:
+    - استخراج وحل مسميات العام الأكاديمي والصف والشعبة بأمان من موديلات الأكاديميا (`AcademicYear`, `Grade`, `Section`) بدلاً من قراءة خصائص غير معرّفة مباشرة في كائن `StudentEnrollment`، مما أنهى خطأ `AttributeError: 'StudentEnrollment' object has no attribute 'academic_year_name'` وأعاد استجابة الخط الزمني لحالة النجاح HTTP 200 فورياً.
+
 ## [v1.9.13] - 2026-09-17
 
 ### Added

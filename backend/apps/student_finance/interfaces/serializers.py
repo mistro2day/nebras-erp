@@ -77,7 +77,7 @@ def _get_payment_method_name(pm_id):
     except Exception:
         return 'تحويل بنكي'
 
-def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None):
+def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None, branch_map=None, **kwargs):
     if not billing_account:
         return {
             'student_id': '', 'student_number': '', 'student_name': '',
@@ -138,13 +138,16 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
                 # Branch
                 bid = getattr(enrollment, 'branch_id', None)
                 if bid:
-                    try:
-                        from apps.organization.domain.models import Branch
-                        br = Branch.objects.filter(id=bid).first()
-                        if br:
-                            data['branch_name'] = getattr(br, 'name_ar', '') or getattr(br, 'name', '') or ''
-                    except Exception:
-                        pass
+                    if branch_map is not None and bid in branch_map:
+                        data['branch_name'] = branch_map[bid]
+                    else:
+                        try:
+                            from apps.organization.domain.models import Branch
+                            br = Branch.objects.filter(id=bid).first()
+                            if br:
+                                data['branch_name'] = getattr(br, 'name_ar', '') or getattr(br, 'name', '') or ''
+                        except Exception:
+                            pass
                 if not data['branch_name']:
                     data['branch_name'] = 'فرع البنات' if gender_val == 'female' else 'فرع البنين'
 
