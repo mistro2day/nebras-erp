@@ -1219,6 +1219,75 @@ class ReceiptViewSet(BaseCRUDViewSet):
 
         return qs
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        receipts_list = list(page if page is not None else queryset)
+
+        # تحميل جماعي سريع لبيانات الطلاب لمنع مئات استعلامات الشبكة السحابية
+        student_ids = {
+            r.student_billing_account.student_id
+            for r in receipts_list
+            if getattr(r, 'student_billing_account', None) and getattr(r.student_billing_account, 'student_id', None)
+        }
+        pm_ids = {
+            r.payment_method_id
+            for r in receipts_list
+            if getattr(r, 'payment_method_id', None)
+        }
+
+        from apps.student_finance.interfaces.serializers import (
+            _extract_student_finance_metadata, _PAYMENT_METHOD_CACHE, _ACC_TOTALS_CACHE
+        )
+
+        if student_ids:
+            from apps.students.domain.models import Student
+            from apps.academics.domain.models import Grade, Section
+
+            students_qs = Student.objects.filter(id__in=student_ids).select_related('profile').prefetch_related(
+                'enrollments', 'family_relations'
+            )
+            student_map = {s.id: s for s in students_qs}
+
+            grade_ids = set()
+            section_ids = set()
+            for s in students_qs:
+                for e in s.enrollments.all():
+                    if getattr(e, 'grade_id', None):
+                        grade_ids.add(e.grade_id)
+                    if getattr(e, 'section_id', None):
+                        section_ids.add(e.section_id)
+
+            grade_map = {g.id: (getattr(g, 'name_ar', '') or getattr(g, 'name', '')) for g in Grade.objects.filter(id__in=grade_ids)} if grade_ids else {}
+            section_map = {sec.id: (getattr(sec, 'name_ar', '') or getattr(sec, 'name', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
+
+            for r in receipts_list:
+                if getattr(r, 'student_billing_account', None):
+                    _extract_student_finance_metadata(
+                        r.student_billing_account,
+                        student_map=student_map,
+                        grade_map=grade_map,
+                        section_map=section_map
+                    )
+
+        if pm_ids:
+            from apps.finance.domain.models import PaymentMethod
+            for pm in PaymentMethod.objects.filter(id__in=pm_ids):
+                _PAYMENT_METHOD_CACHE[str(pm.id)] = pm.name_ar or pm.name
+
+        for r in receipts_list:
+            acc = getattr(r, 'student_billing_account', None)
+            if acc and getattr(acc, 'id', None) and acc.id not in _ACC_TOTALS_CACHE:
+                _ACC_TOTALS_CACHE[acc.id] = (
+                    float(acc.current_balance or 0.0),
+                    max(0.0, float(acc.current_balance or 0.0) - float(acc.outstanding_balance or 0.0))
+                )
+
+        serializer = self.get_serializer(receipts_list, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], url_path='receive-payment')
     def receive_payment(self, request):
         tenant_id = request.tenant_id

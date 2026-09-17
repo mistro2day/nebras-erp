@@ -98,16 +98,16 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
             <span class="ico">🔄</span> تحديث
           </button>
 
-          <button class="btn print" (click)="printCurrentReport()">
-            <span class="ico">🖨️</span> طباعة A4 رسمي
-          </button>
-
           <nb-export-menu
             [columns]="activeExportColumns()"
             [rows]="activeExportRows()"
             [title]="activeReportTitle()"
             [showPrint]="false"
           />
+
+          <button class="btn print" (click)="printCurrentReport()" title="طباعة التقرير المالي الرسمي A4">
+            <span class="ico">🖨️</span> طباعة A4 رسمي
+          </button>
         </div>
       </nb-page-header>
 

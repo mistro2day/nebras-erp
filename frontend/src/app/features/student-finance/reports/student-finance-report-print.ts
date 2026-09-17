@@ -9,9 +9,10 @@
  * جميع المبالغ بالجنيه السوداني (ج.س) مع التفقيط العربي وتوقيعات الاعتماد.
  */
 import { ExportColumn } from '../../../shared/export/export.types';
+import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-branding';
 
-const BRAND = 'نبراس — نظام إدارة المدارس والتحصيل المالي';
-const BRAND_COLOR = '#0057B8';
+const BRAND_SYSTEM = 'منظومة نبراس لإدارة المدارس (Nebras OS)';
+const PRIMARY_COLOR = '#0057B8';
 const MINISTRY = 'جمهورية السودان — وزارة التعليم والتربية الوطنية';
 
 /**
@@ -80,7 +81,7 @@ function cellValue(col: ExportColumn, row: any): string {
 }
 
 /**
- * طباعة تقرير مالي رسمي للطلاب بصيغة A4
+ * طباعة تقرير مالي رسمي للطلاب بصيغة A4 أفقية (Landscape) بهوية المستأجر المعتمدة
  */
 export function printStudentFinanceReport(
   title: string,
@@ -88,8 +89,11 @@ export function printStudentFinanceReport(
   rows: any[],
   filterInfo: string,
   kpis?: Array<{ label: string; value: string; sub?: string }>,
-  customGrandTotal?: number
+  customGrandTotal?: number,
+  tenantInfo?: any
 ): void {
+  const branding = getTenantPrintBranding(tenantInfo);
+
   // حساب المجموع الكلي
   let grandTotal = customGrandTotal ?? 0;
   if (!grandTotal) {
@@ -119,7 +123,7 @@ export function printStudentFinanceReport(
 
   const tafqeetHtml = grandTotal > 0
     ? `<div class="tafqeet">
-        <span class="tafqeet-label">الإجمالي تفقيطاً:</span>
+        <span class="tafqeet-label">المبلغ الإجمالي تفقيطاً بالعملة الوطنية:</span>
         <span class="tafqeet-text">${tafqeet(grandTotal)} فقط لا غير</span>
        </div>`
     : '';
@@ -128,92 +132,142 @@ export function printStudentFinanceReport(
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
-  <title>${title} — ${BRAND}</title>
+  <title>${title} — ${branding.schoolNameAr}</title>
   <style>
-    * { font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fff; color: #111827; }
-    @page { size: A4 portrait; margin: 12mm 15mm; }
-    @media print { .no-print { display: none !important; } }
-
-    .doc { padding: 24px; max-width: 210mm; margin: 0 auto; }
-
-    /* ترويسة المدرسة الرسمية */
-    .doc-header {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      border-bottom: 3px solid ${BRAND_COLOR}; padding-bottom: 14px; margin-bottom: 16px;
+    * { font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; color: #0f172a; font-size: 11px; line-height: 1.35; direction: rtl; }
+    @page { 
+      size: A4 landscape; 
+      margin: 8mm 10mm 8mm 10mm; 
     }
-    .header-main h1 { font-size: 18px; color: #111827; margin-bottom: 4px; font-weight: 800; }
-    .header-main .sub { font-size: 11.5px; color: #4B5563; }
-    .header-brand { text-align: left; }
-    .header-brand .brand-name { font-size: 13px; font-weight: 700; color: ${BRAND_COLOR}; }
-    .header-brand .brand-date { font-size: 10px; color: #6B7280; margin-top: 3px; }
-    .header-brand .ministry { font-size: 9.5px; color: #6B7280; margin-top: 2px; font-weight: 600; }
+    @media print { 
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
 
-    /* شريط الفلاتر والمعلومات */
-    .filter-bar { font-size: 11px; color: #374151; margin-bottom: 14px; padding: 8px 12px;
-      background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; display: flex; justify-content: space-between; }
+    .doc { padding: 12px 16px; max-width: 297mm; width: 100%; margin: 0 auto; }
 
-    /* مؤشرات الأداء */
-    .kpi-strip { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-    .kpi { flex: 1; min-width: 130px; padding: 10px 12px; background: #F3F4F6; border-radius: 6px;
-      border-right: 3px solid ${BRAND_COLOR}; }
-    .kpi-l { display: block; font-size: 9.5px; color: #6B7280; font-weight: 600; }
-    .kpi-v { display: block; font-size: 15px; font-weight: 800; color: #111827; margin-top: 2px; font-variant-numeric: tabular-nums; }
-    .kpi-s { display: block; font-size: 9px; color: #9CA3AF; margin-top: 1px; }
+    /* ترويسة المدرسة الرسمية بهوية المستأجر */
+    .tenant-header {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 2.5px solid ${PRIMARY_COLOR}; padding-bottom: 8px; margin-bottom: 10px;
+    }
+    .header-right { flex: 1; text-align: right; }
+    .ministry { font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 2px; }
+    .school-name-ar { font-size: 17px; font-weight: 900; color: ${PRIMARY_COLOR}; margin-bottom: 1px; }
+    .school-name-en { font-size: 10.5px; font-weight: 600; color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 3px; }
+    .school-contact { font-size: 9px; color: #64748b; }
 
-    /* جدول التقرير */
-    .report-tbl { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
-    .report-tbl th { background: #EEF3FB; padding: 8px 10px; border-bottom: 2px solid #D6DBE6;
-      font-size: 10px; font-weight: 700; color: #1F2937; }
-    .report-tbl td { padding: 7px 10px; border-bottom: 1px solid #E5E8EF; color: #111827; }
-    .report-tbl tbody tr:nth-child(even) td { background: #FAFBFD; }
+    .header-center { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .logo-box { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+    .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .report-title-badge { 
+      background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
+      padding: 3px 14px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-block;
+    }
+
+    .header-left { flex: 1; text-align: left; font-size: 9.5px; color: #475569; line-height: 1.6; }
+    .header-left .meta-row strong { color: #0f172a; }
+
+    /* شريط العنوان والفلترة */
+    .doc-banner {
+      display: flex; justify-content: space-between; align-items: center;
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      color: #ffffff; border-radius: 6px; padding: 6px 14px; margin-bottom: 10px;
+    }
+    .doc-banner .banner-title { font-size: 12.5px; font-weight: 800; }
+    .doc-banner .banner-meta { font-size: 10px; opacity: 0.95; }
+
+    /* شريط مؤشرات الأداء KPIs */
+    .kpi-strip { display: flex; gap: 10px; margin-bottom: 10px; }
+    .kpi { 
+      flex: 1; min-width: 100px; padding: 6px 10px; background: #f8fafc; 
+      border: 1px solid #e2e8f0; border-radius: 6px; border-right: 3px solid ${PRIMARY_COLOR}; 
+    }
+    .kpi-l { display: block; font-size: 9px; color: #64748b; font-weight: 600; }
+    .kpi-v { display: block; font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 1px; font-variant-numeric: tabular-nums; }
+    .kpi-s { display: block; font-size: 8.5px; color: #94a3b8; }
+
+    /* جدول التقرير الأفقي */
+    .report-tbl { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
+    .report-tbl th { 
+      background: #f1f5f9; padding: 6px 8px; border: 1px solid #cbd5e1;
+      font-size: 10px; font-weight: 800; color: #1e293b; white-space: nowrap;
+    }
+    .report-tbl td { 
+      padding: 5px 8px; border: 1px solid #e2e8f0; color: #0f172a; white-space: nowrap; 
+    }
+    .report-tbl tbody tr:nth-child(even) td { background: #f8fafc; }
     .report-tbl .bold { font-weight: 700; }
     .report-tbl .total-row td {
-      background: #EEF3FB !important; font-weight: 800; font-size: 11.5px;
-      border-top: 2px solid ${BRAND_COLOR}; border-bottom: 2px double ${BRAND_COLOR};
+      background: #eff6ff !important; font-weight: 900; font-size: 11px;
+      border-top: 2px solid ${PRIMARY_COLOR}; border-bottom: 2px double ${PRIMARY_COLOR};
+      color: #1e3a8a;
     }
-    .report-tbl .sub-total td { background: #F3F4F6 !important; font-weight: 700; border-top: 1px solid #D1D5DB; }
+    .report-tbl .sub-total td { background: #f1f5f9 !important; font-weight: 700; border-top: 1px solid #cbd5e1; }
 
     /* تفقيط */
-    .tafqeet { padding: 10px 14px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px;
-      font-size: 12px; margin-bottom: 14px; }
-    .tafqeet-label { font-weight: 700; color: #92400E; }
-    .tafqeet-text { color: #78350F; }
+    .tafqeet { 
+      padding: 7px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+      font-size: 11px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .tafqeet-label { font-weight: 700; color: #92400e; }
+    .tafqeet-text { font-weight: 700; color: #78350f; }
 
-    /* التوقيعات الرسمية */
+    /* التوقيعات الرسمية بهوية المستأجر والختم */
     .signatures {
-      display: flex; justify-content: space-between; gap: 20px; margin-top: 28px;
-      padding-top: 16px; border-top: 1px dashed #D1D5DB;
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; 
+      margin-top: 18px; padding-top: 10px; border-top: 1px dashed #cbd5e1;
     }
     .sig { flex: 1; text-align: center; }
-    .sig-label { font-size: 10px; color: #6B7280; margin-bottom: 24px; display: block; }
-    .sig-line { border-top: 1px solid #374151; padding-top: 6px; font-size: 11px; font-weight: 600; color: #111827; }
+    .sig-label { font-size: 9.5px; color: #64748b; margin-bottom: 20px; display: block; font-weight: 600; }
+    .sig-line { border-top: 1px solid #334155; padding-top: 4px; font-size: 10px; font-weight: 700; color: #0f172a; }
+    .stamp-box {
+      width: 60px; height: 60px; border: 1.5px dashed #94a3b8; border-radius: 50%;
+      display: grid; place-items: center; font-size: 8px; color: #94a3b8; margin: 0 auto;
+    }
+    .stamp-img { max-width: 65px; max-height: 65px; object-fit: contain; }
 
-    /* تذييل */
-    .doc-footer { text-align: center; font-size: 9px; color: #9CA3AF; margin-top: 20px; padding-top: 10px; border-top: 1px solid #E5E7EB; }
+    /* تذييل الصفحة الرسمي */
+    .doc-footer { 
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 8.5px; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; 
+    }
   </style>
 </head>
 <body>
   <div class="doc">
-    <div class="doc-header">
-      <div class="header-main">
-        <h1>${title}</h1>
-        <div class="sub">حسابات الطلاب المالية والقبض &nbsp;•&nbsp; ${filterInfo}</div>
-      </div>
-      <div class="header-brand">
-        <div class="brand-name">${BRAND}</div>
-        <div class="brand-date">${timestamp()}</div>
+    <!-- ترويسة المستأجر الرسمية -->
+    <div class="tenant-header">
+      <div class="header-right">
         <div class="ministry">${MINISTRY}</div>
+        <div class="school-name-ar">${branding.schoolNameAr}</div>
+        <div class="school-name-en">${branding.schoolNameEn}</div>
+        <div class="school-contact">${branding.address ? branding.address + ' &nbsp;|&nbsp; ' : ''}هاتف: ${branding.phone || '—'}</div>
+      </div>
+      <div class="header-center">
+        <div class="logo-box">
+          <img src="${branding.logoUrl}" alt="شعار المدرسة" class="logo-img" onerror="this.style.display='none'">
+        </div>
+        <div class="report-title-badge">${title}</div>
+      </div>
+      <div class="header-left">
+        <div class="meta-row">تاريخ التقرير: <strong>${timestamp()}</strong></div>
+        <div class="meta-row">نطاق السجلات: <strong>${filterInfo}</strong></div>
+        <div class="meta-row">العملة: <strong>الجنيه السوداني (ج.س / SDG)</strong></div>
+        <div class="meta-row">إجمالي القيود: <strong>${rows.length} قيد</strong></div>
       </div>
     </div>
 
-    <div class="filter-bar">
-      <span>📅 ${filterInfo}</span>
-      <span>💰 العملة: <strong>الجنيه السوداني (ج.س / SDG)</strong></span>
+    <!-- شريط الملخص والفلترة -->
+    <div class="doc-banner">
+      <div class="banner-title">📊 ${title} &nbsp;•&nbsp; ${filterInfo}</div>
+      <div class="banner-meta">تقرير رسمي معتمد — الإدارة المالية وإدارة حسابات الطلاب</div>
     </div>
 
     ${kpiHtml}
 
+    <!-- جدول البيانات في الصفحة الأفقية -->
     <table class="report-tbl">
       <thead><tr>${theadHtml}</tr></thead>
       <tbody>${tbodyHtml}</tbody>
@@ -221,30 +275,36 @@ export function printStudentFinanceReport(
 
     ${tafqeetHtml}
 
+    <!-- توقيعات الاعتماد والختم الرسمي للمدرسة -->
     <div class="signatures">
       <div class="sig">
-        <span class="sig-label">إعداد الموظف المختص</span>
-        <div class="sig-line">محاسب شؤون الطلاب والقبض</div>
+        <span class="sig-label">إعداد المحاسب المسؤول</span>
+        <div class="sig-line">محاسب شؤون الطلاب والخزينة</div>
       </div>
       <div class="sig">
-        <span class="sig-label">تدقيق ومراجعة</span>
-        <div class="sig-line">المراقب المالي الداخلي</div>
+        <span class="sig-label">تدقيق ومراجعة داخلية</span>
+        <div class="sig-line">المراقب المالي</div>
       </div>
       <div class="sig">
-        <span class="sig-label">اعتماد رسمي</span>
-        <div class="sig-line">المدير المالي والإداري / الختم الرسمي</div>
+        <span class="sig-label">اعتماد المدير المالي والإداري</span>
+        <div class="sig-line">مدير الإدارة المالية</div>
+      </div>
+      <div class="sig" style="flex: 0 0 100px;">
+        ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي">` : '<div class="stamp-box">الختم الرسمي للمدرسة</div>'}
       </div>
     </div>
 
+    <!-- التذييل النظامي -->
     <div class="doc-footer">
-      ${BRAND} &nbsp;•&nbsp; جميع المعاملات بالجنيه السوداني &nbsp;•&nbsp; سجلات: ${rows.length} &nbsp;•&nbsp; تاريخ الطباعة: ${timestamp()}
+      <span>${branding.schoolNameAr} &nbsp;•&nbsp; ${branding.address || 'جمهورية السودان'} &nbsp;•&nbsp; هاتف: ${branding.phone || '—'}</span>
+      <span>${BRAND_SYSTEM} &nbsp;•&nbsp; تم الاستخراج بتاريخ: ${timestamp()}</span>
     </div>
   </div>
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
 
-  const w = window.open('', '_blank', 'width=980,height=720');
+  const w = window.open('', '_blank', 'width=1100,height=750');
   if (!w) return;
   w.document.open();
   w.document.write(html);
@@ -262,42 +322,46 @@ export function printClearanceCertificate(student: {
   guardian_name?: string;
   total_paid: number;
   academic_year?: string;
-}): void {
+}, tenantInfo?: any): void {
+  const branding = getTenantPrintBranding(tenantInfo);
   const html = `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
   <title>شهادة براءة ذمة مالية — ${student.student_name}</title>
   <style>
-    * { font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    * { font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #fff; color: #111827; }
     @page { size: A4 portrait; margin: 15mm 20mm; }
     .cert { padding: 30px; max-width: 210mm; margin: 0 auto; border: 4px double #0057B8; border-radius: 8px; position: relative; }
     .header { text-align: center; border-bottom: 2px solid #0057B8; padding-bottom: 15px; margin-bottom: 25px; }
-    .header h2 { font-size: 14px; color: #4B5563; margin-bottom: 4px; }
-    .header h1 { font-size: 24px; color: #0057B8; margin-bottom: 6px; font-weight: 800; }
+    .header .ministry { font-size: 11px; color: #4B5563; font-weight: 700; margin-bottom: 3px; }
+    .header .school-name { font-size: 16px; color: #0057B8; font-weight: 900; margin-bottom: 6px; }
+    .header h1 { font-size: 22px; color: #1E3A8A; margin-bottom: 6px; font-weight: 800; }
     .header .sub { font-size: 11px; color: #6B7280; }
     .body { font-size: 14px; line-height: 2; margin-bottom: 30px; text-align: justify; }
     .highlight { font-weight: 700; color: #1E3A8A; background: #EEF3FB; padding: 2px 8px; border-radius: 4px; }
     .info-box { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 13px; }
     .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
     .info-row:last-child { margin-bottom: 0; }
-    .signatures { display: flex; justify-content: space-between; margin-top: 50px; text-align: center; }
+    .signatures { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 50px; text-align: center; }
     .sig { width: 160px; }
-    .sig-line { border-top: 1px solid #374151; margin-top: 50px; padding-top: 8px; font-size: 12px; font-weight: 700; }
-    .stamp-box { width: 120px; height: 120px; border: 2px dashed #9CA3AF; border-radius: 50%; display: grid; place-items: center; font-size: 11px; color: #9CA3AF; margin: 20px auto 0; }
+    .sig-line { border-top: 1px solid #374151; margin-top: 40px; padding-top: 8px; font-size: 12px; font-weight: 700; }
+    .stamp-box { width: 100px; height: 100px; border: 2px dashed #9CA3AF; border-radius: 50%; display: grid; place-items: center; font-size: 10px; color: #9CA3AF; margin: 0 auto; }
+    .stamp-img { max-width: 95px; max-height: 95px; object-fit: contain; }
   </style>
 </head>
 <body>
   <div class="cert">
     <div class="header">
-      <h2>${MINISTRY}</h2>
+      <div class="ministry">${MINISTRY}</div>
+      <div class="school-name">${branding.schoolNameAr}</div>
       <h1>إفادة براءة ذمة مالية رسمية</h1>
       <div class="sub">العام الدراسي: ${student.academic_year || '2025 - 2026 م'} &nbsp;|&nbsp; التاريخ: ${timestamp()}</div>
     </div>
 
     <div class="body">
-      تشهد الإدارة المالية وإدارة حسابات الطلاب بأن الطالب/ـة: <span class="highlight">${student.student_name}</span>،
+      تشهد الإدارة المالية وإدارة حسابات الطلاب في <strong>${branding.schoolNameAr}</strong> بأن الطالب/ـة: <span class="highlight">${student.student_name}</span>،
       المقيد بالرقم الأكاديمي: <span class="highlight">${student.student_number}</span>،
       بالصف/المرحلة: <span class="highlight">${student.grade_name || '—'}</span>،
       وحساب الفوترة رقم: <span class="highlight">${student.account_number}</span>،
@@ -320,7 +384,7 @@ export function printClearanceCertificate(student: {
         <div class="sig-line">توقيع المحاسب</div>
       </div>
       <div class="sig">
-        <div class="stamp-box">ختم المدرسة الرسمي</div>
+        ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي">` : '<div class="stamp-box">ختم المدرسة الرسمي</div>'}
       </div>
       <div class="sig">
         <span>المدير المالي والإداري</span>
@@ -352,7 +416,8 @@ export function printDemandNotice(student: {
   outstanding_balance: number;
   days_overdue: number;
   overdue_items: Array<{ title: string; due_date: string; amount: number }>;
-}): void {
+}, tenantInfo?: any): void {
+  const branding = getTenantPrintBranding(tenantInfo);
   const itemsHtml = student.overdue_items.map(it => `
     <tr>
       <td style="padding:8px; border-bottom:1px solid #E5E7EB;">${it.title}</td>
@@ -367,12 +432,13 @@ export function printDemandNotice(student: {
   <meta charset="utf-8">
   <title>إشعار مطالبة مالية — ${student.student_name}</title>
   <style>
-    * { font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    * { font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #fff; color: #111827; }
     @page { size: A4 portrait; margin: 15mm 20mm; }
     .notice { padding: 30px; max-width: 210mm; margin: 0 auto; border: 2px solid #DC2626; border-radius: 8px; }
     .header { text-align: center; border-bottom: 2px solid #DC2626; padding-bottom: 12px; margin-bottom: 20px; }
-    .header h2 { font-size: 13px; color: #6B7280; }
+    .header .ministry { font-size: 11px; color: #4B5563; font-weight: 700; margin-bottom: 3px; }
+    .header .school-name { font-size: 16px; color: #1E3A8A; font-weight: 900; margin-bottom: 6px; }
     .header h1 { font-size: 22px; color: #DC2626; font-weight: 800; margin: 4px 0; }
     .body { font-size: 13.5px; line-height: 1.8; margin-bottom: 20px; }
     .tbl { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12.5px; }
@@ -385,17 +451,20 @@ export function printDemandNotice(student: {
 <body>
   <div class="notice">
     <div class="header">
-      <h2>${MINISTRY}</h2>
+      <div class="ministry">${MINISTRY}</div>
+      <div class="school-name">${branding.schoolNameAr}</div>
       <h1>إشعار مطالبة مالية وتذكير بالسداد</h1>
       <div>التاريخ: ${timestamp()} &nbsp;|&nbsp; رقم الحساب: ${student.account_number}</div>
     </div>
 
     <div class="body">
-      <strong>السيد ولي أمر الطالب/ـة المحترم:</strong> ${student.guardian_name || student.student_name} (${student.guardian_phone || '—'})<br>
-      <strong>الطالب:</strong> ${student.student_name} (رقم أكاديمي: ${student.student_number}) — <strong>الصف:</strong> ${student.grade_name || '—'}<br><br>
-      نود تذكير عنايتكم الكريمة بوجود مستحقات دراسية متأخرة لم يتم سدادها حتى تاريخه، بإجمالي قدره:
-      <strong style="color:#DC2626; font-size:16px;"> ${student.outstanding_balance.toLocaleString('en-US')} ج.س</strong>
-      (${tafqeet(student.outstanding_balance)})، بفترة تأخير بلغت <strong>${student.days_overdue} يوماً</strong>.
+      السيد ولي أمر الطالب/ـة المحترم: <strong>${student.guardian_name || student.student_name}</strong><br>
+      السلام عليكم ورحمة الله وبركاته،،<br><br>
+      تحية طيبة، ونود إحاطتكم بوجود متأخرات مالية مستحقة على حساب الطالب/ـة:
+      <strong>${student.student_name}</strong> (الرقم الأكاديمي: ${student.student_number}، الصف: ${student.grade_name || '—'})،
+      حيث بلغت المبالغ المتأخرة المستحقة حتى تاريخه مبلغاً وقدره:
+      <strong style="color:#DC2626; font-size:16px;">${student.outstanding_balance.toLocaleString('en-US')} جنيه سوداني</strong>
+      (${tafqeet(student.outstanding_balance)}).
     </div>
 
     <table class="tbl">
@@ -441,7 +510,7 @@ export function printDemandNotice(student: {
 }
 
 /**
- * طباعة إيصال / سند قبض مالي رسمي A4 للطالب بهوية وزارة التعليم والتربية الوطنية
+ * طباعة إيصال / سند قبض مالي رسمي A4 للطالب بهوية المدرسة والوزارة
  */
 export function printReceiptVoucher(receipt: {
   receipt_number: string;
@@ -457,7 +526,8 @@ export function printReceiptVoucher(receipt: {
   amount: number;
   collector?: string;
   notes?: string;
-}): void {
+}, tenantInfo?: any): void {
+  const branding = getTenantPrintBranding(tenantInfo);
   const amountStr = (Number(receipt.amount) || 0).toLocaleString('en-US');
   const tafqeetStr = tafqeet(Number(receipt.amount) || 0);
 
@@ -467,12 +537,13 @@ export function printReceiptVoucher(receipt: {
   <meta charset="utf-8">
   <title>سند قبض رسمي — ${receipt.receipt_number}</title>
   <style>
-    * { font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    * { font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #fff; color: #111827; padding: 20px; }
     @page { size: A4 portrait; margin: 15mm 20mm; }
     .voucher { max-width: 210mm; margin: 0 auto; border: 2px solid #0057B8; border-radius: 8px; padding: 25px; position: relative; }
     .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0057B8; padding-bottom: 15px; margin-bottom: 20px; }
-    .header .title-area h2 { font-size: 13px; color: #4B5563; }
+    .header .title-area h3 { font-size: 11px; color: #4B5563; margin-bottom: 2px; }
+    .header .title-area h2 { font-size: 15px; color: #1E3A8A; font-weight: 800; margin-bottom: 4px; }
     .header .title-area h1 { font-size: 22px; color: #0057B8; font-weight: 800; margin: 4px 0; }
     .header .meta { text-align: left; font-size: 12px; color: #374151; }
     .receipt-badge { background: #EEF3FB; border: 1px solid #0057B8; color: #0057B8; font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 6px; display: inline-block; margin-top: 4px; }
@@ -484,9 +555,11 @@ export function printReceiptVoucher(receipt: {
     .amount-title { font-size: 12px; color: #15803D; font-weight: 600; }
     .amount-num { font-size: 26px; font-weight: 800; color: #16A34A; margin: 4px 0; }
     .amount-words { font-size: 14px; color: #166534; font-weight: 600; }
-    .signatures { display: flex; justify-content: space-between; margin-top: 45px; text-align: center; font-size: 12px; }
+    .signatures { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 45px; text-align: center; font-size: 12px; }
     .sig-box { width: 170px; }
     .sig-line { border-top: 1px solid #374151; margin-top: 40px; padding-top: 6px; font-weight: 700; }
+    .stamp-box { width: 80px; height: 80px; border: 1.5px dashed #94a3b8; border-radius: 50%; display: grid; place-items: center; font-size: 9px; color: #94a3b8; margin: 0 auto; }
+    .stamp-img { max-width: 75px; max-height: 75px; object-fit: contain; }
     .footer { text-align: center; margin-top: 30px; font-size: 11px; color: #9CA3AF; border-top: 1px dashed #E5E7EB; padding-top: 10px; }
   </style>
 </head>
@@ -494,7 +567,8 @@ export function printReceiptVoucher(receipt: {
   <div class="voucher">
     <div class="header">
       <div class="title-area">
-        <h2>${MINISTRY}</h2>
+        <h3>${MINISTRY}</h3>
+        <h2>${branding.schoolNameAr}</h2>
         <h1>سند قبض وتحصيل مالي</h1>
         <div style="font-size:12px; color:#4B5563;">حسابات الرسوم والقبض المدرسية</div>
       </div>
@@ -555,8 +629,8 @@ export function printReceiptVoucher(receipt: {
         <div class="sig-line">${receipt.collector || 'أمين الصندوق'}</div>
       </div>
       <div class="sig-box">
-        <div>الاعتماد المالي والختم</div>
-        <div class="sig-line">المدير المالي</div>
+        ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي">` : '<div class="stamp-box">الختم الرسمي</div>'}
+        <div class="sig-line" style="margin-top:10px;">المدير المالي</div>
       </div>
     </div>
 
