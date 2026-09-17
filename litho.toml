@@ -1,0 +1,45 @@
+# ==============================================================================
+# Litho / DeepWiki-RS Configuration File for Nebras ERP
+# Repository: https://github.com/sopaco/deepwiki-rs
+# ==============================================================================
+
+[project]
+name = "Nebras ERP"
+description = "نظام إدارة موارد المؤسسات التعليمية والمدرسية بالسودان (Nebras ERP Platform)"
+path = "."
+output_path = "./docs/architecture"
+target_language = "ar"
+repository = "https://github.com/mistro2day/nebras-erp"
+
+# استبعاد مجلدات التبعيات وحزم البناء لمنع إهدار التوكنز والوقت
+[analysis]
+excluded_dirs = [
+    ".git",
+    ".venv",
+    "node_modules",
+    "dist",
+    ".agents",
+    ".gemini",
+    "__pycache__",
+    "docs/architecture",
+    "scratch",
+    "mobile"
+]
+
+include_dirs = [
+    "backend/apps",
+    "frontend/src/app"
+]
+
+# إعدادات نمذجة معمارية C4 Model
+[c4_model]
+enabled = true
+generate_context = true
+generate_container = true
+generate_component = true
+generate_code = true
+
+# إدراج التوثيق الموجود مسبقاً لدعم السياق
+[knowledge]
+docs_path = "./docs"
+include_markdown = true

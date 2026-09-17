@@ -4,6 +4,12 @@
 
 ## [v1.9.13] - 2026-09-17
 
+### Added
+- **تكامل خادم DeepWiki MCP وتهيئة محرك التوثيق المعماري Litho (`litho.toml` & `.mcp.json`)**:
+  * **ربط خادم DeepWiki MCP الرسمي**: تكامل خادم DeepWiki عبر بروتوكول سياق النماذج (`mcp-remote`) في إعدادات بيئة Antigravity ومجلد المشروع لتزويد وكلاء الذكاء الاصطناعي برؤية معمارية شاملة للأكواد.
+  * **ملف تهيئة المحرك المعماري `litho.toml`**: إعداد شامل مخصص لمنظومة Nebras ERP لاستخراج مخططات C4 (Context, Container, Component, Code) والتوثيق التلقائي في `docs/architecture`.
+  * **حاوية دوكر وسكربت تشغيل**: إضافة `docker/deepwiki/Dockerfile` وسكربت `scripts/deepwiki.ps1` لتشغيل الفحص وتوليد التوثيق محلياً عبر Docker بسهولة.
+
 ### Fixed
 - **معالجة وحل تعذر حفظ وتعديل الطلاب واستعلام العام الأكاديمي (`StudentApplicationService` & `StudentViewSet`)**:
   * **إصلاح استعلام العام الدراسي النشط**: تصحيح الاستعلام في `services.py` لاستخدام `current_flag=True` وحالة `status='active'` بدلاً من الحقل الخاطئ `is_active` الذي كان يتسبب في استثناء `django.core.exceptions.FieldError: Cannot resolve keyword 'is_active' into field` وتوقف الحفظ نهائياً.
