@@ -4,17 +4,15 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password
 from django.utils import timezone
 from django.db.models import Q, Count
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 
-from apps.identity.domain.models import User, PasswordHistory
-from apps.identity.domain.rbac import Role, Permission, UserRole, RolePermission, ensure_system_roles
-from apps.identity.domain.sessions import UserSession
-from apps.identity.domain.user_assignment import UserAssignment
+from apps.identity.models import User, PasswordHistory, Role, Permission, UserRole, RolePermission, UserSession, UserAssignment
+from apps.identity.domain.rbac import ensure_system_roles
 
 from apps.identity.interfaces.serializers import (
     UserSerializer, CreateUserSerializer, RoleSerializer, 
@@ -114,7 +112,7 @@ class LoginView(APIView):
             _log.exception('login: portal user type fetch failed')
 
         return StandardResponse({
-            'access': str(refresh.access_token),
+            'access': str(getattr(refresh, 'access_token', refresh)),
             'refresh': str(refresh),
             'user': {
                 **UserSerializer(user, context={'request': request}).data,
@@ -203,8 +201,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if tenant_id:
             qs = qs.filter(
                 Q(roles__tenant_id=tenant_id) |
-                Q(assignments__tenant_id=tenant_id) |
-                Q(portal_user__tenant_id=tenant_id)
+                Q(assignments__tenant_id=tenant_id)
             ).distinct()
 
         # 1. تصفية الفئة / الدور (role_category / role)
@@ -212,13 +209,14 @@ class UserViewSet(viewsets.ModelViewSet):
         if category:
             cat = category.lower().strip()
             if cat in ['parent', 'parents', 'أولياء الأمور']:
-                qs = qs.filter(Q(roles__role__code='parent') | Q(portal_user__user_type='parent')).distinct()
+                qs = qs.filter(roles__role__code='parent').distinct()
             elif cat in ['teacher', 'teachers', 'faculty', 'المعلمون']:
-                qs = qs.filter(Q(roles__role__code__in=['teacher', 'faculty'])).distinct()
+                qs = qs.filter(roles__role__code__in=['teacher', 'faculty']).distinct()
             elif cat in ['admin', 'administration', 'administrator', 'الإدارة']:
                 qs = qs.filter(
-                    (Q(roles__role__code='administrator') | Q(is_staff=True)) &
-                    ~Q(roles__role__code__in=['teacher', 'faculty', 'student', 'parent'])
+                    Q(roles__role__code='administrator') | Q(is_staff=True)
+                ).exclude(
+                    roles__role__code__in=['teacher', 'faculty', 'student', 'parent']
                 ).distinct()
             elif cat in ['accountant', 'accountants', 'المحاسب', 'المحاسبون']:
                 qs = qs.filter(roles__role__code='accountant').distinct()
@@ -227,11 +225,14 @@ class UserViewSet(viewsets.ModelViewSet):
             elif cat in ['hr', 'hr_officer', 'الموارد البشرية']:
                 qs = qs.filter(roles__role__code__in=['hr_officer', 'hr']).distinct()
             elif cat in ['student', 'students', 'الطلاب']:
-                qs = qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct()
+                qs = qs.filter(roles__role__code='student').distinct()
             elif cat in ['staff', 'employee', 'employees', 'الموظفون']:
                 qs = qs.filter(
-                    ~Q(roles__role__code__in=['parent', 'student']) &
-                    (Q(roles__role__category='custom') | Q(roles__role__code__in=['staff', 'accountant', 'hr', 'hr_officer', 'registrar']) | Q(is_staff=True))
+                    Q(roles__role__category='custom') |
+                    Q(roles__role__code__in=['staff', 'accountant', 'hr', 'hr_officer', 'registrar']) |
+                    Q(is_staff=True)
+                ).exclude(
+                    roles__role__code__in=['parent', 'student', 'teacher', 'faculty']
                 ).distinct()
             elif cat != 'all':
                 qs = qs.filter(roles__role__code=cat).distinct()
@@ -259,18 +260,18 @@ class UserViewSet(viewsets.ModelViewSet):
         if tenant_id:
             base_qs = base_qs.filter(
                 Q(roles__tenant_id=tenant_id) |
-                Q(assignments__tenant_id=tenant_id) |
-                Q(portal_user__tenant_id=tenant_id)
+                Q(assignments__tenant_id=tenant_id)
             ).distinct()
 
         total = base_qs.count()
-        parents = base_qs.filter(Q(roles__role__code='parent') | Q(portal_user__user_type='parent')).distinct().count()
+        parents = base_qs.filter(roles__role__code='parent').distinct().count()
         teachers = base_qs.filter(roles__role__code__in=['teacher', 'faculty']).distinct().count()
         admins = base_qs.filter(
-            (Q(roles__role__code='administrator') | Q(is_staff=True)) &
-            ~Q(roles__role__code__in=['teacher', 'faculty', 'student', 'parent'])
+            Q(roles__role__code='administrator') | Q(is_staff=True)
+        ).exclude(
+            roles__role__code__in=['teacher', 'faculty', 'student', 'parent']
         ).distinct().count()
-        students = base_qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct().count()
+        students = base_qs.filter(roles__role__code='student').distinct().count()
         
         active_count = base_qs.filter(status='active', is_active=True).count()
         locked_count = base_qs.filter(Q(status='locked') | Q(lockout_until__gt=timezone.now())).count()

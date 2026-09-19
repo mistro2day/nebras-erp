@@ -83,11 +83,12 @@ class PermissionCacheService:
     CACHE_TIMEOUT = 3600 # ساعة واحدة
 
     @classmethod
-    def get_user_permissions(cls, user: User, tenant_id: str) -> set:
+    def get_user_permissions(cls, user: User, tenant_id: str | None = None) -> set:
         if user.is_superuser:
             return {"*"}
         
-        cache_key = f"user_perms_{user.id}_{tenant_id}"
+        tenant_key = str(tenant_id) if tenant_id else 'global'
+        cache_key = f"user_perms_{user.id}_{tenant_key}"
         cached_perms = cache.get(cache_key)
         if cached_perms is not None:
             return set(cached_perms)
@@ -111,6 +112,7 @@ class PermissionCacheService:
         return perm_codes
 
     @classmethod
-    def clear_user_permissions_cache(cls, user_id: str, tenant_id: str) -> None:
-        cache_key = f"user_perms_{user_id}_{tenant_id}"
+    def clear_user_permissions_cache(cls, user_id: str, tenant_id: str | None = None) -> None:
+        tenant_key = str(tenant_id) if tenant_id else 'global'
+        cache_key = f"user_perms_{user_id}_{tenant_key}"
         cache.delete(cache_key)
