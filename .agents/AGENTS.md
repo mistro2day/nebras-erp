@@ -21,6 +21,11 @@ For all frontend UI tasks — including building pages, components, layouts, cho
 
 ## Git Workflow Rules
 - **Arabic Git Commits**: All `git commit` messages MUST be written in Arabic to maintain context and history consistency.
+- **ZERO PROBLEMS & THOROUGH TESTING BEFORE COMMIT/PUSH (حظر الرفع بوجود مشاكل أو أخطاء برمجية - الاختبار أولاً ثم الرفع)**:
+  It is **STRICTLY PROHIBITED** to commit or push any changes to Git if there are syntax errors, compile issues, lint errors, or active Problems.
+  1. You MUST first resolve all IDE/TypeScript/Django errors and Problems (`npx tsc --noEmit` / `python backend/manage.py check`).
+  2. Verify that the build and tests pass cleanly.
+  3. Commit and push to Git (`git push origin <branch>`) ONLY as the very final step after total verification and clean execution.
 - **MANDATORY GIT PUSH (الإلزام الصارم بعمل git push دائماً)**:
   After committing any changes, it is **STRICTLY MANDATORY** to push changes to the remote repository (`git push origin <branch>`). Never consider any task finished without pushing to remote.
 

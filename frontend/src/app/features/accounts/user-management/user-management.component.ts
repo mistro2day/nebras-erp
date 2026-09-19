@@ -118,9 +118,9 @@ export class UserManagementComponent implements OnInit {
     if (tab !== 'all') {
       if (tab === 'parents') list = list.filter((u) => u.user_type === 'parent' || u.role_codes.includes('parent'));
       else if (tab === 'teachers') list = list.filter((u) => u.user_type === 'teacher' || u.role_codes.includes('teacher') || u.role_codes.includes('faculty'));
-      else if (tab === 'admin') list = list.filter((u) => u.user_type === 'admin' || u.role_codes.includes('administrator') || u.is_staff || u.is_superuser);
+      else if (tab === 'admin') list = list.filter((u) => (u.user_type === 'admin' || u.role_codes.includes('administrator') || (u.is_staff && u.user_type !== 'teacher')) && !u.role_codes.includes('teacher') && !u.role_codes.includes('faculty'));
       else if (tab === 'students') list = list.filter((u) => u.user_type === 'student' || u.role_codes.includes('student'));
-      else if (tab === 'staff') list = list.filter((u) => u.user_type === 'staff' || u.role_codes.some(r => ['staff', 'hr', 'hr_officer', 'accountant', 'registrar'].includes(r)));
+      else if (tab === 'staff') list = list.filter((u) => (u.user_type === 'staff' || u.role_codes.some(r => ['staff', 'hr', 'hr_officer', 'accountant', 'registrar'].includes(r))) && !u.role_codes.includes('teacher'));
     }
 
     if (st !== 'all') {

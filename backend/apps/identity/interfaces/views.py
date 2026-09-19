@@ -216,7 +216,10 @@ class UserViewSet(viewsets.ModelViewSet):
             elif cat in ['teacher', 'teachers', 'faculty', 'المعلمون']:
                 qs = qs.filter(Q(roles__role__code__in=['teacher', 'faculty'])).distinct()
             elif cat in ['admin', 'administration', 'administrator', 'الإدارة']:
-                qs = qs.filter(Q(roles__role__code='administrator') | Q(is_staff=True)).distinct()
+                qs = qs.filter(
+                    (Q(roles__role__code='administrator') | Q(is_staff=True)) &
+                    ~Q(roles__role__code__in=['teacher', 'faculty', 'student', 'parent'])
+                ).distinct()
             elif cat in ['accountant', 'accountants', 'المحاسب', 'المحاسبون']:
                 qs = qs.filter(roles__role__code='accountant').distinct()
             elif cat in ['registrar', 'registrars', 'التسجيل', 'مسجل الطلاب']:
@@ -263,7 +266,10 @@ class UserViewSet(viewsets.ModelViewSet):
         total = base_qs.count()
         parents = base_qs.filter(Q(roles__role__code='parent') | Q(portal_user__user_type='parent')).distinct().count()
         teachers = base_qs.filter(roles__role__code__in=['teacher', 'faculty']).distinct().count()
-        admins = base_qs.filter(Q(roles__role__code='administrator') | Q(is_staff=True)).distinct().count()
+        admins = base_qs.filter(
+            (Q(roles__role__code='administrator') | Q(is_staff=True)) &
+            ~Q(roles__role__code__in=['teacher', 'faculty', 'student', 'parent'])
+        ).distinct().count()
         students = base_qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct().count()
         
         active_count = base_qs.filter(status='active', is_active=True).count()
