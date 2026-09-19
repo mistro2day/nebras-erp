@@ -167,40 +167,58 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
               <nb-datepicker [(value)]="paymentDate" ariaLabel="تاريخ تحصيل الدفعة"></nb-datepicker>
             </div>
 
-            <label class="half-width">
-              <span class="fld-title">الصندوق / الخزينة النقدية</span>
-              <select class="fld" [ngModel]="cashBoxId" (ngModelChange)="onCashBoxChange($event)">
-                <option [ngValue]="null">— بدون (أو إيداع بنكي) —</option>
-                @for (cb of cashBoxes(); track cb.id) {
-                  <option [ngValue]="cb.id">{{ cb.name_ar }}</option>
-                }
-              </select>
-            </label>
+            <!-- إذا كانت طريقة السداد تحويل بنكي / تطبيق / شيك: يظهر فقط الحساب البنكي المودع به -->
+            @if (isBankPaymentMethod()) {
+              <label class="half-width">
+                <span class="fld-title">الحساب البنكي المودع به (تطبيق بنكك / فوري / أوكاش / حساب مصرفي) *</span>
+                <select class="fld" [ngModel]="bankAccountId" (ngModelChange)="onBankAccountChange($event)">
+                  <option [ngValue]="null">اختر الحساب البنكي المودع به…</option>
+                  @for (b of bankAccounts(); track b.id) {
+                    <option [ngValue]="b.id">{{ b.bank_name || 'حساب بنكي' }} — {{ b.account_number }}</option>
+                  }
+                </select>
+              </label>
 
-            <label class="half-width">
-              <span class="fld-title">الحساب البنكي المودع به (تطبيق بنكك / فوري / أوكاش / حساب مصرفي)</span>
-              <select class="fld" [ngModel]="bankAccountId" (ngModelChange)="onBankAccountChange($event)">
-                <option [ngValue]="null">— بدون (إيداع خزينة نقدية) —</option>
-                @for (b of bankAccounts(); track b.id) {
-                  <option [ngValue]="b.id">{{ b.bank_name || 'حساب بنكي' }} — {{ b.account_number }}</option>
-                }
-              </select>
-            </label>
+              <label class="half-width">
+                <span class="fld-title">رقم إشعار التحويل / المرجع البنكي *</span>
+                <input
+                  type="text"
+                  class="fld mono"
+                  [(ngModel)]="referenceNumber"
+                  placeholder="مثال: رقم العملية في تطبيق بنكك (10293848) أو فوري…"
+                />
+              </label>
+            } @else {
+              <!-- إذا كانت طريقة السداد نقداً / خزينة: يظهر فقط الصندوق / الخزينة النقدية -->
+              <label class="half-width">
+                <span class="fld-title">الصندوق / الخزينة النقدية المستلمة *</span>
+                <select class="fld" [ngModel]="cashBoxId" (ngModelChange)="onCashBoxChange($event)">
+                  <option [ngValue]="null">اختر الصندوق / الخزينة النقدية…</option>
+                  @for (cb of cashBoxes(); track cb.id) {
+                    <option [ngValue]="cb.id">{{ cb.name_ar }}</option>
+                  }
+                </select>
+              </label>
 
-            <label class="full-width">
-              <span class="fld-title">رقم إشعار التحويل / المرجع البنكي (اختياري)</span>
-              <input
-                type="text"
-                class="fld mono"
-                [(ngModel)]="referenceNumber"
-                placeholder="مثال: رقم العملية في تطبيق بنكك (10293848) أو شيك…"
-              />
-            </label>
+              <label class="half-width">
+                <span class="fld-title">رقم السند اليدوي / المرجع (اختياري)</span>
+                <input
+                  type="text"
+                  class="fld mono"
+                  [(ngModel)]="referenceNumber"
+                  placeholder="رقم السند الدفتري أو إيصال الخزينة (إن وُجد)…"
+                />
+              </label>
+            }
           </div>
 
           <div class="step-hint-box">
             <span class="hint-icon">🏦</span>
-            <span>يدعم نظام نبراس المحافظ والتطبيقات البنكية السودانية المعتمدة (بنكك، فوري، أوكاش) والخزائن النقدية، مع إمكانية تعديل تاريخ السند يدوياً لمطابقة الإشعارات الفعلية.</span>
+            @if (isBankPaymentMethod()) {
+              <span>طريقة السداد المحددة هي تحويل بنكي / إلكتروني: يرجى تحديد الحساب البنكي المودع به ورقم إشعار العملية (تطبيق بنكك، فوري، أوكاش).</span>
+            } @else {
+              <span>طريقة السداد المحددة هي نقدية (كاش): سيتم قيد الدفعة مباشرة في الصندوق/الخزينة النقدية المحددة لمطابقة الجرد المالي.</span>
+            }
           </div>
         }
 
@@ -1081,25 +1099,22 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     }
   }
 
-  autoSelectDestination() {
+  isBankPaymentMethod(): boolean {
     const m = this.methods().find((x) => x.id === this.paymentMethodId);
     const name = (m?.name_ar || m?.name || m?.code || '').toLowerCase();
-    const isBank = ['bank', 'بنك', 'بنكك', 'فوري', 'أوكاش', 'تحويل', 'شيك', 'card', 'pos'].some((w) => name.includes(w));
-    if (isBank) {
-      if (this.bankAccounts().length > 0) {
+    return ['bank', 'بنك', 'بنكك', 'فوري', 'أوكاش', 'تحويل', 'شيك', 'card', 'pos'].some((w) => name.includes(w));
+  }
+
+  autoSelectDestination() {
+    if (this.isBankPaymentMethod()) {
+      this.cashBoxId = null;
+      if (this.bankAccounts().length > 0 && !this.bankAccountId) {
         this.bankAccountId = this.bankAccounts()[0].id;
-        this.cashBoxId = null;
-      } else if (this.cashBoxes().length > 0) {
-        this.cashBoxId = this.cashBoxes()[0].id;
-        this.bankAccountId = null;
       }
     } else {
-      if (this.cashBoxes().length > 0) {
+      this.bankAccountId = null;
+      if (this.cashBoxes().length > 0 && !this.cashBoxId) {
         this.cashBoxId = this.cashBoxes()[0].id;
-        this.bankAccountId = null;
-      } else if (this.bankAccounts().length > 0) {
-        this.bankAccountId = this.bankAccounts()[0].id;
-        this.cashBoxId = null;
       }
     }
   }
@@ -1109,7 +1124,12 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
       return (!!this.selectedAccountId() || !!this.selectedAccount()) && Number(this.amount) > 0;
     }
     if (this.currentStep() === 1) {
-      return !!this.paymentMethodId && !!this.paymentDate && (!!this.cashBoxId || !!this.bankAccountId);
+      if (!this.paymentMethodId || !this.paymentDate) return false;
+      if (this.isBankPaymentMethod()) {
+        return !!this.bankAccountId;
+      } else {
+        return !!this.cashBoxId;
+      }
     }
     return true;
   }
@@ -1139,6 +1159,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     };
     if (this.bankAccountId) payload.bank_account_id = this.bankAccountId;
     if (this.cashBoxId) payload.cash_box_id = this.cashBoxId;
+    if (this.referenceNumber?.trim()) payload.reference_number = this.referenceNumber.trim();
 
     this.svc.receiveStudentPayment(payload).subscribe({
       next: (res) => {
