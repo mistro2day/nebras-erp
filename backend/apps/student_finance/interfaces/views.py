@@ -973,9 +973,16 @@ class InstallmentViewSet(BaseCRUDViewSet):
         يدعم التصفية حسب السنة، الشهر، وحالة السداد (الكل، المتأخرات فقط، المستحقة، المسددة).
         """
         from django.http import HttpResponse
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
+        import importlib
+        openpyxl = importlib.import_module('openpyxl')
+        openpyxl_styles = importlib.import_module('openpyxl.styles')
+        openpyxl_utils = importlib.import_module('openpyxl.utils')
+        Font = openpyxl_styles.Font
+        PatternFill = openpyxl_styles.PatternFill
+        Alignment = openpyxl_styles.Alignment
+        Border = openpyxl_styles.Border
+        Side = openpyxl_styles.Side
+        get_column_letter = openpyxl_utils.get_column_letter
 
         tenant_id = request.tenant_id
         today = timezone.localdate()
