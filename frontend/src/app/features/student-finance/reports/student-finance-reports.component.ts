@@ -448,7 +448,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                           <button class="btn xs print-btn" title="طباعة سند القبض الرسمي" (click)="openReceiptDrawer(r)">
                             🖨️ طباعة السند
                           </button>
-                          <button class="btn xs ghost" title="عرض كشف حساب الطالب" (click)="viewAccount(r.account_id)">
+                          <button class="btn xs ghost" title="عرض كشف حساب الطالب" (click)="viewAccount(r)">
                             كشف الحساب
                           </button>
                         </div>
@@ -1577,6 +1577,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'BOK-9847120',
         amount: 450000,
         collector: 'مزمل الكباشي',
+        account_id: 'acc-st-0041',
+        student_billing_account_id: 'acc-st-0041',
+        student_id: 'std-0041',
+        account_number: 'ACC-ST-2026-0041',
+        guardian_name: 'دفع الله إدريس إبراهيم',
+        guardian_phone: '0912345678',
+        outstanding_balance: 50000,
       },
       {
         id: 'rec-02',
@@ -1593,6 +1600,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'FWR-338192',
         amount: 320000,
         collector: 'فاطمة البدوي',
+        account_id: 'acc-st-0052',
+        student_billing_account_id: 'acc-st-0052',
+        student_id: 'std-0052',
+        account_number: 'ACC-ST-2026-0052',
+        guardian_name: 'ميرغني التوم عبد الله',
+        guardian_phone: '0912233445',
+        outstanding_balance: 140000,
       },
       {
         id: 'rec-03',
@@ -1609,6 +1623,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'CSH-00291',
         amount: 220000,
         collector: 'التاج إبراهيم',
+        account_id: 'acc-st-0089',
+        student_billing_account_id: 'acc-st-0089',
+        student_id: 'std-0089',
+        account_number: 'ACC-ST-2026-0089',
+        guardian_name: 'بابكر عبد الله الفاتح',
+        guardian_phone: '0912389102',
+        outstanding_balance: 100000,
       },
       {
         id: 'rec-04',
@@ -1625,6 +1646,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'BOK-7729104',
         amount: 480000,
         collector: 'فاطمة البدوي',
+        account_id: 'acc-st-0144',
+        student_billing_account_id: 'acc-st-0144',
+        student_id: 'std-0144',
+        account_number: 'ACC-ST-2026-0144',
+        guardian_name: 'البدوي الزبير العوض',
+        guardian_phone: '0923456789',
+        outstanding_balance: 0,
       },
       {
         id: 'rec-05',
@@ -1641,6 +1669,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'OKS-192847',
         amount: 280000,
         collector: 'التاج إبراهيم',
+        account_id: 'acc-st-0105',
+        student_billing_account_id: 'acc-st-0105',
+        student_id: 'std-0105',
+        account_number: 'ACC-ST-2026-0105',
+        guardian_name: 'تاج السر حسن عثمان',
+        guardian_phone: '0922334455',
+        outstanding_balance: 180000,
       },
       {
         id: 'rec-06',
@@ -1657,6 +1692,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'BOK-6192834',
         amount: 260000,
         collector: 'مزمل الكباشي',
+        account_id: 'acc-st-0211',
+        student_billing_account_id: 'acc-st-0211',
+        student_id: 'std-0211',
+        account_number: 'ACC-ST-2026-0211',
+        guardian_name: 'الصديق كمال عبد المحمود',
+        guardian_phone: '0934567890',
+        outstanding_balance: 0,
       },
       {
         id: 'rec-07',
@@ -1673,6 +1715,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'CSH-00295',
         amount: 190000,
         collector: 'التاج إبراهيم',
+        account_id: 'acc-st-0399',
+        student_billing_account_id: 'acc-st-0399',
+        student_id: 'std-0399',
+        account_number: 'ACC-ST-2026-0399',
+        guardian_name: 'عمر الصديق يوسف',
+        guardian_phone: '0919283746',
+        outstanding_balance: 60000,
       },
       {
         id: 'rec-08',
@@ -1689,6 +1738,13 @@ export class StudentFinanceReportsComponent implements OnInit {
         reference_number: 'FWR-918231',
         amount: 210000,
         collector: 'فاطمة البدوي',
+        account_id: 'acc-st-0312',
+        student_billing_account_id: 'acc-st-0312',
+        student_id: 'std-0312',
+        account_number: 'ACC-ST-2026-0312',
+        guardian_name: 'السر الهادي النور',
+        guardian_phone: '0945678901',
+        outstanding_balance: 0,
       },
     ];
   }
@@ -1728,7 +1784,13 @@ export class StudentFinanceReportsComponent implements OnInit {
             reference_number: ref,
             amount: amt,
             collector: collector,
-            account_id: r.billing_account_id || r.billing_account?.id,
+            account_id: r.billing_account_id || r.billing_account?.id || r.student_billing_account_id,
+            student_billing_account_id: r.student_billing_account_id || r.student_billing_account || r.billing_account_id || r.billing_account?.id,
+            student_id: r.student_id || r.billing_account?.student_id || r.billing_account?.student?.id,
+            account_number: r.account_number || r.billing_account?.account_number || `ACC-${studentNum}`,
+            guardian_name: r.guardian_name || r.billing_account?.student?.guardian_name || r.billing_account?.guardian_name,
+            guardian_phone: r.guardian_phone || r.billing_account?.student?.guardian_phone || r.billing_account?.guardian_phone,
+            outstanding_balance: r.outstanding_balance ?? r.remaining_balance ?? r.billing_account?.outstanding_balance,
           };
         });
       }
@@ -2461,7 +2523,10 @@ export class StudentFinanceReportsComponent implements OnInit {
         payment_method_name: receipt.payment_method,
         reference_number: receipt.reference_number,
         amount: receipt.amount,
-        remaining_balance: receipt.remaining_balance ?? 0,
+        remaining_balance: receipt.outstanding_balance ?? receipt.remaining_balance ?? 0,
+        outstanding_balance: receipt.outstanding_balance ?? receipt.remaining_balance ?? 0,
+        student_billing_account_id: receipt.student_billing_account_id || receipt.account_id,
+        student_id: receipt.student_id,
         notes: receipt.notes || 'دفعة سداد معتمدة بموجب إيصال قبض',
         status: receipt.status || 'posted',
         collector: receipt.collector,
@@ -2522,9 +2587,28 @@ export class StudentFinanceReportsComponent implements OnInit {
     window.open(`https://wa.me/249${phone}?text=${msg}`, '_blank');
   }
 
-  viewAccount(accountId?: string) {
-    if (accountId) {
-      this.router.navigate(['/student-finance/accounts', accountId, 'statement']);
+  viewAccount(itemOrId?: any) {
+    if (!itemOrId) {
+      this.router.navigate(['/student-finance/accounts']);
+      return;
+    }
+
+    if (typeof itemOrId === 'string') {
+      this.router.navigate(['/student-finance/accounts', itemOrId, 'statement']);
+      return;
+    }
+
+    // كائن (سند أو فاتورة أو قسط)
+    const targetId =
+      itemOrId.student_billing_account_id ||
+      itemOrId.account_id ||
+      itemOrId.student_id ||
+      itemOrId.account_number ||
+      itemOrId.student_number ||
+      itemOrId.id;
+
+    if (targetId) {
+      this.router.navigate(['/student-finance/accounts', targetId, 'statement']);
     } else {
       this.router.navigate(['/student-finance/accounts']);
     }
