@@ -248,9 +248,19 @@ export class StudentFinanceService {
     return this.api.post('student-finance/receipts/receive-payment/', body);
   }
 
-  /** عكس/إلغاء سند قبض مرحل (يعيد الأرصدة ويعكس القيد المحاسبي). */
+  /** عكس سند قبض مرحل (بعد مرور 24 ساعة، يعيد الأرصدة ويعكس القيد المحاسبي). */
   cancelReceipt(receiptId: string, reason: string): Observable<any> {
     return this.api.post(`student-finance/receipts/${receiptId}/cancel/`, { reason });
+  }
+
+  /** حذف سند قبض وإلغاء أثره المالي (صالح خلال أول 24 ساعة من إدخال السند). */
+  deleteReceipt(receiptId: string, reason?: string): Observable<any> {
+    return this.api.post(`student-finance/receipts/${receiptId}/delete-receipt/`, { reason: reason || 'حذف السند خلال مهلة 24 ساعة' });
+  }
+
+  /** فتح قفل سند القبض للتعديل والحذف بعد 24 ساعة (صلاحية خاصة بالأدمن). */
+  unlockReceipt(receiptId: string, hours = 24): Observable<any> {
+    return this.api.post(`student-finance/receipts/${receiptId}/unlock-edit/`, { hours });
   }
 
   // ---- الربط بالمالية والطلاب: مراجع ومصادر (360° لحساب الطالب) ----

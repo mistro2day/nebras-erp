@@ -1236,7 +1236,8 @@ class InstallmentViewSet(BaseCRUDViewSet):
         remaining = max(0.0, float(installment.amount) - float(installment.paid_amount))
         formatted_amount = f"{remaining:,.0f} ج.س"
         
-        clean_phone = guardian_phone.replace(' ', '').replace('-', '').replace('+', '')
+        guardian_phone_str = str(guardian_phone or '').strip()
+        clean_phone = guardian_phone_str.replace(' ', '').replace('-', '').replace('+', '')
         if clean_phone.startswith('0'):
             clean_phone = '249' + clean_phone[1:]
         elif not clean_phone.startswith('249') and len(clean_phone) == 9:
@@ -1446,17 +1447,82 @@ class ReceiptViewSet(BaseCRUDViewSet):
                 reason=reason.strip()
             )
             serializer = self.get_serializer(receipt)
-            return Response(
-                {'data': serializer.data, 'message': 'تم عكس سند القبض وتحديث الأرصدة المالية بنجاح.'},
-                status=status.HTTP_200_OK
+            return StandardResponse(
+                data=serializer.data,
+                message='تم عكس سند القبض وتحديث الأرصدة المالية بنجاح.'
             )
         except DjangoValidationError as e:
             msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
             return Response({'error': {'message': msg}}, status=status.HTTP_400_BAD_REQUEST)
-        except Receipt.DoesNotExist:
-            return Response({'error': {'message': 'سند القبض غير موجود.'}}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
+                return Response({'error': {'message': 'سند القبض غير موجود.'}}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post', 'delete'], url_path='delete-receipt')
+    def delete_receipt_action(self, request, pk=None):
+        """حذف سند القبض وإلغاء أثره المالي (صالح خلال أول 24 ساعة، أو بصلاحية الأدمن)."""
+        tenant_id = request.tenant_id
+        reason = request.data.get('reason', '')
+        try:
+            res = PaymentService.delete_receipt(
+                tenant_id=tenant_id,
+                receipt_id=pk,
+                user_id=request.user.id if request.user else None,
+                reason=reason
+            )
+            return StandardResponse(
+                data=res,
+                message=f"تم حذف سند القبض {res['receipt_number']} وإرجاع الرصيد بنجاح."
+            )
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+            return Response({'error': {'message': msg}}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
+                return Response({'error': {'message': 'سند القبض غير موجود.'}}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='unlock-edit')
+    def unlock_for_edit(self, request, pk=None):
+        """فتح قفل السند للتعديل والحذف بعد 24 ساعة (صلاحية خاصة بالأدمن)."""
+        tenant_id = request.tenant_id
+        hours = int(request.data.get('hours', 24))
+        try:
+            receipt = PaymentService.unlock_receipt_for_edit(
+                tenant_id=tenant_id,
+                receipt_id=pk,
+                user_id=request.user.id if request.user else None,
+                unlock_hours=hours
+            )
+            serializer = self.get_serializer(receipt)
+            return StandardResponse(
+                data=serializer.data,
+                message=f'تم فتح قفل السند لمدة {hours} ساعة للتعديل والحذف بنجاح.'
+            )
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+            return Response({'error': {'message': msg}}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': {'message': str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs) -> StandardResponse:
+        """توجيه الحذف القياسي إلى خدمة حذف السند وضبط التأثيرات المالية وقاعدة الـ 24 ساعة."""
+        tenant_id = request.tenant_id
+        pk = kwargs.get('pk')
+        try:
+            res = PaymentService.delete_receipt(
+                tenant_id=tenant_id,
+                receipt_id=pk,
+                user_id=request.user.id if request.user else None,
+                reason='حذف السند عبر الواجهة'
+            )
+            return StandardResponse(data=res, message='تم حذف السند بنجاح.')
+        except DjangoValidationError as e:
+            msg = e.messages[0] if hasattr(e, 'messages') and e.messages else str(e)
+            return StandardResponse(error=msg, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return StandardResponse(error=str(e), status=status.HTTP_400_BAD_REQUEST)
 
 class RefundViewSet(BaseCRUDViewSet):
     model_class = Refund

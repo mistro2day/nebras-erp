@@ -27,6 +27,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { StudentCascadeDeleteModalComponent } from './student-cascade-delete-modal.component';
 import { ReceiptCreateModalComponent } from '../../student-finance/receipts/receipt-create-modal.component';
 
+import { AuthService } from '../../../core/auth/auth.service';
+
 @Component({
   selector: 'app-student-details',
   standalone: true,
@@ -326,11 +328,26 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                               {{ r.status === 'posted' ? 'مرحل ومقفل' : r.status === 'reversed' ? 'معكوس' : r.status === 'draft' ? 'مسودة' : 'ملغي' }}
                             </span>
                           </span>
-                          <span>
+                          <span class="receipt-actions-cell" (click)="$event.stopPropagation()">
                             @if (r.status === 'posted') {
-                              <button type="button" class="btn-cancel-receipt" (click)="openCancelReceiptModal(r); $event.stopPropagation()">
-                                ↺ عكس السند
-                              </button>
+                              @if (canEditOrDeleteReceipt(r)) {
+                                <button type="button" class="btn-delete-receipt" (click)="openDeleteReceiptModal(r)" title="حذف السند وإلغاء أثره المالي (خلال 24 ساعة)">
+                                  🗑️ حذف السند
+                                </button>
+                              }
+                              @if (canReverseReceipt(r)) {
+                                <button type="button" class="btn-cancel-receipt" (click)="openCancelReceiptModal(r)" title="عكس السند محاسبياً في دفتر الأستاذ">
+                                  ↺ عكس السند
+                                </button>
+                              }
+                              @if (!canEditOrDeleteReceipt(r) && !canReverseReceipt(r)) {
+                                <span class="badge-locked" title="تم قفل خيار الحذف والتعديل لمرور 24 ساعة">🔒 مقفل</span>
+                              }
+                              @if (!isReceiptUnder24h(r) && canUnlockReceipt(r)) {
+                                <button type="button" class="btn-unlock-receipt" (click)="unlockReceiptForAdmin(r)" title="فتح قفل السند للتعديل والحذف (صلاحية الأدمن)">
+                                  🔓 فتح القفل
+                                </button>
+                              }
                             } @else if (r.status === 'reversed') {
                               <span class="text-muted" style="font-size: 11px;">تم العكس</span>
                             } @else {
@@ -971,8 +988,8 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                   <div class="modal-title-box">
                     <span class="modal-header-icon">⚠️</span>
                     <div>
-                      <h3 class="modal-title">عكس وإلغاء سند القبض</h3>
-                      <p class="modal-subtitle">سيتم إلغاء السند وعكس القيد المحاسبي وإعادة فتح مستحقات الطالب</p>
+                      <h3 class="modal-title">عكس سند القبض (بعد 24 ساعة)</h3>
+                      <p class="modal-subtitle">سيتم توليد قيد عكسي في دفتر الأستاذ العام وإعادة فتح مستحقات الطالب</p>
                     </div>
                   </div>
                   <button type="button" class="close-btn" (click)="closeCancelReceiptModal()">✕</button>
@@ -1000,13 +1017,13 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                     <textarea
                       rows="3"
                       style="width: 100%; padding: 10px; border: 1px solid var(--nb-border); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box;"
-                      placeholder="أدخل سبب عكس السند (مثال: تم تسجيل الدفعة بالخطأ، إلغاء السند بناءً على طلب ولي الأمر...)"
+                      placeholder="أدخل سبب عكس السند في دفتر الأستاذ العام..."
                       [(ngModel)]="cancelReceiptReason"
                     ></textarea>
                   </div>
 
                   <div class="warn-box-inline" style="margin-top: 14px; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 12px; font-size: 12px; color: #92400e; line-height: 1.6;">
-                    ⚠️ <strong>تنبيه:</strong> يتطلب هذا الإجراء صلاحية مدير المدرسة أو مستخدم فائق. سيؤدي التأكيد إلى توليد قيد عكسي تلقائي في دفتر الأستاذ العام وإعادة فتح رصيد الفاتورة والمستحقات على ملف الطالب فوراً.
+                    ⚠️ <strong>حوكمة العكس المحاسبي:</strong> يتفعل هذا الخيار بعد مرور 24 ساعة من تسجيل السند، ويؤدي إلى توليد قيد عكسي قانوني مرحل في دفتر الأستاذ العام وإعادة فتح رصيد الفاتورة فوراً.
                   </div>
                 </div>
                 <div class="modal-footer">
@@ -1054,6 +1071,73 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
                   </button>
                 </div>
               }
+            </div>
+          </div>
+        }
+
+        <!-- Modal حذف سند القبض (صالح خلال أول 24 ساعة) -->
+        @if (deleteReceiptModalOpen()) {
+          <div class="modal-backdrop" (click)="closeDeleteReceiptModal()">
+            <div class="modal-card cancel-receipt-card" (click)="$event.stopPropagation()">
+              <div class="modal-header header-danger">
+                <div class="modal-title-box">
+                  <span class="modal-header-icon">🗑️</span>
+                  <div>
+                    <h3 class="modal-title">حذف وإلغاء سند القبض نهائياً</h3>
+                    <p class="modal-subtitle">حذف السند وإلغاء أثره المالي وإرجاع المبالغ للمستحقات (خلال مهلة 24 ساعة)</p>
+                  </div>
+                </div>
+                <button type="button" class="close-btn" (click)="closeDeleteReceiptModal()">✕</button>
+              </div>
+              <div class="modal-body" style="padding: 18px 20px;">
+                <div class="cancel-receipt-info">
+                  <div class="info-row">
+                    <span class="label">رقم السند:</span>
+                    <span class="value font-bold">{{ deleteReceiptTarget()?.receipt_number }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">المبلغ المحصّل:</span>
+                    <span class="value text-danger" style="font-weight: 800;">{{ deleteReceiptTarget()?.amount | number:'1.2-2' }} ج.س</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">تاريخ السند:</span>
+                    <span class="value">{{ deleteReceiptTarget()?.payment_date }}</span>
+                  </div>
+                </div>
+
+                <div class="form-field" style="margin-top: 14px;">
+                  <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+                    سبب الحذف (اختياري)
+                  </label>
+                  <textarea
+                    rows="2"
+                    style="width: 100%; padding: 10px; border: 1px solid var(--nb-border); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box;"
+                    placeholder="سبب حذف السند وتصحيحه..."
+                    [(ngModel)]="deleteReceiptReason"
+                  ></textarea>
+                </div>
+
+                <div class="warn-box-inline" style="margin-top: 14px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 12px; font-size: 12px; color: #991b1b; line-height: 1.6;">
+                  🗑️ <strong>تنبيه مالي:</strong> يتاح الحذف المباشر خلال 24 ساعة فقط لتصحيح الأخطاء اللحظية دون توليد قيود عكسية متراكمة. سيتم إلغاء السند وإعادة الفاتورة للحالة المستحقة فوراً.
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" (click)="closeDeleteReceiptModal()" [disabled]="deleteReceiptBusy()">
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  (click)="confirmDeleteReceipt()"
+                  [disabled]="deleteReceiptBusy()"
+                >
+                  @if (deleteReceiptBusy()) {
+                    <span>جارٍ حذف السند وتحديث الرصيد…</span>
+                  } @else {
+                    <span>تأكيد حذف السند وإرجاع الرصيد</span>
+                  }
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -1464,11 +1548,17 @@ import { ReceiptCreateModalComponent } from '../../student-finance/receipts/rece
     .tbl-head, .tbl-row { display: grid; gap: 12px; padding: 12px 18px; align-items: center; }
     .tbl-head.doc, .tbl-row.doc { grid-template-columns: 1.4fr 1.4fr 1fr; }
     .tbl-head.finance-tbl, .tbl-row.finance-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 1fr; }
-    .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.2fr 1fr 1fr 1fr 0.9fr; }
+    .tbl-head.receipts-tbl, .tbl-row.receipts-tbl { grid-template-columns: 1.1fr 1fr 1fr 0.9fr 1.3fr; }
     .reversed-badge { background: #fef3c7 !important; color: #92400e !important; border: 1px solid #fde68a !important; }
     .reversed-amount { color: var(--nb-text-muted) !important; text-decoration: line-through; }
-    .btn-cancel-receipt { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
-    .btn-cancel-receipt:hover { background: #fecaca; color: #991b1b; }
+    .receipt-actions-cell { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .btn-delete-receipt { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 3px; }
+    .btn-delete-receipt:hover { background: #fee2e2; color: #991b1b; }
+    .btn-cancel-receipt { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 3px; }
+    .btn-cancel-receipt:hover { background: #ffedd5; color: #9a3412; }
+    .btn-unlock-receipt { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 3px; }
+    .btn-unlock-receipt:hover { background: #dbeafe; color: #1e40af; }
+    .badge-locked { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
     .header-danger { background: linear-gradient(135deg, #fee2e2, #fef2f2) !important; border-bottom: 1px solid #fecaca !important; }
     .header-success { background: linear-gradient(135deg, #dcfce7, #f0fdf4) !important; border-bottom: 1px solid #bbf7d0 !important; }
     .cancel-receipt-card { max-width: 480px; }
@@ -2237,6 +2327,7 @@ export class StudentDetailsComponent implements OnInit {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private http = inject(HttpClient);
+  authService = inject(AuthService);
 
   private sanitizer = inject(DomSanitizer);
 
@@ -2343,12 +2434,46 @@ export class StudentDetailsComponent implements OnInit {
       .reduce((s, r) => s + (Number(r.amount) || 0), 0)
   );
 
-  // ---- إلغاء وعكس سند القبض ----
+  // ---- إلغاء وعكس سند القبض وحذفه وفتح قفله ----
   readonly cancelReceiptModalOpen = signal<boolean>(false);
   readonly cancelReceiptTarget = signal<any>(null);
   readonly cancelReceiptStep = signal<'confirm' | 'success'>('confirm');
   readonly cancelReceiptBusy = signal<boolean>(false);
   cancelReceiptReason = '';
+
+  readonly deleteReceiptModalOpen = signal<boolean>(false);
+  readonly deleteReceiptTarget = signal<any>(null);
+  readonly deleteReceiptBusy = signal<boolean>(false);
+  deleteReceiptReason = '';
+
+  isReceiptUnder24h(r: any): boolean {
+    if (r?.is_under_24h !== undefined) return !!r.is_under_24h;
+    if (!r?.created_at) return true;
+    const diffHours = (new Date().getTime() - new Date(r.created_at).getTime()) / (1000 * 3600);
+    return diffHours <= 24;
+  }
+
+  canEditOrDeleteReceipt(r: any): boolean {
+    if (r?.status === 'reversed') return false;
+    if (this.authService.isSuperuser() || this.authService.hasPermission('receipts:delete')) {
+      if (this.isReceiptUnder24h(r) || r?.is_admin_unlocked || this.authService.isSuperuser()) {
+        return true;
+      }
+    }
+    return this.isReceiptUnder24h(r);
+  }
+
+  canReverseReceipt(r: any): boolean {
+    if (r?.status !== 'posted') return false;
+    if (this.authService.isSuperuser()) return true;
+    // يتفعل بعد مرور 24 ساعة بشرط امتلاك الصلاحية
+    return !this.isReceiptUnder24h(r) && this.authService.hasPermission('receipts:reverse');
+  }
+
+  canUnlockReceipt(r: any): boolean {
+    if (r?.status === 'reversed') return false;
+    return this.authService.isSuperuser() || this.authService.hasPermission('receipts:unlock');
+  }
 
   openCancelReceiptModal(receipt: any): void {
     this.cancelReceiptTarget.set(receipt);
@@ -2383,6 +2508,51 @@ export class StudentDetailsComponent implements OnInit {
         const msg = e?.error?.error?.message || e?.error?.message || 'تعذّر عكس سند القبض.';
         this.snack.open(msg, 'إغلاق', { duration: 5000 });
       },
+    });
+  }
+
+  openDeleteReceiptModal(receipt: any): void {
+    this.deleteReceiptTarget.set(receipt);
+    this.deleteReceiptReason = '';
+    this.deleteReceiptModalOpen.set(true);
+  }
+
+  closeDeleteReceiptModal(): void {
+    this.deleteReceiptModalOpen.set(false);
+    this.deleteReceiptTarget.set(null);
+    this.deleteReceiptReason = '';
+  }
+
+  confirmDeleteReceipt(): void {
+    const receipt = this.deleteReceiptTarget();
+    if (!receipt) return;
+
+    this.deleteReceiptBusy.set(true);
+    this.sfService.deleteReceipt(receipt.id, this.deleteReceiptReason.trim()).subscribe({
+      next: () => {
+        this.deleteReceiptBusy.set(false);
+        this.closeDeleteReceiptModal();
+        this.snack.open(`تم حذف سند القبض ${receipt.receipt_number} وإعادة الرصيد للمستحقات بنجاح.`, 'إغلاق', { duration: 5000 });
+        this.refreshFinanceData();
+      },
+      error: (e) => {
+        this.deleteReceiptBusy.set(false);
+        const msg = e?.error?.error?.message || e?.error?.message || 'تعذّر حذف سند القبض.';
+        this.snack.open(msg, 'إغلاق', { duration: 5000 });
+      }
+    });
+  }
+
+  unlockReceiptForAdmin(receipt: any): void {
+    this.sfService.unlockReceipt(receipt.id, 24).subscribe({
+      next: () => {
+        this.snack.open(`تم فتح قفل السند ${receipt.receipt_number} للتعديل والحذف لمدة 24 ساعة إضافية.`, 'إغلاق', { duration: 5000 });
+        this.refreshFinanceData();
+      },
+      error: (e) => {
+        const msg = e?.error?.error?.message || e?.error?.message || 'تعذّر فتح قفل السند.';
+        this.snack.open(msg, 'إغلاق', { duration: 5000 });
+      }
     });
   }
   totalDiscounts = computed(() => {

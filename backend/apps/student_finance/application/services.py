@@ -580,29 +580,46 @@ class PaymentService:
         5. عكس القيد المحاسبي في دفتر الأستاذ
         6. تحديث حالة السند والإيصال
         """
-        # --- 0. التحقق من صلاحية المستخدم ---
+        # --- 0. التحقق من صلاحية المستخدم وقاعدة الـ 24 ساعة ---
+        is_admin = False
+        user_perms = []
         if user_id:
             from apps.identity.domain.models import User
-            from apps.identity.domain.rbac import UserRole
+            from apps.identity.domain.rbac import UserRole, RolePermission
             try:
                 user = User.objects.get(id=user_id)
-                if not user.is_superuser:
-                    # التحقق من أن المستخدم يملك دور administrator
+                if user.is_superuser:
+                    is_admin = True
+                else:
+                    roles_qs = UserRole.objects.filter(user=user, tenant_id=tenant_id).values_list('role_id', flat=True)
                     has_admin_role = UserRole.objects.filter(
                         user=user, tenant_id=tenant_id, role__code='administrator'
                     ).exists()
-                    if not has_admin_role:
-                        raise ValidationError(
-                            "عكس سند القبض يتطلب صلاحية مدير المدرسة أو مستخدم فائق. "
-                            "يرجى التواصل مع إدارة النظام للحصول على الموافقة."
-                        )
+                    if has_admin_role:
+                        is_admin = True
+                    user_perms = list(RolePermission.objects.filter(role_id__in=roles_qs).values_list('permission__code', flat=True))
             except User.DoesNotExist:
                 raise ValidationError("المستخدم غير موجود.")
 
-        # --- 1. جلب الإيصال والتحقق من حالته ---
+        # --- 1. جلب الإيصال والتحقق من حالته ومنع تكرار العكس ---
         receipt = Receipt.objects.select_for_update().get(id=receipt_id, tenant_id=tenant_id)
+        if receipt.status == 'reversed' or receipt.reversed_at:
+            raise ValidationError("سند القبض هذا معكوس بالفعل مسبقاً، ولا يمكن تكرار عكس القيود المالية.")
+
         if receipt.status != 'posted':
             raise ValidationError("يمكن فقط عكس سندات القبض المرحلة (posted).")
+
+        # التحقق من شرط مرور 24 ساعة:
+        # زر عكس السند يتفعل بعد مرور 24 ساعة (أو بصلاحية المشرف/الأدمن الاستثنائية)
+        hours_since_creation = (timezone.now() - receipt.created_at).total_seconds() / 3600.0 if receipt.created_at else 999.0
+        can_reverse_perm = is_admin or ('receipts:reverse' in user_perms)
+        if hours_since_creation < 24.0 and not is_admin:
+            raise ValidationError(
+                f"لا يمكن عكس السند خلال أول 24 ساعة من تسجيله (مضى {hours_since_creation:.1f} ساعة). "
+                f"يمكنك بدلاً من ذلك استخدام خيار تعديل أو حذف السند مباشرة."
+            )
+        if not can_reverse_perm and not is_admin:
+            raise ValidationError("ليس لديك صلاحية عكس سندات القبض في مصفوفة الصلاحيات.")
 
         account = StudentBillingAccount.objects.select_for_update().get(
             id=receipt.student_billing_account_id, tenant_id=tenant_id
@@ -652,7 +669,7 @@ class PaymentService:
         if receipt.voucher_id:
             try:
                 voucher = Voucher.objects.get(id=receipt.voucher_id, tenant_id=tenant_id)
-                # البحث عن القيد المرتبط بالسند
+                # البحث عن القيد المرتبط بالسند والتأكد أنه مرحل ولم يعكس مسبقاً
                 journal = JournalEntry.objects.filter(
                     tenant_id=tenant_id,
                     reference=voucher.voucher_number,
@@ -722,6 +739,162 @@ class PaymentService:
             f"المبلغ: {receipt.amount} ج.س — الطالب: {student_name}"
         )
 
+        return receipt
+
+    @classmethod
+    @db_atomic
+    def delete_receipt(cls, tenant_id, receipt_id, user_id=None, reason=None):
+        """
+        حذف السند وإلغاء أثره المالي خلال الـ 24 ساعة الأولى من تسجيله،
+        أو بعد 24 ساعة بصلاحية الأدمن / الإذن الإداري (unlock).
+        """
+        is_admin = False
+        user_perms = []
+        if user_id:
+            from apps.identity.domain.models import User
+            from apps.identity.domain.rbac import UserRole, RolePermission
+            try:
+                user = User.objects.get(id=user_id)
+                if user.is_superuser:
+                    is_admin = True
+                else:
+                    roles_qs = UserRole.objects.filter(user=user, tenant_id=tenant_id).values_list('role_id', flat=True)
+                    has_admin_role = UserRole.objects.filter(
+                        user=user, tenant_id=tenant_id, role__code='administrator'
+                    ).exists()
+                    if has_admin_role:
+                        is_admin = True
+                    user_perms = list(RolePermission.objects.filter(role_id__in=roles_qs).values_list('permission__code', flat=True))
+            except User.DoesNotExist:
+                raise ValidationError("المستخدم غير موجود.")
+
+        receipt = Receipt.objects.select_for_update().get(id=receipt_id, tenant_id=tenant_id)
+        if receipt.status == 'reversed':
+            raise ValidationError("لا يمكن حذف سند معكوس محاسبياً بالفعل.")
+
+        # التحقق من نافذة الـ 24 ساعة والصلاحيات
+        now = timezone.now()
+        hours_passed = (now - receipt.created_at).total_seconds() / 3600.0 if receipt.created_at else 999.0
+        is_unlocked_by_admin = bool(receipt.admin_unlocked_until and receipt.admin_unlocked_until >= now)
+
+        if hours_passed > 24.0 and not is_admin and not is_unlocked_by_admin:
+            raise ValidationError(
+                f"انقضت المهلة المحددة لحذف السند (24 ساعة، مضى {hours_passed:.1f} ساعة). "
+                f"يتطلب الحذف والتعديل بعد هذه المدة موافقة وفتح القفل من مدير النظام (الأدمن)."
+            )
+
+        if not is_admin and not is_unlocked_by_admin and 'receipts:delete' not in user_perms:
+            # إذا لم تكن صلاحية receipts:delete ممنوحة في مصفوفة الصلاحيات
+            raise ValidationError("ليس لديك صلاحية حذف وتعديل سندات القبض في مصفوفة الصلاحيات.")
+
+        account = StudentBillingAccount.objects.select_for_update().get(
+            id=receipt.student_billing_account_id, tenant_id=tenant_id
+        )
+
+        # 1. التراجع عن تخصيصات السداد (PaymentAllocation)
+        allocations = PaymentAllocation.objects.filter(receipt=receipt)
+        total_allocated = Decimal('0.0')
+        for alloc in allocations:
+            allocated_amount = alloc.amount_allocated
+            total_allocated += allocated_amount
+
+            receivable = StudentReceivable.objects.select_for_update().get(id=alloc.receivable_id)
+            receivable.paid_amount = max(Decimal('0.0'), receivable.paid_amount - allocated_amount)
+            receivable.outstanding_amount += allocated_amount
+            if receivable.status == 'paid':
+                receivable.status = 'outstanding'
+            receivable.save(update_fields=['paid_amount', 'outstanding_amount', 'status'])
+
+            invoice = receivable.invoice
+            invoice.paid_amount = max(Decimal('0.0'), invoice.paid_amount - allocated_amount)
+            invoice.outstanding_amount += allocated_amount
+            invoice.save(update_fields=['paid_amount', 'outstanding_amount'])
+
+        # حذف سجلات التخصيص
+        allocations.delete()
+
+        # 2. تسوية فائض السداد وحساب الفوترة
+        credit_reversed = receipt.amount - total_allocated
+        if credit_reversed > 0:
+            account.credit_balance = max(Decimal('0.0'), account.credit_balance - credit_reversed)
+
+        account.outstanding_balance += receipt.amount
+        account.current_balance += receipt.amount
+        account.save(update_fields=['outstanding_balance', 'current_balance', 'credit_balance'])
+
+        # 3. معالجة سند الصندوق/البنك والقيد في موديول المالية
+        if receipt.voucher_id:
+            try:
+                voucher = Voucher.objects.filter(id=receipt.voucher_id, tenant_id=tenant_id).first()
+                if voucher:
+                    # إلغاء القيد المرتبط به إن وجد
+                    journals = JournalEntry.objects.filter(tenant_id=tenant_id, reference=voucher.voucher_number)
+                    for j in journals:
+                        j.lines.all().delete()
+                        j.delete()
+                    voucher.status = 'cancelled'
+                    voucher.save(update_fields=['status'])
+                    voucher.delete()
+            except Exception as e:
+                logger.warning(f"Error cleaning up voucher during receipt deletion: {e}")
+
+        # 4. تسجيل التدقيق المالي
+        receipt_num = receipt.receipt_number
+        rec_amount = float(receipt.amount)
+        BillingAudit.objects.create(
+            tenant_id=tenant_id,
+            action_type='delete_receipt',
+            performed_by=user_id,
+            details={
+                'receipt_number': receipt_num,
+                'amount': rec_amount,
+                'reason': reason or 'حذف سند القبض خلال مهلة الـ 24 ساعة',
+                'hours_passed': hours_passed,
+            }
+        )
+
+        # 5. حذف سجل سند القبض نفسه
+        receipt.delete()
+        return {'receipt_number': receipt_num, 'amount': rec_amount}
+
+    @classmethod
+    @db_atomic
+    def unlock_receipt_for_edit(cls, tenant_id, receipt_id, user_id, unlock_hours=24):
+        """
+        صلاحية خاصة بمدير النظام (الأدمن) لفتح قفل السند للتعديل أو الحذف بعد انقضاء 24 ساعة.
+        """
+        from apps.identity.domain.models import User
+        from apps.identity.domain.rbac import UserRole, RolePermission
+        user = User.objects.get(id=user_id)
+        is_admin = user.is_superuser
+        if not is_admin:
+            roles_qs = UserRole.objects.filter(user=user, tenant_id=tenant_id).values_list('role_id', flat=True)
+            has_admin_role = UserRole.objects.filter(
+                user=user, tenant_id=tenant_id, role__code='administrator'
+            ).exists()
+            has_unlock_perm = RolePermission.objects.filter(role_id__in=roles_qs, permission__code='receipts:unlock').exists()
+            if not has_admin_role and not has_unlock_perm:
+                raise ValidationError("فتح قفل السند للتعديل بعد 24 ساعة يتطلب صلاحية مدير النظام أو إذن receipts:unlock.")
+
+        receipt = Receipt.objects.select_for_update().get(id=receipt_id, tenant_id=tenant_id)
+        if receipt.status == 'reversed':
+            raise ValidationError("لا يمكن فتح قفل سند معكوس.")
+
+        from datetime import timedelta
+        receipt.admin_unlocked_until = timezone.now() + timedelta(hours=unlock_hours)
+        receipt.admin_unlocked_by = user_id
+        receipt.save(update_fields=['admin_unlocked_until', 'admin_unlocked_by'])
+
+        BillingAudit.objects.create(
+            tenant_id=tenant_id,
+            action_type='unlock_receipt',
+            performed_by=user_id,
+            details={
+                'receipt_id': str(receipt.id),
+                'receipt_number': receipt.receipt_number,
+                'unlocked_until': str(receipt.admin_unlocked_until),
+            }
+        )
         return receipt
 
 

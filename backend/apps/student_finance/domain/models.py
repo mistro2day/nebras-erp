@@ -333,6 +333,10 @@ class Receipt(CombinedSharedModel):
     reversed_by = models.UUIDField(null=True, blank=True, help_text="المستخدم الذي قام بالعكس")
     reversal_journal_entry_id = models.UUIDField(null=True, blank=True, help_text="القيد العكسي المولد في دفتر الأستاذ")
 
+    # حقول فتح القفل الاستثنائي بواسطة إدارة النظام بعد مرور 24 ساعة
+    admin_unlocked_until = models.DateTimeField(null=True, blank=True, help_text="صلاحية فتح قفل التعديل والحذف بعد 24 ساعة بأمر الأدمن")
+    admin_unlocked_by = models.UUIDField(null=True, blank=True, help_text="المدير الذي قام بفتح القفل")
+
     class Meta:
         db_table = 'nebras_student_receipts'
         unique_together = ('tenant_id', 'receipt_number')

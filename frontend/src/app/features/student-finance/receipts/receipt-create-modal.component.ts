@@ -135,10 +135,10 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
               />
             </div>
 
-            @if (amount > 0) {
+            @if (amount && +amount > 0) {
               <div class="full-width tafqeet-box">
                 <span class="tafqeet-title">المبلغ كتابةً:</span>
-                <span class="tafqeet-text">{{ getTafqeet(amount) }}</span>
+                <span class="tafqeet-text">{{ getTafqeet(+amount) }}</span>
               </div>
             }
           </div>
@@ -880,7 +880,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   selectedAccountId = signal<string>('');
   selectedAccount = signal<any | null>(null);
 
-  amount: number = 0;
+  amount: number | null = null;
   paymentMethodId = '';
   paymentDate: string = new Date().toISOString().slice(0, 10);
   cashBoxId: string | null = null;
@@ -920,9 +920,6 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
         this.selectedAccountId.set(target.id);
         this.selectedAccount.set(target);
         this.accountMode.set('locked');
-        if (+target.outstanding_balance > 0) {
-          this.amount = +target.outstanding_balance;
-        }
       } else if (this.preselectedAccountId) {
         this.selectedAccountId.set(this.preselectedAccountId);
         this.accountMode.set('locked');
@@ -941,9 +938,6 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
           const found = list.find((a: any) => a.id === this.selectedAccountId());
           if (found) {
             this.selectedAccount.set(found);
-            if (!this.amount && +found.outstanding_balance > 0) {
-              this.amount = +found.outstanding_balance;
-            }
           }
         }
       },
@@ -996,7 +990,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     const initialId = initialAccount?.id || this.preselectedAccountId || '';
     this.selectedAccountId.set(initialId);
     this.selectedAccount.set(initialAccount);
-    this.amount = initialAccount && +initialAccount.outstanding_balance > 0 ? +initialAccount.outstanding_balance : 0;
+    this.amount = null;
     this.referenceNumber = '';
     this.submitting.set(false);
     if (this.methods().length > 0 && !this.paymentMethodId) {
@@ -1015,9 +1009,6 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     this.selectedAccountId.set(strId);
     const found = this.accounts().find((a) => a.id === strId);
     this.selectedAccount.set(found || null);
-    if (found && +found.outstanding_balance > 0) {
-      this.amount = +found.outstanding_balance;
-    }
   }
 
   revertToPreselected() {
@@ -1026,9 +1017,6 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
       this.selectedAccountId.set(target.id);
       this.selectedAccount.set(target);
       this.accountMode.set('locked');
-      if (+target.outstanding_balance > 0) {
-        this.amount = +target.outstanding_balance;
-      }
     }
   }
 
@@ -1070,8 +1058,8 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
     return 'صندوق المركز المالي العام';
   }
 
-  getTafqeet(amount: number): string {
-    return tafqeetArabic(amount, 'جنيه سوداني');
+  getTafqeet(amount: number | null | undefined): string {
+    return tafqeetArabic(Number(amount) || 0, 'جنيه سوداني');
   }
 
   onPaymentMethodChange(methodId: string) {
@@ -1118,7 +1106,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
 
   canProceed(): boolean {
     if (this.currentStep() === 0) {
-      return (!!this.selectedAccountId() || !!this.selectedAccount()) && this.amount > 0;
+      return (!!this.selectedAccountId() || !!this.selectedAccount()) && Number(this.amount) > 0;
     }
     if (this.currentStep() === 1) {
       return !!this.paymentMethodId && !!this.paymentDate && (!!this.cashBoxId || !!this.bankAccountId);

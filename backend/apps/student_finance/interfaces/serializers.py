@@ -350,6 +350,11 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     total_invoiced = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
     payment_method_name = serializers.SerializerMethodField()
+    is_under_24h = serializers.SerializerMethodField()
+    can_delete_edit = serializers.SerializerMethodField()
+    can_reverse = serializers.SerializerMethodField()
+    hours_since_creation = serializers.SerializerMethodField()
+    is_admin_unlocked = serializers.SerializerMethodField()
 
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = Receipt
@@ -440,6 +445,41 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
         if hasattr(obj, 'payment_method_name') and obj.payment_method_name:
             return obj.payment_method_name
         return _get_payment_method_name(getattr(obj, 'payment_method_id', None))
+
+    def get_hours_since_creation(self, obj):
+        if not getattr(obj, 'created_at', None):
+            return 999.0
+        from django.utils import timezone
+        diff = timezone.now() - obj.created_at
+        return round(diff.total_seconds() / 3600.0, 1)
+
+    def get_is_under_24h(self, obj):
+        hours = self.get_hours_since_creation(obj)
+        return hours <= 24.0
+
+    def get_is_admin_unlocked(self, obj):
+        if not getattr(obj, 'admin_unlocked_until', None):
+            return False
+        from django.utils import timezone
+        return obj.admin_unlocked_until >= timezone.now()
+
+    def get_can_delete_edit(self, obj):
+        if obj.status == 'reversed':
+            return False
+        # متاح خلال 24 ساعة أو إذا قام الأدمن بفتح القفل أو إذا كان المستخدم سوبر يوزر
+        req = self.context.get('request')
+        is_su = bool(req and req.user and req.user.is_superuser)
+        return self.get_is_under_24h(obj) or self.get_is_admin_unlocked(obj) or is_su
+
+    def get_can_reverse(self, obj):
+        if obj.status != 'posted':
+            return False
+        if obj.status == 'reversed' or getattr(obj, 'reversed_at', None):
+            return False
+        # العكس يتفعل بعد مرور 24 ساعة (أو للسوبر يوزر)
+        req = self.context.get('request')
+        is_su = bool(req and req.user and req.user.is_superuser)
+        return (not self.get_is_under_24h(obj)) or is_su
 
 class RefundSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):

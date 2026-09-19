@@ -36,11 +36,14 @@ PERMISSION_CATALOG = [
     ("employees:update", "تعديل موظف", "employees", "employee", "update"),
     ("employees:activate", "تفعيل حساب موظف", "employees", "employee", "custom"),
 
-    # --- الرواتب والمالية ---
+    # --- الرواتب والمالية ومالية الطلاب ---
     ("payroll:read", "عرض الرواتب", "payroll", "payroll", "read"),
     ("payroll:approve", "اعتماد المسيّرات", "payroll", "payroll", "approve"),
     ("finance:read", "عرض المالية", "finance", "finance", "read"),
     ("finance:update", "إدارة المالية", "finance", "finance", "update"),
+    ("receipts:delete", "حذف وتعديل سندات القبض (خلال 24 ساعة)", "finance", "receipt", "delete"),
+    ("receipts:reverse", "عكس سندات القبض المحاسبية (بعد 24 ساعة)", "finance", "receipt", "custom"),
+    ("receipts:unlock", "فتح قفل سند القبض للتعديل بعد 24 ساعة (صلاحية إدارية)", "finance", "receipt", "custom"),
 
     # --- الإعدادات والصلاحيات ---
     ("settings:read", "عرض الإعدادات", "settings", "settings", "read"),
