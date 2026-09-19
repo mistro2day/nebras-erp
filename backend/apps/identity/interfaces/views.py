@@ -217,12 +217,18 @@ class UserViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(Q(roles__role__code__in=['teacher', 'faculty'])).distinct()
             elif cat in ['admin', 'administration', 'administrator', 'الإدارة']:
                 qs = qs.filter(Q(roles__role__code='administrator') | Q(is_staff=True)).distinct()
+            elif cat in ['accountant', 'accountants', 'المحاسب', 'المحاسبون']:
+                qs = qs.filter(roles__role__code='accountant').distinct()
+            elif cat in ['registrar', 'registrars', 'التسجيل', 'مسجل الطلاب']:
+                qs = qs.filter(roles__role__code='registrar').distinct()
+            elif cat in ['hr', 'hr_officer', 'الموارد البشرية']:
+                qs = qs.filter(roles__role__code__in=['hr_officer', 'hr']).distinct()
             elif cat in ['student', 'students', 'الطلاب']:
                 qs = qs.filter(Q(roles__role__code='student') | Q(portal_user__user_type='student')).distinct()
             elif cat in ['staff', 'employee', 'employees', 'الموظفون']:
                 qs = qs.filter(
                     ~Q(roles__role__code__in=['parent', 'student']) &
-                    (Q(roles__role__category='custom') | Q(roles__role__code__in=['staff', 'accountant', 'hr', 'registrar']) | Q(is_staff=True))
+                    (Q(roles__role__category='custom') | Q(roles__role__code__in=['staff', 'accountant', 'hr', 'hr_officer', 'registrar']) | Q(is_staff=True))
                 ).distinct()
             elif cat != 'all':
                 qs = qs.filter(roles__role__code=cat).distinct()

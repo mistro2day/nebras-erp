@@ -120,7 +120,7 @@ export class UserManagementComponent implements OnInit {
       else if (tab === 'teachers') list = list.filter((u) => u.user_type === 'teacher' || u.role_codes.includes('teacher') || u.role_codes.includes('faculty'));
       else if (tab === 'admin') list = list.filter((u) => u.user_type === 'admin' || u.role_codes.includes('administrator') || u.is_staff || u.is_superuser);
       else if (tab === 'students') list = list.filter((u) => u.user_type === 'student' || u.role_codes.includes('student'));
-      else if (tab === 'staff') list = list.filter((u) => u.user_type === 'staff' || u.role_codes.some(r => ['staff', 'hr', 'accountant'].includes(r)));
+      else if (tab === 'staff') list = list.filter((u) => u.user_type === 'staff' || u.role_codes.some(r => ['staff', 'hr', 'hr_officer', 'accountant', 'registrar'].includes(r)));
     }
 
     if (st !== 'all') {

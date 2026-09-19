@@ -80,6 +80,31 @@ SYSTEM_ROLES = {
         "name": "إداري النظام",
         "permissions": ["*"],
     },
+    "accountant": {
+        "name": "محاسب مالي",
+        "permissions": [
+            "finance:read", "finance:update",
+            "receipts:delete", "payroll:read",
+            "students:read", "forms:read",
+        ],
+    },
+    "registrar": {
+        "name": "مسجل الطلاب والقبول",
+        "permissions": [
+            "students:read", "students:create", "students:update",
+            "admissions:read", "admissions:update",
+            "attendance:read", "forms:read", "forms:update",
+            "communications:read",
+        ],
+    },
+    "hr_officer": {
+        "name": "مسؤول الموارد البشرية",
+        "permissions": [
+            "employees:read", "employees:create", "employees:update", "employees:activate",
+            "payroll:read", "payroll:approve",
+            "communications:send",
+        ],
+    },
     "teacher": {
         "name": "معلم",
         "permissions": [

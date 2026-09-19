@@ -89,6 +89,12 @@ class UserSerializer(serializers.ModelSerializer):
             pass
         if 'administrator' in codes or obj.is_superuser:
             return 'admin'
+        if 'accountant' in codes:
+            return 'accountant'
+        if 'registrar' in codes:
+            return 'registrar'
+        if 'hr_officer' in codes:
+            return 'hr_officer'
         if obj.is_staff:
             return 'admin'
         if 'parent' in codes:
@@ -101,6 +107,9 @@ class UserSerializer(serializers.ModelSerializer):
         t = self.get_user_type(obj)
         labels = {
             'admin': 'إداري / مشرف',
+            'accountant': 'محاسب مالي',
+            'registrar': 'مسجل طلاب وقبول',
+            'hr_officer': 'مسؤول موارد بشرية',
             'teacher': 'معلم / هيئة تدريس',
             'parent': 'ولي أمر',
             'student': 'طالب',
