@@ -236,9 +236,9 @@ import { AuthService } from '../../../core/auth/auth.service';
                   </div>
                 } @else if (billingAccount()) {
                   <div class="finance-header-box">
-                    <div class="fin-stat-card">
+                    <div class="fin-stat-card fin-card-acc">
                       <span class="fin-label">رقم الحساب المالي</span>
-                      <span class="fin-value">{{ billingAccount().account_number }}</span>
+                      <span class="fin-value mono acc-num-val" [title]="billingAccount().account_number">{{ billingAccount().account_number }}</span>
                     </div>
                     <div class="fin-stat-card">
                       <span class="fin-label">الرصيد المستحق</span>
@@ -1425,18 +1425,42 @@ import { AuthService } from '../../../core/auth/auth.service';
     /* المالية */
     .finance-header-box {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
+      grid-template-columns: minmax(280px, 1.4fr) repeat(4, minmax(170px, 1fr));
+      gap: 14px;
       margin-bottom: 20px;
+      width: 100%;
+    }
+    @media (max-width: 1200px) {
+      .finance-header-box {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
     }
     .fin-stat-card {
       background: var(--nb-surface-raised);
       border: 1px solid var(--nb-border-soft);
-      padding: 16px;
+      padding: 14px 16px;
       border-radius: var(--nb-radius-card);
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      justify-content: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .fin-card-acc {
+      border-color: rgba(30, 58, 138, 0.15);
+      background: linear-gradient(135deg, var(--nb-surface-raised) 0%, rgba(241, 245, 249, 0.6) 100%);
+    }
+    .acc-num-val {
+      font-size: 13.5px !important;
+      letter-spacing: 0.2px;
+      white-space: nowrap !important;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      direction: ltr !important;
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+      font-weight: 700;
+      color: #0f172a;
     }
     .fin-actions-row {
       grid-column: 1 / -1;
@@ -1473,8 +1497,8 @@ import { AuthService } from '../../../core/auth/auth.service';
     .btn-collect-head:hover {
       background: var(--nb-primary-700);
     }
-    .fin-label { font-size: 11.5px; color: var(--nb-text-muted); }
-    .fin-value { font-size: 18px; font-weight: 700; color: var(--nb-text); }
+    .fin-label { font-size: 11.5px; color: var(--nb-text-muted); font-weight: 500; }
+    .fin-value { font-size: 17px; font-weight: 700; color: var(--nb-text); white-space: nowrap; }
     .text-danger { color: #ef4444; }
     .text-success { color: #22c55e; }
     .text-warning { color: #d97706; font-weight: 600; }
