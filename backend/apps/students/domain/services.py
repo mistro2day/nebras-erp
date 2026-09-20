@@ -37,12 +37,13 @@ class StudentNumberGenerator:
             except Exception:
                 prefix = 'STD'
 
-        count = Student.objects.filter(tenant_id=tenant_id).count() + 1
+        student_mgr = getattr(Student, 'all_objects', Student.objects)
+        count = student_mgr.filter(tenant_id=tenant_id).count() + 1
         seq = max(count, sequence_num)
         candidate = f"{prefix}-{year_clean}-{seq:04d}"
 
-        # التحقق ضد أي تعارض في قاعدة البيانات
-        while Student.objects.filter(student_number=candidate).exists():
+        # التحقق ضد أي تعارض في قاعدة البيانات بالكامل دون تقييد بمستأجر السياق الحالي
+        while student_mgr.filter(student_number=candidate).exists():
             seq += 1
             candidate = f"{prefix}-{year_clean}-{seq:04d}"
 

@@ -209,7 +209,7 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
             <nb-stepper [steps]="manualSteps" [current]="manualStep()"></nb-stepper>
           </div>
 
-          <form (submit)="submitManualStudent($event)" class="manual-form">
+          <div class="manual-form">
             <!-- 1) البيانات الشخصية للتلميذ والأكاديمية والأشقاء -->
             <div class="step-content" *ngIf="manualStep() === 1" @fadeSlide>
               <div class="step-title-box">
@@ -376,12 +376,12 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
                   <div class="field wide-2">
                     <label>رقم واتساب المتابعة المدرسية <span class="required-star">*</span></label>
                     <div class="phone-with-country">
-                      <select [(ngModel)]="whatsappCountryCode" (change)="updateFullWhatsappNumber()" class="country-select">
+                      <select [(ngModel)]="whatsappCountryCode" name="whatsapp_country_code" (change)="updateFullWhatsappNumber()" class="country-select">
                         @for (c of waCountries; track c.code) {
                           <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
                         }
                       </select>
-                      <input type="text" [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()" [placeholder]="'مثال: ' + selectedWaCountry().sample" class="phone-body" dir="ltr" />
+                      <input type="text" [(ngModel)]="whatsappBody" name="whatsapp_body" (input)="updateFullWhatsappNumber()" [placeholder]="'مثال: ' + selectedWaCountry().sample" class="phone-body" dir="ltr" />
                     </div>
                     @if (whatsappError()) {
                       <span class="val-err">{{ whatsappError() }}</span>
@@ -563,12 +563,12 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
 
               <div class="form-actions">
                 <button type="button" class="nb-btn-secondary" (click)="manualStep.set(4)">→ السابق: الرسوم والأقساط</button>
-                <button type="submit" class="nb-btn-primary btn-save-final" [disabled]="submitting()">
+                <button type="button" class="nb-btn-primary btn-save-final" (click)="submitManualStudent()" [disabled]="submitting()">
                   {{ submitting() ? 'جارٍ حفظ واعتماد ملف الطالب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
                 </button>
               </div>
             </div>
-          </form>
+          </div>
         </nb-panel>
       </div>
     </div>
@@ -1456,8 +1456,10 @@ export class StudentCreateComponent implements OnInit {
     });
   }
 
-  submitManualStudent(event: Event) {
-    event.preventDefault();
+  submitManualStudent(event?: Event) {
+    if (event) {
+      event.preventDefault();
+    }
     if (!this.personalForm.arabic_name?.trim() || !this.personalForm.date_of_birth) {
       this.errorMessage.set('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
       this.snack.open('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)', 'إغلاق', { duration: 4000 });
