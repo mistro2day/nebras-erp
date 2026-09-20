@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-H2WIGTE2.js").then(o=>o.FacultyDashboardComponent)}];export{t as FACULTY_ROUTES};

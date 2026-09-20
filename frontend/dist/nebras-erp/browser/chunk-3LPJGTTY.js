@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"explorer",pathMatch:"full"},{path:"explorer",loadComponent:()=>import("./chunk-YPBZ2AZP.js").then(o=>o.DocumentExplorerComponent)}];export{t as DOCUMENT_ROUTES};

@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-DJFLGU4O.js").then(o=>o.GatewayDashboardComponent)}];export{t as INTEGRATION_ROUTES};

@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"builder",pathMatch:"full"},{path:"builder",loadComponent:()=>import("./chunk-CJCHJQ26.js").then(o=>o.FormBuilderComponent)}];export{t as FORMS_ROUTES};

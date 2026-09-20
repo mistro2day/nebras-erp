@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var e=[{path:"",redirectTo:"palette",pathMatch:"full"},{path:"palette",loadComponent:()=>import("./chunk-EU2L7WLF.js").then(t=>t.CommandPaletteComponent)}];export{e as COMMAND_ROUTES};
