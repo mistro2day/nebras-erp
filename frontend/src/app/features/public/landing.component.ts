@@ -21,7 +21,7 @@ import { AdmissionsService } from '../admissions/admissions.service';
       <header class="top">
         <a routerLink="/nebras" class="brand brand-link" title="الانتقال إلى صفحة نبراس الرئيسية">
           <div class="logo-mark"><img src="assets/branding/logo-icon-light.png" alt="شعار نبراس" class="brand-logo-img" /></div>
-          <span class="brand-name">{{ tenantName() || 'نبراس' }} <b>OS</b></span>
+          <span class="brand-name">{{ tenantName() || 'نبراس' }}</span>
         </a>
         <a routerLink="/accounts/login" class="top-login">دخول الإدارة</a>
       </header>
@@ -80,7 +80,8 @@ import { AdmissionsService } from '../admissions/admissions.service';
       </main>
 
       <footer class="foot">
-        <span>© {{ year }} {{ tenantName() || 'نبراس' }} — نظام نبراس OS لإدارة المدارس</span>
+        <span>© {{ year }} {{ tenantName() || 'نبراس' }} — </span>
+        <a routerLink="/nebras" class="foot-link" title="الانتقال إلى موقع نظام نبراس OS لإدارة المدارس">نظام نبراس OS لإدارة المدارس</a>
       </footer>
     </div>
   `,
@@ -129,6 +130,10 @@ import { AdmissionsService } from '../admissions/admissions.service';
     .card-arrow { margin-inline-start: auto; font-size: 18px; color: var(--nb-primary-600); opacity: 0.4; transition: transform 180ms ease, opacity 180ms ease; }
 
     .foot { position: relative; z-index: 1; padding: 18px; text-align: center; font-size: 12px; color: var(--nb-text-faint); }
+    .foot-link { color: var(--nb-primary-600); font-weight: 600; text-decoration: none; transition: color 150ms ease, text-decoration 150ms ease; }
+    .foot-link:hover { color: var(--nb-primary-700); text-decoration: underline; }
+    .brand-link { text-decoration: none; cursor: pointer; transition: opacity 150ms ease; }
+    .brand-link:hover { opacity: 0.85; }
 
     @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
     @media (prefers-reduced-motion: reduce) { .hero-title, .hero-sub, .status-pill, .card { animation: none; } .card:hover { transform: none; } }
