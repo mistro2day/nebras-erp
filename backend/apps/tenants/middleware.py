@@ -7,9 +7,9 @@ from apps.tenants.domain.models import Tenant
 from apps.tenants.context import set_current_tenant_id, clear_current_tenant
 
 # النطاقات التي تمثّل منصة الـ API نفسها (وليس مدرسة فرعية).
-# تُعرَّف عبر الإعداد، وتتخلف إلى نطاق Render التجريبي.
+# تُعرَّف عبر الإعداد، وتتخلف إلى نطاق Render و DuckDNS التجريبي.
 PLATFORM_HOST_SUFFIXES = getattr(
-    settings, 'TENANT_PLATFORM_HOST_SUFFIXES', ['.onrender.com']
+    settings, 'TENANT_PLATFORM_HOST_SUFFIXES', ['.onrender.com', '.duckdns.org', 'duckdns.org']
 )
 
 

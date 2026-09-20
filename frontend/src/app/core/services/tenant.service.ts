@@ -31,9 +31,9 @@ const TENANT_STORAGE_KEY = 'nb_tenant';
 
 // نطاقات التطوير/الاستضافة التي لا تمثّل نطاق مستأجر فرعياً؛ عندها نعتمد
 // المستأجر الافتراضي (وضع المدرسة الواحدة) بدل استخراج subdomain.
-const DEV_HOST_SUFFIXES = ['localhost', '.local', '.onrender.com', '.vercel.app', '.ngrok.io'];
+const DEV_HOST_SUFFIXES = ['localhost', '.local', '.onrender.com', '.vercel.app', '.ngrok.io', '.duckdns.org'];
 // نطاقات فرعية محجوزة لا تمثّل مدرسة.
-const RESERVED_SUBDOMAINS = ['www', 'app', 'admin', 'api', 'portal'];
+const RESERVED_SUBDOMAINS = ['www', 'app', 'admin', 'api', 'portal', 'nebras', 'nebraserp'];
 
 @Injectable({
   providedIn: 'root'
