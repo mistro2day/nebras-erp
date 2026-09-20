@@ -205,7 +205,7 @@ export class CommunicationsService {
 
   // إعدادات Evolution API (تُمرَّر عبر بروكسي /whatsapp-api → http://localhost:8050)
   private evoInstance = 'nebras-khartoum-instance';
-  private evoApiKey = 'evo_key_998237465';
+  private evoApiKey = 'nebras_evo_secret_key_2026';
   private get evoHeaders() {
     return { apikey: this.evoApiKey };
   }
