@@ -264,9 +264,12 @@ class StudentApplicationService:
 
     @classmethod
     @atomic_method
-    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None, academic_data: dict | None = None, financial_config: dict | None = None) -> Student:
+    def create_student_manually(cls, profile_data: dict, tenant_id: uuid.UUID, user_id: uuid.UUID, config=None,
+                                academic_data: dict | None = None, guardian_data: dict | None = None,
+                                emergency_data: dict | None = None, address_data: dict | None = None,
+                                financial_config: dict | None = None) -> Student:
         """
-        إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأكاديمية والمالية
+        إنشاء طالب يدوياً بالكامل مع تفاصيله الشخصية والطبية والأسرية والأكاديمية والمالية
         """
         cls._enforce_student_limit(tenant_id)
 
@@ -332,6 +335,50 @@ class StudentApplicationService:
             },
             user_id=user_id,
         )
+
+        # 4c. إنشاء علاقة ولي الأمر الرئيسي (إن توفرت البيانات)
+        if guardian_data and (guardian_data.get('full_name') or guardian_data.get('phone')):
+            from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyContact, StudentAddress
+            StudentFamilyRelation.objects.create(
+                student=student,
+                relationship=guardian_data.get('relationship', 'guardian'),
+                full_name=guardian_data.get('full_name', ''),
+                phone=guardian_data.get('phone', ''),
+                email=guardian_data.get('email') or None,
+                occupation=guardian_data.get('occupation', ''),
+                employer=guardian_data.get('work_address', ''),
+                national_id=guardian_data.get('national_id', ''),
+                emergency_contact=False,
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
+
+        # 4d. جهة الاتصال البديلة للطوارئ
+        if emergency_data and emergency_data.get('name'):
+            from apps.students.domain.models import StudentEmergencyContact
+            StudentEmergencyContact.objects.create(
+                student=student,
+                name=emergency_data.get('name', ''),
+                relationship=emergency_data.get('relationship', '—'),
+                phone=emergency_data.get('phone', ''),
+                is_primary=False,
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
+
+        # 4e. بيانات العنوان والسكن
+        if address_data and (address_data.get('address_line1') or address_data.get('city')):
+            from apps.students.domain.models import StudentAddress
+            StudentAddress.objects.create(
+                student=student,
+                address_type='current',
+                address_line1=address_data.get('address_line1', ''),
+                address_line2=address_data.get('building_number', ''),
+                city=address_data.get('city', 'الخرطوم'),
+                country=address_data.get('country', 'السودان'),
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
 
         # 4b. تسكين الطالب دراسياً إن توفرت البيانات الأكاديمية
         gender = profile_data.get('gender', 'male')

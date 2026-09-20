@@ -200,9 +200,9 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
         }
       </div>
 
-      <!-- نموذج التسجيل اليدوي للطلاب بنظام الخطوات المعتمد -->
+      <!-- نموذج التسجيل اليدوي للطلاب بنظام الخطوات المعتمد المطابق لاستمارة القبول -->
       <div class="registration-manual-layout" *ngIf="regMode() === 'manual'" @fadeSlide>
-        <nb-panel title="تسجيل طالب يدوياً" subtitle="معالج تسجيل الطالب خطوة بخطوة مع تحديد الصف الدراسي والبيانات الطبية وخطة الرسوم والأقساط.">
+        <nb-panel title="تسجيل طالب يدوياً — ملف متكامل" subtitle="معالج تسجيل الطالب خطوة بخطوة مطابق لاستمارة القبول والتسجيل الرسمية بالمدرسة مع ربط ولي الأمر والملف الصحي والرسوم.">
           
           <!-- مؤشر الخطوات المعتمد -->
           <div class="wizard-stepper-wrap">
@@ -210,26 +210,31 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
           </div>
 
           <form (submit)="submitManualStudent($event)" class="manual-form">
-            <!-- الخطوة 1: البيانات الشخصية والتسكين الأكاديمي -->
+            <!-- 1) البيانات الشخصية للتلميذ والأكاديمية والأشقاء -->
             <div class="step-content" *ngIf="manualStep() === 1" @fadeSlide>
+              <div class="step-title-box">
+                <span class="step-badge">الخطوة الأولى</span>
+                <h3>أ / البيانات الشخصية للتلميذ والتسكين الأكاديمي</h3>
+              </div>
+
               <div class="form-grid">
-                <div class="field">
-                  <label>الاسم بالعربي <span class="required-star">*</span></label>
-                  <input type="text" [(ngModel)]="personalForm.arabic_name" name="arabic_name" required placeholder="مثال: محمد خيدر" />
+                <div class="field wide-2">
+                  <label>اسم التلميذ رباعياً (عربي) <span class="required-star">*</span></label>
+                  <input type="text" [(ngModel)]="personalForm.arabic_name" name="arabic_name" required placeholder="مثال: أحمد محمد عبد الرحمن علي" />
                 </div>
                 <div class="field">
-                  <label>الاسم بالإنجليزي</label>
-                  <input type="text" [(ngModel)]="personalForm.english_name" name="english_name" placeholder="مثال: Mohamed Khaider" />
+                  <label>اسم التلميذ (إنجليزي)</label>
+                  <input type="text" [(ngModel)]="personalForm.english_name" name="english_name" placeholder="Ahmed Mohamed Ali" />
                 </div>
                 <div class="field">
-                  <label>الجنس</label>
+                  <label>الجنس <span class="required-star">*</span></label>
                   <select [ngModel]="personalForm.gender" (ngModelChange)="onGenderChange($event)" name="gender">
                     <option value="male">ذكر</option>
                     <option value="female">أنثى</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label>الفرع المدرسي</label>
+                  <label>الفرع المدرسي المستهدف</label>
                   <div class="branch-pill-manual">
                     <span class="branch-icon">{{ personalForm.gender === 'male' ? '👦' : '👧' }}</span>
                     <span class="branch-name">{{ selectedBranchName() }}</span>
@@ -241,20 +246,24 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
                   <nb-datepicker [(value)]="personalForm.date_of_birth" placeholder="اختر تاريخ الميلاد"></nb-datepicker>
                 </div>
                 <div class="field">
-                  <label>الجنسية</label>
+                  <label>مكان الميلاد</label>
+                  <input type="text" [(ngModel)]="personalForm.birth_place" name="birth_place" placeholder="الخرطوم / أم درمان / ..." />
+                </div>
+                <div class="field">
+                  <label>الجنسية <span class="required-star">*</span></label>
                   <input type="text" [(ngModel)]="personalForm.nationality" name="nationality" placeholder="سوداني" />
                 </div>
                 <div class="field">
-                  <label>الرقم الوطني / الجواز</label>
-                  <input type="text" [(ngModel)]="personalForm.national_id" name="national_id" placeholder="10 أرقام" />
+                  <label>الرقم الوطني <span class="required-star">*</span></label>
+                  <input type="text" [(ngModel)]="personalForm.national_id" name="national_id" placeholder="11 رقم للطلاب السودانيين" />
                 </div>
                 <div class="field">
-                  <label>رقم جواز السفر</label>
-                  <input type="text" [(ngModel)]="personalForm.passport" name="passport" />
+                  <label>رقم جواز السفر (لغير السودانيين)</label>
+                  <input type="text" [(ngModel)]="personalForm.passport" name="passport" placeholder="رقم الجواز إن وجد" />
                 </div>
                 <div class="field">
                   <label>الديانة</label>
-                  <input type="text" [(ngModel)]="personalForm.religion" name="religion" placeholder="مسلم، مسيحي..." />
+                  <input type="text" [(ngModel)]="personalForm.religion" name="religion" placeholder="مسلم" />
                 </div>
                 <div class="field">
                   <label>فصيلة الدم</label>
@@ -282,7 +291,7 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
                 <div class="field">
                   <label>الفصل الدراسي (اختياري)</label>
                   <select [(ngModel)]="manualAcademic.section_id" name="manual_section" [disabled]="!manualAcademic.grade_id">
-                    <option value="">{{ manualAvailableSections().length > 0 ? '-- اختر الفصل (اختياري) --' : (manualAcademic.grade_id ? '-- لا توجد فصول معرفة --' : '-- اختر الصف أولاً --') }}</option>
+                    <option value="">{{ manualAvailableSections().length > 0 ? '-- اختر الفصل (اختياري) --' : (manualAcademic.grade_id ? '-- لا توجد فصول معرفة لهذا الصف --' : '-- اختر الصف أولاً --') }}</option>
                     @for (s of manualAvailableSections(); track s.id) {
                       <option [value]="s.id">{{ s.name }} (السعة: {{ s.capacity }})</option>
                     }
@@ -290,53 +299,272 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
                 </div>
               </div>
 
+              <!-- قسم الأشقاء بالمدرسة -->
+              <div class="inner-sub-card">
+                <div class="sub-head">الأشقاء المسجلين في المدرسة</div>
+                <div class="form-grid">
+                  <div class="field full-width">
+                    <label class="chk-label">
+                      <input type="checkbox" [(ngModel)]="personalForm.has_siblings" name="has_siblings" />
+                      <span>هل للتلميذ أشقاء مسجلين بمدارس المورد؟</span>
+                    </label>
+                  </div>
+                  @if (personalForm.has_siblings) {
+                    <div class="field">
+                      <label>القسم</label>
+                      <select [(ngModel)]="personalForm.siblings_section" name="siblings_section">
+                        <option value="إبتدائي">إبتدائي</option>
+                        <option value="متوسط">متوسط</option>
+                        <option value="ثانوي">ثانوي</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>عددهم</label>
+                      <input type="number" min="1" max="10" [(ngModel)]="personalForm.siblings_count" name="siblings_count" />
+                    </div>
+                    <div class="field wide-2">
+                      <label>تفاصيل الأشقاء (الاسم / الرقم الوطني / الصف)</label>
+                      <input type="text" [(ngModel)]="personalForm.siblings_details" name="siblings_details" placeholder="مثال: خالد محمد (الصف الرابع)، سارة محمد (الصف الثاني)" />
+                    </div>
+                  }
+                </div>
+              </div>
+
               <div class="form-actions">
                 <button type="button" class="nb-btn-secondary" (click)="cancel()">إلغاء</button>
                 <button type="button" class="nb-btn-primary" (click)="goToNextStep(2)">
-                  التالي: الملف الطبي ←
+                  التالي: بيانات ولي الأمر والبديل ←
                 </button>
               </div>
             </div>
 
-            <!-- الخطوة 2: الملف الطبي -->
+            <!-- 2) بيانات ولي الأمر والشخص البديل للطوارئ -->
             <div class="step-content" *ngIf="manualStep() === 2" @fadeSlide>
-              <div class="form-grid">
-                <div class="field full-width">
-                  <label>الحساسية (افصل بينها بفاصلة)</label>
-                  <input type="text" [(ngModel)]="medicalForm.allergiesInput" name="allergies" placeholder="مثال: البنسلين، الفول السوداني" />
+              <div class="step-title-box">
+                <span class="step-badge">الخطوة الثانية</span>
+                <h3>بيانات ولي الأمر والشخص البديل للطوارئ</h3>
+              </div>
+
+              <div class="inner-sub-card">
+                <div class="sub-head">بيانات ولي الأمر الرئيسي</div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label>صلة القرابة <span class="required-star">*</span></label>
+                    <select [(ngModel)]="guardianForm.relationship" name="guardian_rel">
+                      <option value="father">أب</option>
+                      <option value="mother">أم</option>
+                      <option value="guardian">ولي أمر</option>
+                      <option value="sponsor">كفيل</option>
+                    </select>
+                  </div>
+                  <div class="field wide-2">
+                    <label>اسم ولي الأمر رباعياً <span class="required-star">*</span></label>
+                    <input type="text" [(ngModel)]="guardianForm.full_name" name="guardian_name" required placeholder="اسم ولي الأمر كاملاً" />
+                  </div>
+                  <div class="field">
+                    <label>الرقم الوطني لولي الأمر</label>
+                    <input type="text" [(ngModel)]="guardianForm.national_id" name="guardian_nid" placeholder="الرقم الوطني لولي الأمر" />
+                  </div>
+                  <div class="field">
+                    <label>رقم هاتف ولي الأمر (1) <span class="required-star">*</span></label>
+                    <input type="tel" [(ngModel)]="guardianForm.phone" name="guardian_phone" required placeholder="09xxxxxxx" />
+                  </div>
+                  <div class="field">
+                    <label>رقم هاتف ولي الأمر (2)</label>
+                    <input type="tel" [(ngModel)]="guardianForm.phone2" name="guardian_phone2" placeholder="01xxxxxxx" />
+                  </div>
+                  <div class="field wide-2">
+                    <label>رقم واتساب المتابعة المدرسية <span class="required-star">*</span></label>
+                    <div class="phone-with-country">
+                      <select [(ngModel)]="whatsappCountryCode" (change)="updateFullWhatsappNumber()" class="country-select">
+                        @for (c of waCountries; track c.code) {
+                          <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                        }
+                      </select>
+                      <input type="text" [(ngModel)]="whatsappBody" (input)="updateFullWhatsappNumber()" [placeholder]="'مثال: ' + selectedWaCountry().sample" class="phone-body" dir="ltr" />
+                    </div>
+                    @if (whatsappError()) {
+                      <span class="val-err">{{ whatsappError() }}</span>
+                    } @else if (guardianForm.whatsapp_phone) {
+                      <span class="val-ok">✓ الرقم الدولي المعتمد للواتساب: <b dir="ltr">{{ guardianForm.whatsapp_phone }}</b></span>
+                    }
+                  </div>
+                  <div class="field">
+                    <label>المهنة / الوظيفة</label>
+                    <input type="text" [(ngModel)]="guardianForm.occupation" name="guardian_job" placeholder="المهنة أو الوظيفة" />
+                  </div>
+                  <div class="field wide-2">
+                    <label>عنوان عمل ولي الأمر</label>
+                    <input type="text" [(ngModel)]="guardianForm.work_address" name="guardian_work" placeholder="اسم الجهة أو عنوان العمل" />
+                  </div>
+                  <div class="field wide-2">
+                    <label>السكن / المنطقة والحي</label>
+                    <input type="text" [(ngModel)]="guardianForm.address" name="guardian_addr" placeholder="المنطقة - الحي - الشارع" />
+                  </div>
+                  <div class="field">
+                    <label>رقم المنزل / العمارة</label>
+                    <input type="text" [(ngModel)]="guardianForm.building_number" name="guardian_building" placeholder="رقم المنزل أو الشقة" />
+                  </div>
+                  <div class="field">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" [(ngModel)]="guardianForm.email" name="guardian_email" placeholder="example@domain.com" />
+                  </div>
+                  <div class="field wide-2">
+                    <label>هاتف والدة التلميذ (أو من ينوب عنها)</label>
+                    <input type="tel" [(ngModel)]="guardianForm.mother_phone" name="mother_phone" placeholder="هاتف الأم: 09xxxxxxx" />
+                  </div>
                 </div>
-                <div class="field full-width">
-                  <label>الأمراض المزمنة (افصل بينها بفاصلة)</label>
-                  <input type="text" [(ngModel)]="medicalForm.chronicDiseasesInput" name="chronic_diseases" placeholder="مثال: الربو، السكري" />
-                </div>
-                <div class="field full-width">
-                  <label>الأدوية الموصوفة</label>
-                  <input type="text" [(ngModel)]="medicalForm.medicationInput" name="medication" placeholder="أدوية يحتاجها الطالب بانتظام" />
-                </div>
-                <div class="field">
-                  <label>طبيب الأسرة المفضل</label>
-                  <input type="text" [(ngModel)]="medicalForm.doctor" name="doctor" />
-                </div>
-                <div class="field full-width">
-                  <label>ملاحظات طبية أخرى</label>
-                  <textarea [(ngModel)]="medicalForm.medical_notes" name="medical_notes" rows="3"></textarea>
+              </div>
+
+              <!-- الشخص البديل للطوارئ -->
+              <div class="inner-sub-card alert-card">
+                <div class="sub-head warn-title">الشخص البديل في حالة الطوارئ وعدم الوصول لولي الأمر</div>
+                <div class="form-grid">
+                  <div class="field wide-2">
+                    <label>اسم الشخص البديل</label>
+                    <input type="text" [(ngModel)]="guardianForm.emergency_contact_name" name="em_name" placeholder="الاسم الكامل للشخص البديل" />
+                  </div>
+                  <div class="field">
+                    <label>صلة القرابة</label>
+                    <input type="text" [(ngModel)]="guardianForm.emergency_contact_relation" name="em_rel" placeholder="عم / خال / جد..." />
+                  </div>
+                  <div class="field">
+                    <label>رقم هاتف البديل</label>
+                    <input type="tel" [(ngModel)]="guardianForm.emergency_contact_phone" name="em_phone" placeholder="09xxxxxxx" />
+                  </div>
+                  <div class="field wide-2">
+                    <label>عنوان البديل</label>
+                    <input type="text" [(ngModel)]="guardianForm.emergency_contact_address" name="em_addr" placeholder="عنوان السكن للشخص البديل" />
+                  </div>
                 </div>
               </div>
 
               <div class="form-actions">
                 <button type="button" class="nb-btn-secondary" (click)="manualStep.set(1)">→ السابق: البيانات الشخصية</button>
-                <button type="button" class="nb-btn-primary" (click)="manualStep.set(3)">التالي: البيانات المالية والأقساط ←</button>
+                <button type="button" class="nb-btn-primary" (click)="goToNextStep(3)">التالي: الملف الصحي والترحيل ←</button>
               </div>
             </div>
 
-            <!-- الخطوة 3: البيانات المالية والأقساط والاعتماد -->
+            <!-- 3) الملف الصحي والاجتماعي والترحيل -->
             <div class="step-content" *ngIf="manualStep() === 3" @fadeSlide>
-              <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
+              <div class="step-title-box">
+                <span class="step-badge">الخطوة الثالثة</span>
+                <h3>الملف الصحي والاجتماعي وخدمات الترحيل</h3>
+              </div>
+
+              <div class="inner-sub-card">
+                <div class="sub-head">الملف الطبي والصحي للطالب (العيادة المدرسية)</div>
+                <div class="form-grid">
+                  <div class="field full-width">
+                    <label>الحساسية (افصل بينها بفاصلة)</label>
+                    <input type="text" [(ngModel)]="medicalForm.allergiesInput" name="allergies" placeholder="مثال: البنسلين، الفول السوداني" />
+                  </div>
+                  <div class="field full-width">
+                    <label>الأمراض المزمنة (افصل بينها بفاصلة)</label>
+                    <input type="text" [(ngModel)]="medicalForm.chronicDiseasesInput" name="chronic_diseases" placeholder="مثال: الربو، السكري" />
+                  </div>
+                  <div class="field full-width">
+                    <label>الأدوية الموصوفة بانتظام</label>
+                    <input type="text" [(ngModel)]="medicalForm.medicationInput" name="medication" placeholder="أدوية يحتاجها الطالب بانتظام" />
+                  </div>
+                  <div class="field">
+                    <label>طبيب الأسرة المفضل</label>
+                    <input type="text" [(ngModel)]="medicalForm.doctor" name="doctor" placeholder="اسم الطبيب أو المركز" />
+                  </div>
+                  <div class="field full-width">
+                    <label>ملاحظات طبية أو توجيهات للعيادة</label>
+                    <textarea [(ngModel)]="medicalForm.medical_notes" name="medical_notes" rows="2" placeholder="أي إرشادات خاصة بالطالب..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="inner-sub-card">
+                <div class="sub-head">الحالة الاجتماعية ووسيلة الترحيل والاعتماد الأكاديمي</div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label>التلميذ يقيم مع</label>
+                    <select [(ngModel)]="personalForm.resides_with" name="resides_with">
+                      <option value="parents">الأم والأب</option>
+                      <option value="father">الأب</option>
+                      <option value="mother">الأم</option>
+                      <option value="other">أخرى (أقارب / كفيل)</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>وسيلة ترحيل التلميذ</label>
+                    <select [(ngModel)]="personalForm.transport_mode" name="transport_mode">
+                      <option value="school">ترحيل المدرسة الرسمي</option>
+                      <option value="private">ترحيل خاص</option>
+                      <option value="public">المواصلات العامة</option>
+                      <option value="walking">الأقدام</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>يعتمد التلميذ في المذاكرة على</label>
+                    <select [(ngModel)]="personalForm.study_dependence" name="study_dependence">
+                      <option value="self">نفسه</option>
+                      <option value="other">غيره (مدرس / ولي الأمر / دروس خاصة)</option>
+                    </select>
+                  </div>
+                  <div class="field full-width">
+                    <label>المدرسة أو الروضة السابقة</label>
+                    <input type="text" [(ngModel)]="personalForm.previous_school" name="previous_school" placeholder="اسم المدرسة أو الروضة السابقة إن وجد" />
+                  </div>
+                </div>
+              </div>
 
               <div class="form-actions">
-                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(2)">→ السابق: الملف الطبي</button>
-                <button type="submit" class="nb-btn-primary" [disabled]="submitting()">
-                  {{ submitting() ? 'جارٍ حفظ واعتماد الطالب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(2)">→ السابق: ولي الأمر</button>
+                <button type="button" class="nb-btn-primary" (click)="goToNextStep(4)">التالي: الرسوم والأقساط ←</button>
+              </div>
+            </div>
+
+            <!-- 4) الرسوم والأقساط والسداد الفوري -->
+            <div class="step-content" *ngIf="manualStep() === 4" @fadeSlide>
+              <div class="step-title-box">
+                <span class="step-badge">الخطوة الرابعة</span>
+                <h3>الرسوم الدراسية وخطة الأقساط والسداد الفوري</h3>
+              </div>
+
+              <div class="finance-form-wrapper">
+                <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(3)">→ السابق: الملف الصحي والترحيل</button>
+                <button type="button" class="nb-btn-primary" (click)="goToNextStep(5)">التالي: مراجعة البيانات والاعتماد ←</button>
+              </div>
+            </div>
+
+            <!-- 5) المراجعة الشاملة والاعتماد النهائي -->
+            <div class="step-content" *ngIf="manualStep() === 5" @fadeSlide>
+              <div class="step-title-box">
+                <span class="step-badge">الخطوة الخامسة والأخيرة</span>
+                <h3>مراجعة ملخص الملف والاعتماد النهائي</h3>
+              </div>
+
+              <div class="review-card">
+                <div class="sub-head">ملخص بيانات الطالب قبل التسجيل الرسمي</div>
+                <div class="rev-grid">
+                  <div><span>اسم التلميذ:</span><b>{{ personalForm.arabic_name || '—' }}</b></div>
+                  <div><span>الجنس والفرع:</span><b>{{ personalForm.gender === 'male' ? 'ذكر' : 'أنثى' }} · {{ selectedBranchName() }}</b></div>
+                  <div><span>تاريخ الميلاد:</span><b>{{ personalForm.date_of_birth || '—' }}</b></div>
+                  <div><span>الرقم الوطني:</span><b>{{ personalForm.national_id || '—' }}</b></div>
+                  <div><span>الصف الدراسي:</span><b>{{ selectedGradeName() }}</b></div>
+                  <div><span>الفصل الدراسي:</span><b>{{ selectedSectionName() }}</b></div>
+                  <div><span>ولي الأمر:</span><b>{{ guardianForm.full_name || '—' }} ({{ relationshipLabel(guardianForm.relationship) }})</b></div>
+                  <div><span>هاتف ولي الأمر:</span><b>{{ guardianForm.phone || '—' }}</b></div>
+                  <div><span>واتساب المتابعة:</span><b dir="ltr">{{ guardianForm.whatsapp_phone || '—' }}</b></div>
+                  <div><span>السكن والحي:</span><b>{{ guardianForm.address || '—' }} {{ guardianForm.building_number ? '(مبنى: ' + guardianForm.building_number + ')' : '' }}</b></div>
+                  <div><span>البديل للطوارئ:</span><b>{{ guardianForm.emergency_contact_name || '—' }} {{ guardianForm.emergency_contact_phone ? '(' + guardianForm.emergency_contact_phone + ')' : '' }}</b></div>
+                  <div><span>وسيلة الترحيل:</span><b>{{ transportLabel(personalForm.transport_mode) }}</b></div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(4)">→ السابق: الرسوم والأقساط</button>
+                <button type="submit" class="nb-btn-primary btn-save-final" [disabled]="submitting()">
+                  {{ submitting() ? 'جارٍ حفظ واعتماد ملف الطالب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
                 </button>
               </div>
             </div>
@@ -535,40 +763,61 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
       }
       .font-bold { font-weight: 700; }
 
-      /* نموذج التسجيل اليدوي */
+      /* معالج التسجيل اليدوي بنظام الخطوات المعتمد */
       .manual-form {
         display: flex;
         flex-direction: column;
         gap: 20px;
       }
-      .form-tabs {
-        display: flex;
-        gap: 10px;
+      .wizard-stepper-wrap {
+        margin-bottom: 24px;
+        padding-bottom: 12px;
         border-bottom: 1px solid var(--nb-border-soft);
-        padding-bottom: 8px;
       }
-      .form-tabs button {
-        background: transparent;
-        border: none;
-        font-family: var(--nb-font-family);
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--nb-text-muted);
-        padding: 6px 12px;
-        cursor: pointer;
-        position: relative;
+      .step-title-box {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--nb-primary-50, #eff6ff);
       }
-      .form-tabs button.active {
-        color: var(--nb-primary-600);
-      }
-      .form-tabs button.active::after {
-        content: '';
-        position: absolute;
-        bottom: -9px; left: 0; right: 0;
-        height: 2px;
+      .step-badge {
         background: var(--nb-primary-600);
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 20px;
       }
-      
+      .step-title-box h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--nb-text);
+      }
+
+      .inner-sub-card {
+        background: var(--nb-surface-raised, #f8fafc);
+        border: 1px solid var(--nb-border-soft, #e2e8f0);
+        border-radius: var(--nb-radius-card, 12px);
+        padding: 18px 20px;
+        margin-top: 16px;
+      }
+      .inner-sub-card.alert-card {
+        background: #fffbeb;
+        border-color: #fde68a;
+      }
+      .sub-head {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--nb-text);
+        margin-bottom: 14px;
+      }
+      .sub-head.warn-title {
+        color: #b45309;
+      }
+
       .form-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -576,6 +825,8 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
       }
       
       .field { display: flex; flex-direction: column; gap: 5px; }
+      .field.wide-2 { grid-column: span 2; }
+      @media (max-width: 640px) { .field.wide-2 { grid-column: 1 / -1; } }
       .field.full-width { grid-column: 1 / -1; }
       .field label { font-size: 12px; font-weight: 600; color: var(--nb-text); }
       .field input, .field select, .field textarea {
@@ -590,6 +841,84 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
       }
       .field input, .field select { height: 36px; }
       .field textarea { padding: 10px; }
+      .chk-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .chk-label input {
+        width: 17px;
+        height: 17px;
+        accent-color: var(--nb-primary-600);
+        cursor: pointer;
+      }
+
+      /* رقم الواتساب مع ماسك الدولة الذكي */
+      .phone-with-country {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 8px;
+        direction: ltr;
+      }
+      @media (max-width: 520px) { .phone-with-country { grid-template-columns: 1fr; } }
+      .country-select {
+        height: 36px;
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        padding: 0 8px;
+        font-size: 12.5px;
+        font-weight: 700;
+        background: var(--nb-surface);
+        outline: none;
+      }
+      .phone-body {
+        height: 36px;
+        border: 1px solid var(--nb-border);
+        border-radius: var(--nb-radius);
+        padding: 0 12px;
+        font-size: 13px;
+        outline: none;
+        direction: ltr;
+        text-align: left;
+      }
+      .val-err { font-size: 11px; color: #ef4444; font-weight: 600; margin-top: 3px; }
+      .val-ok { font-size: 11px; color: #16a34a; font-weight: 600; margin-top: 3px; }
+
+      /* بطاقة المراجعة النهائية */
+      .review-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .rev-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 10px;
+      }
+      .rev-grid > div {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .rev-grid span { font-size: 11px; color: #64748b; }
+      .rev-grid b { font-size: 13px; color: #0f172a; }
+
+      .btn-save-final {
+        background: #16a34a !important;
+        font-size: 14px !important;
+        padding: 0 24px !important;
+      }
+      .btn-save-final:hover {
+        background: #15803d !important;
+      }
       
       .form-actions {
         display: flex;
@@ -768,8 +1097,7 @@ export class StudentCreateComponent implements OnInit {
 
   regMode = signal<'admission' | 'manual'>('admission');
   manualStep = signal<number>(1);
-  readonly manualSteps = ['البيانات الشخصية والأكاديمية', 'الملف الطبي', 'الرسوم والأقساط'];
-  activeFormTab = signal<'personal' | 'medical' | 'financial'>('personal');
+  readonly manualSteps = ['التلميذ والأكاديمية', 'ولي الأمر والبديل', 'الملف الصحي والترحيل', 'الرسوم والأقساط', 'المراجعة والاعتماد'];
   applicants = signal<any[]>([]);
   loadingApplicants = signal<boolean>(false);
   selectedApplicant = signal<any | null>(null);
@@ -804,19 +1132,100 @@ export class StudentCreateComponent implements OnInit {
   };
   manualAvailableSections = signal<any[]>([]);
 
-  // حقول النموذج اليدوي
+  // حقول النموذج اليدوي - الخطوة 1 والاجتماعية
   personalForm = {
     arabic_name: '',
     english_name: '',
     gender: 'male',
     date_of_birth: '',
+    birth_place: '',
     nationality: 'سوداني',
     national_id: '',
     passport: '',
-    religion: '',
+    religion: 'مسلم',
     blood_group: '',
+    has_siblings: false,
+    siblings_section: 'إبتدائي',
+    siblings_count: 1,
+    siblings_details: '',
+    resides_with: 'parents',
+    transport_mode: 'school',
+    study_dependence: 'self',
+    previous_school: '',
   };
 
+  // حقول ولي الأمر والشخص البديل للطوارئ - الخطوة 2
+  guardianForm = {
+    relationship: 'father',
+    full_name: '',
+    national_id: '',
+    phone: '',
+    phone2: '',
+    whatsapp_phone: '',
+    occupation: '',
+    work_address: '',
+    address: '',
+    building_number: '',
+    email: '',
+    mother_phone: '',
+    emergency_contact_name: '',
+    emergency_contact_relation: 'عم',
+    emergency_contact_phone: '',
+    emergency_contact_address: '',
+  };
+
+  // الدول المدعومة لرقم الواتساب: [أدنى، أقصى] عدد خانات الرقم الوطني + مثال
+  readonly waCountries = [
+    { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
+    { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
+    { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
+    { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
+    { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
+    { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
+    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+  ];
+  whatsappCountryCode = '+249';
+  whatsappBody = '';
+  readonly whatsappError = signal('');
+
+  selectedWaCountry() {
+    return this.waCountries.find((c) => c.code === this.whatsappCountryCode) || this.waCountries[0];
+  }
+
+  updateFullWhatsappNumber(): void {
+    const country = this.selectedWaCountry();
+    const [min, max] = country.len;
+
+    let cleaned = (this.whatsappBody || '').replace(/\D/g, '');
+    const codeDigits = country.code.replace(/\D/g, '');
+    if (cleaned.startsWith(codeDigits)) cleaned = cleaned.slice(codeDigits.length);
+    cleaned = cleaned.replace(/^0+/, '');
+    if (cleaned.length > max) cleaned = cleaned.slice(0, max);
+    if (cleaned !== this.whatsappBody) this.whatsappBody = cleaned;
+
+    if (!cleaned) {
+      this.guardianForm.whatsapp_phone = '';
+      this.whatsappError.set('');
+      return;
+    }
+
+    if (cleaned.length < min || cleaned.length > max) {
+      const lenText = min === max ? `${min}` : `${min}–${max}`;
+      this.whatsappError.set(`رقم ${country.name} يجب أن يكون ${lenText} خانة (مثال: ${country.sample}) بدون صفر البداية ولا رمز الدولة.`);
+      this.guardianForm.whatsapp_phone = '';
+      return;
+    }
+
+    this.whatsappError.set('');
+    this.guardianForm.whatsapp_phone = `${this.whatsappCountryCode}${cleaned}`;
+  }
+
+  // الخطوة 3: الملف الصحي
   medicalForm = {
     allergiesInput: '',
     chronicDiseasesInput: '',
@@ -824,6 +1233,37 @@ export class StudentCreateComponent implements OnInit {
     doctor: '',
     medical_notes: '',
   };
+
+  selectedGradeName(): string {
+    const g = this.grades().find(gr => gr.id === this.manualAcademic.grade_id);
+    return g ? g.name : '—';
+  }
+
+  selectedSectionName(): string {
+    const s = this.manualAvailableSections().find(sec => sec.id === this.manualAcademic.section_id);
+    return s ? s.name : 'غير محدد (اختياري)';
+  }
+
+  relationshipLabel(rel: string): string {
+    const map: Record<string, string> = {
+      father: 'أب',
+      mother: 'أم',
+      guardian: 'ولي أمر',
+      sponsor: 'كفيل',
+      sibling: 'شقيق'
+    };
+    return map[rel] || rel || 'ولي أمر';
+  }
+
+  transportLabel(mode: string): string {
+    const map: Record<string, string> = {
+      school: 'ترحيل المدرسة الرسمي',
+      private: 'ترحيل خاص',
+      public: 'المواصلات العامة',
+      walking: 'الأقدام'
+    };
+    return map[mode] || mode || '—';
+  }
 
   ngOnInit() {
     this.loadBranches();
@@ -935,6 +1375,16 @@ export class StudentCreateComponent implements OnInit {
         return;
       }
     }
+    if (step === 3) {
+      if (!this.guardianForm.full_name?.trim() || !this.guardianForm.phone?.trim()) {
+        this.snack.open('يرجى ملء اسم ولي الأمر ورقم هاتفه (حقول إلزامية)', 'إغلاق', { duration: 4000 });
+        return;
+      }
+      if (this.whatsappError()) {
+        this.snack.open('يرجى تصحيح رقم الواتساب قبل المتابعة', 'إغلاق', { duration: 4000 });
+        return;
+      }
+    }
     this.manualStep.set(step);
   }
 
@@ -1008,15 +1458,17 @@ export class StudentCreateComponent implements OnInit {
 
   submitManualStudent(event: Event) {
     event.preventDefault();
-    if (!this.personalForm.arabic_name || !this.personalForm.date_of_birth) {
+    if (!this.personalForm.arabic_name?.trim() || !this.personalForm.date_of_birth) {
       this.errorMessage.set('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)');
       this.snack.open('يرجى ملء الحقول المطلوبة (الاسم بالعربي وتاريخ الميلاد)', 'إغلاق', { duration: 4000 });
+      this.manualStep.set(1);
       return;
     }
 
     if (!this.manualAcademic.grade_id) {
       this.errorMessage.set('اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.');
       this.snack.open('يرجى اختيار الصف الدراسي أولاً (حقل إجباري لتسجيل الطالب)', 'إغلاق', { duration: 5000 });
+      this.manualStep.set(1);
       return;
     }
 
@@ -1034,8 +1486,48 @@ export class StudentCreateComponent implements OnInit {
 
     const payload = {
       profile: {
-        ...this.personalForm,
+        arabic_name: this.personalForm.arabic_name,
+        english_name: this.personalForm.english_name || '',
+        gender: this.personalForm.gender || 'male',
+        date_of_birth: this.personalForm.date_of_birth,
+        nationality: this.personalForm.nationality || 'سوداني',
+        national_id: this.personalForm.national_id || '',
+        passport: this.personalForm.passport || '',
+        religion: this.personalForm.religion || 'مسلم',
+        blood_group: this.personalForm.blood_group || '',
+        notes: [
+          this.personalForm.birth_place ? `مكان الميلاد: ${this.personalForm.birth_place}` : '',
+          this.personalForm.resides_with ? `يقيم مع: ${this.personalForm.resides_with}` : '',
+          this.personalForm.transport_mode ? `وسيلة الترحيل: ${this.transportLabel(this.personalForm.transport_mode)}` : '',
+          this.personalForm.study_dependence ? `المذاكرة: ${this.personalForm.study_dependence}` : '',
+          this.personalForm.previous_school ? `المدرسة السابقة: ${this.personalForm.previous_school}` : '',
+          this.personalForm.has_siblings ? `الأشقاء بالمدرسة: ${this.personalForm.siblings_count} (${this.personalForm.siblings_section}) - ${this.personalForm.siblings_details}` : ''
+        ].filter(Boolean).join(' | '),
         languages: ['العربية']
+      },
+      guardian: {
+        relationship: this.guardianForm.relationship || 'guardian',
+        full_name: this.guardianForm.full_name || '',
+        national_id: this.guardianForm.national_id || '',
+        phone: this.guardianForm.phone || '',
+        phone2: this.guardianForm.phone2 || '',
+        whatsapp_phone: this.guardianForm.whatsapp_phone || this.guardianForm.phone || '',
+        occupation: this.guardianForm.occupation || '',
+        work_address: this.guardianForm.work_address || '',
+        email: this.guardianForm.email || '',
+        mother_phone: this.guardianForm.mother_phone || '',
+      },
+      emergency_contact: {
+        name: this.guardianForm.emergency_contact_name || '',
+        relationship: this.guardianForm.emergency_contact_relation || 'عم',
+        phone: this.guardianForm.emergency_contact_phone || '',
+        address: this.guardianForm.emergency_contact_address || ''
+      },
+      address: {
+        address_line1: this.guardianForm.address || 'السكن والحي',
+        building_number: this.guardianForm.building_number || '',
+        city: 'الخرطوم',
+        country: 'السودان'
       },
       medical_profile: {
         allergies,
@@ -1071,7 +1563,6 @@ export class StudentCreateComponent implements OnInit {
         this.submitting.set(false);
         let msg = err?.error?.error?.message || err?.error?.message || err?.error?.detail;
         if (!msg && err?.error && typeof err.error === 'object') {
-          // فحص أخطاء الحقول مثل {'arabic_name': ['هذا الحقل مطلوب']}
           const firstKey = Object.keys(err.error)[0];
           if (firstKey) {
             const val = err.error[firstKey];

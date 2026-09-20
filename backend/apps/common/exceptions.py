@@ -32,6 +32,21 @@ def custom_exception_handler(exc, context):
             }
         }, status=exc.status_code)
 
+    # معالجة استثناءات التحقق لـ Django
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    if isinstance(exc, DjangoValidationError):
+        msg = exc.message if hasattr(exc, 'message') else str(exc)
+        if hasattr(exc, 'messages') and exc.messages:
+            msg = " ".join(exc.messages)
+        return Response({
+            'success': False,
+            'error': {
+                'code': 'validation_error',
+                'message': msg,
+                'details': exc.message_dict if hasattr(exc, 'message_dict') else None
+            }
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     # معالجة استثناءات مكتبة التأسيس المشتركة (BaseAppException)
     from apps.shared.domain.exceptions import BaseAppException
     if isinstance(exc, BaseAppException):

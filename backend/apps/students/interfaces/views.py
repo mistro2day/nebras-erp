@@ -297,17 +297,20 @@ class StudentViewSet(viewsets.ModelViewSet):
         return StandardResponse(serializer.data, message="تم تحديث بيانات الطالب بنجاح.")
 
     def create(self, request, *args, **kwargs):
-        """إنشاء ملف طالب يدوياً بالكامل مع دعم الفوترة والأقساط والسداد الفوري"""
+        """إنشاء ملف طالب يدوياً بالكامل مع دعم الفوترة والأقساط والسداد الفوري وحفظ ولي الأمر والبديل والعنوان"""
         tenant_id = request.tenant.id if hasattr(request, 'tenant') and request.tenant else uuid.uuid4()
         user_id = request.user.id if request.user else uuid.uuid4()
         
         profile_data = request.data.get('profile', {})
         medical_data = request.data.get('medical_profile', {})
         academic_data = request.data.get('academic_data', {})
+        guardian_data = request.data.get('guardian', {})
+        emergency_data = request.data.get('emergency_contact', {})
+        address_data = request.data.get('address', {})
         financial_config = request.data.get('financial_config', None)
 
         if not academic_data or not academic_data.get('grade_id'):
-            raise ValidationError("اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.")
+            raise BusinessException("اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.", code="grade_required")
         
         full_data = {**profile_data, **medical_data}
         
@@ -316,6 +319,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             tenant_id=tenant_id,
             user_id=user_id,
             academic_data=academic_data,
+            guardian_data=guardian_data,
+            emergency_data=emergency_data,
+            address_data=address_data,
             financial_config=financial_config
         )
         
