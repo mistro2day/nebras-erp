@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
       <div class="auth-card">
         <div class="auth-head">
           @if (brand) {
-            <a class="auth-brand" routerLink="/welcome" aria-label="الصفحة الرئيسية للموقع">
+            <a class="auth-brand" routerLink="/nebras" aria-label="الصفحة الرئيسية للموقع" title="العودة إلى صفحة نبراس الرئيسية">
               <img src="assets/branding/logo-light.png" alt="شعار نبراس" class="auth-logo-img" />
             </a>
           }

@@ -19,10 +19,10 @@ import { AdmissionsService } from '../admissions/admissions.service';
       <div class="bg-orb orb-2" aria-hidden="true"></div>
 
       <header class="top">
-        <div class="brand">
+        <a routerLink="/nebras" class="brand brand-link" title="الانتقال إلى صفحة نبراس الرئيسية">
           <div class="logo-mark"><img src="assets/branding/logo-icon-light.png" alt="شعار نبراس" class="brand-logo-img" /></div>
           <span class="brand-name">{{ tenantName() || 'نبراس' }} <b>OS</b></span>
-        </div>
+        </a>
         <a routerLink="/accounts/login" class="top-login">دخول الإدارة</a>
       </header>
 
