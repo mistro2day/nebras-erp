@@ -13,6 +13,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { StudentsService } from '../../students/students.service';
 import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+import { SendMessageModalComponent } from '../../communications/components/send-message-modal.component';
 import { StudentFinanceService } from '../student-finance.service';
 import { NbPageHeaderComponent } from '../../../shared/nebras/nb-page-header.component';
 import { NbExportMenuComponent } from '../../../shared/export/nb-export-menu.component';
@@ -42,7 +43,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
   selector: 'app-student-finance-reports',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent, NbLoadingComponent, SfDocumentDrawerComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, NbExportMenuComponent, NbDatepickerComponent, NbLoadingComponent, SfDocumentDrawerComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <!-- ترويسة الصفحة -->
@@ -446,9 +447,9 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                         @if (item.guardian_phone && item.guardian_phone !== '—') {
                           <div class="phone-action-wrap">
                             <span class="phone-num-ltr" dir="ltr">{{ item.guardian_phone }}</span>
-                            <a [href]="'https://wa.me/' + cleanPhone(item.guardian_phone)" target="_blank" rel="noopener" class="btn xs wa-direct-btn" title="مراسلة ولي الأمر عبر واتساب">
+                            <button type="button" class="btn xs wa-direct-btn" (click)="openMessageModal(item)" title="مراسلة ولي الأمر بنظام القوالب والإرسال المباشر">
                               💬
-                            </a>
+                            </button>
                           </div>
                         } @else {
                           <span class="muted">—</span>
@@ -779,7 +780,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                         <button class="btn xs danger" (click)="printDemand(od)" title="طباعة إشعار مطالبة رسمية للبريد/التسليم">
                           🖨️ إشعار مطالبة
                         </button>
-                        <button class="btn xs ghost" (click)="sendWhatsApp(od)" title="إرسال تذكير عبر واتساب">
+                        <button class="btn xs ghost" (click)="openMessageModal(od)" title="إرسال تذكير عبر واتساب بنظام القوالب">
                           💬 واتساب
                         </button>
                       </td>
@@ -890,6 +891,17 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
 
       <!-- درج عرض وطباعة السند الرسمي (نفس شكل سند ملف الطالب) -->
       <sf-document-drawer [doc]="receiptDoc()" [methods]="receiptMethods()" [schoolInfo]="receiptSchoolInfo()" (closed)="receiptDoc.set(null)"></sf-document-drawer>
+
+      <!-- مودال مراسلة ولي الأمر المعتمد بنظام القوالب والإرسال المباشر -->
+      <app-send-message-modal
+        [open]="showMsgModal()"
+        (openChange)="showMsgModal.set($event)"
+        [recipientName]="msgRecipientName()"
+        [recipientPhone]="msgRecipientPhone()"
+        [contextVariables]="msgContextVariables()"
+        defaultTemplateCode="FEE_REMINDER"
+        [allowedCategories]="[]"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [`
@@ -3257,12 +3269,48 @@ export class StudentFinanceReportsComponent implements OnInit {
     });
   }
 
+  showMsgModal = signal(false);
+  msgRecipientName = signal('');
+  msgRecipientPhone = signal('');
+  msgContextVariables = signal<any>({});
+
+  openMessageModal(studentOrItem: any) {
+    if (!studentOrItem) return;
+    const name = studentOrItem.guardian_name && studentOrItem.guardian_name !== '—'
+      ? studentOrItem.guardian_name
+      : (studentOrItem.student_name ? `ولي أمر الطالب/ـة: ${studentOrItem.student_name}` : 'ولي الأمر');
+    
+    const phone = studentOrItem.guardian_phone && studentOrItem.guardian_phone !== '—'
+      ? studentOrItem.guardian_phone
+      : '';
+
+    const outstanding = studentOrItem.outstanding_balance ?? studentOrItem.outstanding_amount ?? 0;
+    const totalBilled = studentOrItem.total_billed ?? studentOrItem.original_amount ?? studentOrItem.total_amount ?? outstanding;
+    const totalPaid = studentOrItem.total_paid ?? studentOrItem.paid_amount ?? 0;
+
+    this.msgRecipientName.set(name);
+    this.msgRecipientPhone.set(phone);
+    this.msgContextVariables.set({
+      student_name: studentOrItem.student_name || '',
+      student_number: studentOrItem.student_number || '',
+      guardian_name: name,
+      guardian_phone: phone,
+      outstanding_amount: this.fmt(outstanding),
+      total_billed: this.fmt(totalBilled),
+      total_paid: this.fmt(totalPaid),
+      grade_name: studentOrItem.grade_name || '',
+      section_name: studentOrItem.section_name || '',
+      branch_name: studentOrItem.branch_name || '',
+      due_date: studentOrItem.due_date || 'فوراً',
+      academic_year: studentOrItem.academic_year || '2025/2026 م',
+      school_name: 'مدارس نبراس النموذجية',
+      date: this.todayStr,
+    });
+    this.showMsgModal.set(true);
+  }
+
   sendWhatsApp(student: any) {
-    const phone = student.guardian_phone?.replace(/[^0-9]/g, '');
-    const msg = encodeURIComponent(
-      `السلام عليكم ورحمة الله،\nالسيد ولي أمر الطالب/ـة: ${student.student_name}.\nنود تذكيركم بوجود مستحقات دراسية متأخرة قدرها ${this.fmt(student.outstanding_amount)} جنيه سوداني، نرجو التكرم بالسداد عبر تطبيق بنكك أو خزينة المدرسة.\nشكراً لتعاونكم.`
-    );
-    window.open(`https://wa.me/249${phone}?text=${msg}`, '_blank');
+    this.openMessageModal(student);
   }
 
   viewAccount(itemOrId?: any) {

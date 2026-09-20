@@ -203,7 +203,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ---------------------------------------------------------------------------
 # إعدادات التخزين السحابي (Amazon S3 / Local File Storage)
 # ---------------------------------------------------------------------------
-USE_S3 = os.environ.get('USE_S3', 'false').lower() in ('true', '1') or bool(os.environ.get('AWS_STORAGE_BUCKET_NAME'))
+USE_S3_REQUESTED = os.environ.get('USE_S3', 'false').lower() in ('true', '1') or bool(os.environ.get('AWS_STORAGE_BUCKET_NAME'))
+try:
+    import storages  # noqa: F401
+    HAS_STORAGES = True
+except ImportError:
+    HAS_STORAGES = False
+
+USE_S3 = USE_S3_REQUESTED and HAS_STORAGES
 
 if USE_S3:
     if 'storages' not in INSTALLED_APPS:

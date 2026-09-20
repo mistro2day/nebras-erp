@@ -169,9 +169,50 @@ ADMISSIONS_DEFAULT_TEMPLATES = {
 }
 
 
+SYSTEM_DEFAULT_TEMPLATES = {
+    'FEE_REMINDER': (
+        'تذكير بالرسوم الدراسية والمستحقات',
+        'finance',
+        'السلام عليكم ورحمة الله وبركاته،\n'
+        'السيد ولي أمر الطالب/ـة: {{student_name}} المحترم،\n'
+        'نود تذكيركم بوجود مستحقات رسوم دراسية بمبلغ {{outstanding_amount}} ج.س (المتبقي من إجمالي الرسوم المقررة: {{total_billed}} ج.س).\n'
+        'نرجو التكرم بالسداد عبر تطبيق بنكك أو خزينة المدرسة.\n'
+        'شاكرين ومقدرين حسن تعاونكم معنا.\n'
+        'إدارة الشؤون المالية — مدارس نبراس'
+    ),
+    'INVOICE_ISSUED': (
+        'إشعار صدور الفاتورة المدرسية',
+        'finance',
+        'عزيزي ولي الأمر {{guardian_name}}، تم إصدار الفاتورة الدراسية رقم {{invoice_number}} بمبلغ {{amount}} ج.س للطالب {{student_name}}.'
+    ),
+    'STUDENT_ABSENT_ALERT': (
+        'تنبيه غياب الطالب الفوري',
+        'attendance',
+        'نحيطكم علماً بغياب ابنكم/ابنتكم {{student_name}} عن حصة اليوم {{date}}. نرجو التواصل مع مكتب شؤون الطلاب.'
+    ),
+}
+
+
 class TemplateViewSet(BaseCRUDViewSet):
     model_class = CommunicationTemplate
     serializer_class = CommunicationTemplateSerializer
+
+    def list(self, request, *args, **kwargs):
+        tenant = getattr(request, 'tenant', None)
+        if tenant:
+            ch = CommunicationChannel.objects.filter(
+                tenant_id=tenant.id, channel_type='whatsapp', deleted_at__isnull=True
+            ).order_by('-is_active').first()
+            for code, (name, category, body) in SYSTEM_DEFAULT_TEMPLATES.items():
+                CommunicationTemplate.objects.get_or_create(
+                    tenant_id=tenant.id, code=code, deleted_at__isnull=True,
+                    defaults={
+                        'name': name, 'category': category, 'channel': ch,
+                        'content_type': 'plain_text', 'language': 'ar',
+                        'body': body, 'is_active': True,
+                    }
+                )
+        return super().list(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-by-code')
     def public_by_code(self, request):

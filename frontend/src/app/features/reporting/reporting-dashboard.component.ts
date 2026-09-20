@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ReportingService } from './reporting.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { TenantService } from '../../core/services/tenant.service';
+import { SendMessageModalComponent } from '../communications/components/send-message-modal.component';
 
 type TabKey = 'reports' | 'dashboards' | 'sources';
 
@@ -18,7 +19,7 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
   selector: 'app-reporting-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, NbPageHeaderComponent],
+  imports: [CommonModule, FormsModule, NbPageHeaderComponent, SendMessageModalComponent],
   template: `
     <div class="page" dir="rtl">
       <nb-page-header
@@ -244,7 +245,7 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
                                   @if (isPhoneCol(c) && row[c] && row[c] !== '—' && row[c] !== '-') {
                                     <div class="phone-box">
                                       <span class="phone-num" dir="ltr">{{ row[c] }}</span>
-                                      <a [href]="'https://wa.me/' + cleanPhone(row[c])" target="_blank" rel="noopener" class="wa-action" title="مراسلة ولي الأمر عبر واتساب">💬</a>
+                                      <button type="button" class="wa-action" (click)="openMessageModal(row, row[c])" title="مراسلة ولي الأمر بنظام القوالب والإرسال المباشر">💬</button>
                                     </div>
                                   } @else {
                                     {{ row[c] }}
@@ -300,6 +301,17 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
           </div>
         }
       </section>
+
+      <!-- مودال المراسلة الرسمي المتبع (SendMessageModal) -->
+      <app-send-message-modal
+        [open]="showMsgModal()"
+        (openChange)="showMsgModal.set($event)"
+        [recipientName]="msgRecipientName()"
+        [recipientPhone]="msgRecipientPhone()"
+        [contextVariables]="msgContextVariables()"
+        defaultTemplateCode="FEE_REMINDER"
+        [allowedCategories]="[]"
+      ></app-send-message-modal>
     </div>
   `,
   styles: [`
@@ -796,5 +808,36 @@ export class ReportingDashboardComponent implements OnInit {
     if (p.startsWith('0')) p = '249' + p.substring(1);
     else if (!p.startsWith('+') && !p.startsWith('249')) p = '249' + p;
     return p.replace('+', '');
+  }
+
+  showMsgModal = signal(false);
+  msgRecipientName = signal('');
+  msgRecipientPhone = signal('');
+  msgContextVariables = signal<any>({});
+
+  openMessageModal(row: any, phoneValue?: any) {
+    const studentName = row['اسم الطالب'] || row['طالب'] || row['student_name'] || '';
+    const guardianName = row['اسم ولي الأمر'] || row['ولي الأمر'] || row['guardian_name'] || (studentName ? `ولي أمر الطالب/ـة: ${studentName}` : 'ولي الأمر');
+    const phone = phoneValue || row['هاتف ولي الأمر'] || row['رقم الجوال'] || row['guardian_phone'] || '';
+    const grade = row['الصف الدراسي'] || row['الصف'] || row['grade_name'] || '';
+    const section = row['الفصل / الشعبة'] || row['الشعبة'] || row['section_name'] || '';
+    const branch = row['الفرع'] || row['branch_name'] || '';
+
+    this.msgRecipientName.set(guardianName);
+    this.msgRecipientPhone.set(phone);
+    this.msgContextVariables.set({
+      student_name: studentName,
+      guardian_name: guardianName,
+      guardian_phone: phone,
+      grade_name: grade,
+      section_name: section,
+      branch_name: branch,
+      outstanding_amount: '0',
+      total_billed: '0',
+      total_paid: '0',
+      school_name: this.schoolName(),
+      date: new Date().toISOString().split('T')[0],
+    });
+    this.showMsgModal.set(true);
   }
 }

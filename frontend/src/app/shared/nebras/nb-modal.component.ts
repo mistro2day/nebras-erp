@@ -54,8 +54,10 @@ import { CommonModule } from '@angular/common';
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       width: 100%;
       max-width: 500px;
+      max-height: calc(100vh - 40px);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
       animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -118,6 +120,8 @@ import { CommonModule } from '@angular/common';
       font-size: 13.5px;
       line-height: 1.5;
       color: var(--nb-text-secondary, #374151);
+      overflow-y: auto;
+      flex: 1;
     }
 
     .nb-modal-foot {

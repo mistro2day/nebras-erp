@@ -136,6 +136,18 @@ const FALLBACK_PROVIDERS: CommunicationProvider[] = [
 
 const FALLBACK_TEMPLATES: CommunicationTemplate[] = [
   {
+    id: 't0',
+    name: 'تذكير بالرسوم الدراسية والمستحقات',
+    code: 'FEE_REMINDER',
+    category: 'finance',
+    language: 'ar',
+    subject: 'تذكير بسداد الرسوم الدراسية المستحقة',
+    body: 'السلام عليكم ورحمة الله وبركاته،\nالسيد ولي أمر الطالب/ـة: {{student_name}} المحترم،\nنود تذكيركم بوجود مستحقات رسوم دراسية بمبلغ {{outstanding_amount}} ج.س (المتبقي من إجمالي الرسوم المقررة: {{total_billed}} ج.س).\nنرجو التكرم بالسداد عبر تطبيق بنكك أو خزينة المدرسة.\nشاكرين ومقدرين حسن تعاونكم معنا.\nإدارة الشؤون المالية — مدارس نبراس',
+    content_type: 'plain_text',
+    is_active: true,
+    version_count: 1,
+  },
+  {
     id: 't1',
     name: 'إشعار صدور الفاتورة المدرسية',
     code: 'INVOICE_ISSUED',
