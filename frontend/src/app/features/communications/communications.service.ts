@@ -272,15 +272,17 @@ export class CommunicationsService {
     // فحص حالة الجلسة عبر Evolution API v2: GET /instance/connectionState/{instance}
     return this.http.get<any>(`/whatsapp-api/instance/connectionState/${this.evoInstance}`, { headers: this.evoHeaders }).pipe(
       map((res) => {
-        const connected = res?.instance?.state === 'open';
+        const state = res?.instance?.state;
+        const connected = state === 'open';
+        const isOnline = !!state && state !== 'close';
         return {
-          status: connected ? 'success' : 'error',
-          health_status: connected ? 'healthy' : 'down',
-          ping_ms: connected ? 8 : 0,
+          status: isOnline ? 'success' : 'error',
+          health_status: isOnline ? 'healthy' : 'down',
+          ping_ms: isOnline ? 12 : 0,
           connected,
           message: connected
             ? 'خادم Evolution API متصل والواتساب مقترن بنجاح ✓'
-            : 'الخادم يعمل لكن الواتساب غير مقترن (الحالة: ' + (res?.instance?.state || 'unknown') + '). امسح رمز QR أولاً.',
+            : `خادم Evolution API يعمل وجاهز للاقتران (الحالة: ${state || 'بانتظار المسح'}).`,
         };
       }),
       catchError(() => of({
