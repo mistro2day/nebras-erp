@@ -12,11 +12,13 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
 
+import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+
 @Component({
   selector: 'app-student-create',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, RegistrationFinanceFormComponent],
+  imports: [CommonModule, FormsModule, MatSnackBarModule, NbPageHeaderComponent, NbPanelComponent, NbDatepickerComponent, NbLoadingComponent, NbStepperComponent, RegistrationFinanceFormComponent],
   animations: [
     trigger('listAnimation', [
       transition('* <=> *', [
@@ -198,27 +200,26 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
         }
       </div>
 
-      <!-- نموذج التسجيل اليدوي للطلاب -->
+      <!-- نموذج التسجيل اليدوي للطلاب بنظام الخطوات المعتمد -->
       <div class="registration-manual-layout" *ngIf="regMode() === 'manual'" @fadeSlide>
-        <nb-panel title="بيانات الطالب الشخصية والأكاديمية والمالية" subtitle="أدخل كافة بيانات الطالب يدوياً مع تحديد خطة الرسوم والأقساط والسداد الفوري.">
-          <form (submit)="submitManualStudent($event)" class="manual-form">
-            <!-- تبويبات النموذج اليدوي -->
-            <div class="form-tabs">
-              <button type="button" [class.active]="activeFormTab() === 'personal'" (click)="activeFormTab.set('personal')">البيانات الشخصية</button>
-              <button type="button" [class.active]="activeFormTab() === 'medical'" (click)="activeFormTab.set('medical')">الملف الطبي</button>
-              <button type="button" [class.active]="activeFormTab() === 'financial'" (click)="activeFormTab.set('financial')">البيانات المالية والأقساط</button>
-            </div>
+        <nb-panel title="تسجيل طالب يدوياً" subtitle="معالج تسجيل الطالب خطوة بخطوة مع تحديد الصف الدراسي والبيانات الطبية وخطة الرسوم والأقساط.">
+          
+          <!-- مؤشر الخطوات المعتمد -->
+          <div class="wizard-stepper-wrap">
+            <nb-stepper [steps]="manualSteps" [current]="manualStep()"></nb-stepper>
+          </div>
 
-            <!-- تبويب البيانات الشخصية -->
-            <div class="tab-panel-content" *ngIf="activeFormTab() === 'personal'">
+          <form (submit)="submitManualStudent($event)" class="manual-form">
+            <!-- الخطوة 1: البيانات الشخصية والتسكين الأكاديمي -->
+            <div class="step-content" *ngIf="manualStep() === 1" @fadeSlide>
               <div class="form-grid">
                 <div class="field">
-                  <label>الاسم بالعربي (مطلوب)</label>
-                  <input type="text" [(ngModel)]="personalForm.arabic_name" name="arabic_name" required placeholder="مثال: أحمد محمد علي" />
+                  <label>الاسم بالعربي <span class="required-star">*</span></label>
+                  <input type="text" [(ngModel)]="personalForm.arabic_name" name="arabic_name" required placeholder="مثال: محمد خيدر" />
                 </div>
                 <div class="field">
                   <label>الاسم بالإنجليزي</label>
-                  <input type="text" [(ngModel)]="personalForm.english_name" name="english_name" placeholder="مثال: Ahmed Mohamed Ali" />
+                  <input type="text" [(ngModel)]="personalForm.english_name" name="english_name" placeholder="مثال: Mohamed Khaider" />
                 </div>
                 <div class="field">
                   <label>الجنس</label>
@@ -228,20 +229,20 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   </select>
                 </div>
                 <div class="field">
-                  <label>الفرع المدرسي (تحديد تلقائي)</label>
+                  <label>الفرع المدرسي</label>
                   <div class="branch-pill-manual">
                     <span class="branch-icon">{{ personalForm.gender === 'male' ? '👦' : '👧' }}</span>
                     <span class="branch-name">{{ selectedBranchName() }}</span>
-                    <span class="auto-tag">تلقائي (بحسب الجنس: {{ personalForm.gender === 'male' ? 'ذكر' : 'أنثى' }})</span>
+                    <span class="auto-tag">تلقائي بحسب الجنس</span>
                   </div>
                 </div>
                 <div class="field">
-                  <label>تاريخ الميلاد</label>
+                  <label>تاريخ الميلاد <span class="required-star">*</span></label>
                   <nb-datepicker [(value)]="personalForm.date_of_birth" placeholder="اختر تاريخ الميلاد"></nb-datepicker>
                 </div>
                 <div class="field">
                   <label>الجنسية</label>
-                  <input type="text" [(ngModel)]="personalForm.nationality" name="nationality" placeholder="سوداني، سعودي..." />
+                  <input type="text" [(ngModel)]="personalForm.nationality" name="nationality" placeholder="سوداني" />
                 </div>
                 <div class="field">
                   <label>الرقم الوطني / الجواز</label>
@@ -269,33 +270,36 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                     <option value="AB-">AB-</option>
                   </select>
                 </div>
-
-                <div class="field-separator full-width">
-                  <span class="sep-title">التسكين الأكاديمي في الصف والفصل (إجباري)</span>
-                </div>
                 <div class="field">
-                  <label>الصف الدراسي <span class="required-star">*</span> (إجباري)</label>
+                  <label>الصف الدراسي <span class="required-star">*</span></label>
                   <select [ngModel]="manualAcademic.grade_id" (ngModelChange)="onManualGradeChange($event)" name="manual_grade" required>
-                    <option value="">-- اختر الصف لتسكين الطالب (إجباري) --</option>
+                    <option value="">-- اختر الصف الدراسي --</option>
                     @for (g of grades(); track g.id) {
                       <option [value]="g.id">{{ g.name }}</option>
                     }
                   </select>
                 </div>
                 <div class="field">
-                  <label>الفصل الدراسي</label>
+                  <label>الفصل الدراسي (اختياري)</label>
                   <select [(ngModel)]="manualAcademic.section_id" name="manual_section" [disabled]="!manualAcademic.grade_id">
-                    <option value="">{{ manualAvailableSections().length > 0 ? '-- اختر الفصل --' : (manualAcademic.grade_id ? '-- لا توجد فصول معرفة --' : '-- اختر الصف أولاً --') }}</option>
+                    <option value="">{{ manualAvailableSections().length > 0 ? '-- اختر الفصل (اختياري) --' : (manualAcademic.grade_id ? '-- لا توجد فصول معرفة --' : '-- اختر الصف أولاً --') }}</option>
                     @for (s of manualAvailableSections(); track s.id) {
                       <option [value]="s.id">{{ s.name }} (السعة: {{ s.capacity }})</option>
                     }
                   </select>
                 </div>
               </div>
+
+              <div class="form-actions">
+                <button type="button" class="nb-btn-secondary" (click)="cancel()">إلغاء</button>
+                <button type="button" class="nb-btn-primary" (click)="goToNextStep(2)">
+                  التالي: الملف الطبي ←
+                </button>
+              </div>
             </div>
 
-            <!-- تبويب الملف الطبي -->
-            <div class="tab-panel-content" *ngIf="activeFormTab() === 'medical'">
+            <!-- الخطوة 2: الملف الطبي -->
+            <div class="step-content" *ngIf="manualStep() === 2" @fadeSlide>
               <div class="form-grid">
                 <div class="field full-width">
                   <label>الحساسية (افصل بينها بفاصلة)</label>
@@ -306,7 +310,7 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   <input type="text" [(ngModel)]="medicalForm.chronicDiseasesInput" name="chronic_diseases" placeholder="مثال: الربو، السكري" />
                 </div>
                 <div class="field full-width">
-                  <label>الأدية الموصوفة</label>
+                  <label>الأدوية الموصوفة</label>
                   <input type="text" [(ngModel)]="medicalForm.medicationInput" name="medication" placeholder="أدوية يحتاجها الطالب بانتظام" />
                 </div>
                 <div class="field">
@@ -318,18 +322,23 @@ import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/reg
                   <textarea [(ngModel)]="medicalForm.medical_notes" name="medical_notes" rows="3"></textarea>
                 </div>
               </div>
+
+              <div class="form-actions">
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(1)">→ السابق: البيانات الشخصية</button>
+                <button type="button" class="nb-btn-primary" (click)="manualStep.set(3)">التالي: البيانات المالية والأقساط ←</button>
+              </div>
             </div>
 
-            <!-- تبويب البيانات المالية والأقساط -->
-            <div class="tab-panel-content" *ngIf="activeFormTab() === 'financial'">
+            <!-- الخطوة 3: البيانات المالية والأقساط والاعتماد -->
+            <div class="step-content" *ngIf="manualStep() === 3" @fadeSlide>
               <app-registration-finance-form (configChange)="financialConfig.set($event)"></app-registration-finance-form>
-            </div>
 
-            <div class="form-actions">
-              <button type="button" class="nb-btn-secondary" (click)="cancel()">إلغاء</button>
-              <button type="submit" class="nb-btn-primary" [disabled]="submitting()">
-                {{ submitting() ? 'جارٍ تسجيل الطالب والفوترة…' : 'حفظ وتسجيل الطالب يدوياً ✓' }}
-              </button>
+              <div class="form-actions">
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(2)">→ السابق: الملف الطبي</button>
+                <button type="submit" class="nb-btn-primary" [disabled]="submitting()">
+                  {{ submitting() ? 'جارٍ حفظ واعتماد الطالب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
+                </button>
+              </div>
             </div>
           </form>
         </nb-panel>
@@ -758,6 +767,8 @@ export class StudentCreateComponent implements OnInit {
   private snack = inject(MatSnackBar);
 
   regMode = signal<'admission' | 'manual'>('admission');
+  manualStep = signal<number>(1);
+  readonly manualSteps = ['البيانات الشخصية والأكاديمية', 'الملف الطبي', 'الرسوم والأقساط'];
   activeFormTab = signal<'personal' | 'medical' | 'financial'>('personal');
   applicants = signal<any[]>([]);
   loadingApplicants = signal<boolean>(false);
@@ -907,9 +918,24 @@ export class StudentCreateComponent implements OnInit {
     this.selectedApplicant.set(null);
     this.selectedSectionId.set('');
     this.availableSections.set([]);
+    this.manualStep.set(1);
     if (mode === 'manual') {
       this.autoSelectBranch(this.personalForm.gender || 'male');
     }
+  }
+
+  goToNextStep(step: number) {
+    if (step === 2) {
+      if (!this.personalForm.arabic_name?.trim() || !this.personalForm.date_of_birth) {
+        this.snack.open('يرجى ملء الحقول الإلزامية: الاسم بالعربي وتاريخ الميلاد', 'إغلاق', { duration: 4000 });
+        return;
+      }
+      if (!this.manualAcademic.grade_id) {
+        this.snack.open('يرجى اختيار الصف الدراسي أولاً (حقل إجباري)', 'إغلاق', { duration: 4000 });
+        return;
+      }
+    }
+    this.manualStep.set(step);
   }
 
   getInitials(name?: string): string {
@@ -1043,8 +1069,16 @@ export class StudentCreateComponent implements OnInit {
       },
       error: (err) => {
         this.submitting.set(false);
-        const msg = err?.error?.error?.message || err?.error?.message || err?.error?.detail || 'تعذّر حفظ الطالب. تحقق من صحة الحقول.';
-        this.snack.open(msg, 'إغلاق', { duration: 6000 });
+        let msg = err?.error?.error?.message || err?.error?.message || err?.error?.detail;
+        if (!msg && err?.error && typeof err.error === 'object') {
+          // فحص أخطاء الحقول مثل {'arabic_name': ['هذا الحقل مطلوب']}
+          const firstKey = Object.keys(err.error)[0];
+          if (firstKey) {
+            const val = err.error[firstKey];
+            msg = Array.isArray(val) ? `${firstKey}: ${val.join(' ')}` : `${firstKey}: ${val}`;
+          }
+        }
+        this.snack.open(msg || 'تعذّر حفظ الطالب. تحقق من صحة الحقول.', 'إغلاق', { duration: 6000 });
       }
     });
   }
