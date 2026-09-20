@@ -211,6 +211,13 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://127\.0\.0\.1:\d+$",
     r"^https:\/\/.*\.vercel\.app$",
     r"^https:\/\/.*\.onrender\.com$",
+    r"^https?:\/\/.*\.duckdns\.org(:\d+)?$",
+]
+
+# حماية CSRF لدومينات الإنتاج والوصول عبر النطاق
+CSRF_TRUSTED_ORIGINS = [
+    'https://nebraserp.duckdns.org',
+    'http://nebraserp.duckdns.org',
 ]
 
 # السماح برأس المستأجر المخصص في طلبات الواجهة عبر المصادر (CORS preflight)

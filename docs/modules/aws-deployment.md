@@ -68,3 +68,32 @@ git pull origin master
 cd docker
 sudo docker compose up -d --build
 ```
+
+---
+
+## 4. إعداد النطاق المجاني وشهادة الأمان (Domain & SSL Setup)
+
+تم ربط المنظومة بالنطاق السحابي المجاني:
+**`nebraserp.duckdns.org`** -> `142.154.53.91`
+
+### أ) سكريبت التحديث التلقائي للـ IP (Cron Job على سيرفر AWS):
+لضمان تحديث الـ IP تلقائياً إذا تغير عنوان السيرفر:
+```bash
+mkdir -p ~/duckdns
+cat << 'EOF' > ~/duckdns/duck.sh
+echo url="https://www.duckdns.org/update?domains=nebraserp&token=YOUR_DUCKDNS_TOKEN&ip=" | curl -k -o ~/duckdns/duck.log -K -
+EOF
+chmod 700 ~/duckdns/duck.sh
+```
+ثم إضافة مهمة مجدولة عبر `crontab -e`:
+```bash
+*/15 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
+```
+
+### ب) استخراج شهادة SSL/HTTPS المجانية (Certbot):
+```bash
+sudo dnf install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d nebraserp.duckdns.org
+```
+تقوم الأداة بتهيئة شهادة Let's Encrypt وتجديدها تلقائياً.
+
