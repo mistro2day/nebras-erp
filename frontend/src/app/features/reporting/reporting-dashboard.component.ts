@@ -234,11 +234,24 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
                     <div class="scroll-x">
                       <table class="data report-table">
                         <thead>
-                          <tr>@for (c of dataColumns(); track c) { <th>{{ c }}</th> }</tr>
+                          <tr>@for (c of dataColumns(); track c) { <th [class.ta-ltr]="isPhoneCol(c)">{{ c }}</th> }</tr>
                         </thead>
                         <tbody>
                           @for (row of executedData(); track $index) {
-                            <tr>@for (c of dataColumns(); track c) { <td>{{ row[c] }}</td> }</tr>
+                            <tr>
+                              @for (c of dataColumns(); track c) {
+                                <td [class.phone-cell]="isPhoneCol(c)">
+                                  @if (isPhoneCol(c) && row[c] && row[c] !== '—' && row[c] !== '-') {
+                                    <div class="phone-box">
+                                      <span class="phone-num" dir="ltr">{{ row[c] }}</span>
+                                      <a [href]="'https://wa.me/' + cleanPhone(row[c])" target="_blank" rel="noopener" class="wa-action" title="مراسلة ولي الأمر عبر واتساب">💬</a>
+                                    </div>
+                                  } @else {
+                                    {{ row[c] }}
+                                  }
+                                </td>
+                              }
+                            </tr>
                           }
                         </tbody>
                       </table>
@@ -424,6 +437,14 @@ type TabKey = 'reports' | 'dashboards' | 'sources';
       border-bottom: 1px solid var(--nb-border-soft); }
     table.data td { padding: 8px 12px; white-space: nowrap; color: var(--nb-text);
       border-bottom: 1px solid var(--nb-border-row); font-variant-numeric: tabular-nums; }
+    th.ta-ltr { text-align: end; }
+    td.phone-cell { font-family: ui-monospace, monospace; }
+    .phone-box { display: inline-flex; align-items: center; gap: 6px; }
+    .phone-num { font-size: 12px; color: var(--nb-text); letter-spacing: 0.5px; }
+    .wa-action { text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 4px; background: rgba(37, 211, 102, 0.12); color: #128c7e;
+      transition: all .15s ease; }
+    .wa-action:hover { background: #25d366; color: #fff; transform: scale(1.15); }
 
     @media (max-width: 900px) {
       .page { padding: 14px; }
@@ -762,5 +783,18 @@ export class ReportingDashboardComponent implements OnInit {
 
   printReport(): void {
     window.print();
+  }
+
+  isPhoneCol(col: string): boolean {
+    if (!col) return false;
+    return col.includes('جوال') || col.includes('هاتف') || col.includes('phone') || col.includes('موبايل');
+  }
+
+  cleanPhone(phone: any): string {
+    if (!phone) return '';
+    let p = String(phone).replace(/[^0-9+]/g, '');
+    if (p.startsWith('0')) p = '249' + p.substring(1);
+    else if (!p.startsWith('+') && !p.startsWith('249')) p = '249' + p;
+    return p.replace('+', '');
   }
 }

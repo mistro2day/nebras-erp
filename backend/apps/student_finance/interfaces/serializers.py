@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Sum
 from apps.student_finance.domain.models import (
     FeeCategory, FeeType, FeeStructure, FeeSchedule, AcademicFeePlan,
     StudentBillingAccount, StudentInvoice, InvoiceItem, InvoiceAdjustment,
@@ -36,11 +37,6 @@ class FeeScheduleSerializer(BaseStudentFinanceSerializer):
 class AcademicFeePlanSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
         model = AcademicFeePlan
-        fields = '__all__'
-
-class StudentBillingAccountSerializer(BaseStudentFinanceSerializer):
-    class Meta(BaseStudentFinanceSerializer.Meta):
-        model = StudentBillingAccount
         fields = '__all__'
 
 class InvoiceItemSerializer(BaseStudentFinanceSerializer):
@@ -202,6 +198,91 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
     if acc_id:
         _STUDENT_META_CACHE[acc_id] = data
     return data
+
+
+class StudentBillingAccountSerializer(BaseStudentFinanceSerializer):
+    student_name = serializers.SerializerMethodField()
+    student_number = serializers.SerializerMethodField()
+    stage_name = serializers.SerializerMethodField()
+    grade_name = serializers.SerializerMethodField()
+    section_name = serializers.SerializerMethodField()
+    branch_name = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    guardian_name = serializers.SerializerMethodField()
+    guardian_phone = serializers.SerializerMethodField()
+    total_billed = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
+    remaining_balance = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+
+    class Meta(BaseStudentFinanceSerializer.Meta):
+        model = StudentBillingAccount
+        fields = '__all__'
+
+    def _meta_for(self, obj):
+        return _extract_student_finance_metadata(obj)
+
+    def get_student_name(self, obj):
+        return self._meta_for(obj)['student_name']
+
+    def get_student_number(self, obj):
+        return self._meta_for(obj)['student_number']
+
+    def get_stage_name(self, obj):
+        return self._meta_for(obj)['stage_name']
+
+    def get_grade_name(self, obj):
+        return self._meta_for(obj)['grade_name']
+
+    def get_section_name(self, obj):
+        return self._meta_for(obj)['section_name']
+
+    def get_branch_name(self, obj):
+        return self._meta_for(obj)['branch_name']
+
+    def get_gender(self, obj):
+        return self._meta_for(obj)['gender']
+
+    def get_guardian_name(self, obj):
+        return self._meta_for(obj)['guardian_name']
+
+    def get_guardian_phone(self, obj):
+        return self._meta_for(obj)['guardian_phone']
+
+    def get_total_billed(self, obj):
+        try:
+            inv_sum = obj.invoices.aggregate(s=Sum('total_amount'))['s']
+            if inv_sum is not None and float(inv_sum) > 0:
+                return float(inv_sum)
+        except Exception:
+            pass
+        out = float(obj.outstanding_balance or 0.0)
+        curr = float(obj.current_balance or 0.0)
+        return max(out, curr, 0.0)
+
+    def get_total_paid(self, obj):
+        try:
+            paid_sum = obj.invoices.aggregate(s=Sum('paid_amount'))['s']
+            if paid_sum is not None:
+                return float(paid_sum)
+        except Exception:
+            pass
+        billed = self.get_total_billed(obj)
+        out = float(obj.outstanding_balance or 0.0)
+        return max(0.0, billed - out)
+
+    def get_remaining_balance(self, obj):
+        return float(obj.outstanding_balance or 0.0)
+
+    def get_payment_status(self, obj):
+        out = float(obj.outstanding_balance or 0.0)
+        if out <= 0:
+            return 'paid'
+        billed = self.get_total_billed(obj)
+        paid = self.get_total_paid(obj)
+        if paid > 0 and out > 0:
+            return 'partial'
+        return 'unpaid'
 
 
 class StudentInvoiceSerializer(BaseStudentFinanceSerializer):

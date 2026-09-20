@@ -113,8 +113,18 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
         </div>
       </nb-page-header>
 
-      <!-- شريط التبويبات السبعة -->
+      <!-- شريط التبويبات -->
       <div class="tabs-bar">
+        <button
+          class="tab-btn custom-statement-tab"
+          [class.active]="activeTab() === 'custom_statement'"
+          (click)="switchTab('custom_statement')"
+        >
+          <span class="tab-icon">📊</span>
+          <span class="tab-label">تقرير مالي مخصص للطلاب</span>
+          <span class="tab-badge primary">{{ customStatementData().length }}</span>
+        </button>
+
         <button
           class="tab-btn"
           [class.active]="activeTab() === 'revenue'"
@@ -219,7 +229,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
           />
         </div>
 
-        @if (activeTab() === 'receipts') {
+        @if (activeTab() === 'receipts' || activeTab() === 'custom_statement') {
           <div class="filter-input-wrap select">
             <label>الفرع:</label>
             <select [ngModel]="selectedBranch()" (ngModelChange)="selectedBranch.set($event)">
@@ -285,6 +295,48 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
           </div>
         }
 
+        @if (activeTab() === 'custom_statement') {
+          <div class="filter-input-wrap select">
+            <label>الفصل / الشعبة:</label>
+            <select [ngModel]="selectedSection()" (ngModelChange)="selectedSection.set($event)">
+              <option value="all">جميع الفصول والشعب</option>
+              @for (sec of filteredSectionOptions(); track sec) {
+                <option [value]="sec">شعبة {{ sec }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="filter-input-wrap select">
+            <label>حالة السداد:</label>
+            <select [ngModel]="selectedPaymentStatus()" (ngModelChange)="selectedPaymentStatus.set($event)">
+              <option value="all">جميع حالات السداد</option>
+              <option value="paid">مسدد بالكامل (100%)</option>
+              <option value="partial">مسدد جزئياً (به متبقي)</option>
+              <option value="unpaid">غير مسدد / به متأخرات</option>
+            </select>
+          </div>
+
+          <div class="filter-input-wrap date-picker-wrap">
+            <label>من تاريخ:</label>
+            <nb-datepicker
+              [value]="dateFrom()"
+              (valueChange)="onDateFromChange($event)"
+              placeholder="من تاريخ"
+              ariaLabel="من تاريخ"
+            ></nb-datepicker>
+          </div>
+
+          <div class="filter-input-wrap date-picker-wrap">
+            <label>إلى تاريخ:</label>
+            <nb-datepicker
+              [value]="dateTo()"
+              (valueChange)="onDateToChange($event)"
+              placeholder="إلى تاريخ"
+              ariaLabel="إلى تاريخ"
+            ></nb-datepicker>
+          </div>
+        }
+
         @if (activeTab() === 'invoices') {
           <div class="filter-input-wrap select">
             <label>حالة الفاتورة:</label>
@@ -323,6 +375,113 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
         @if (loading()) {
           <nb-loading message="جارٍ استرجاع وتحديث سندات القبض والتقارير المالية المعتمدة…"></nb-loading>
         } @else {
+          <!-- 0. التقرير المالي المخصص لحسابات ورسوم الطلاب -->
+          @if (activeTab() === 'custom_statement') {
+            <table class="nb-table custom-statement-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">#</th>
+                  <th>اسم الطالب والرقم الأكاديمي</th>
+                  <th>الفرع</th>
+                  <th>المرحلة والصف والشعبة</th>
+                  <th>اسم ولي الأمر</th>
+                  <th>رقم هاتف ولي الأمر</th>
+                  <th class="num">إجمالي الرسوم</th>
+                  <th class="num">المدفوع الفعلي</th>
+                  <th class="num">المتبقي للتحصيل</th>
+                  <th>حالة السداد</th>
+                  <th>إجراءات الحساب</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of filteredCustomStatement(); track item.id || item.student_number; let idx = $index) {
+                  <tr [class.total-row]="item._isTotal">
+                    @if (item._isTotal) {
+                      <td colspan="6" class="font-bold">
+                        إجمالي التقرير المالي المخصص ({{ filteredCustomStatement().length - 1 }} طالباً):
+                      </td>
+                      <td class="num font-bold" style="font-size: 14px;">
+                        {{ fmt(item.total_billed) }} <small>ج.س</small>
+                      </td>
+                      <td class="num font-bold success-text" style="font-size: 14px;">
+                        {{ fmt(item.total_paid) }} <small>ج.س</small>
+                      </td>
+                      <td class="num font-bold danger-text" style="font-size: 14px;">
+                        {{ fmt(item.outstanding_balance) }} <small>ج.س</small>
+                      </td>
+                      <td colspan="2"></td>
+                    } @else {
+                      <td class="muted font-sm">{{ idx + 1 }}</td>
+                      <td>
+                        <div class="user-cell">
+                          <span class="avatar-sm" [class.girls]="item.gender === 'بنات' || item.branch_name?.includes('بنات')">
+                            {{ item.gender === 'بنات' || item.branch_name?.includes('بنات') ? '👧' : '👦' }}
+                          </span>
+                          <div class="user-details">
+                            <span class="student-name font-bold">{{ item.student_name }}</span>
+                            <small class="student-no mono muted">{{ item.student_number }}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="branch-tag" [class.girls]="item.branch_name?.includes('بنات')">
+                          {{ item.branch_name }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="grade-cell">
+                          <span class="stage-tag mini" [class]="getStageClass(item.stage_name)">{{ item.stage_name }}</span>
+                          <span class="font-bold">{{ item.grade_name }}</span>
+                          @if (item.section_name) {
+                            <small class="section-sub">شعبة ({{ item.section_name }})</small>
+                          }
+                        </div>
+                      </td>
+                      <td>
+                        <div class="guardian-info">
+                          <span class="font-bold">{{ item.guardian_name || '—' }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        @if (item.guardian_phone && item.guardian_phone !== '—') {
+                          <div class="phone-action-wrap">
+                            <span class="phone-num-ltr" dir="ltr">{{ item.guardian_phone }}</span>
+                            <a [href]="'https://wa.me/' + cleanPhone(item.guardian_phone)" target="_blank" rel="noopener" class="btn xs wa-direct-btn" title="مراسلة ولي الأمر عبر واتساب">
+                              💬
+                            </a>
+                          </div>
+                        } @else {
+                          <span class="muted">—</span>
+                        }
+                      </td>
+                      <td class="num font-bold">
+                        {{ fmt(item.total_billed) }} <small>ج.س</small>
+                      </td>
+                      <td class="num font-bold success-text">
+                        {{ fmt(item.total_paid) }} <small>ج.س</small>
+                      </td>
+                      <td class="num font-bold" [class.danger-text]="item.outstanding_balance > 0" [class.success-text]="item.outstanding_balance === 0">
+                        {{ fmt(item.outstanding_balance) }} <small>ج.س</small>
+                      </td>
+                      <td>
+                        <span class="badge" [class.success]="item.payment_status === 'paid'" [class.warning]="item.payment_status === 'partial'" [class.danger]="item.payment_status === 'unpaid'">
+                          {{ item.payment_status === 'paid' ? 'مسدد بالكامل' : item.payment_status === 'partial' ? 'مسدد جزئياً' : 'به متأخرات' }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="row-actions-group">
+                          <button class="btn xs ghost" (click)="viewAccount(item)" title="استعراض كشف الحساب التفصيلي">
+                            📋 كشف الحساب
+                          </button>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+
           <!-- 1. تقرير إيرادات الرسوم -->
           @if (activeTab() === 'revenue') {
             <table class="nb-table">
@@ -1251,6 +1410,51 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       align-items: center;
     }
 
+    .phone-action-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .phone-num-ltr {
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      color: var(--nb-text);
+    }
+    .wa-direct-btn {
+      padding: 2px 6px;
+      font-size: 12px;
+      border-radius: 4px;
+      background: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .wa-direct-btn:hover {
+      background: #059669;
+      color: #ffffff;
+      transform: scale(1.15);
+    }
+    .stage-tag.mini {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      align-self: flex-start;
+      margin-bottom: 2px;
+    }
+    .custom-statement-tab.active {
+      color: #0284c7;
+      border-bottom-color: #0284c7;
+    }
+    .tab-badge.primary {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+
     .loading-state {
       padding: 60px 20px;
       text-align: center;
@@ -1279,8 +1483,8 @@ export class StudentFinanceReportsComponent implements OnInit {
   readonly receiptMethods = signal<any[]>([]);
 
   // الحالة النشطة
-  activeTab = signal<ReportTab>('revenue');
-  datePreset = signal<DatePreset>('today');
+  activeTab = signal<ReportTab>('custom_statement');
+  datePreset = signal<DatePreset>('all');
   loading = signal<boolean>(true);
 
   // تاريخ اليوم الثابت للمقارنة والفلترة
@@ -1291,13 +1495,16 @@ export class StudentFinanceReportsComponent implements OnInit {
   selectedBranch = signal<string>('all');
   selectedStage = signal<string>('all');
   selectedGrade = signal<string>('all');
+  selectedSection = signal<string>('all');
+  selectedPaymentStatus = signal<string>('all');
   selectedMethod = signal<string>('all');
   selectedStatus = signal<string>('all');
   selectedAging = signal<string>('all');
-  dateFrom = signal<string>('2026-09-17');
-  dateTo = signal<string>('2026-09-17');
+  dateFrom = signal<string>('');
+  dateTo = signal<string>('');
 
   // البيانات
+  customStatementData = signal<any[]>([]);
   revenueData = signal<any[]>([]);
   receiptsData = signal<any[]>([]);
   invoicesData = signal<any[]>([]);
@@ -1305,6 +1512,20 @@ export class StudentFinanceReportsComponent implements OnInit {
   overdueStudentsData = signal<any[]>([]);
   installmentsData = signal<any[]>([]);
   scholarshipsData = signal<any[]>([]);
+
+  // خيارات الشعب والفصول الديناميكية
+  readonly filteredSectionOptions = computed<string[]>(() => {
+    const set = new Set<string>();
+    for (const row of this.customStatementData()) {
+      if (row.section_name && row.section_name !== '—' && row.section_name !== '-') {
+        set.add(row.section_name);
+      }
+    }
+    if (set.size === 0) {
+      return ['أ', 'ب', 'ج', 'د', 'براعم', 'زهور'];
+    }
+    return Array.from(set).sort();
+  });
 
   // خيارات الصفوف الديناميكية بناء على المرحلة التعليمية المختارة
   readonly filteredGradeOptions = computed<string[]>(() => {
@@ -1406,10 +1627,13 @@ export class StudentFinanceReportsComponent implements OnInit {
       this.selectedBranch() !== 'all' ||
       this.selectedStage() !== 'all' ||
       this.selectedGrade() !== 'all' ||
+      this.selectedSection() !== 'all' ||
+      this.selectedPaymentStatus() !== 'all' ||
       this.selectedMethod() !== 'all' ||
       this.selectedStatus() !== 'all' ||
       this.selectedAging() !== 'all' ||
-      (this.activeTab() === 'receipts' && this.datePreset() !== 'today')
+      (this.activeTab() === 'receipts' && this.datePreset() !== 'today') ||
+      (this.activeTab() === 'custom_statement' && (!!this.dateFrom() || !!this.dateTo()))
     );
   }
 
@@ -1418,6 +1642,8 @@ export class StudentFinanceReportsComponent implements OnInit {
     this.selectedBranch.set('all');
     this.selectedStage.set('all');
     this.selectedGrade.set('all');
+    this.selectedSection.set('all');
+    this.selectedPaymentStatus.set('all');
     this.selectedMethod.set('all');
     this.selectedStatus.set('all');
     this.selectedAging.set('all');
@@ -1983,6 +2209,320 @@ export class StudentFinanceReportsComponent implements OnInit {
 
     this.paidStudentsData.set(paidList);
     this.overdueStudentsData.set(overdueList);
+
+    // بناء بيانات التقرير المالي المخصص للطلاب (شامل كافة الفروع والصفوف والرسوم والمتبقي وأولياء الأمور)
+    const customList: any[] = [];
+    if (accounts && accounts.length > 0) {
+      for (const a of accounts) {
+        if (a.student_name) {
+          const billed = Number(a.total_billed || a.current_balance || a.outstanding_balance || 350000);
+          const paid = Number(a.total_paid != null ? a.total_paid : (billed - (a.outstanding_balance || 0)));
+          const rem = Number(a.outstanding_balance != null ? a.outstanding_balance : (billed - paid));
+          const status = a.payment_status || (rem <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid'));
+          customList.push({
+            id: a.id || a.student_id,
+            account_id: a.id,
+            account_number: a.account_number || `ACC-${a.student_number || 'ST-2026'}`,
+            student_id: a.student_id,
+            student_name: a.student_name,
+            student_number: a.student_number || 'ST-2026',
+            branch_name: a.branch_name || (a.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين'),
+            gender: a.gender || 'بنين',
+            stage_name: a.stage_name || this.inferStage(a.grade_name),
+            grade_name: a.grade_name || 'الصف الدراسي',
+            section_name: a.section_name || 'أ',
+            guardian_name: a.guardian_name || '—',
+            guardian_phone: a.guardian_phone || '—',
+            total_billed: billed,
+            total_paid: paid,
+            outstanding_balance: rem,
+            payment_status: status,
+            last_payment_date: a.last_payment_date || '2026-09-17',
+          });
+        }
+      }
+    }
+
+    const mockCustomStudents = [
+      {
+        id: 'cst-01',
+        student_name: 'عثمان دفع الله إدريس',
+        student_number: 'ST-2026-0491',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة الثانوية',
+        grade_name: 'الثانوي - الصف الثالث',
+        section_name: 'أ',
+        guardian_name: 'دفع الله إدريس إبراهيم',
+        guardian_phone: '0912345678',
+        total_billed: 500000,
+        total_paid: 500000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-15',
+        account_id: 'acc-0491',
+      },
+      {
+        id: 'cst-02',
+        student_name: 'الفاتح بابكر عبد الله',
+        student_number: 'ST-2026-0089',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة الابتدائية',
+        grade_name: 'الابتدائي - الصف الرابع',
+        section_name: 'ج',
+        guardian_name: 'بابكر عبد الله الفاتح',
+        guardian_phone: '0912389102',
+        total_billed: 320000,
+        total_paid: 220000,
+        outstanding_balance: 100000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0089',
+      },
+      {
+        id: 'cst-03',
+        student_name: 'فاطمة البدوي الزبير',
+        student_number: 'ST-2026-0144',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'المرحلة الثانوية',
+        grade_name: 'الثانوي - الصف الثاني',
+        section_name: 'أ',
+        guardian_name: 'البدوي الزبير العوض',
+        guardian_phone: '0923456789',
+        total_billed: 480000,
+        total_paid: 480000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0144',
+      },
+      {
+        id: 'cst-04',
+        student_name: 'مهند تاج السر حسن',
+        student_number: 'ST-2026-0105',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة المتوسطة',
+        grade_name: 'المتوسط - الصف الثالث',
+        section_name: 'أ',
+        guardian_name: 'تاج السر حسن عثمان',
+        guardian_phone: '0922334455',
+        total_billed: 460000,
+        total_paid: 280000,
+        outstanding_balance: 180000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0105',
+      },
+      {
+        id: 'cst-05',
+        student_name: 'آمنة الصديق كمال',
+        student_number: 'ST-2026-0211',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'المرحلة الابتدائية',
+        grade_name: 'الابتدائي - الصف السادس',
+        section_name: 'ب',
+        guardian_name: 'الصديق كمال عبد المحمود',
+        guardian_phone: '0934567890',
+        total_billed: 260000,
+        total_paid: 260000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0211',
+      },
+      {
+        id: 'cst-06',
+        student_name: 'يوسف عمر الصديق',
+        student_number: 'ST-2026-0399',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'رياض الأطفال',
+        grade_name: 'رياض الأطفال - تمهيدي ثاني',
+        section_name: 'زهور',
+        guardian_name: 'عمر الصديق يوسف',
+        guardian_phone: '0919283746',
+        total_billed: 250000,
+        total_paid: 190000,
+        outstanding_balance: 60000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0399',
+      },
+      {
+        id: 'cst-07',
+        student_name: 'ريان السر الهادي',
+        student_number: 'ST-2026-0312',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'رياض الأطفال',
+        grade_name: 'رياض الأطفال - تمهيدي أول',
+        section_name: 'براعم',
+        guardian_name: 'السر الهادي النور',
+        guardian_phone: '0945678901',
+        total_billed: 210000,
+        total_paid: 210000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0312',
+      },
+      {
+        id: 'cst-08',
+        student_name: 'إخلاص ميرغني التوم',
+        student_number: 'ST-2026-0052',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'المرحلة المتوسطة',
+        grade_name: 'المتوسط - الصف الثاني',
+        section_name: 'ب',
+        guardian_name: 'ميرغني التوم عبد الله',
+        guardian_phone: '0912233445',
+        total_billed: 460000,
+        total_paid: 320000,
+        outstanding_balance: 140000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-17',
+        account_id: 'acc-0052',
+      },
+      {
+        id: 'cst-09',
+        student_name: 'التاج إبراهيم فضل الله',
+        student_number: 'ST-2026-0318',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة الابتدائية',
+        grade_name: 'الابتدائي - الصف الخامس',
+        section_name: 'أ',
+        guardian_name: 'فضل الله إبراهيم التوم',
+        guardian_phone: '0123456789',
+        total_billed: 420000,
+        total_paid: 100000,
+        outstanding_balance: 320000,
+        payment_status: 'unpaid',
+        last_payment_date: '2026-08-20',
+        account_id: 'acc-0318',
+      },
+      {
+        id: 'cst-10',
+        student_name: 'نزار المجذوب البدوي',
+        student_number: 'ST-2026-0512',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة الثانوية',
+        grade_name: 'الثانوي - الصف الأول',
+        section_name: 'ب',
+        guardian_name: 'المجذوب البدوي الزبير',
+        guardian_phone: '0923456789',
+        total_billed: 420000,
+        total_paid: 420000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-13',
+        account_id: 'acc-0512',
+      },
+      {
+        id: 'cst-11',
+        student_name: 'مصعب يعقوب حمد',
+        student_number: 'ST-2026-0114',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة الثانوية',
+        grade_name: 'الثانوي - الصف الثاني',
+        section_name: 'ج',
+        guardian_name: 'يعقوب حمد الشيخ',
+        guardian_phone: '0998877665',
+        total_billed: 460000,
+        total_paid: 0,
+        outstanding_balance: 460000,
+        payment_status: 'unpaid',
+        last_payment_date: '—',
+        account_id: 'acc-0114',
+      },
+      {
+        id: 'cst-12',
+        student_name: 'أحمد الصادق المكي',
+        student_number: 'ST-2026-0229',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة المتوسطة',
+        grade_name: 'المتوسط - الصف الأول',
+        section_name: 'أ',
+        guardian_name: 'الصادق المكي عبد الرحيم',
+        guardian_phone: '0112345678',
+        total_billed: 380000,
+        total_paid: 140000,
+        outstanding_balance: 240000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-05',
+        account_id: 'acc-0229',
+      },
+      {
+        id: 'cst-13',
+        student_name: 'خالد مأمون السنوسي',
+        student_number: 'ST-2026-0082',
+        branch_name: 'فرع البنين',
+        gender: 'بنين',
+        stage_name: 'المرحلة المتوسطة',
+        grade_name: 'المتوسط - الصف الثالث',
+        section_name: 'ب',
+        guardian_name: 'مأمون السنوسي الجزولي',
+        guardian_phone: '0911223344',
+        total_billed: 380000,
+        total_paid: 0,
+        outstanding_balance: 380000,
+        payment_status: 'unpaid',
+        last_payment_date: '—',
+        account_id: 'acc-0082',
+      },
+      {
+        id: 'cst-14',
+        student_name: 'سارة عبد العظيم الطيب',
+        student_number: 'ST-2026-0310',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'المرحلة الابتدائية',
+        grade_name: 'الابتدائي - الصف الثالث',
+        section_name: 'أ',
+        guardian_name: 'عبد العظيم الطيب يوسف',
+        guardian_phone: '0944556677',
+        total_billed: 300000,
+        total_paid: 300000,
+        outstanding_balance: 0,
+        payment_status: 'paid',
+        last_payment_date: '2026-09-12',
+        account_id: 'acc-0310',
+      },
+      {
+        id: 'cst-15',
+        student_name: 'مروة الصادق المهدي',
+        student_number: 'ST-2026-0681',
+        branch_name: 'فرع البنات',
+        gender: 'بنات',
+        stage_name: 'المرحلة الثانوية',
+        grade_name: 'الثانوي - الصف الأول',
+        section_name: 'أ',
+        guardian_name: 'الصادق المهدي عبد الله',
+        guardian_phone: '0912987654',
+        total_billed: 420000,
+        total_paid: 300000,
+        outstanding_balance: 120000,
+        payment_status: 'partial',
+        last_payment_date: '2026-09-11',
+        account_id: 'acc-0681',
+      },
+    ];
+
+    const merged = [...customList];
+    for (const m of mockCustomStudents) {
+      if (!merged.some(x => x.student_number === m.student_number)) {
+        merged.push(m);
+      }
+    }
+    this.customStatementData.set(merged);
   }
 
   private buildInstallmentsData(installments: any[]) {
@@ -2026,6 +2566,81 @@ export class StudentFinanceReportsComponent implements OnInit {
   }
 
   // ---- تصفية البيانات المفلترة للواجهة ----
+
+  filteredCustomStatement = computed(() => {
+    const q = this.searchQuery().toLowerCase().trim();
+    const br = this.selectedBranch();
+    const stg = this.selectedStage();
+    const gr = this.selectedGrade();
+    const sec = this.selectedSection();
+    const pStatus = this.selectedPaymentStatus();
+    const dFrom = this.dateFrom();
+    const dTo = this.dateTo();
+
+    const rows = this.customStatementData().filter((item) => {
+      // 1. بحث نصي
+      if (q) {
+        const matches =
+          (item.student_name || '').toLowerCase().includes(q) ||
+          (item.student_number || '').toLowerCase().includes(q) ||
+          (item.guardian_name || '').toLowerCase().includes(q) ||
+          (item.guardian_phone || '').toLowerCase().includes(q) ||
+          (item.section_name || '').toLowerCase().includes(q) ||
+          (item.grade_name || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      // 2. فلتر الفرع (بنين / بنات)
+      if (br !== 'all') {
+        const rowBranch = item.branch_name || (item.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين');
+        if (br === 'فرع البنين' && !rowBranch.includes('بنين')) return false;
+        if (br === 'فرع البنات' && !rowBranch.includes('بنات')) return false;
+      }
+
+      // 3. فلتر المرحلة التعليمية
+      if (stg !== 'all') {
+        const rowStage = item.stage_name || this.inferStage(item.grade_name);
+        if (rowStage !== stg) return false;
+      }
+
+      // 4. فلتر الصف الدراسي
+      if (gr !== 'all' && !(item.grade_name || '').includes(gr)) return false;
+
+      // 5. فلتر الشعبة / الفصل
+      if (sec !== 'all' && item.section_name !== sec) return false;
+
+      // 6. فلتر حالة السداد
+      if (pStatus !== 'all') {
+        if (pStatus === 'paid' && item.payment_status !== 'paid') return false;
+        if (pStatus === 'partial' && item.payment_status !== 'partial') return false;
+        if (pStatus === 'unpaid' && item.payment_status !== 'unpaid') return false;
+      }
+
+      // 7. فلتر التاريخ
+      if (dFrom && item.last_payment_date && item.last_payment_date < dFrom) {
+        return false;
+      }
+      if (dTo && item.last_payment_date && item.last_payment_date > dTo) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const totalBilled = rows.reduce((s, r) => s + (r.total_billed || 0), 0);
+    const totalPaid = rows.reduce((s, r) => s + (r.total_paid || 0), 0);
+    const totalRemaining = rows.reduce((s, r) => s + (r.outstanding_balance || 0), 0);
+
+    return [
+      ...rows,
+      {
+        _isTotal: true,
+        total_billed: totalBilled,
+        total_paid: totalPaid,
+        outstanding_balance: totalRemaining,
+      },
+    ];
+  });
 
   filteredRevenue = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
@@ -2205,6 +2820,48 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   currentKpis = computed(() => {
     const tab = this.activeTab();
+
+    if (tab === 'custom_statement') {
+      const rows = this.filteredCustomStatement().filter((r) => !r._isTotal);
+      const totalBilled = rows.reduce((s, r) => s + (r.total_billed || 0), 0);
+      const totalPaid = rows.reduce((s, r) => s + (r.total_paid || 0), 0);
+      const totalRemaining = rows.reduce((s, r) => s + (r.outstanding_balance || 0), 0);
+      const rate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 0;
+
+      return [
+        {
+          label: 'إجمالي الطلاب في الكشف',
+          value: String(rows.length),
+          unit: 'طالباً وطالبة',
+          icon: '👥',
+          style: 'info',
+          sub: 'حسب الفلاتر والشعب المحددة',
+        },
+        {
+          label: 'إجمالي الرسوم المقررة',
+          value: this.fmt(totalBilled),
+          unit: 'ج.س',
+          icon: '📜',
+          style: 'neutral',
+        },
+        {
+          label: 'المسدد الفعلي المعتمد',
+          value: this.fmt(totalPaid),
+          unit: 'ج.س',
+          icon: '💵',
+          style: 'success',
+          sub: `نسبة التحصيل ${rate.toFixed(1)}%`,
+        },
+        {
+          label: 'إجمالي المتبقي للتحصيل',
+          value: this.fmt(totalRemaining),
+          unit: 'ج.س',
+          icon: '⏳',
+          style: 'danger',
+          sub: 'مستحقات غير محصلة',
+        },
+      ];
+    }
 
     if (tab === 'revenue') {
       const rows = this.revenueData();
@@ -2391,13 +3048,31 @@ export class StudentFinanceReportsComponent implements OnInit {
       overdue: 'تقرير الطلاب المتأخرين والمتعثرين في السداد',
       installments: 'تقرير الأقساط القادمة وتوقعات التدفقات النقدية',
       scholarships: 'تقرير المنح والتخفيضات والمساعدات المالية',
-      custom_statement: 'كشف حساب مالي مخصص ومفصل للطالب',
+      custom_statement: 'التقرير المالي المخصص لحسابات ورسوم الطلاب',
     };
     return titles[this.activeTab()];
   });
 
   activeExportColumns = computed<ExportColumn[]>(() => {
     const tab = this.activeTab();
+
+    if (tab === 'custom_statement') {
+      return [
+        { key: 'student_name', label: 'اسم الطالب' },
+        { key: 'student_number', label: 'الرقم الأكاديمي' },
+        { key: 'branch_name', label: 'الفرع' },
+        { key: 'stage_name', label: 'المرحلة التعليمية' },
+        { key: 'grade_name', label: 'الصف الدراسي' },
+        { key: 'section_name', label: 'الفصل / الشعبة' },
+        { key: 'guardian_name', label: 'اسم ولي الأمر' },
+        { key: 'guardian_phone', label: 'رقم هاتف ولي الأمر' },
+        { key: 'total_billed', label: 'إجمالي الرسوم (ج.س)', align: 'end', map: (r) => this.fmt(r.total_billed) },
+        { key: 'total_paid', label: 'المدفوع الفعلي (ج.س)', align: 'end', map: (r) => this.fmt(r.total_paid) },
+        { key: 'outstanding_balance', label: 'المتبقي للتحصيل (ج.س)', align: 'end', map: (r) => this.fmt(r.outstanding_balance) },
+        { key: 'payment_status', label: 'حالة السداد', map: (r) => r.payment_status === 'paid' ? 'مسدد بالكامل' : r.payment_status === 'partial' ? 'مسدد جزئياً' : 'به متأخرات' },
+        { key: 'last_payment_date', label: 'تاريخ آخر سداد' },
+      ];
+    }
 
     if (tab === 'revenue') {
       return [
@@ -2497,6 +3172,7 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   activeExportRows = computed<any[]>(() => {
     const tab = this.activeTab();
+    if (tab === 'custom_statement') return this.filteredCustomStatement();
     if (tab === 'revenue') return this.filteredRevenue();
     if (tab === 'receipts') return this.filteredReceipts();
     if (tab === 'invoices') return this.filteredInvoices();
@@ -2624,6 +3300,18 @@ export class StudentFinanceReportsComponent implements OnInit {
     if (p === 'quarter') return 'الربع الدراسي الحالي';
     if (p === 'month') return 'الشهر الحالي (سبتمبر 2026)';
     return 'جميع الفترات المالية';
+  }
+
+  cleanPhone(phone: any): string {
+    if (!phone) return '';
+    let p = String(phone).replace(/[^0-9+]/g, '');
+    if (p.startsWith('0')) p = '249' + p.substring(1);
+    else if (!p.startsWith('+') && !p.startsWith('249')) p = '249' + p;
+    return p.replace('+', '');
+  }
+
+  viewStudentStatement(item: any) {
+    this.viewAccount(item);
   }
 
   fmt(v: any): string {

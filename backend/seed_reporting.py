@@ -13,6 +13,12 @@ import os
 import sys
 import django
 
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
@@ -212,6 +218,40 @@ REPORTS = [
                              WHEN 'female' THEN 'فرع البنات' ELSE 'غير محدد' END),
                      g.name, g."order"
             ORDER BY "الفرع", g."order"
+        """,
+    },
+    {
+        "cat_code": "rep_students", "cat_name": "تقارير الطلاب", "cat_type": "students", "icon": "🎓",
+        "code": "students_parents_contact_directory",
+        "name": "دليل الطلاب وأولياء الأمور وبيانات الاتصال",
+        "desc": "قائمة تفصيلية بأسماء الطلاب وأولياء أمورهم والصف الدراسي ورقم الهاتف للتواصل.",
+        "sql": """
+            SELECT p.arabic_name AS "اسم الطالب",
+                   s.student_number AS "الرقم الأكاديمي",
+                   COALESCE(g.name, '—') AS "الصف الدراسي",
+                   COALESCE(b.name_ar, b.name, CASE p.gender WHEN 'female' THEN 'فرع البنات' ELSE 'فرع البنين' END) AS "الفرع",
+                   COALESCE(f.full_name, '—') AS "اسم ولي الأمر",
+                   CASE f.relationship
+                        WHEN 'father' THEN 'أب'
+                        WHEN 'mother' THEN 'أم'
+                        WHEN 'guardian' THEN 'ولي أمر'
+                        WHEN 'sponsor' THEN 'كفيل'
+                        WHEN 'sibling' THEN 'شقيق'
+                        ELSE COALESCE(f.relationship, 'ولي أمر') END AS "صلة القرابة",
+                   COALESCE(f.phone, '—') AS "رقم الجوال"
+            FROM students s
+            JOIN student_profiles p ON p.student_id = s.id
+            LEFT JOIN student_enrollments e ON e.student_id = s.id AND e.deleted_at IS NULL
+            LEFT JOIN academic_grades g ON g.id = e.grade_id
+            LEFT JOIN branches b ON b.id = e.branch_id
+            LEFT JOIN (
+                SELECT DISTINCT ON (student_id) student_id, full_name, relationship, phone
+                FROM student_family_relations
+                WHERE deleted_at IS NULL
+                ORDER BY student_id, emergency_contact DESC, created_at ASC
+            ) f ON f.student_id = s.id
+            WHERE s.tenant_id = %(tenant_id)s AND s.deleted_at IS NULL
+            ORDER BY g."order" NULLS LAST, p.arabic_name ASC
         """,
     },
     {
