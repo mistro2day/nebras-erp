@@ -126,6 +126,8 @@ class StudentAttachmentSerializer(serializers.ModelSerializer):
         try:
             asset = FileAsset.objects.filter(id=obj.file_asset_id).first()
             if asset and asset.file_path:
+                if getattr(settings, 'USE_S3', False):
+                    return default_storage.url(asset.file_path)
                 if settings.DEBUG:
                     return f"{settings.MEDIA_URL}{asset.file_path}"
                 return default_storage.url(asset.file_path)

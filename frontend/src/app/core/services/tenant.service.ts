@@ -209,6 +209,8 @@ export class TenantService {
     email: string;
     logo: string;
     logo_url: string;
+    stamp: string;
+    stamp_url: string;
   }>): Observable<TenantInfo> {
     const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
     return this.http.patch<any>(`${base}tenants/branding/current/`, data).pipe(

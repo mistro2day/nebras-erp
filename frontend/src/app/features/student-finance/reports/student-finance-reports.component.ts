@@ -27,6 +27,7 @@ import {
 } from './student-finance-report-print';
 
 export type ReportTab =
+  | 'custom_statement'
   | 'revenue'
   | 'receipts'
   | 'invoices'
@@ -2390,6 +2391,7 @@ export class StudentFinanceReportsComponent implements OnInit {
       overdue: 'تقرير الطلاب المتأخرين والمتعثرين في السداد',
       installments: 'تقرير الأقساط القادمة وتوقعات التدفقات النقدية',
       scholarships: 'تقرير المنح والتخفيضات والمساعدات المالية',
+      custom_statement: 'كشف حساب مالي مخصص ومفصل للطالب',
     };
     return titles[this.activeTab()];
   });

@@ -137,6 +137,37 @@ class TenantViewSet(viewsets.ModelViewSet):
                     tenant.logo = None
                     feat.pop('logo_url', None)
 
+            # معالجة تحديث الختم الرسمي للمدرسة (Official Seal / Stamp)
+            if 'stamp' in request.FILES:
+                tenant.stamp = request.FILES['stamp']
+            elif 'stamp' in payload:
+                stamp_val = payload['stamp']
+                if isinstance(stamp_val, str) and stamp_val.startswith('data:image'):
+                    try:
+                        import base64
+                        from django.core.files.base import ContentFile
+                        header_part, base64_data = stamp_val.split(';base64,')
+                        ext = 'png'
+                        if '/' in header_part:
+                            ext = header_part.split(';')[0].split('/')[-1]
+                            if ext.lower() == 'jpeg':
+                                ext = 'jpg'
+                        filename = f"school_stamp_{tenant.id}.{ext}"
+                        target_rel = f"tenants/stamps/{filename}"
+                        if tenant.stamp and tenant.stamp.storage.exists(target_rel):
+                            try:
+                                tenant.stamp.storage.delete(target_rel)
+                            except Exception:
+                                pass
+                        tenant.stamp.save(filename, ContentFile(base64.b64decode(base64_data)), save=False)
+                    except Exception:
+                        pass
+                elif isinstance(stamp_val, str) and (stamp_val.startswith('http') or stamp_val.startswith('/') or stamp_val.startswith('assets/')):
+                    feat['stamp_url'] = stamp_val
+                elif not stamp_val:
+                    tenant.stamp = None
+                    feat.pop('stamp_url', None)
+
             tenant.features = feat
             tenant.save()
 
@@ -185,7 +216,12 @@ class TenantViewSet(viewsets.ModelViewSet):
             data['logo_url'] = "/assets/branding/logo-dark.png"
             
         if tenant.stamp:
-            data['stamp_url'] = request.build_absolute_uri(tenant.stamp.url)
+            try:
+                data['stamp_url'] = request.build_absolute_uri(tenant.stamp.url)
+            except Exception:
+                data['stamp_url'] = feat.get('stamp_url')
+        elif feat.get('stamp_url'):
+            data['stamp_url'] = feat['stamp_url']
         else:
             data['stamp_url'] = None
             

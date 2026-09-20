@@ -78,7 +78,42 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
             </div>
           </nb-panel>
 
-          <!-- 2. الأسماء الرسمية -->
+          <!-- 2. الختم الرسمي للمؤسسة والاعتماد -->
+          <nb-panel title="الختم الرسمي للمؤسسة والاعتماد (Official Stamp / Seal)">
+            <div class="panel-body">
+              <div class="logo-config-wrapper">
+                <div class="logo-preview-box stamp-preview-box">
+                  @if (stampPreview()) {
+                    <img [src]="stampPreview()" alt="الختم الرسمي للمدرسة" class="school-stamp-img" />
+                  } @else {
+                    <div class="no-logo-placeholder">🔴 لا يوجد ختم مخصص</div>
+                  }
+                </div>
+                <div class="logo-actions">
+                  <input
+                    type="file"
+                    #stampFileInput
+                    (change)="onStampFileSelected($event)"
+                    accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                    style="display: none;"
+                  />
+                  <div class="logo-btn-row">
+                    <button type="button" class="nb-btn-secondary upload-btn" (click)="stampFileInput.click()">
+                      📁 اختيار أو رفع الختم الرسمي
+                    </button>
+                    @if (stampPreview()) {
+                      <button type="button" class="btn-remove-logo" (click)="removeStamp()">
+                        إزالة الختم
+                      </button>
+                    }
+                  </div>
+                  <span class="hint">يظهر الختم المعتمد في أسفل سندات القبض، الفواتير، التقارير والشهادات الرسمية بجانب توقيع المحاسب. يفضل صورة دائرية بخلفية شفافة (PNG) قياس 250×250 بكسل.</span>
+                </div>
+              </div>
+            </div>
+          </nb-panel>
+
+          <!-- 3. الأسماء الرسمية -->
           <nb-panel title="الاسم الرسمي للمؤسسة التعليمية">
             <div class="panel-body">
               <div class="form-group">
@@ -285,6 +320,34 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                   <div class="mock-line w-75"></div>
                   <div class="mock-line w-50"></div>
                   <div class="mock-line w-90"></div>
+                </div>
+
+                <!-- التوقيعات والختم المعتمد في المعاينة الحية -->
+                <div class="mock-signatures-row">
+                  <div class="mock-sig-col">
+                    <span class="mock-sig-title">أمين الصندوق / المحاسب</span>
+                    <div class="mock-sig-line"></div>
+                    <span class="mock-sig-sub">التوقيع والاعتماد</span>
+                  </div>
+                  <div class="mock-sig-col mock-stamp-col">
+                    <span class="mock-sig-title">الختم الرسمي للمدرسة</span>
+                    <div class="mock-stamp-display">
+                      @if (stampPreview()) {
+                        <img [src]="stampPreview()" alt="الختم الرسمي" class="mock-stamp-img" />
+                      } @else {
+                        <div class="mock-stamp-placeholder-circle">
+                          <span class="txt-top">{{ nameAr() || 'المدرسة' }}</span>
+                          <span class="txt-mid">معتمد</span>
+                          <span class="txt-bot">★</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                  <div class="mock-sig-col">
+                    <span class="mock-sig-title">إدارة المدرسة / المدير</span>
+                    <div class="mock-sig-line"></div>
+                    <span class="mock-sig-sub">الاعتماد الرسمي</span>
+                  </div>
                 </div>
 
                 <!-- الفوتر المطبوع المحاكي -->
@@ -810,6 +873,77 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
     .w-50 { width: 50%; }
     .w-90 { width: 90%; }
 
+    /* أنماط الختم في لوحة الإعدادات */
+    .stamp-preview-box {
+      border-radius: 50% !important;
+      border: 2px dashed #0284c7 !important;
+    }
+    .school-stamp-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transform: rotate(-5deg);
+    }
+
+    /* أنماط التوقيعات والختم في المعاينة الحية */
+    .mock-signatures-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 10px;
+      align-items: center;
+      margin: 14px 0 10px;
+      padding: 10px 6px 4px;
+      border-top: 1px dashed #cbd5e1;
+      text-align: center;
+    }
+    .mock-sig-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .mock-sig-title {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .mock-sig-line {
+      width: 80%;
+      border-bottom: 1px dashed #94a3b8;
+      height: 14px;
+    }
+    .mock-sig-sub {
+      font-size: 8px;
+      color: #94a3b8;
+    }
+    .mock-stamp-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+    }
+    .mock-stamp-img {
+      max-height: 50px;
+      max-width: 70px;
+      object-fit: contain;
+      transform: rotate(-6deg);
+    }
+    .mock-stamp-placeholder-circle {
+      width: 44px;
+      height: 44px;
+      border: 1.5px dashed #0284c7;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 7px;
+      color: #0284c7;
+      font-weight: 700;
+      transform: rotate(-6deg);
+      line-height: 1.1;
+    }
+
     .mock-footer {
       border-top: 1px solid #e2e8f0;
       padding-top: 10px;
@@ -871,6 +1005,11 @@ export class SchoolIdentitySettingsComponent implements OnInit {
   logoDataUrl = signal<string | null>(null);
   logoPreview = computed(() => this.logoDataUrl() || this.logoUrl());
 
+  // إدارة الختم الرسمي للمؤسسة والاعتماد
+  stampUrl = signal<string | null>(null);
+  stampDataUrl = signal<string | null>(null);
+  stampPreview = computed(() => this.stampDataUrl() !== null ? this.stampDataUrl() : this.stampUrl());
+
   saving = signal(false);
   saveSuccess = signal(false);
   saveError = signal<string | null>(null);
@@ -909,6 +1048,13 @@ export class SchoolIdentitySettingsComponent implements OnInit {
     }
     this.logoDataUrl.set(null);
 
+    if (t.stampUrl) {
+      this.stampUrl.set(t.stampUrl);
+    } else {
+      this.stampUrl.set(null);
+    }
+    this.stampDataUrl.set(null);
+
     if (t.phones && t.phones.length > 0) {
       this.phones.set([...t.phones]);
     } else if (t.phone) {
@@ -935,6 +1081,23 @@ export class SchoolIdentitySettingsComponent implements OnInit {
   removeLogo(): void {
     this.logoDataUrl.set('');
     this.logoUrl.set('/assets/branding/logo-dark.png');
+  }
+
+  onStampFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.stampDataUrl.set(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeStamp(): void {
+    this.stampDataUrl.set('');
+    this.stampUrl.set(null);
   }
 
   addPhone(): void {
@@ -992,6 +1155,11 @@ export class SchoolIdentitySettingsComponent implements OnInit {
     // إضافة الشعار في حالة رفعه أو تغييره
     if (this.logoDataUrl() !== null) {
       payload.logo = this.logoDataUrl();
+    }
+
+    // إضافة الختم في حالة رفعه أو تغييره أو حذفه
+    if (this.stampDataUrl() !== null) {
+      payload.stamp = this.stampDataUrl();
     }
 
     this.tenantService.updateTenantSettings(payload).subscribe({
