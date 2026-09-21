@@ -248,22 +248,28 @@ export async function exportPdf(meta: ExportMeta, columns: ExportColumn[], rows:
   document.body.appendChild(holder);
 
   try {
-    const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    const pdf = new JsPDF(isLandscape ? 'l' : 'p', 'mm', 'a4');
+    const canvas = await html2canvas(holder, {
+      scale: 1.2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      imageTimeout: 500,
+    });
+    const pdf = new JsPDF(isLandscape ? 'l' : 'p', 'mm', 'a4', true);
     const pageW = isLandscape ? 297 : 210;
     const pageH = isLandscape ? 210 : 297;
     const imgW = pageW;
     const imgH = (canvas.height * imgW) / canvas.width;
-    const img = canvas.toDataURL('image/png');
+    const img = canvas.toDataURL('image/jpeg', 0.85);
 
     let heightLeft = imgH;
     let position = 0;
-    pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+    pdf.addImage(img, 'JPEG', 0, position, imgW, imgH, undefined, 'FAST');
     heightLeft -= pageH;
     while (heightLeft > 0) {
       position -= pageH;
       pdf.addPage();
-      pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+      pdf.addImage(img, 'JPEG', 0, position, imgW, imgH, undefined, 'FAST');
       heightLeft -= pageH;
     }
     pdf.save(fileName(meta, 'pdf'));

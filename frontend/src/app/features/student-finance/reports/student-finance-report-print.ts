@@ -526,7 +526,7 @@ export async function exportStudentFinanceReportToPdf(
   document.body.appendChild(holder);
 
   try {
-    // انتظار تحميل الخطوط والصور لضمان أقصى دقة وجودة التقاط
+    // انتظار تحميل الخطوط والصور بمهلة قصيرة جداً
     if (document.fonts?.ready) {
       await document.fonts.ready;
     }
@@ -537,7 +537,7 @@ export async function exportStudentFinanceReportToPdf(
         return new Promise(resolve => {
           img.onload = resolve;
           img.onerror = resolve;
-          setTimeout(resolve, 1500);
+          setTimeout(resolve, 300);
         });
       }));
     }
@@ -556,20 +556,34 @@ export async function exportStudentFinanceReportToPdf(
     const pageW = 297;
     const pageH = 210;
 
-    for (let i = 0; i < pageElements.length; i++) {
-      const pageEl = pageElements[i];
-      const canvas = await html2canvas(pageEl, {
-        scale: 1.5,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
-        width: 1122,
-        height: 793,
-        windowWidth: 1122,
-        windowHeight: 793,
+    // معالجة الصفحات بالتوازي المجمّع فائق السرعة (Parallel Batch Rendering)
+    const BATCH_SIZE = 3;
+    const canvases: any[] = new Array(pageElements.length);
+    for (let i = 0; i < pageElements.length; i += BATCH_SIZE) {
+      const slice = pageElements.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        slice.map(pageEl =>
+          html2canvas(pageEl, {
+            scale: 1.1,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false,
+            width: 1122,
+            height: 793,
+            windowWidth: 1122,
+            windowHeight: 793,
+            imageTimeout: 500,
+          })
+        )
+      );
+      batchResults.forEach((canvas, idx) => {
+        canvases[i + idx] = canvas;
       });
+    }
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.90);
+    for (let i = 0; i < canvases.length; i++) {
+      const canvas = canvases[i];
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       if (i > 0) {
         pdf.addPage('a4', 'l');
       }
