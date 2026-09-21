@@ -81,7 +81,53 @@ function cellValue(col: ExportColumn, row: any): string {
 }
 
 /**
+ * خوارزمية تقسيم صفوف التقرير المالي إلى صفحات A4 أفقية متوازنة
+ * تمنع اقتطاع أي صف وتضمن تكرار الترويسة وظهور التوقيعات والتفقيط في الصفحة الأخيرة بنسق منضبط.
+ */
+function paginateReportRows(rows: any[], hasKpis: boolean): any[][] {
+  const p1SingleMax = hasKpis ? 14 : 16;
+  if (rows.length <= p1SingleMax) {
+    return [rows];
+  }
+
+  const p1MultiMax = hasKpis ? 16 : 18;
+  const midMax = 22;
+  const finalMax = 16;
+
+  const pages: any[][] = [];
+  let remaining = [...rows];
+
+  // الصفحة الأولى
+  pages.push(remaining.slice(0, p1MultiMax));
+  remaining = remaining.slice(p1MultiMax);
+
+  while (remaining.length > 0) {
+    if (remaining.length <= finalMax) {
+      // منع وجود صف أو صفين يتيمين في الصفحة الأخيرة: إعادة موازنة من الصفحة السابقة
+      if (remaining.length < 3 && pages[pages.length - 1].length > 8) {
+        const moved = pages[pages.length - 1].splice(-2);
+        remaining = [...moved, ...remaining];
+      }
+      pages.push(remaining);
+      remaining = [];
+    } else if (remaining.length <= midMax + finalMax) {
+      // تقسيم بالتساوي بين الصفحة المتوسطة والصفحة الأخيرة لضمان تناسق التوزيع
+      const count = Math.ceil(remaining.length / 2);
+      pages.push(remaining.slice(0, count));
+      pages.push(remaining.slice(count));
+      remaining = [];
+    } else {
+      pages.push(remaining.slice(0, midMax));
+      remaining = remaining.slice(midMax);
+    }
+  }
+
+  return pages;
+}
+
+/**
  * توليد كود HTML الكامل لتقرير مالي رسمي بصيغة A4 أفقية بهوية المستأجر المعتمدة
+ * بنظام الصفحات المنفصلة المنضبطة لمنع اقتطاع الصفوف وضمان تكرار ترويسة الجدول في كل صفحة.
  */
 export function renderStudentFinanceReportHtml(
   title: string,
@@ -112,16 +158,6 @@ export function renderStudentFinanceReportHtml(
     : '';
 
   const theadHtml = columns.map(c => `<th style="text-align:${c.align === 'end' ? 'left' : 'right'}">${c.label}</th>`).join('');
-  const tbodyHtml = rows.map(r => {
-    const isTotal = r._isTotal;
-    const isSub = r._isSubTotal;
-    const cls = isTotal ? 'total-row' : isSub ? 'sub-total' : '';
-    const cells = columns.map(c => {
-      const val = cellValue(c, r);
-      return `<td style="text-align:${c.align === 'end' ? 'left' : 'right'}" class="${isTotal || isSub ? 'bold' : ''}">${val}</td>`;
-    }).join('');
-    return `<tr class="${cls}">${cells}</tr>`;
-  }).join('');
 
   const tafqeetHtml = grandTotal > 0
     ? `<div class="tafqeet">
@@ -132,79 +168,264 @@ export function renderStudentFinanceReportHtml(
 
   const printScript = forPdf ? '' : '<script>window.onload = () => window.print();</script>';
 
+  // تقسيم السجلات إلى صفحات مستقلة
+  const pages = paginateReportRows(rows, !!(kpis && kpis.length > 0));
+  const totalPages = pages.length;
+
+  const pagesHtml = pages.map((pageRows, pageIdx) => {
+    const isFirstPage = pageIdx === 0;
+    const isLastPage = pageIdx === totalPages - 1;
+
+    const pageTbodyHtml = pageRows.map(r => {
+      const isTotal = r._isTotal;
+      const isSub = r._isSubTotal;
+      const cls = isTotal ? 'total-row' : isSub ? 'sub-total' : '';
+      const cells = columns.map(c => {
+        const val = cellValue(c, r);
+        return `<td style="text-align:${c.align === 'end' ? 'left' : 'right'}" class="${isTotal || isSub ? 'bold' : ''}">${val}</td>`;
+      }).join('');
+      return `<tr class="${cls}">${cells}</tr>`;
+    }).join('');
+
+    const pageHeaderHtml = isFirstPage
+      ? `
+      <div class="tenant-header">
+        <div class="header-right">
+          <div class="ministry">${MINISTRY}</div>
+          <div class="school-name-ar">${branding.schoolNameAr}</div>
+          <div class="school-name-en">${branding.schoolNameEn}</div>
+          <div class="school-contact">${branding.address ? branding.address + ' &nbsp;|&nbsp; ' : ''}هاتف: ${branding.phone || '—'}</div>
+        </div>
+        <div class="header-center">
+          <div class="logo-box">
+            <img src="${branding.logoUrl}" alt="شعار المدرسة" class="logo-img" onerror="this.style.display='none'">
+          </div>
+          <div class="report-title-badge">${title}</div>
+        </div>
+        <div class="header-left">
+          <div class="meta-row">تاريخ التقرير: <strong>${timestamp()}</strong></div>
+          <div class="meta-row">نطاق السجلات: <strong>${filterInfo}</strong></div>
+          <div class="meta-row">العملة: <strong>الجنيه السوداني (ج.س / SDG)</strong></div>
+          <div class="meta-row">إجمالي القيود: <strong>${rows.length} قيد</strong></div>
+        </div>
+      </div>
+      <div class="doc-banner">
+        <div class="banner-title">📊 ${title} &nbsp;•&nbsp; ${filterInfo}</div>
+        <div class="banner-meta">تقرير رسمي معتمد — الإدارة المالية وإدارة حسابات الطلاب</div>
+      </div>
+      ${kpiHtml}
+      `
+      : `
+      <div class="continuation-header">
+        <div class="cont-right">
+          <span class="cont-school">${branding.schoolNameAr}</span>
+          <span class="cont-ministry">${MINISTRY}</span>
+        </div>
+        <div class="cont-center">
+          <div class="cont-badge">تابع: ${title} &nbsp;•&nbsp; صفحة ${pageIdx + 1} من ${totalPages}</div>
+        </div>
+        <div class="cont-left">
+          <span>${filterInfo}</span>
+          <span>التاريخ: ${timestamp()}</span>
+        </div>
+      </div>
+      `;
+
+    const summaryHtml = isLastPage
+      ? `
+      ${tafqeetHtml}
+      <div class="signatures">
+        <div class="sig">
+          <span class="sig-label">إعداد المحاسب المسؤول</span>
+          <div class="sig-line">محاسب شؤون الطلاب والخزينة</div>
+        </div>
+        <div class="sig">
+          <span class="sig-label">تدقيق ومراجعة داخلية</span>
+          <div class="sig-line">المراقب المالي</div>
+        </div>
+        <div class="sig">
+          <span class="sig-label">اعتماد المدير المالي والإداري</span>
+          <div class="sig-line">مدير الإدارة المالية</div>
+        </div>
+        <div class="sig" style="flex: 0 0 90px;">
+          ${docStamp ? `<img src="${docStamp}" class="stamp-img" alt="ختم الإدارة المالية">` : '<div class="stamp-box">ختم الإدارة المالية</div>'}
+        </div>
+      </div>
+      `
+      : '';
+
+    return `
+    <div class="pdf-page" id="pdf-page-${pageIdx + 1}">
+      <div class="page-body">
+        ${pageHeaderHtml}
+        <table class="report-tbl">
+          <thead><tr>${theadHtml}</tr></thead>
+          <tbody>${pageTbodyHtml}</tbody>
+        </table>
+        ${summaryHtml}
+      </div>
+      <div class="doc-footer">
+        <span>${branding.schoolNameAr} &nbsp;•&nbsp; ${branding.address || 'جمهورية السودان'} &nbsp;•&nbsp; هاتف: ${branding.phone || '—'}</span>
+        <span class="page-num-badge">صفحة ${pageIdx + 1} من ${totalPages}</span>
+        <span>${BRAND_SYSTEM} &nbsp;•&nbsp; ${timestamp()}</span>
+      </div>
+    </div>
+    `;
+  }).join('\n');
+
   return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
   <title>${title} — ${branding.schoolNameAr}</title>
   <style>
-    * { font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #fff; color: #0f172a; font-size: 11px; line-height: 1.35; direction: rtl; }
+    * { 
+      font-family: 'Segoe UI', 'Tajawal', Tahoma, 'Arial', sans-serif; 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
+    body { 
+      background: ${forPdf ? '#ffffff' : '#f1f5f9'}; 
+      color: #0f172a; 
+      font-size: 10px; 
+      line-height: 1.35; 
+      direction: rtl; 
+      padding: ${forPdf ? '0' : '20px 0'};
+      margin: 0;
+    }
+
+    .pdf-container {
+      width: 1122px;
+      margin: 0 auto;
+    }
+
+    .pdf-page {
+      width: 1122px;
+      height: 793px;
+      max-height: 793px;
+      min-height: 793px;
+      overflow: hidden;
+      box-sizing: border-box;
+      padding: 16px 22px 14px 22px;
+      background: #ffffff;
+      margin: 0 auto 20px auto;
+      box-shadow: ${forPdf ? 'none' : '0 4px 14px rgba(0, 0, 0, 0.08)'};
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
     @page { 
       size: A4 landscape; 
-      margin: 8mm 10mm 8mm 10mm; 
+      margin: 0; 
     }
+
     @media print { 
+      body { 
+        background: #fff !important; 
+        padding: 0 !important; 
+        -webkit-print-color-adjust: exact; 
+        print-color-adjust: exact; 
+      }
       .no-print { display: none !important; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .pdf-container { width: 100% !important; margin: 0 !important; }
+      .pdf-page {
+        width: 297mm !important;
+        height: 210mm !important;
+        max-height: 210mm !important;
+        min-height: 210mm !important;
+        margin: 0 !important;
+        padding: 10mm 12mm 8mm 12mm !important;
+        box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .pdf-page:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
     }
 
-    .doc { padding: 12px 16px; max-width: 297mm; width: 100%; margin: 0 auto; }
-
-    /* ترويسة المدرسة الرسمية بهوية المستأجر */
+    /* ترويسة المدرسة الرسمية بالصفحة الأولى */
     .tenant-header {
       display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 2.5px solid ${PRIMARY_COLOR}; padding-bottom: 8px; margin-bottom: 10px;
+      border-bottom: 2.5px solid ${PRIMARY_COLOR}; padding-bottom: 6px; margin-bottom: 8px;
     }
     .header-right { flex: 1; text-align: right; }
-    .ministry { font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 2px; }
-    .school-name-ar { font-size: 17px; font-weight: 900; color: ${PRIMARY_COLOR}; margin-bottom: 1px; }
-    .school-name-en { font-size: 10.5px; font-weight: 600; color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 3px; }
-    .school-contact { font-size: 9px; color: #64748b; }
+    .ministry { font-size: 9.5px; font-weight: 700; color: #475569; margin-bottom: 2px; }
+    .school-name-ar { font-size: 16px; font-weight: 900; color: ${PRIMARY_COLOR}; margin-bottom: 1px; }
+    .school-name-en { font-size: 10px; font-weight: 600; color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 2px; }
+    .school-contact { font-size: 8.5px; color: #64748b; }
 
     .header-center { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .logo-box { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+    .logo-box { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; }
     .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .report-title-badge { 
       background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
-      padding: 3px 14px; border-radius: 20px; font-size: 13px; font-weight: 800; display: inline-block;
+      padding: 3px 12px; border-radius: 16px; font-size: 12px; font-weight: 800; display: inline-block;
     }
 
-    .header-left { flex: 1; text-align: left; font-size: 9.5px; color: #475569; line-height: 1.6; }
+    .header-left { flex: 1; text-align: left; font-size: 9px; color: #475569; line-height: 1.5; }
     .header-left .meta-row strong { color: #0f172a; }
 
-    /* شريط العنوان والفلترة */
+    /* ترويسة مصغرة لصفحات المتابعة */
+    .continuation-header {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 2px solid ${PRIMARY_COLOR}; padding-bottom: 6px; margin-bottom: 8px; font-size: 9.5px;
+    }
+    .cont-right { display: flex; flex-direction: column; gap: 1px; text-align: right; }
+    .cont-school { font-size: 12.5px; font-weight: 900; color: ${PRIMARY_COLOR}; }
+    .cont-ministry { font-size: 8.5px; font-weight: 700; color: #475569; }
+    .cont-center { text-align: center; }
+    .cont-badge {
+      background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
+      padding: 3px 12px; border-radius: 16px; font-size: 11px; font-weight: 800; display: inline-block;
+    }
+    .cont-left { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 8.5px; color: #475569; }
+
+    /* شريط الملخص والفلترة بالصفحة الأولى */
     .doc-banner {
       display: flex; justify-content: space-between; align-items: center;
       background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
-      color: #ffffff; border-radius: 6px; padding: 6px 14px; margin-bottom: 10px;
+      color: #ffffff; border-radius: 6px; padding: 5px 12px; margin-bottom: 8px;
     }
-    .doc-banner .banner-title { font-size: 12.5px; font-weight: 800; }
-    .doc-banner .banner-meta { font-size: 10px; opacity: 0.95; }
+    .doc-banner .banner-title { font-size: 11.5px; font-weight: 800; }
+    .doc-banner .banner-meta { font-size: 9.5px; opacity: 0.95; }
 
     /* شريط مؤشرات الأداء KPIs */
-    .kpi-strip { display: flex; gap: 10px; margin-bottom: 10px; }
+    .kpi-strip { display: flex; gap: 8px; margin-bottom: 8px; }
     .kpi { 
-      flex: 1; min-width: 100px; padding: 6px 10px; background: #f8fafc; 
+      flex: 1; min-width: 90px; padding: 5px 8px; background: #f8fafc; 
       border: 1px solid #e2e8f0; border-radius: 6px; border-right: 3px solid ${PRIMARY_COLOR}; 
     }
-    .kpi-l { display: block; font-size: 9px; color: #64748b; font-weight: 600; }
-    .kpi-v { display: block; font-size: 13.5px; font-weight: 800; color: #0f172a; margin-top: 1px; font-variant-numeric: tabular-nums; }
-    .kpi-s { display: block; font-size: 8.5px; color: #94a3b8; }
+    .kpi-l { display: block; font-size: 8.5px; color: #64748b; font-weight: 600; }
+    .kpi-v { display: block; font-size: 12.5px; font-weight: 800; color: #0f172a; margin-top: 1px; font-variant-numeric: tabular-nums; }
+    .kpi-s { display: block; font-size: 8px; color: #94a3b8; }
 
     /* جدول التقرير الأفقي */
-    .report-tbl { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
+    .report-tbl { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 6px; }
     .report-tbl th { 
-      background: #f1f5f9; padding: 6px 8px; border: 1px solid #cbd5e1;
-      font-size: 10px; font-weight: 800; color: #1e293b; white-space: nowrap;
+      background: #f1f5f9; padding: 5px 6px; border: 1px solid #cbd5e1;
+      font-size: 9.5px; font-weight: 800; color: #1e293b; white-space: nowrap;
     }
     .report-tbl td { 
-      padding: 5px 8px; border: 1px solid #e2e8f0; color: #0f172a; white-space: nowrap; 
+      padding: 4px 6px; border: 1px solid #e2e8f0; color: #0f172a; white-space: nowrap; 
     }
     .report-tbl tbody tr:nth-child(even) td { background: #f8fafc; }
     .report-tbl .bold { font-weight: 700; }
     .report-tbl .total-row td {
-      background: #eff6ff !important; font-weight: 900; font-size: 11px;
+      background: #eff6ff !important; font-weight: 900; font-size: 10.5px;
       border-top: 2px solid ${PRIMARY_COLOR}; border-bottom: 2px double ${PRIMARY_COLOR};
       color: #1e3a8a;
     }
@@ -212,97 +433,41 @@ export function renderStudentFinanceReportHtml(
 
     /* تفقيط */
     .tafqeet { 
-      padding: 7px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
-      font-size: 11px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+      font-size: 10px; margin-top: 4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
     }
     .tafqeet-label { font-weight: 700; color: #92400e; }
     .tafqeet-text { font-weight: 700; color: #78350f; }
 
     /* التوقيعات الرسمية بهوية المستأجر والختم */
     .signatures {
-      display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; 
-      margin-top: 18px; padding-top: 10px; border-top: 1px dashed #cbd5e1;
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; 
+      margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1;
     }
     .sig { flex: 1; text-align: center; }
-    .sig-label { font-size: 9.5px; color: #64748b; margin-bottom: 20px; display: block; font-weight: 600; }
-    .sig-line { border-top: 1px solid #334155; padding-top: 4px; font-size: 10px; font-weight: 700; color: #0f172a; }
+    .sig-label { font-size: 9px; color: #64748b; margin-bottom: 14px; display: block; font-weight: 600; }
+    .sig-line { border-top: 1px solid #334155; padding-top: 3px; font-size: 9.5px; font-weight: 700; color: #0f172a; }
     .stamp-box {
-      width: 60px; height: 60px; border: 1.5px dashed #94a3b8; border-radius: 50%;
+      width: 52px; height: 52px; border: 1.5px dashed #94a3b8; border-radius: 50%;
       display: grid; place-items: center; font-size: 8px; color: #94a3b8; margin: 0 auto;
     }
-    .stamp-img { max-width: 65px; max-height: 65px; object-fit: contain; }
+    .stamp-img { max-width: 56px; max-height: 56px; object-fit: contain; }
 
     /* تذييل الصفحة الرسمي */
     .doc-footer { 
       display: flex; justify-content: space-between; align-items: center;
-      font-size: 8.5px; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; 
+      font-size: 8px; color: #94a3b8; padding-top: 5px; border-top: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .page-num-badge {
+      font-weight: 800; color: #1e3a8a; background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 1px 8px; border-radius: 10px; font-size: 8.5px;
     }
   </style>
 </head>
 <body>
-  <div class="doc">
-    <!-- ترويسة المستأجر الرسمية -->
-    <div class="tenant-header">
-      <div class="header-right">
-        <div class="ministry">${MINISTRY}</div>
-        <div class="school-name-ar">${branding.schoolNameAr}</div>
-        <div class="school-name-en">${branding.schoolNameEn}</div>
-        <div class="school-contact">${branding.address ? branding.address + ' &nbsp;|&nbsp; ' : ''}هاتف: ${branding.phone || '—'}</div>
-      </div>
-      <div class="header-center">
-        <div class="logo-box">
-          <img src="${branding.logoUrl}" alt="شعار المدرسة" class="logo-img" onerror="this.style.display='none'">
-        </div>
-        <div class="report-title-badge">${title}</div>
-      </div>
-      <div class="header-left">
-        <div class="meta-row">تاريخ التقرير: <strong>${timestamp()}</strong></div>
-        <div class="meta-row">نطاق السجلات: <strong>${filterInfo}</strong></div>
-        <div class="meta-row">العملة: <strong>الجنيه السوداني (ج.س / SDG)</strong></div>
-        <div class="meta-row">إجمالي القيود: <strong>${rows.length} قيد</strong></div>
-      </div>
-    </div>
-
-    <!-- شريط الملخص والفلترة -->
-    <div class="doc-banner">
-      <div class="banner-title">📊 ${title} &nbsp;•&nbsp; ${filterInfo}</div>
-      <div class="banner-meta">تقرير رسمي معتمد — الإدارة المالية وإدارة حسابات الطلاب</div>
-    </div>
-
-    ${kpiHtml}
-
-    <!-- جدول البيانات في الصفحة الأفقية -->
-    <table class="report-tbl">
-      <thead><tr>${theadHtml}</tr></thead>
-      <tbody>${tbodyHtml}</tbody>
-    </table>
-
-    ${tafqeetHtml}
-
-    <!-- توقيعات الاعتماد والختم المالي الرسمي للمدرسة -->
-    <div class="signatures">
-      <div class="sig">
-        <span class="sig-label">إعداد المحاسب المسؤول</span>
-        <div class="sig-line">محاسب شؤون الطلاب والخزينة</div>
-      </div>
-      <div class="sig">
-        <span class="sig-label">تدقيق ومراجعة داخلية</span>
-        <div class="sig-line">المراقب المالي</div>
-      </div>
-      <div class="sig">
-        <span class="sig-label">اعتماد المدير المالي والإداري</span>
-        <div class="sig-line">مدير الإدارة المالية</div>
-      </div>
-      <div class="sig" style="flex: 0 0 100px;">
-        ${docStamp ? `<img src="${docStamp}" class="stamp-img" alt="ختم الإدارة المالية">` : '<div class="stamp-box">ختم الإدارة المالية</div>'}
-      </div>
-    </div>
-
-    <!-- التذييل النظامي -->
-    <div class="doc-footer">
-      <span>${branding.schoolNameAr} &nbsp;•&nbsp; ${branding.address || 'جمهورية السودان'} &nbsp;•&nbsp; هاتف: ${branding.phone || '—'}</span>
-      <span>${BRAND_SYSTEM} &nbsp;•&nbsp; تم الاستخراج بتاريخ: ${timestamp()}</span>
-    </div>
+  <div class="pdf-container">
+    ${pagesHtml}
   </div>
   ${printScript}
 </body>
@@ -322,7 +487,7 @@ export function printStudentFinanceReport(
   tenantInfo?: any
 ): void {
   const html = renderStudentFinanceReportHtml(title, columns, rows, filterInfo, kpis, customGrandTotal, tenantInfo, false);
-  const w = window.open('', '_blank', 'width=1100,height=750');
+  const w = window.open('', '_blank', 'width=1140,height=820');
   if (!w) return;
   w.document.open();
   w.document.write(html);
@@ -331,6 +496,7 @@ export function printStudentFinanceReport(
 
 /**
  * تصدير ملف PDF رسمي عالي الدقة مطابق تماماً لمطبوعة A4 الأفقية
+ * يلتقط كل صفحة A4 مستقلة دون اقتطاع لأي صف مع تكرار الترويسة لكل صفحة
  */
 export async function exportStudentFinanceReportToPdf(
   title: string,
@@ -358,29 +524,56 @@ export async function exportStudentFinanceReportToPdf(
   document.body.appendChild(holder);
 
   try {
-    const canvas = await html2canvas(holder, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
+    // انتظار تحميل الخطوط والصور لضمان أقصى دقة وجودة التقاط
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+    const images = Array.from(holder.querySelectorAll('img'));
+    if (images.length > 0) {
+      await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+          setTimeout(resolve, 1500);
+        });
+      }));
+    }
+
+    const pageElements = Array.from(holder.querySelectorAll<HTMLElement>('.pdf-page'));
+    if (pageElements.length === 0) {
+      throw new Error('لم يتم العثور على صفحات التقرير لتصديرها');
+    }
+
+    const pdf = new JsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
     });
-    const pdf = new JsPDF('l', 'mm', 'a4');
     const pageW = 297;
     const pageH = 210;
-    const imgW = pageW;
-    const imgH = (canvas.height * imgW) / canvas.width;
-    const img = canvas.toDataURL('image/png');
 
-    let heightLeft = imgH;
-    let position = 0;
-    pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
-    heightLeft -= pageH;
-    while (heightLeft > 0) {
-      position -= pageH;
-      pdf.addPage();
-      pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
-      heightLeft -= pageH;
+    for (let i = 0; i < pageElements.length; i++) {
+      const pageEl = pageElements[i];
+      const canvas = await html2canvas(pageEl, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+        width: 1122,
+        height: 793,
+        windowWidth: 1122,
+        windowHeight: 793,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      if (i > 0) {
+        pdf.addPage('a4', 'l');
+      }
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
     }
+
     const cleanName = `${title.replace(/[\s\/\\:*?"<>|]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.pdf`;
     pdf.save(cleanName);
   } finally {
