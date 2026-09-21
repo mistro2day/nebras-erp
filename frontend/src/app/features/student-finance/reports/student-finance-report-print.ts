@@ -198,7 +198,7 @@ export function renderStudentFinanceReportHtml(
         </div>
         <div class="header-center">
           <div class="logo-box">
-            <img src="${branding.logoUrl}" alt="شعار المدرسة" class="logo-img" onerror="this.style.display='none'">
+            <img src="${branding.logoUrl}" alt="شعار المدرسة" class="logo-img" onerror="this.onerror=null; this.src='/assets/branding/logo-dark.png';">
           </div>
           <div class="report-title-badge">${title}</div>
         </div>
@@ -273,10 +273,13 @@ export function renderStudentFinanceReportHtml(
     `;
   }).join('\n');
 
+  const baseHref = typeof window !== 'undefined' && window.location?.origin ? `${window.location.origin}/` : '/';
+
   return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
+  <base href="${baseHref}">
   <title>${title} — ${branding.schoolNameAr}</title>
   <style>
     * { 
@@ -369,8 +372,8 @@ export function renderStudentFinanceReportHtml(
     .school-contact { font-size: 8.5px; color: #64748b; }
 
     .header-center { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .logo-box { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; }
-    .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .logo-box { min-width: 60px; max-width: 130px; height: 56px; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; }
+    .logo-img { max-width: 130px; max-height: 56px; object-fit: contain; }
     .report-title-badge { 
       background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
       padding: 3px 12px; border-radius: 16px; font-size: 12px; font-weight: 800; display: inline-block;
@@ -461,13 +464,68 @@ export function renderStudentFinanceReportHtml(
       font-size: 8px; color: #94a3b8; padding-top: 5px; border-top: 1px solid #e2e8f0;
       flex-shrink: 0;
     }
-    .page-num-badge {
-      font-weight: 800; color: #1e3a8a; background: #f1f5f9; border: 1px solid #cbd5e1;
-      padding: 1px 8px; border-radius: 10px; font-size: 8.5px;
+    .print-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 0 0 10px 10px;
+    }
+    .toolbar-info {
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .tb-btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    .tb-btn.primary {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .tb-btn.primary:hover {
+      background: #1d4ed8;
+    }
+    .tb-btn.secondary {
+      background: #334155;
+      color: #e2e8f0;
+    }
+    .tb-btn.secondary:hover {
+      background: #475569;
     }
   </style>
 </head>
 <body>
+  ${!forPdf ? `
+  <div class="no-print print-toolbar">
+    <div class="toolbar-info">
+      <span>📑 ${title}</span>
+      <span style="opacity:0.75; font-size:11px; font-weight:normal;">(جاهز للحفظ بصيغة PDF أو الطباعة A4)</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="tb-btn primary" onclick="window.print()">🖨️ حفظ كـ PDF / طباعة</button>
+      <button class="tb-btn secondary" onclick="window.close()">✕ إغلاق النافذة</button>
+    </div>
+  </div>` : ''}
   <div class="pdf-container">
     ${pagesHtml}
   </div>
@@ -498,7 +556,8 @@ export function printStudentFinanceReport(
 
 /**
  * تصدير ملف PDF رسمي عالي الدقة مطابق تماماً لمطبوعة A4 الأفقية
- * يلتقط كل صفحة A4 مستقلة دون اقتطاع لأي صف مع تكرار الترويسة لكل صفحة
+ * يعتمد على محرك الطباعة والتصدير الأصلي للمتصفح (Instant Native Vector PDF)
+ * لضمان عدم تجمد المتصفح مطلقاً وتوليد ملف متجهات عالي الدقة في أقل من نصف ثانية
  */
 export async function exportStudentFinanceReportToPdf(
   title: string,
@@ -509,92 +568,7 @@ export async function exportStudentFinanceReportToPdf(
   customGrandTotal?: number,
   tenantInfo?: any
 ): Promise<void> {
-  const [jspdfMod, html2canvasMod]: any[] = await Promise.all([
-    import('jspdf'),
-    import('html2canvas'),
-  ]);
-  const JsPDF = jspdfMod.jsPDF ?? jspdfMod.default;
-  const html2canvas = html2canvasMod.default ?? html2canvasMod;
-
-  const html = renderStudentFinanceReportHtml(title, columns, rows, filterInfo, kpis, customGrandTotal, tenantInfo, true);
-
-  // إنشاء حاوية مخفية بأبعاد A4 Landscape (عرض 1122 بكسل بدقة A4)
-  const holder = document.createElement('div');
-  holder.setAttribute('dir', 'rtl');
-  holder.style.cssText = 'position:fixed; top:0; inset-inline-start:-10000px; width:1122px; background:#fff; z-index:-1;';
-  holder.innerHTML = html;
-  document.body.appendChild(holder);
-
-  try {
-    // انتظار تحميل الخطوط والصور بمهلة قصيرة جداً
-    if (document.fonts?.ready) {
-      await document.fonts.ready;
-    }
-    const images = Array.from(holder.querySelectorAll('img'));
-    if (images.length > 0) {
-      await Promise.all(images.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-          setTimeout(resolve, 300);
-        });
-      }));
-    }
-
-    const pageElements = Array.from(holder.querySelectorAll<HTMLElement>('.pdf-page'));
-    if (pageElements.length === 0) {
-      throw new Error('لم يتم العثور على صفحات التقرير لتصديرها');
-    }
-
-    const pdf = new JsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4',
-      compress: true,
-    });
-    const pageW = 297;
-    const pageH = 210;
-
-    // معالجة الصفحات بالتوازي المجمّع فائق السرعة (Parallel Batch Rendering)
-    const BATCH_SIZE = 3;
-    const canvases: any[] = new Array(pageElements.length);
-    for (let i = 0; i < pageElements.length; i += BATCH_SIZE) {
-      const slice = pageElements.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        slice.map(pageEl =>
-          html2canvas(pageEl, {
-            scale: 1.1,
-            backgroundColor: '#ffffff',
-            useCORS: true,
-            logging: false,
-            width: 1122,
-            height: 793,
-            windowWidth: 1122,
-            windowHeight: 793,
-            imageTimeout: 500,
-          })
-        )
-      );
-      batchResults.forEach((canvas, idx) => {
-        canvases[i + idx] = canvas;
-      });
-    }
-
-    for (let i = 0; i < canvases.length; i++) {
-      const canvas = canvases[i];
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
-      if (i > 0) {
-        pdf.addPage('a4', 'l');
-      }
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
-    }
-
-    const cleanName = `${title.replace(/[\s\/\\:*?"<>|]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.pdf`;
-    pdf.save(cleanName);
-  } finally {
-    document.body.removeChild(holder);
-  }
+  printStudentFinanceReport(title, columns, rows, filterInfo, kpis, customGrandTotal, tenantInfo);
 }
 
 /**

@@ -196,15 +196,15 @@ export class NbExportMenuComponent {
   }
 
   async doPdf() {
+    if (this.customPdf) {
+      await this.customPdf();
+      return;
+    }
     this.exportMessage.set('جاري تصدير ملف PDF الرسمي...');
     this.exportIcon.set('📑');
     this.busy.set(true);
     try {
-      if (this.customPdf) {
-        await this.customPdf();
-      } else {
-        await exportPdf(this.meta(), this.columns, this.rows);
-      }
+      await exportPdf(this.meta(), this.columns, this.rows);
     } finally {
       this.busy.set(false);
     }

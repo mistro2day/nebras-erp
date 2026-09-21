@@ -57,33 +57,45 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     schoolNameEn = 'Al-Mawred Model Private Schools';
   }
 
+  const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+  const toAbs = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    const clean = url.startsWith('/') ? url : `/${url}`;
+    return origin ? `${origin}${clean}` : clean;
+  };
+
   // الشعار والأختام الرسمية المعتمدة
-  const logoUrl =
+  const rawLogo =
     info.logoUrl ||
     info.logo_url ||
     info.logo ||
-    '/assets/default_school_logo.png';
+    '/assets/branding/logo-dark.png';
+  const logoUrl = toAbs(rawLogo === '/assets/default_school_logo.png' ? '/assets/branding/logo-dark.png' : rawLogo);
 
   // ختم الإدارة العامة (الرئيسي والافتراضي)
-  const stampUrl =
+  const stampUrl = toAbs(
     info.stampUrl ||
     info.stamp_url ||
     info.stamp ||
-    '';
+    ''
+  );
 
   // ختم الإدارة المالية والخزينة (منفصل تماماً عن ختم المدير العام)
-  const stampFinanceUrl =
+  const stampFinanceUrl = toAbs(
     info.stampFinanceUrl ||
     info.stamp_finance_url ||
     info.stamp_finance ||
-    '';
+    ''
+  );
 
   // ختم الشؤون الأكاديمية والمتابعة (منفصل تماماً عن ختم المدير العام)
-  const stampAcademicUrl =
+  const stampAcademicUrl = toAbs(
     info.stampAcademicUrl ||
     info.stamp_academic_url ||
     info.stamp_academic ||
-    '';
+    ''
+  );
 
   // الهواتف المعتمدة
   const defaultPhones = ['0123689814', '0110100504', '0110100505', '0110100506'];
