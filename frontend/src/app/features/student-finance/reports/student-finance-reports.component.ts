@@ -2531,43 +2531,40 @@ export class StudentFinanceReportsComponent implements OnInit {
         { key: 'student_name', label: 'اسم الطالب' },
         { key: 'student_number', label: 'الرقم الأكاديمي' },
         { key: 'branch_name', label: 'الفرع' },
-        { key: 'stage_name', label: 'المرحلة التعليمية' },
-        { key: 'grade_name', label: 'الصف الدراسي' },
-        { key: 'section_name', label: 'الفصل / الشعبة' },
-        { key: 'guardian_name', label: 'اسم ولي الأمر' },
-        { key: 'guardian_phone', label: 'رقم هاتف ولي الأمر' },
-        { key: 'total_billed', label: 'إجمالي الرسوم (ج.س)', align: 'end', map: (r) => this.fmt(r.total_billed) },
-        { key: 'total_paid', label: 'المدفوع الفعلي (ج.س)', align: 'end', map: (r) => this.fmt(r.total_paid) },
-        { key: 'outstanding_balance', label: 'المتبقي للتحصيل (ج.س)', align: 'end', map: (r) => this.fmt(r.outstanding_balance) },
-        { key: 'payment_status', label: 'حالة السداد', map: (r) => r.payment_status === 'paid' ? 'مسدد بالكامل' : r.payment_status === 'partial' ? 'مسدد جزئياً' : 'به متأخرات' },
-        { key: 'last_payment_date', label: 'تاريخ آخر سداد' },
+        { key: 'stage_name', label: 'المرحلة' },
+        { key: 'grade_name', label: 'الصف' },
+        { key: 'section_name', label: 'الشعبة' },
+        { key: 'guardian_name', label: 'ولي الأمر' },
+        { key: 'total_billed', label: 'الرسوم', align: 'end', map: (r) => this.fmt(r.total_billed) },
+        { key: 'total_paid', label: 'المدفوع', align: 'end', map: (r) => this.fmt(r.total_paid) },
+        { key: 'outstanding_balance', label: 'المتبقي', align: 'end', map: (r) => this.fmt(r.outstanding_balance) },
+        { key: 'payment_status', label: 'الحالة', map: (r) => r.payment_status === 'paid' ? 'مسدد' : r.payment_status === 'partial' ? 'جزئي' : 'متأخر' },
+        { key: 'last_payment_date', label: 'آخر سداد' },
       ];
     }
 
     if (tab === 'revenue') {
       return [
-        { key: 'name', label: 'بند الرسم / الخدمة' },
+        { key: 'name', label: 'بند الرسم' },
         { key: 'category', label: 'الفئة' },
-        { key: 'invoiced', label: 'إجمالي المفوتر (ج.س)', align: 'end', map: (r) => this.fmt(r.invoiced) },
-        { key: 'collected', label: 'المحصّل الفعلي (ج.س)', align: 'end', map: (r) => this.fmt(r.collected) },
-        { key: 'remaining', label: 'المتبقي (ج.س)', align: 'end', map: (r) => this.fmt(r.remaining) },
-        { key: 'rate', label: 'نسبة التحصيل', align: 'end', map: (r) => `${r.rate?.toFixed(1) || 0}%` },
+        { key: 'invoiced', label: 'المفوتر', align: 'end', map: (r) => this.fmt(r.invoiced) },
+        { key: 'collected', label: 'المحصّل', align: 'end', map: (r) => this.fmt(r.collected) },
+        { key: 'remaining', label: 'المتبقي', align: 'end', map: (r) => this.fmt(r.remaining) },
+        { key: 'rate', label: 'النسبة', align: 'end', map: (r) => `${r.rate?.toFixed(1) || 0}%` },
       ];
     }
 
     if (tab === 'receipts') {
       return [
         { key: 'receipt_number', label: 'رقم السند' },
-        { key: 'receipt_date', label: 'تاريخ السند' },
+        { key: 'receipt_date', label: 'التاريخ' },
         { key: 'student_name', label: 'اسم الطالب' },
         { key: 'student_number', label: 'الرقم الأكاديمي' },
-        { key: 'branch_name', label: 'الفرع' },
-        { key: 'stage_name', label: 'المرحلة التعليمية' },
         { key: 'grade_name', label: 'الصف' },
         { key: 'section_name', label: 'الشعبة' },
         { key: 'payment_method', label: 'طريقة الدفع' },
-        { key: 'reference_number', label: 'رقم المرجع' },
-        { key: 'amount', label: 'المبلغ (ج.س)', align: 'end', map: (r) => this.fmt(r.amount) },
+        { key: 'reference_number', label: 'المرجع' },
+        { key: 'amount', label: 'المبلغ', align: 'end', map: (r) => this.fmt(r.amount) },
         { key: 'collector', label: 'المحصّل' },
       ];
     }
@@ -2575,13 +2572,13 @@ export class StudentFinanceReportsComponent implements OnInit {
     if (tab === 'invoices') {
       return [
         { key: 'invoice_number', label: 'رقم الفاتورة' },
-        { key: 'issue_date', label: 'تاريخ الإصدار' },
-        { key: 'due_date', label: 'تاريخ الاستحقاق' },
+        { key: 'issue_date', label: 'الإصدار' },
+        { key: 'due_date', label: 'الاستحقاق' },
         { key: 'student_name', label: 'الطالب' },
         { key: 'grade_name', label: 'الصف' },
-        { key: 'total_amount', label: 'الإجمالي (ج.س)', align: 'end', map: (r) => this.fmt(r.total_amount ?? r.total) },
-        { key: 'paid_amount', label: 'المسدد (ج.س)', align: 'end', map: (r) => this.fmt(r.paid_amount ?? r.paid) },
-        { key: 'remaining_balance', label: 'المتبقي (ج.س)', align: 'end', map: (r) => this.fmt(r.remaining_balance ?? r.remaining) },
+        { key: 'total_amount', label: 'الإجمالي', align: 'end', map: (r) => this.fmt(r.total_amount ?? r.total) },
+        { key: 'paid_amount', label: 'المسدد', align: 'end', map: (r) => this.fmt(r.paid_amount ?? r.paid) },
+        { key: 'remaining_balance', label: 'المتبقي', align: 'end', map: (r) => this.fmt(r.remaining_balance ?? r.remaining) },
         { key: 'status', label: 'الحالة', map: (r) => this.getInvoiceStatusLabel(r.status) },
       ];
     }
@@ -2593,9 +2590,9 @@ export class StudentFinanceReportsComponent implements OnInit {
         { key: 'grade_name', label: 'الصف' },
         { key: 'guardian_name', label: 'ولي الأمر' },
         { key: 'guardian_phone', label: 'الهاتف' },
-        { key: 'total_billed', label: 'المقرر (ج.س)', align: 'end', map: (r) => this.fmt(r.total_billed ?? r.billed) },
-        { key: 'total_paid', label: 'المسدد (ج.س)', align: 'end', map: (r) => this.fmt(r.total_paid ?? r.paid) },
-        { key: 'last_payment_date', label: 'تاريخ آخر دفعة' },
+        { key: 'total_billed', label: 'المقرر', align: 'end', map: (r) => this.fmt(r.total_billed ?? r.billed) },
+        { key: 'total_paid', label: 'المسدد', align: 'end', map: (r) => this.fmt(r.total_paid ?? r.paid) },
+        { key: 'last_payment_date', label: 'آخر دفعة' },
       ];
     }
 
@@ -2605,24 +2602,24 @@ export class StudentFinanceReportsComponent implements OnInit {
         { key: 'student_number', label: 'الرقم الأكاديمي' },
         { key: 'grade_name', label: 'الصف' },
         { key: 'guardian_name', label: 'ولي الأمر' },
-        { key: 'guardian_phone', label: 'هاتف ولي الأمر' },
-        { key: 'outstanding_amount', label: 'المتأخر (ج.س)', align: 'end', map: (r) => this.fmt(r.outstanding_amount ?? r.amount) },
-        { key: 'due_date', label: 'تاريخ الاستحقاق' },
-        { key: 'days_overdue', label: 'أيام التأخير', align: 'end', map: (r) => r.days_overdue ? `${r.days_overdue} يوم` : '' },
-        { key: 'has_hold', label: 'الحظر المالي', map: (r) => r.has_hold ? 'محظور' : 'سارٍ' },
+        { key: 'guardian_phone', label: 'الهاتف' },
+        { key: 'outstanding_amount', label: 'المتأخر', align: 'end', map: (r) => this.fmt(r.outstanding_amount ?? r.amount) },
+        { key: 'due_date', label: 'الاستحقاق' },
+        { key: 'days_overdue', label: 'التأخير', align: 'end', map: (r) => r.days_overdue ? `${r.days_overdue} يوم` : '' },
+        { key: 'has_hold', label: 'الحظر', map: (r) => r.has_hold ? 'محظور' : 'سارٍ' },
       ];
     }
 
     if (tab === 'installments') {
       return [
         { key: 'installment_title', label: 'بيان القسط' },
-        { key: 'due_date', label: 'تاريخ الاستحقاق' },
+        { key: 'due_date', label: 'الاستحقاق' },
         { key: 'student_name', label: 'الطالب' },
         { key: 'grade_name', label: 'الصف' },
-        { key: 'amount', label: 'مبلغ القسط (ج.س)', align: 'end', map: (r) => this.fmt(r.amount) },
-        { key: 'paid_amount', label: 'المسدد (ج.س)', align: 'end', map: (r) => this.fmt(r.paid_amount ?? r.paid) },
-        { key: 'remaining_amount', label: 'المتبقي (ج.س)', align: 'end', map: (r) => this.fmt(r.remaining_amount ?? r.remaining) },
-        { key: 'days_left', label: 'الأيام المتبقية', align: 'end', map: (r) => r.days_left ? `${r.days_left} أيام` : '' },
+        { key: 'amount', label: 'مبلغ القسط', align: 'end', map: (r) => this.fmt(r.amount) },
+        { key: 'paid_amount', label: 'المسدد', align: 'end', map: (r) => this.fmt(r.paid_amount ?? r.paid) },
+        { key: 'remaining_amount', label: 'المتبقي', align: 'end', map: (r) => this.fmt(r.remaining_amount ?? r.remaining) },
+        { key: 'days_left', label: 'الأيام', align: 'end', map: (r) => r.days_left ? `${r.days_left}` : '' },
       ];
     }
 
@@ -2631,12 +2628,12 @@ export class StudentFinanceReportsComponent implements OnInit {
       { key: 'student_name', label: 'الطالب' },
       { key: 'student_number', label: 'الرقم الأكاديمي' },
       { key: 'grade_name', label: 'الصف' },
-      { key: 'scholarship_name', label: 'المنحة / التخفيض' },
+      { key: 'scholarship_name', label: 'المنحة' },
       { key: 'discount_rate', label: 'نوع الخصم' },
-      { key: 'original_amount', label: 'الرسوم الأصلية (ج.س)', align: 'end', map: (r) => this.fmt(r.original_amount ?? r.original) },
-      { key: 'discount_amount', label: 'قيمة الخصم (ج.س)', align: 'end', map: (r) => this.fmt(r.discount_amount ?? r.discount) },
-      { key: 'net_amount', label: 'الصافي بعد الخصم (ج.س)', align: 'end', map: (r) => this.fmt(r.net_amount ?? r.net) },
-      { key: 'approved_by', label: 'جهة الاعتماد' },
+      { key: 'original_amount', label: 'الأصلية', align: 'end', map: (r) => this.fmt(r.original_amount ?? r.original) },
+      { key: 'discount_amount', label: 'الخصم', align: 'end', map: (r) => this.fmt(r.discount_amount ?? r.discount) },
+      { key: 'net_amount', label: 'الصافي', align: 'end', map: (r) => this.fmt(r.net_amount ?? r.net) },
+      { key: 'approved_by', label: 'الاعتماد' },
     ];
   });
 

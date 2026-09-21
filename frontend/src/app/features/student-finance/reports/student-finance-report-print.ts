@@ -414,18 +414,20 @@ export function renderStudentFinanceReportHtml(
     .kpi-s { display: block; font-size: 8px; color: #94a3b8; }
 
     /* جدول التقرير الأفقي */
-    .report-tbl { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 6px; }
+    .report-tbl { width: 100%; border-collapse: collapse; font-size: 8.5px; margin-bottom: 6px; table-layout: auto; }
     .report-tbl th { 
-      background: #f1f5f9; padding: 5px 6px; border: 1px solid #cbd5e1;
-      font-size: 9.5px; font-weight: 800; color: #1e293b; white-space: nowrap;
+      background: #f1f5f9; padding: 4px 4px; border: 1px solid #cbd5e1;
+      font-size: 8.5px; font-weight: 800; color: #1e293b; text-align: center;
+      word-break: break-word; white-space: normal;
     }
     .report-tbl td { 
-      padding: 4px 6px; border: 1px solid #e2e8f0; color: #0f172a; white-space: nowrap; 
+      padding: 3px 4px; border: 1px solid #e2e8f0; color: #0f172a;
+      word-break: break-word; white-space: normal;
     }
     .report-tbl tbody tr:nth-child(even) td { background: #f8fafc; }
     .report-tbl .bold { font-weight: 700; }
     .report-tbl .total-row td {
-      background: #eff6ff !important; font-weight: 900; font-size: 10.5px;
+      background: #eff6ff !important; font-weight: 900; font-size: 9.5px;
       border-top: 2px solid ${PRIMARY_COLOR}; border-bottom: 2px double ${PRIMARY_COLOR};
       color: #1e3a8a;
     }
@@ -557,7 +559,7 @@ export async function exportStudentFinanceReportToPdf(
     for (let i = 0; i < pageElements.length; i++) {
       const pageEl = pageElements[i];
       const canvas = await html2canvas(pageEl, {
-        scale: 2,
+        scale: 1.5,
         backgroundColor: '#ffffff',
         useCORS: true,
         logging: false,
@@ -567,11 +569,11 @@ export async function exportStudentFinanceReportToPdf(
         windowHeight: 793,
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.90);
       if (i > 0) {
         pdf.addPage('a4', 'l');
       }
-      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
     }
 
     const cleanName = `${title.replace(/[\s\/\\:*?"<>|]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.pdf`;
