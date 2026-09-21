@@ -313,19 +313,19 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       object-fit: contain;
       transform: rotate(-5deg);
     }
-    .stamp-circle-ph {
+    .stamp-badge-ph, .stamp-circle-ph {
       font-size: 8.5px;
       color: #0284c7;
       font-weight: 700;
       border: 1.5px dashed #0284c7;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
+      border-radius: 6px;
+      width: 64px;
+      height: 42px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      transform: rotate(-5deg);
+      transform: rotate(-3deg);
     }
 
     /* الفوتر */

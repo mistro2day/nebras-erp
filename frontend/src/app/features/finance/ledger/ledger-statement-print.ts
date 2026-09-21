@@ -105,8 +105,8 @@ export function printLedgerStatement(account: any, entries: any[], tenantInfo?: 
     .sig-label { display: block; font-size: 9.5px; font-weight: 800; color: #1e3a8a; border-bottom: 1px dashed #cbd5e1; padding-bottom: 2px; margin-bottom: 4px; }
     .sig-sign { display: block; font-size: 9px; color: #94a3b8; }
     .stamp-wrap { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 40px; }
-    .stamp-img { max-height: 50px; max-width: 80px; object-fit: contain; transform: rotate(-5deg); }
-    .stamp-ph { font-size: 7.5px; color: #0284c7; border: 1px dashed #0284c7; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; text-align: center; transform: rotate(-5deg); }
+    .stamp-img { max-height: 50px; max-width: 80px; object-fit: contain; transform: rotate(-3deg); }
+    .stamp-ph { font-size: 7.5px; color: #0284c7; border: 1px dashed #0284c7; border-radius: 6px; width: 56px; height: 36px; display: flex; align-items: center; justify-content: center; text-align: center; transform: rotate(-3deg); }
 
     .tenant-footer {
       border-top: 1.5px solid #cbd5e1; padding-top: 5px; display: flex; justify-content: space-between;

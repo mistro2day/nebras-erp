@@ -317,14 +317,14 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
       font-size: 8.5px;
       color: #94a3b8;
       border: 1.5px dashed #cbd5e1;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
+      border-radius: 6px;
+      width: 58px;
+      height: 38px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      line-height: 1.1;
+      line-height: 1.15;
     }
 
     /* الفوتر */

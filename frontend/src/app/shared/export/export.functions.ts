@@ -211,8 +211,8 @@ const DOC_CSS = `
   .nb-sig-title { font-size: 9px; font-weight: 700; color: #4B5563; border-bottom: 1px dashed #D1D5DB; padding-bottom: 2px; margin-bottom: 4px; }
   .nb-sig-val { font-size: 8.5px; color: #9CA3AF; }
   .nb-stamp-wrapper { display: flex; align-items: center; justify-content: center; min-height: 40px; flex: 1; }
-  .nb-stamp-img { max-height: 48px; max-width: 75px; object-fit: contain; transform: rotate(-5deg); }
-  .nb-stamp-ph { font-size: 8px; color: #${BRAND_COLOR}; border: 1px dashed #${BRAND_COLOR}; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; text-align: center; transform: rotate(-5deg); font-weight: 700; }
+  .nb-stamp-img { max-height: 52px; max-width: 85px; object-fit: contain; transform: rotate(-3deg); }
+  .nb-stamp-ph { font-size: 8px; color: #${BRAND_COLOR}; border: 1px dashed #${BRAND_COLOR}; border-radius: 6px; width: 55px; height: 36px; display: flex; align-items: center; justify-content: center; text-align: center; transform: rotate(-3deg); font-weight: 700; }
   .nb-doc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 9.5px; color: #9CA3AF; border-top: 1px solid #E5E8EF; padding-top: 6px; }
 `;
 

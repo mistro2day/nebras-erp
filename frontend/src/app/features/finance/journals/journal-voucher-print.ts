@@ -491,20 +491,20 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       max-height: 55px;
       max-width: 85px;
       object-fit: contain;
-      transform: rotate(-5deg);
+      transform: rotate(-3deg);
     }
     .stamp-ph {
       font-size: 8px;
       color: #0284c7;
       border: 1px dashed #0284c7;
-      border-radius: 50%;
-      width: 44px;
-      height: 44px;
+      border-radius: 6px;
+      width: 62px;
+      height: 38px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      transform: rotate(-5deg);
+      transform: rotate(-3deg);
     }
 
     /* تذييل المستأجر وهوية نبراس */

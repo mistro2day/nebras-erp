@@ -158,7 +158,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                   </div>
                 </div>
               </div>
-              <span class="hint mt-2">يفضل استخدام صور دائرية مفرغة بخلفية شفافة (PNG) قياس 250×250 بكسل. في حال عدم رفع ختم لأي قسم، تعتمد المنظومة تلقائياً ختم الإدارة العامة.</span>
+              <span class="hint mt-2">يمكن رفع الختم بأي شكل معتمد للمؤسسة (دائري، بيضاوي، أو مربع) بخلفية شفافة (PNG) دون أي تقييد. في حال عدم رفع ختم لأي قسم، تعتمد المنظومة تلقائياً ختم الإدارة العامة.</span>
             </div>
           </nb-panel>
 
@@ -397,8 +397,8 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                       @if (activeStampPreview()) {
                         <img [src]="activeStampPreview()" [alt]="previewStampLabel()" class="mock-stamp-img" />
                       } @else {
-                        <div class="mock-stamp-placeholder-circle">
-                          <span class="txt-top">{{ nameAr() || 'المدرسة' }}</span>
+                        <div class="mock-stamp-placeholder-badge">
+                          <span class="txt-top">{{ nameAr() || 'المؤسسة' }}</span>
                           <span class="txt-mid">معتمد</span>
                           <span class="txt-bot">★</span>
                         </div>
@@ -638,9 +638,9 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
       gap: 8px;
     }
     .seal-dept-card .stamp-preview-box {
-      width: 75px;
+      width: 85px;
       height: 75px;
-      border-radius: 50%;
+      border-radius: 8px;
     }
     .seal-actions {
       display: flex;
@@ -992,11 +992,11 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
       object-fit: contain;
     }
     .logo-box {
-      width: 48px;
+      width: 58px;
       height: 48px;
-      border-radius: 50%;
+      border-radius: 8px;
       background: #eff6ff;
-      border: 2px solid #3b82f6;
+      border: 1.5px solid #3b82f6;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1042,14 +1042,15 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
     /* أنماط الختم في لوحة الإعدادات */
     .stamp-preview-box {
-      border-radius: 50% !important;
-      border: 2px dashed #0284c7 !important;
+      border-radius: 8px !important;
+      border: 1.5px dashed #0284c7 !important;
+      background: #f0f9ff;
     }
     .school-stamp-img {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      transform: rotate(-5deg);
+      transform: rotate(-3deg);
     }
 
     /* أنماط التوقيعات والختم في المعاينة الحية */
@@ -1091,15 +1092,15 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
     }
     .mock-stamp-img {
       max-height: 50px;
-      max-width: 70px;
+      max-width: 80px;
       object-fit: contain;
-      transform: rotate(-6deg);
+      transform: rotate(-3deg);
     }
-    .mock-stamp-placeholder-circle {
-      width: 44px;
+    .mock-stamp-placeholder-badge {
+      width: 62px;
       height: 44px;
       border: 1.5px dashed #0284c7;
-      border-radius: 50%;
+      border-radius: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1107,8 +1108,9 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
       font-size: 7px;
       color: #0284c7;
       font-weight: 700;
-      transform: rotate(-6deg);
-      line-height: 1.1;
+      transform: rotate(-3deg);
+      line-height: 1.15;
+      padding: 2px 4px;
     }
 
     .mock-footer {

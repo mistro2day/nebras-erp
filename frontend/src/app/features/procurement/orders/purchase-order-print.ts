@@ -306,19 +306,19 @@ export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: str
       object-fit: contain;
       transform: rotate(-5deg);
     }
-    .stamp-circle-ph {
+    .stamp-badge-ph, .stamp-circle-ph {
       font-size: 8px;
       color: #0284c7;
       font-weight: 700;
-      border: 1px dashed #0284c7;
-      border-radius: 50%;
-      width: 42px;
-      height: 42px;
+      border: 1.5px dashed #0284c7;
+      border-radius: 6px;
+      width: 58px;
+      height: 38px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      transform: rotate(-5deg);
+      transform: rotate(-3deg);
     }
 
     /* الفوتر */

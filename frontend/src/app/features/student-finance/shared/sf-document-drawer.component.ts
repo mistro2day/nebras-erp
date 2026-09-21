@@ -373,7 +373,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
                 @if (getStampUrl()) {
                   <img [src]="getStampUrl()" alt="الختم الرسمي للمدرسة" class="official-school-stamp-img" (error)="onStampError()" />
                 } @else {
-                  <div class="stamp-circle">
+                  <div class="stamp-badge">
                     <span class="stamp-school-text">{{ getSchoolNameAr() }}</span>
                     <span class="stamp-center-text">الإدارة المالية</span>
                     <span class="stamp-approved-text">★ معتمد ★</span>
@@ -756,13 +756,13 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       max-height: 80px;
       max-width: 110px;
       object-fit: contain;
-      transform: rotate(-6deg);
+      transform: rotate(-3deg);
     }
-    .stamp-circle {
-      width: 70px;
-      height: 70px;
+    .stamp-badge {
+      width: 80px;
+      height: 56px;
       border: 1.5px dashed #0284c7;
-      border-radius: 50%;
+      border-radius: 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -770,7 +770,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       font-size: 8px;
       color: #0284c7;
       font-weight: 700;
-      transform: rotate(-6deg);
+      transform: rotate(-3deg);
       text-align: center;
       line-height: 1.2;
       padding: 4px;
@@ -1522,13 +1522,13 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             max-height: 75px !important;
             max-width: 105px !important;
             object-fit: contain !important;
-            transform: rotate(-5deg) !important;
+            transform: rotate(-3deg) !important;
           }
-          .stamp-circle {
-            width: 68px !important;
-            height: 68px !important;
+          .stamp-badge, .stamp-circle {
+            width: 78px !important;
+            height: 54px !important;
             border: 1.5px dashed #0284c7 !important;
-            border-radius: 50% !important;
+            border-radius: 6px !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -1536,10 +1536,10 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             font-size: 8px !important;
             color: #0284c7 !important;
             font-weight: 700 !important;
-            transform: rotate(-5deg) !important;
+            transform: rotate(-3deg) !important;
             text-align: center !important;
             line-height: 1.2 !important;
-            padding: 4px !important;
+            padding: 2px 4px !important;
           }
           .voucher-footer-meta {
             display: flex !important;
