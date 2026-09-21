@@ -180,13 +180,21 @@ import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-brand
             </div>
           </section>
 
-          <!-- الإقرار والتوقيع -->
+          <!-- الإقرار والتوقيع والاعتماد الرسمي -->
           <section class="paper-section pledge-section">
             <p class="final-pledge">ـ يُقر ولي أمر التلميذ بالموافقة على الرسوم الدراسية أعلاه وبصحة البيانات أعلاه.</p>
             <div class="signatures-row">
-              <div>توقيع ولي الأمر: ............................</div>
-              <div>توقيع التلميذ: ............................</div>
-              <div>التاريخ: {{ currentDate }}</div>
+              <div class="sig-item"><span>توقيع ولي الأمر:</span> ............................</div>
+              <div class="sig-item"><span>توقيع التلميذ:</span> ............................</div>
+              <div class="sig-item stamp-item">
+                <span>اعتماد وختم إدارة القبول:</span>
+                @if (branding.stampUrl) {
+                  <img [src]="branding.stampUrl" alt="ختم المدرسة" class="print-stamp-img" />
+                } @else {
+                  <span class="stamp-box-ph">الختم المعتمد</span>
+                }
+              </div>
+              <div class="sig-item"><span>التاريخ:</span> {{ currentDate }}</div>
             </div>
           </section>
 
@@ -238,7 +246,11 @@ import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-brand
     
     .pledge-section { margin-top: 14px; font-size: 12.5px; }
     .final-pledge { font-weight: bold; margin-bottom: 14px; }
-    .signatures-row { display: flex; justify-content: space-between; font-weight: bold; padding-top: 10px; border-top: 1px solid #000; }
+    .signatures-row { display: flex; justify-content: space-between; align-items: flex-end; font-weight: bold; padding-top: 10px; border-top: 1px solid #000; }
+    .sig-item { display: flex; flex-direction: column; gap: 4px; }
+    .stamp-item { align-items: center; }
+    .print-stamp-img { max-height: 55px; max-width: 90px; object-fit: contain; transform: rotate(-3deg); margin-top: 2px; }
+    .stamp-box-ph { display: inline-block; border: 1px dashed #999; border-radius: 4px; padding: 2px 8px; font-size: 10px; color: #666; }
     
     .paper-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ccc; display: flex; justify-content: space-between; font-size: 10px; color: #666; }
 

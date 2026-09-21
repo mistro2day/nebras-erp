@@ -12,6 +12,8 @@ class TenantSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'logo': {'required': False, 'allow_null': True},
             'stamp': {'required': False, 'allow_null': True},
+            'stamp_finance': {'required': False, 'allow_null': True},
+            'stamp_academic': {'required': False, 'allow_null': True},
             'icon': {'required': False, 'allow_null': True},
         }
 
@@ -20,7 +22,7 @@ class TenantSerializer(serializers.ModelSerializer):
         if isinstance(data, dict):
             clean_data = data.copy()
             clean_data.pop('sub', None)
-            for img_field in ('logo', 'stamp', 'icon'):
+            for img_field in ('logo', 'stamp', 'stamp_finance', 'stamp_academic', 'icon'):
                 if img_field in clean_data and isinstance(clean_data[img_field], str):
                     clean_data.pop(img_field)
             return super().to_internal_value(clean_data)
@@ -137,7 +139,7 @@ class TenantViewSet(viewsets.ModelViewSet):
                     tenant.logo = None
                     feat.pop('logo_url', None)
 
-            # معالجة تحديث الختم الرسمي للمدرسة (Official Seal / Stamp)
+            # معالجة تحديث الختم الرسمي العام للمدرسة (General Administration Seal)
             if 'stamp' in request.FILES:
                 tenant.stamp = request.FILES['stamp']
             elif 'stamp' in payload:
@@ -167,6 +169,68 @@ class TenantViewSet(viewsets.ModelViewSet):
                 elif not stamp_val:
                     tenant.stamp = None
                     feat.pop('stamp_url', None)
+
+            # معالجة تحديث ختم الإدارة المالية والخزينة (Financial Administration Seal)
+            if 'stamp_finance' in request.FILES:
+                tenant.stamp_finance = request.FILES['stamp_finance']
+            elif 'stamp_finance' in payload:
+                sf_val = payload['stamp_finance']
+                if isinstance(sf_val, str) and sf_val.startswith('data:image'):
+                    try:
+                        import base64
+                        from django.core.files.base import ContentFile
+                        header_part, base64_data = sf_val.split(';base64,')
+                        ext = 'png'
+                        if '/' in header_part:
+                            ext = header_part.split(';')[0].split('/')[-1]
+                            if ext.lower() == 'jpeg':
+                                ext = 'jpg'
+                        filename = f"school_stamp_finance_{tenant.id}.{ext}"
+                        target_rel = f"tenants/stamps/{filename}"
+                        if tenant.stamp_finance and tenant.stamp_finance.storage.exists(target_rel):
+                            try:
+                                tenant.stamp_finance.storage.delete(target_rel)
+                            except Exception:
+                                pass
+                        tenant.stamp_finance.save(filename, ContentFile(base64.b64decode(base64_data)), save=False)
+                    except Exception:
+                        pass
+                elif isinstance(sf_val, str) and (sf_val.startswith('http') or sf_val.startswith('/') or sf_val.startswith('assets/')):
+                    feat['stamp_finance_url'] = sf_val
+                elif not sf_val:
+                    tenant.stamp_finance = None
+                    feat.pop('stamp_finance_url', None)
+
+            # معالجة تحديث ختم الشؤون الأكاديمية والمتابعة (Academic Affairs & Follow-up Seal)
+            if 'stamp_academic' in request.FILES:
+                tenant.stamp_academic = request.FILES['stamp_academic']
+            elif 'stamp_academic' in payload:
+                sa_val = payload['stamp_academic']
+                if isinstance(sa_val, str) and sa_val.startswith('data:image'):
+                    try:
+                        import base64
+                        from django.core.files.base import ContentFile
+                        header_part, base64_data = sa_val.split(';base64,')
+                        ext = 'png'
+                        if '/' in header_part:
+                            ext = header_part.split(';')[0].split('/')[-1]
+                            if ext.lower() == 'jpeg':
+                                ext = 'jpg'
+                        filename = f"school_stamp_academic_{tenant.id}.{ext}"
+                        target_rel = f"tenants/stamps/{filename}"
+                        if tenant.stamp_academic and tenant.stamp_academic.storage.exists(target_rel):
+                            try:
+                                tenant.stamp_academic.storage.delete(target_rel)
+                            except Exception:
+                                pass
+                        tenant.stamp_academic.save(filename, ContentFile(base64.b64decode(base64_data)), save=False)
+                    except Exception:
+                        pass
+                elif isinstance(sa_val, str) and (sa_val.startswith('http') or sa_val.startswith('/') or sa_val.startswith('assets/')):
+                    feat['stamp_academic_url'] = sa_val
+                elif not sa_val:
+                    tenant.stamp_academic = None
+                    feat.pop('stamp_academic_url', None)
 
             tenant.features = feat
             tenant.save()
@@ -215,6 +279,7 @@ class TenantViewSet(viewsets.ModelViewSet):
         else:
             data['logo_url'] = "/assets/branding/logo-dark.png"
             
+        # ختم الإدارة العامة (الافتراضي)
         if tenant.stamp:
             try:
                 data['stamp_url'] = request.build_absolute_uri(tenant.stamp.url)
@@ -224,5 +289,27 @@ class TenantViewSet(viewsets.ModelViewSet):
             data['stamp_url'] = feat['stamp_url']
         else:
             data['stamp_url'] = None
+
+        # ختم الإدارة المالية والخزينة (مع التراجع للختم العام إذا لم يتوفر)
+        if tenant.stamp_finance:
+            try:
+                data['stamp_finance_url'] = request.build_absolute_uri(tenant.stamp_finance.url)
+            except Exception:
+                data['stamp_finance_url'] = feat.get('stamp_finance_url')
+        elif feat.get('stamp_finance_url'):
+            data['stamp_finance_url'] = feat['stamp_finance_url']
+        else:
+            data['stamp_finance_url'] = data['stamp_url']
+
+        # ختم الشؤون الأكاديمية والمتابعة (مع التراجع للختم العام إذا لم يتوفر)
+        if tenant.stamp_academic:
+            try:
+                data['stamp_academic_url'] = request.build_absolute_uri(tenant.stamp_academic.url)
+            except Exception:
+                data['stamp_academic_url'] = feat.get('stamp_academic_url')
+        elif feat.get('stamp_academic_url'):
+            data['stamp_academic_url'] = feat['stamp_academic_url']
+        else:
+            data['stamp_academic_url'] = data['stamp_url']
             
         return Response(data)

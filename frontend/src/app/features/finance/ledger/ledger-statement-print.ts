@@ -101,9 +101,12 @@ export function printLedgerStatement(account: any, entries: any[], tenantInfo?: 
       display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; margin-bottom: 8px;
       page-break-inside: avoid; break-inside: avoid;
     }
-    .sig-col { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px; text-align: center; background: #fff; }
-    .sig-label { display: block; font-size: 9.5px; font-weight: 800; color: #1e3a8a; border-bottom: 1px dashed #cbd5e1; padding-bottom: 2px; margin-bottom: 20px; }
+    .sig-col { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px; text-align: center; background: #fff; display: flex; flex-direction: column; justify-content: space-between; min-height: 75px; }
+    .sig-label { display: block; font-size: 9.5px; font-weight: 800; color: #1e3a8a; border-bottom: 1px dashed #cbd5e1; padding-bottom: 2px; margin-bottom: 4px; }
     .sig-sign { display: block; font-size: 9px; color: #94a3b8; }
+    .stamp-wrap { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 40px; }
+    .stamp-img { max-height: 50px; max-width: 80px; object-fit: contain; transform: rotate(-5deg); }
+    .stamp-ph { font-size: 7.5px; color: #0284c7; border: 1px dashed #0284c7; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; text-align: center; transform: rotate(-5deg); }
 
     .tenant-footer {
       border-top: 1.5px solid #cbd5e1; padding-top: 5px; display: flex; justify-content: space-between;
@@ -223,7 +226,9 @@ export function printLedgerStatement(account: any, entries: any[], tenantInfo?: 
       </div>
       <div class="sig-col">
         <span class="sig-label">الختم المالي الرسمي</span>
-        <span class="sig-sign">ختم المؤسسة المعتمد</span>
+        <div class="stamp-wrap">
+          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">معتمد</div>` : '<div class="stamp-ph">معتمد</div>'}
+        </div>
       </div>
     </div>
 

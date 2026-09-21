@@ -255,11 +255,11 @@ export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: str
     }
     .terms-box .t-title { font-weight: 800; color: #475569; margin-bottom: 3px; }
 
-    /* مصفوفة التوقيعات */
+    /* مصفوفة التوقيعات والختم المعتمد */
     .signatures-matrix {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
       margin-top: 18px;
       margin-bottom: 12px;
       page-break-inside: avoid;
@@ -267,23 +267,58 @@ export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: str
     .sig-col {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 8px 6px;
+      padding: 6px 4px;
       text-align: center;
       background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 75px;
     }
     .sig-label {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
       color: #475569;
       display: block;
       border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 4px;
-      margin-bottom: 28px;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
     }
     .sig-sign {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 600;
       color: #64748b;
+    }
+    .stamp-col {
+      background: #f8fafc;
+      border: 1px solid #94a3b8;
+    }
+    .stamp-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-height: 45px;
+    }
+    .stamp-img {
+      max-height: 50px;
+      max-width: 80px;
+      object-fit: contain;
+      transform: rotate(-5deg);
+    }
+    .stamp-circle-ph {
+      font-size: 8px;
+      color: #0284c7;
+      font-weight: 700;
+      border: 1px dashed #0284c7;
+      border-radius: 50%;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transform: rotate(-5deg);
     }
 
     /* الفوتر */
@@ -400,6 +435,12 @@ export function printPurchaseOrder(order: any, tenantInfo?: any, printedBy?: str
       <div class="sig-col">
         <span class="sig-label">استلام وتعهد المورّد</span>
         <span class="sig-sign">الختم والتوقيع</span>
+      </div>
+      <div class="sig-col stamp-col">
+        <span class="sig-label">الختم الرسمي للمؤسسة</span>
+        <div class="stamp-wrap">
+          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-circle-ph" style="display:none;"><span>معتمد</span></div>` : '<div class="stamp-circle-ph"><span>الختم المعتمد</span></div>'}
+        </div>
       </div>
     </div>
 

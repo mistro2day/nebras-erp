@@ -938,7 +938,12 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   getStampUrl(): string {
     if (this.stampFailed()) return '';
     const info = this.schoolData();
-    let url = info?.stamp_url || info?.stamp || this.tenantService.currentTenant()?.stampUrl || DEFAULT_BRAND.stamp_url;
+    let url = this.tenantService.currentTenant()?.stampFinanceUrl
+      || info?.stamp_finance_url
+      || info?.stamp_url
+      || info?.stamp
+      || this.tenantService.currentTenant()?.stampUrl
+      || DEFAULT_BRAND.stamp_url;
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
       return url;

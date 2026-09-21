@@ -12,6 +12,8 @@ export interface TenantPrintBranding {
   schoolNameEn: string;
   logoUrl: string;
   stampUrl: string;
+  stampFinanceUrl: string;
+  stampAcademicUrl: string;
   phone: string;
   phones: string[];
   phonesFormatted: string;
@@ -55,18 +57,33 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     schoolNameEn = 'Al-Mawred Model Private Schools';
   }
 
-  // الشعار والختم
+  // الشعار والأختام الرسمية المعتمدة
   const logoUrl =
     info.logoUrl ||
     info.logo_url ||
     info.logo ||
     '/assets/default_school_logo.png';
 
+  // ختم الإدارة العامة (الرئيسي والافتراضي)
   const stampUrl =
     info.stampUrl ||
     info.stamp_url ||
     info.stamp ||
     '';
+
+  // ختم الإدارة المالية والخزينة (يتراجع للختم العام إذا لم يحدد)
+  const stampFinanceUrl =
+    info.stampFinanceUrl ||
+    info.stamp_finance_url ||
+    info.stamp_finance ||
+    stampUrl;
+
+  // ختم الشؤون الأكاديمية والمتابعة (يتراجع للختم العام إذا لم يحدد)
+  const stampAcademicUrl =
+    info.stampAcademicUrl ||
+    info.stamp_academic_url ||
+    info.stamp_academic ||
+    stampUrl;
 
   // الهواتف المعتمدة
   const defaultPhones = ['0123689814', '0110100504', '0110100505', '0110100506'];
@@ -99,6 +116,8 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     schoolNameEn,
     logoUrl,
     stampUrl,
+    stampFinanceUrl,
+    stampAcademicUrl,
     phone,
     phones,
     phonesFormatted,
@@ -106,4 +125,25 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     email,
     address,
   };
+}
+
+/**
+ * الحصول على ختم القسم المناسب للمستند الرسمي
+ * @param branding بيانات الهوية والمطبوعات للمستأجر
+ * @param dept نوع القسم: 'finance' للمالية | 'academic' للمتابعة والأكاديميات | 'general' للإدارة العامة والشهادات
+ */
+export function getDepartmentStamp(
+  branding: TenantPrintBranding,
+  dept: 'general' | 'finance' | 'academic' = 'general'
+): string {
+  if (!branding) return '';
+  switch (dept) {
+    case 'finance':
+      return branding.stampFinanceUrl || branding.stampUrl || '';
+    case 'academic':
+      return branding.stampAcademicUrl || branding.stampUrl || '';
+    case 'general':
+    default:
+      return branding.stampUrl || '';
+  }
 }

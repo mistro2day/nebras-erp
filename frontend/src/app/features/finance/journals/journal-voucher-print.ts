@@ -461,6 +461,10 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       padding: 6px 8px;
       text-align: center;
       background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 80px;
     }
     .sig-label {
       display: block;
@@ -469,12 +473,38 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       color: #1e3a8a;
       border-bottom: 1px dashed #cbd5e1;
       padding-bottom: 3px;
-      margin-bottom: 22px;
+      margin-bottom: 6px;
     }
     .sig-sign {
       display: block;
       font-size: 9.5px;
       color: #94a3b8;
+    }
+    .stamp-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-height: 45px;
+    }
+    .stamp-img {
+      max-height: 55px;
+      max-width: 85px;
+      object-fit: contain;
+      transform: rotate(-5deg);
+    }
+    .stamp-ph {
+      font-size: 8px;
+      color: #0284c7;
+      border: 1px dashed #0284c7;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transform: rotate(-5deg);
     }
 
     /* تذييل المستأجر وهوية نبراس */
@@ -639,7 +669,9 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       </div>
       <div class="sig-col">
         <span class="sig-label">الختم المالي الرسمي</span>
-        <span class="sig-sign">ختم المؤسسة المعتمد</span>
+        <div class="stamp-wrap">
+          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">معتمد</div>` : '<div class="stamp-ph">معتمد</div>'}
+        </div>
       </div>
     </div>
 

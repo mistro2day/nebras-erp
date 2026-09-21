@@ -262,35 +262,70 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       line-height: 1.5;
     }
 
-    /* مصفوفة التوقيعات */
+    /* مصفوفة التوقيعات والختم المعتمد */
     .signatures-matrix {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-top: 24px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 20px;
       margin-bottom: 16px;
       page-break-inside: avoid;
     }
     .sig-col {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 10px 8px;
+      padding: 8px 6px;
       text-align: center;
       background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 85px;
     }
     .sig-label {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 700;
       color: #475569;
       display: block;
       border-bottom: 1px dashed #cbd5e1;
       padding-bottom: 4px;
-      margin-bottom: 35px;
+      margin-bottom: 6px;
     }
     .sig-sign {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 600;
       color: #64748b;
+    }
+    .stamp-col {
+      background: #f8fafc;
+      border: 1px solid #94a3b8;
+    }
+    .stamp-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-height: 50px;
+    }
+    .stamp-img {
+      max-height: 60px;
+      max-width: 90px;
+      object-fit: contain;
+      transform: rotate(-5deg);
+    }
+    .stamp-circle-ph {
+      font-size: 8.5px;
+      color: #0284c7;
+      font-weight: 700;
+      border: 1.5px dashed #0284c7;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transform: rotate(-5deg);
     }
 
     /* الفوتر */
@@ -394,7 +429,7 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       <div class="desc-val">${voucher.description || 'لا يوجد بيان إضافي مدون بالسند.'}</div>
     </div>
 
-    <!-- مصفوفة التوقيعات والاعتمادات -->
+    <!-- مصفوفة التوقيعات والختم المعتمد -->
     <div class="signatures-matrix">
       <div class="sig-col">
         <span class="sig-label">أمين الخزينة / المحاسب</span>
@@ -411,6 +446,12 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       <div class="sig-col">
         <span class="sig-label">${isPayment ? 'توقيع المستلم' : 'توقيع الدافع'}</span>
         <span class="sig-sign">الاسم والتوقيع</span>
+      </div>
+      <div class="sig-col stamp-col">
+        <span class="sig-label">الختم المالي الرسمي</span>
+        <div class="stamp-wrap">
+          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي للمدرسة" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-circle-ph" style="display:none;"><span>معتمد</span></div>` : '<div class="stamp-circle-ph"><span>الختم المعتمد</span></div>'}
+        </div>
       </div>
     </div>
 

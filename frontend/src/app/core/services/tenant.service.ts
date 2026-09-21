@@ -14,6 +14,8 @@ export interface TenantInfo {
   secondaryColor: string;
   logoUrl?: string;
   stampUrl?: string;
+  stampFinanceUrl?: string;
+  stampAcademicUrl?: string;
   phone?: string;
   phoneNumber?: string;
   phones?: string[];
@@ -209,8 +211,12 @@ export class TenantService {
     email: string;
     logo: string;
     logo_url: string;
-    stamp: string;
-    stamp_url: string;
+    stamp?: string;
+    stamp_url?: string;
+    stamp_finance?: string;
+    stamp_finance_url?: string;
+    stamp_academic?: string;
+    stamp_academic_url?: string;
   }>): Observable<TenantInfo> {
     const base = (environment.apiUrl || '/api/v1/').replace(/\/?$/, '/');
     return this.http.patch<any>(`${base}tenants/branding/current/`, data).pipe(
@@ -227,6 +233,8 @@ export class TenantService {
           secondaryColor: d.secondary_color || '#10b981',
           logoUrl: d.logo_url || d.logo || '',
           stampUrl: d.stamp_url || d.stamp || '',
+          stampFinanceUrl: d.stamp_finance_url || d.stamp_finance || d.stamp_url || d.stamp || '',
+          stampAcademicUrl: d.stamp_academic_url || d.stamp_academic || d.stamp_url || d.stamp || '',
           phone: d.phone || d.phone_number || '0123689814',
           phoneNumber: d.phone_number || d.phone || '0123689814',
           phones: Array.isArray(d.phones) && d.phones.length > 0 ? d.phones : ['0123689814', '0110100504', '0110100505', '0110100506'],

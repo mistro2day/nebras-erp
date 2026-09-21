@@ -78,38 +78,87 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
             </div>
           </nb-panel>
 
-          <!-- 2. الختم الرسمي للمؤسسة والاعتماد -->
-          <nb-panel title="الختم الرسمي للمؤسسة والاعتماد (Official Stamp / Seal)">
+          <!-- 2. منظومة الأختام الإدارية الرسمية للمؤسسة -->
+          <nb-panel title="منظومة الأختام الإدارية الرسمية للمؤسسة التعليمية (Official Department Seals)">
             <div class="panel-body">
-              <div class="logo-config-wrapper">
-                <div class="logo-preview-box stamp-preview-box">
-                  @if (stampPreview()) {
-                    <img [src]="stampPreview()" alt="الختم الرسمي للمدرسة" class="school-stamp-img" />
-                  } @else {
-                    <div class="no-logo-placeholder">🔴 لا يوجد ختم مخصص</div>
-                  }
-                </div>
-                <div class="logo-actions">
-                  <input
-                    type="file"
-                    #stampFileInput
-                    (change)="onStampFileSelected($event)"
-                    accept="image/png, image/jpeg, image/webp, image/svg+xml"
-                    style="display: none;"
-                  />
-                  <div class="logo-btn-row">
-                    <button type="button" class="nb-btn-secondary upload-btn" (click)="stampFileInput.click()">
-                      📁 اختيار أو رفع الختم الرسمي
-                    </button>
-                    @if (stampPreview()) {
-                      <button type="button" class="btn-remove-logo" (click)="removeStamp()">
-                        إزالة الختم
-                      </button>
-                    }
+              <p class="seals-intro-text">
+                تتيح منظومة نبراس تخصيص ختم رسمي مستقل لكل إدارة في المدرسة لضمان الحوكمة والاعتماد الرسمي الدقيق، مع ربط كل ختم بنوع المستند المطبوع تلقائياً:
+              </p>
+
+              <div class="seals-grid">
+                <!-- أ) ختم الإدارة العامة والمدير العام -->
+                <div class="seal-dept-card" [class.has-seal]="!!stampPreview()">
+                  <div class="seal-card-header">
+                    <div class="seal-badge general">ختم الإدارة العامة والمدير العام</div>
+                    <span class="seal-desc">الشهادات، النتائج الأكاديمية، استمارات القبول، العقود والقرارات</span>
                   </div>
-                  <span class="hint">يظهر الختم المعتمد في أسفل سندات القبض، الفواتير، التقارير والشهادات الرسمية بجانب توقيع المحاسب. يفضل صورة دائرية بخلفية شفافة (PNG) قياس 250×250 بكسل.</span>
+                  <div class="seal-card-body">
+                    <div class="logo-preview-box stamp-preview-box">
+                      @if (stampPreview()) {
+                        <img [src]="stampPreview()" alt="ختم الإدارة العامة" class="school-stamp-img" />
+                      } @else {
+                        <div class="no-logo-placeholder">🔴 لا يوجد ختم مخصص</div>
+                      }
+                    </div>
+                    <div class="seal-actions">
+                      <input type="file" #stampGeneralInput (change)="onStampFileSelected($event)" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;" />
+                      <button type="button" class="nb-btn-secondary upload-btn xs" (click)="stampGeneralInput.click()">📁 رفع ختم الإدارة</button>
+                      @if (stampPreview()) {
+                        <button type="button" class="btn-remove-logo xs" (click)="removeStamp()">إزالة</button>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ب) ختم الإدارة المالية والخزينة -->
+                <div class="seal-dept-card" [class.has-seal]="!!stampFinancePreview()">
+                  <div class="seal-card-header">
+                    <div class="seal-badge finance">ختم الإدارة المالية والحسابات</div>
+                    <span class="seal-desc">سندات القبض والصرف، فواتير الرسوم، كشوفات الحسابات، وإبراء الذمة</span>
+                  </div>
+                  <div class="seal-card-body">
+                    <div class="logo-preview-box stamp-preview-box">
+                      @if (stampFinancePreview()) {
+                        <img [src]="stampFinancePreview()" alt="ختم الإدارة المالية" class="school-stamp-img" />
+                      } @else {
+                        <div class="no-logo-placeholder">🔴 لا يوجد ختم مخصص</div>
+                      }
+                    </div>
+                    <div class="seal-actions">
+                      <input type="file" #stampFinanceInput (change)="onStampFinanceFileSelected($event)" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;" />
+                      <button type="button" class="nb-btn-secondary upload-btn xs" (click)="stampFinanceInput.click()">📁 رفع ختم المالية</button>
+                      @if (stampFinancePreview()) {
+                        <button type="button" class="btn-remove-logo xs" (click)="removeStampFinance()">إزالة</button>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ج) ختم المتابعة والشؤون الأكاديمية -->
+                <div class="seal-dept-card" [class.has-seal]="!!stampAcademicPreview()">
+                  <div class="seal-card-header">
+                    <div class="seal-badge academic">ختم المتابعة والشؤون الأكاديمية</div>
+                    <span class="seal-desc">كشوفات الحضور والغياب، إنذارات وسجلات المواظبة، وبطاقات المتابعة</span>
+                  </div>
+                  <div class="seal-card-body">
+                    <div class="logo-preview-box stamp-preview-box">
+                      @if (stampAcademicPreview()) {
+                        <img [src]="stampAcademicPreview()" alt="ختم الشؤون الأكاديمية" class="school-stamp-img" />
+                      } @else {
+                        <div class="no-logo-placeholder">🔴 لا يوجد ختم مخصص</div>
+                      }
+                    </div>
+                    <div class="seal-actions">
+                      <input type="file" #stampAcademicInput (change)="onStampAcademicFileSelected($event)" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;" />
+                      <button type="button" class="nb-btn-secondary upload-btn xs" (click)="stampAcademicInput.click()">📁 رفع ختم المتابعة</button>
+                      @if (stampAcademicPreview()) {
+                        <button type="button" class="btn-remove-logo xs" (click)="removeStampAcademic()">إزالة</button>
+                      }
+                    </div>
+                  </div>
                 </div>
               </div>
+              <span class="hint mt-2">يفضل استخدام صور دائرية مفرغة بخلفية شفافة (PNG) قياس 250×250 بكسل. في حال عدم رفع ختم لأي قسم، تعتمد المنظومة تلقائياً ختم الإدارة العامة.</span>
             </div>
           </nb-panel>
 
@@ -283,6 +332,19 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
             <div class="preview-card">
               <div class="preview-badge">معاينة حيّة للمطبوعات الورقية والترويسة</div>
 
+              <!-- شريط التبديل التفاعلي بين أنواع المستندات لمعاينة الختم المخصص -->
+              <div class="preview-type-switcher">
+                <button type="button" class="type-btn" [class.active]="previewDocType() === 'finance'" (click)="previewDocType.set('finance')">
+                  💰 مستند مالي
+                </button>
+                <button type="button" class="type-btn" [class.active]="previewDocType() === 'general'" (click)="previewDocType.set('general')">
+                  📜 استمارة إدارية
+                </button>
+                <button type="button" class="type-btn" [class.active]="previewDocType() === 'academic'" (click)="previewDocType.set('academic')">
+                  📋 كشف متابعة وغياب
+                </button>
+              </div>
+
               <div class="print-mock-sheet">
                 <!-- الترويسة المطبوعة المحاكية -->
                 <div class="mock-header">
@@ -313,7 +375,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 
                 <!-- شريط المستند النموذجي -->
                 <div class="mock-doc-title">
-                  <span>سند قبض مالي معتمد / استمارة تسجيل طالب</span>
+                  <span>{{ previewDocTitle() }}</span>
                 </div>
 
                 <div class="mock-body-placeholder">
@@ -325,15 +387,15 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                 <!-- التوقيعات والختم المعتمد في المعاينة الحية -->
                 <div class="mock-signatures-row">
                   <div class="mock-sig-col">
-                    <span class="mock-sig-title">أمين الصندوق / المحاسب</span>
+                    <span class="mock-sig-title">{{ previewSig1Label() }}</span>
                     <div class="mock-sig-line"></div>
                     <span class="mock-sig-sub">التوقيع والاعتماد</span>
                   </div>
                   <div class="mock-sig-col mock-stamp-col">
-                    <span class="mock-sig-title">الختم الرسمي للمدرسة</span>
+                    <span class="mock-sig-title">{{ previewStampLabel() }}</span>
                     <div class="mock-stamp-display">
-                      @if (stampPreview()) {
-                        <img [src]="stampPreview()" alt="الختم الرسمي" class="mock-stamp-img" />
+                      @if (activeStampPreview()) {
+                        <img [src]="activeStampPreview()" [alt]="previewStampLabel()" class="mock-stamp-img" />
                       } @else {
                         <div class="mock-stamp-placeholder-circle">
                           <span class="txt-top">{{ nameAr() || 'المدرسة' }}</span>
@@ -344,7 +406,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                     </div>
                   </div>
                   <div class="mock-sig-col">
-                    <span class="mock-sig-title">إدارة المدرسة / المدير</span>
+                    <span class="mock-sig-title">{{ previewSig2Label() }}</span>
                     <div class="mock-sig-line"></div>
                     <span class="mock-sig-sub">الاعتماد الرسمي</span>
                   </div>
@@ -514,6 +576,111 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
     }
     .btn-remove-logo:hover {
       background: #fee2e2;
+    }
+
+    /* شبكة وبطاقات الأختام المتعددة */
+    .seals-intro-text {
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.5;
+      margin: 0 0 12px 0;
+    }
+    .seals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 900px) {
+      .seals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .seal-dept-card {
+      border: 1px solid var(--nb-border, #cbd5e1);
+      border-radius: 10px;
+      background: #fafafa;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .seal-dept-card.has-seal {
+      border-color: #3b82f6;
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+    }
+    .seal-card-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .seal-badge {
+      display: inline-flex;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      align-self: flex-start;
+    }
+    .seal-badge.general { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .seal-badge.finance { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .seal-badge.academic { background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+    .seal-desc {
+      font-size: 10.5px;
+      color: #64748b;
+      line-height: 1.35;
+    }
+    .seal-card-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .seal-dept-card .stamp-preview-box {
+      width: 75px;
+      height: 75px;
+      border-radius: 50%;
+    }
+    .seal-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .seal-actions button.xs {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+    /* شريط التبديل في المعاينة الحية */
+    .preview-type-switcher {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .type-btn {
+      background: none;
+      border: none;
+      padding: 6px 4px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #64748b;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .type-btn.active {
+      background: #ffffff;
+      color: #1e3a8a;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
 
     .form-group {
@@ -1005,10 +1172,68 @@ export class SchoolIdentitySettingsComponent implements OnInit {
   logoDataUrl = signal<string | null>(null);
   logoPreview = computed(() => this.logoDataUrl() || this.logoUrl());
 
-  // إدارة الختم الرسمي للمؤسسة والاعتماد
+  // إدارة الختم الرسمي العام للمؤسسة والاعتماد (General Administration Seal)
   stampUrl = signal<string | null>(null);
   stampDataUrl = signal<string | null>(null);
   stampPreview = computed(() => this.stampDataUrl() !== null ? this.stampDataUrl() : this.stampUrl());
+
+  // إدارة ختم الإدارة المالية والخزينة (Financial Administration Seal)
+  stampFinanceUrl = signal<string | null>(null);
+  stampFinanceDataUrl = signal<string | null>(null);
+  stampFinancePreview = computed(() => this.stampFinanceDataUrl() !== null ? this.stampFinanceDataUrl() : this.stampFinanceUrl());
+
+  // إدارة ختم الشؤون الأكاديمية والمتابعة (Academic Affairs & Attendance Seal)
+  stampAcademicUrl = signal<string | null>(null);
+  stampAcademicDataUrl = signal<string | null>(null);
+  stampAcademicPreview = computed(() => this.stampAcademicDataUrl() !== null ? this.stampAcademicDataUrl() : this.stampAcademicUrl());
+
+  // نوع المستند المختار في المعاينة الحية
+  previewDocType = signal<'general' | 'finance' | 'academic'>('finance');
+
+  previewDocTitle = computed(() => {
+    switch (this.previewDocType()) {
+      case 'finance': return 'سند قـبـض مـالـي مـعـتـمـد / فـاتـورة رسـوم';
+      case 'academic': return 'كشف متابعة حضور وغياب وتوزيع الطلاب';
+      case 'general':
+      default: return 'استمارة تسجيل وقبول طالب / شهادة إدارية رسمية';
+    }
+  });
+
+  previewSig1Label = computed(() => {
+    switch (this.previewDocType()) {
+      case 'finance': return 'أمين الخزينة / المحاسب';
+      case 'academic': return 'مشرف الصف / شؤون الطلاب';
+      case 'general':
+      default: return 'مسؤول القبول والتسجيل';
+    }
+  });
+
+  previewSig2Label = computed(() => {
+    switch (this.previewDocType()) {
+      case 'finance': return 'اعتماد المدير المالي';
+      case 'academic': return 'اعتماد وكيل المدرسة';
+      case 'general':
+      default: return 'اعتماد المدير العام للمدرسة';
+    }
+  });
+
+  previewStampLabel = computed(() => {
+    switch (this.previewDocType()) {
+      case 'finance': return 'ختم الإدارة المالية';
+      case 'academic': return 'ختم الشؤون الأكاديمية';
+      case 'general':
+      default: return 'ختم الإدارة العامة للمدرسة';
+    }
+  });
+
+  activeStampPreview = computed(() => {
+    switch (this.previewDocType()) {
+      case 'finance': return this.stampFinancePreview() || this.stampPreview();
+      case 'academic': return this.stampAcademicPreview() || this.stampPreview();
+      case 'general':
+      default: return this.stampPreview();
+    }
+  });
 
   saving = signal(false);
   saveSuccess = signal(false);
@@ -1048,12 +1273,17 @@ export class SchoolIdentitySettingsComponent implements OnInit {
     }
     this.logoDataUrl.set(null);
 
-    if (t.stampUrl) {
-      this.stampUrl.set(t.stampUrl);
-    } else {
-      this.stampUrl.set(null);
-    }
+    // ختم الإدارة العامة
+    this.stampUrl.set(t.stampUrl || null);
     this.stampDataUrl.set(null);
+
+    // ختم الإدارة المالية
+    this.stampFinanceUrl.set(t.stampFinanceUrl || null);
+    this.stampFinanceDataUrl.set(null);
+
+    // ختم الشؤون الأكاديمية
+    this.stampAcademicUrl.set(t.stampAcademicUrl || null);
+    this.stampAcademicDataUrl.set(null);
 
     if (t.phones && t.phones.length > 0) {
       this.phones.set([...t.phones]);
@@ -1083,6 +1313,7 @@ export class SchoolIdentitySettingsComponent implements OnInit {
     this.logoUrl.set('/assets/branding/logo-dark.png');
   }
 
+  // ختم الإدارة العامة
   onStampFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
@@ -1098,6 +1329,42 @@ export class SchoolIdentitySettingsComponent implements OnInit {
   removeStamp(): void {
     this.stampDataUrl.set('');
     this.stampUrl.set(null);
+  }
+
+  // ختم الإدارة المالية
+  onStampFinanceFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.stampFinanceDataUrl.set(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeStampFinance(): void {
+    this.stampFinanceDataUrl.set('');
+    this.stampFinanceUrl.set(null);
+  }
+
+  // ختم الشؤون الأكاديمية والمتابعة
+  onStampAcademicFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.stampAcademicDataUrl.set(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  removeStampAcademic(): void {
+    this.stampAcademicDataUrl.set('');
+    this.stampAcademicUrl.set(null);
   }
 
   addPhone(): void {
@@ -1157,9 +1424,19 @@ export class SchoolIdentitySettingsComponent implements OnInit {
       payload.logo = this.logoDataUrl();
     }
 
-    // إضافة الختم في حالة رفعه أو تغييره أو حذفه
+    // ختم الإدارة العامة
     if (this.stampDataUrl() !== null) {
       payload.stamp = this.stampDataUrl();
+    }
+
+    // ختم الإدارة المالية
+    if (this.stampFinanceDataUrl() !== null) {
+      payload.stamp_finance = this.stampFinanceDataUrl();
+    }
+
+    // ختم الشؤون الأكاديمية
+    if (this.stampAcademicDataUrl() !== null) {
+      payload.stamp_academic = this.stampAcademicDataUrl();
     }
 
     this.tenantService.updateTenantSettings(payload).subscribe({

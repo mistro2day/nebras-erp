@@ -262,11 +262,11 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
     }
     .reason-box .r-title { font-weight: 800; color: #475569; margin-bottom: 3px; }
 
-    /* مصفوفة التوقيعات */
+    /* مصفوفة التوقيعات والختم المعتمد */
     .signatures-matrix {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
       margin-top: 18px;
       margin-bottom: 12px;
       page-break-inside: avoid;
@@ -274,23 +274,57 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
     .sig-col {
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      padding: 8px 6px;
+      padding: 6px 4px;
       text-align: center;
       background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 75px;
     }
     .sig-label {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
       color: #475569;
       display: block;
       border-bottom: 1px dashed #cbd5e1;
-      padding-bottom: 4px;
-      margin-bottom: 28px;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
     }
     .sig-sign {
-      font-size: 10px;
+      font-size: 9.5px;
       font-weight: 600;
       color: #64748b;
+    }
+    .stamp-col {
+      background: #f8fafc;
+      border: 1px solid #94a3b8;
+    }
+    .stamp-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-height: 48px;
+    }
+    .stamp-img {
+      max-height: 52px;
+      max-width: 80px;
+      object-fit: contain;
+      transform: rotate(-3deg);
+    }
+    .stamp-placeholder {
+      font-size: 8.5px;
+      color: #94a3b8;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.1;
     }
 
     /* الفوتر */
@@ -388,7 +422,7 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
       <div>${request.reason || 'تأمين احتياجات العملية التعليمية والإدارية وفق الخطة التشغيلية للمؤسسة.'}</div>
     </div>
 
-    <!-- مصفوفة الاعتمادات والتوقيعات -->
+    <!-- مصفوفة الاعتمادات والتوقيعات والختم المعتمد -->
     <div class="signatures-matrix">
       <div class="sig-col">
         <span class="sig-label">رئيس القسم الطالب</span>
@@ -405,6 +439,16 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
       <div class="sig-col">
         <span class="sig-label">الاعتماد المالي والإداري</span>
         <span class="sig-sign">المدير العام / المالي</span>
+      </div>
+      <div class="sig-col stamp-col">
+        <span class="sig-label">الختم المالي الرسمي</span>
+        <div class="stamp-wrap">
+          ${(branding.stampFinanceUrl || branding.stampUrl) ? `
+            <img src="${branding.stampFinanceUrl || branding.stampUrl}" alt="ختم الإدارة المالية" class="stamp-img" onerror="this.parentElement.innerHTML='<div class=\\'stamp-placeholder\\'>ختم مالي<br>معتمد</div>'" />
+          ` : `
+            <div class="stamp-placeholder">ختم مالي<br>معتمد</div>
+          `}
+        </div>
       </div>
     </div>
 

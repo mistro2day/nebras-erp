@@ -21,6 +21,8 @@ class Tenant(models.Model):
     logo = models.ImageField(upload_to='tenants/logos/', null=True, blank=True)
     icon = models.ImageField(upload_to='tenants/icons/', null=True, blank=True)
     stamp = models.ImageField(upload_to='tenants/stamps/', null=True, blank=True)
+    stamp_finance = models.ImageField(upload_to='tenants/stamps/', null=True, blank=True)
+    stamp_academic = models.ImageField(upload_to='tenants/stamps/', null=True, blank=True)
     primary_color = models.CharField(max_length=7, default='#1e3a8a')
     secondary_color = models.CharField(max_length=7, default='#10b981')
     font_family = models.CharField(max_length=100, default='Inter')
