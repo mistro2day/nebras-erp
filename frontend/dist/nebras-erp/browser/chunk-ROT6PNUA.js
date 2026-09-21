@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"preferences",pathMatch:"full"},{path:"preferences",loadComponent:()=>import("./chunk-JE2YO7AV.js").then(e=>e.PreferencesCenterComponent)}];export{t as PERSONALIZATION_ROUTES};

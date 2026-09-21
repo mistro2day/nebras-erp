@@ -22,6 +22,7 @@ import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component'
 import { ExportColumn } from '../../../shared/export/export.types';
 import {
   printStudentFinanceReport,
+  exportStudentFinanceReportToPdf,
   printClearanceCertificate,
   printDemandNotice,
   tafqeet,
@@ -106,6 +107,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
             [rows]="activeExportRows()"
             [title]="activeReportTitle()"
             [showPrint]="false"
+            [customPdf]="exportPdfOfficial"
           />
 
           <button class="btn print" (click)="printCurrentReport()" title="طباعة التقرير المالي الرسمي A4">
@@ -381,38 +383,44 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
             <table class="nb-table custom-statement-table">
               <thead>
                 <tr>
-                  <th style="width: 40px;">#</th>
-                  <th>اسم الطالب والرقم الأكاديمي</th>
-                  <th>الفرع</th>
-                  <th>المرحلة والصف والشعبة</th>
-                  <th>اسم ولي الأمر</th>
-                  <th>رقم هاتف ولي الأمر</th>
-                  <th class="num">إجمالي الرسوم</th>
-                  <th class="num">المدفوع الفعلي</th>
-                  <th class="num">المتبقي للتحصيل</th>
-                  <th>حالة السداد</th>
-                  <th>إجراءات الحساب</th>
+                  <th style="width: 32px; text-align: center;">#</th>
+                  <th style="min-width: 150px;">اسم الطالب والرقم الأكاديمي</th>
+                  <th style="width: 80px; text-align: center;">الفرع</th>
+                  <th style="min-width: 140px;">المرحلة والصف والشعبة</th>
+                  <th style="min-width: 110px;">اسم ولي الأمر</th>
+                  <th style="width: 120px;">رقم هاتف ولي الأمر</th>
+                  <th class="num" style="width: 95px;">إجمالي الرسوم</th>
+                  <th class="num" style="width: 95px;">
+                    @if (dateFrom() || dateTo() || datePreset() !== 'all') {
+                      المسدد بالفترة
+                    } @else {
+                      المدفوع الفعلي
+                    }
+                  </th>
+                  <th class="num" style="width: 95px;">المتبقي للتحصيل</th>
+                  <th style="width: 80px; text-align: center;">حالة السداد</th>
+                  <th style="width: 85px; text-align: center;">إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                @for (item of filteredCustomStatement(); track item.id || item.student_number; let idx = $index) {
+                @for (item of filteredCustomStatement(); track item._isTotal ? 'total-row' : (item.id || item.student_number || idx); let idx = $index) {
                   <tr [class.total-row]="item._isTotal">
                     @if (item._isTotal) {
                       <td colspan="6" class="font-bold">
                         إجمالي التقرير المالي المخصص ({{ filteredCustomStatement().length - 1 }} طالباً):
                       </td>
-                      <td class="num font-bold" style="font-size: 14px;">
+                      <td class="num font-bold" style="font-size: 13.5px;">
                         {{ fmt(item.total_billed) }} <small>ج.س</small>
                       </td>
-                      <td class="num font-bold success-text" style="font-size: 14px;">
+                      <td class="num font-bold success-text" style="font-size: 13.5px;">
                         {{ fmt(item.total_paid) }} <small>ج.س</small>
                       </td>
-                      <td class="num font-bold danger-text" style="font-size: 14px;">
+                      <td class="num font-bold danger-text" style="font-size: 13.5px;">
                         {{ fmt(item.outstanding_balance) }} <small>ج.س</small>
                       </td>
                       <td colspan="2"></td>
                     } @else {
-                      <td class="muted font-sm">{{ idx + 1 }}</td>
+                      <td class="muted font-sm" style="text-align: center;">{{ idx + 1 }}</td>
                       <td>
                         <div class="user-cell">
                           <span class="avatar-sm" [class.girls]="item.gender === 'بنات' || item.branch_name?.includes('بنات')">
@@ -424,7 +432,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td style="text-align: center;">
                         <span class="branch-tag" [class.girls]="item.branch_name?.includes('بنات')">
                           {{ item.branch_name }}
                         </span>
@@ -459,7 +467,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                         {{ fmt(item.total_billed) }} <small>ج.س</small>
                       </td>
                       <td class="num font-bold success-text">
-                        {{ fmt(item.total_paid) }} <small>ج.س</small>
+                        {{ fmt(item.period_paid != null ? item.period_paid : item.total_paid) }} <small>ج.س</small>
                       </td>
                       <td class="num font-bold" [class.danger-text]="item.outstanding_balance > 0" [class.success-text]="item.outstanding_balance === 0">
                         {{ fmt(item.outstanding_balance) }} <small>ج.س</small>
@@ -541,7 +549,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
                 </tr>
               </thead>
               <tbody>
-                @for (r of filteredReceipts(); track r.id) {
+                @for (r of filteredReceipts(); track r._isTotal ? 'total-receipts' : (r.id || r.receipt_number || idx); let idx = $index) {
                   <tr [class.total-row]="r._isTotal">
                     @if (r._isTotal) {
                       <td colspan="8" class="font-bold">
@@ -905,15 +913,28 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
     .page {
-      padding: 24px;
+      padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
       font-family: var(--nb-font-family, 'Segoe UI', Tahoma, sans-serif);
       color: var(--nb-text);
       background: var(--nb-bg);
-      min-height: 100vh;
+      min-height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    nb-page-header {
+      display: block;
+      flex-shrink: 0;
     }
 
     .header-actions {
@@ -1018,23 +1039,26 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       overflow-x: auto;
       padding-bottom: 4px;
       border-bottom: 2px solid var(--nb-border, #e5e7eb);
+      flex-shrink: 0;
+      min-height: 46px;
     }
     .tab-btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 16px;
+      padding: 10px 14px;
       background: transparent;
       border: none;
       border-bottom: 3px solid transparent;
       margin-bottom: -2px;
       font-family: inherit;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--nb-text-muted, #6b7280);
       cursor: pointer;
       white-space: nowrap;
       transition: all 0.15s ease;
+      flex-shrink: 0;
     }
     .tab-btn:hover {
       color: var(--nb-text, #111827);
@@ -1061,16 +1085,17 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     .kpis-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 14px;
+      gap: 12px;
+      flex-shrink: 0;
     }
     .kpi-card {
       background: var(--nb-surface, #ffffff);
       border: 1px solid var(--nb-border, #e5e7eb);
       border-radius: var(--nb-radius-card, 12px);
-      padding: 16px;
+      padding: 14px 16px;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
     .kpi-card.success { border-inline-start: 4px solid #10b981; }
@@ -1078,9 +1103,9 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     .kpi-card.warning { border-inline-start: 4px solid #f59e0b; }
     .kpi-card.info { border-inline-start: 4px solid #3b82f6; }
     .kpi-icon {
-      font-size: 24px;
-      width: 48px;
-      height: 48px;
+      font-size: 22px;
+      width: 44px;
+      height: 44px;
       display: grid;
       place-items: center;
       border-radius: 10px;
@@ -1094,12 +1119,12 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       flex: 1;
     }
     .kpi-label {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--nb-text-muted, #6b7280);
       font-weight: 600;
     }
     .kpi-value {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 800;
       color: var(--nb-text, #111827);
       font-variant-numeric: tabular-nums;
@@ -1121,11 +1146,12 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       background: var(--nb-surface, #ffffff);
       border: 1px solid var(--nb-border, #e5e7eb);
       border-radius: var(--nb-radius-card, 12px);
-      padding: 14px 18px;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       flex-wrap: wrap;
+      flex-shrink: 0;
     }
     .filter-input-wrap {
       display: flex;
@@ -1134,21 +1160,21 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       background: var(--nb-surface-raised, #f9fafb);
       border: 1px solid var(--nb-border, #e5e7eb);
       border-radius: var(--nb-radius, 8px);
-      padding: 0 12px;
-      height: 38px;
+      padding: 0 10px;
+      height: 36px;
     }
-    .filter-input-wrap.search { flex: 1; min-width: 260px; }
+    .filter-input-wrap.search { flex: 1; min-width: 220px; }
     .filter-input-wrap input {
       border: none;
       background: transparent;
       outline: none;
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--nb-text, #111827);
       width: 100%;
     }
     .filter-input-wrap.select label {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--nb-text-muted, #6b7280);
       white-space: nowrap;
     }
@@ -1157,7 +1183,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       background: transparent;
       outline: none;
       font-family: inherit;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--nb-text, #111827);
       cursor: pointer;
     }
@@ -1168,7 +1194,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       gap: 6px;
     }
     .filter-input-wrap.date-picker-wrap label {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--nb-text-muted, #6b7280);
       white-space: nowrap;
     }
@@ -1183,26 +1209,31 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
       border-radius: var(--nb-radius-card, 12px);
       overflow-x: auto;
       box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      width: 100%;
+      box-sizing: border-box;
     }
     .nb-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12px;
+      table-layout: auto;
     }
     .nb-table th {
       background: var(--nb-surface-raised, #f8fafc);
-      padding: 12px 14px;
+      padding: 9px 8px;
       text-align: right;
       font-weight: 700;
       color: var(--nb-text-muted, #475569);
       border-bottom: 2px solid var(--nb-border, #e2e8f0);
       white-space: nowrap;
+      font-size: 11.5px;
     }
     .nb-table td {
-      padding: 12px 14px;
+      padding: 8px 8px;
       border-bottom: 1px solid var(--nb-border, #f1f5f9);
       color: var(--nb-text, #1e293b);
       white-space: nowrap;
+      font-size: 12px;
     }
     .nb-table tbody tr:hover:not(.total-row) {
       background: #f8fafc;
@@ -1214,7 +1245,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     }
     .nb-table .mono {
       font-family: ui-monospace, monospace;
-      font-size: 12px;
+      font-size: 11.5px;
       direction: ltr;
       text-align: right;
     }
@@ -1226,7 +1257,7 @@ export type DatePreset = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all'
     .total-row td {
       background: #f1f5f9 !important;
       font-weight: 800;
-      font-size: 13.5px;
+      font-size: 13px;
       border-top: 2px solid #cbd5e1;
       border-bottom: 2px double #cbd5e1;
     }
@@ -1499,8 +1530,14 @@ export class StudentFinanceReportsComponent implements OnInit {
   datePreset = signal<DatePreset>('all');
   loading = signal<boolean>(true);
 
-  // تاريخ اليوم الثابت للمقارنة والفلترة
-  readonly todayStr: string = '2026-09-17';
+  // تاريخ اليوم الديناميكي للمقارنة والفلترة
+  get todayStr(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   // الفلاتر
   searchQuery = signal<string>('');
@@ -1588,26 +1625,42 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   setDatePreset(preset: DatePreset) {
     this.datePreset.set(preset);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d = now.getDate();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${y}-${pad(m + 1)}-${pad(d)}`;
+
     if (preset === 'today') {
-      this.dateFrom.set(this.todayStr);
-      this.dateTo.set(this.todayStr);
+      this.dateFrom.set(today);
+      this.dateTo.set(today);
+      // الانتقال التلقائي إلى تبويب سندات القبض والتحصيل وتصفية عمليات اليوم فوراً
+      this.activeTab.set('receipts');
     } else if (preset === 'week') {
-      this.dateFrom.set('2026-09-13');
-      this.dateTo.set('2026-09-17');
+      // بداية الأسبوع الحالي (الأحد)
+      const dayOfWeek = now.getDay();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - dayOfWeek);
+      this.dateFrom.set(`${startOfWeek.getFullYear()}-${pad(startOfWeek.getMonth() + 1)}-${pad(startOfWeek.getDate())}`);
+      this.dateTo.set(today);
     } else if (preset === 'month') {
-      this.dateFrom.set('2026-09-01');
-      this.dateTo.set('2026-09-30');
+      this.dateFrom.set(`${y}-${pad(m + 1)}-01`);
+      const endOfMonth = new Date(y, m + 1, 0);
+      this.dateTo.set(`${y}-${pad(m + 1)}-${pad(endOfMonth.getDate())}`);
     } else if (preset === 'quarter') {
-      this.dateFrom.set('2026-07-01');
-      this.dateTo.set('2026-09-30');
+      const qStartMonth = Math.floor(m / 3) * 3;
+      this.dateFrom.set(`${y}-${pad(qStartMonth + 1)}-01`);
+      const qEndMonth = qStartMonth + 2;
+      const endOfQuarter = new Date(y, qEndMonth + 1, 0);
+      this.dateTo.set(`${y}-${pad(qEndMonth + 1)}-${pad(endOfQuarter.getDate())}`);
     } else if (preset === 'year') {
-      this.dateFrom.set('2026-01-01');
-      this.dateTo.set('2026-12-31');
+      this.dateFrom.set(`${y}-01-01`);
+      this.dateTo.set(`${y}-12-31`);
     } else {
       this.dateFrom.set('');
       this.dateTo.set('');
     }
-    this.loadAllData();
   }
 
   onDateFromChange(val: string) {
@@ -1671,98 +1724,39 @@ export class StudentFinanceReportsComponent implements OnInit {
   loadAllData() {
     this.loading.set(true);
 
-    let loadedCount = 0;
-    const totalRequests = 6;
-    const checkFinish = () => {
-      loadedCount++;
-      if (loadedCount >= totalRequests) {
-        this.loading.set(false);
-      }
-    };
+    forkJoin({
+      receipts: this.svc.listReceipts({ page_size: 500, ordering: '-payment_date' }).pipe(catchError(() => of([]))),
+      fees: this.svc.listFeeStructures().pipe(catchError(() => of({ data: [] }))),
+      invoices: this.svc.listInvoices({ page_size: 500 }).pipe(catchError(() => of([]))),
+      accounts: this.svc.listBillingAccounts({ page_size: 500 }).pipe(catchError(() => of({ data: [] }))),
+      installments: this.svc.getInstallmentsCalendar().pipe(catchError(() => of({ data: {} }))),
+      scholarships: this.svc.listScholarships({ page_size: 100 }).pipe(catchError(() => of({ data: [] }))),
+    }).pipe(
+      finalize(() => this.loading.set(false))
+    ).subscribe({
+      next: ({ receipts, fees, invoices, accounts, installments, scholarships }) => {
+        const receiptsData = Array.isArray(receipts) ? receipts : ((receipts as any)?.data || (receipts as any)?.results || []);
+        this.buildReceiptsData(receiptsData);
 
-    // 1. جلب سندات القبض المباشرة (الأولوية العظمى - عرض فوري ومباشر لتقارير اليوم)
-    this.svc.listReceipts({ page_size: 100, ordering: '-payment_date' }).pipe(
-      catchError((err) => {
-        console.error('Error loading receipts:', err);
-        return of([]);
-      })
-    ).subscribe((receipts) => {
-      const receiptsData = Array.isArray(receipts) ? receipts : ((receipts as any)?.data || (receipts as any)?.results || []);
-      this.buildReceiptsData(receiptsData);
-      // فك الحجب فوراً إذا كان المستخدم في تبويب السندات
-      if (this.activeTab() === 'receipts') {
-        this.loading.set(false);
-      }
-      checkFinish();
+        const feesData = (fees as any)?.data || [];
+        this.buildRevenueData(feesData);
+
+        const invoicesData = Array.isArray(invoices) ? invoices : ((invoices as any)?.data || (invoices as any)?.results || []);
+        this.buildInvoicesData(invoicesData);
+
+        const accs = (accounts as any)?.data || [];
+        this.buildAccountsData(accs);
+
+        const inst = (installments as any)?.data?.installments || [];
+        this.buildInstallmentsData(inst);
+
+        const sc = (scholarships as any)?.data || [];
+        this.buildScholarshipsData(sc);
+      },
+      error: (err) => {
+        console.error('Error loading finance report data:', err);
+      },
     });
-
-    // 2. جلب هياكل الرسوم والإيرادات
-    this.svc.listFeeStructures().pipe(
-      catchError(() => of({ data: [] }))
-    ).subscribe((fees) => {
-      const feesData = (fees as any)?.data || [];
-      this.buildRevenueData(feesData);
-      if (this.activeTab() === 'revenue') {
-        this.loading.set(false);
-      }
-      checkFinish();
-    });
-
-    // 3. جلب فواتير الطلاب
-    this.svc.listInvoices({ page_size: 100 }).pipe(
-      catchError((err) => {
-        console.error('Error loading invoices:', err);
-        return of([]);
-      })
-    ).subscribe((invoices) => {
-      const invoicesData = Array.isArray(invoices) ? invoices : ((invoices as any)?.data || (invoices as any)?.results || []);
-      this.buildInvoicesData(invoicesData);
-      if (this.activeTab() === 'invoices') {
-        this.loading.set(false);
-      }
-      checkFinish();
-    });
-
-    // 4. جلب حسابات الفوترة (للطلاب المسددين والمتعثرين)
-    this.svc.listBillingAccounts({ page_size: 100 }).pipe(
-      catchError(() => of({ data: [] }))
-    ).subscribe((accounts) => {
-      const accs = (accounts as any)?.data || [];
-      this.buildAccountsData(accs);
-      if (this.activeTab() === 'paid' || this.activeTab() === 'overdue') {
-        this.loading.set(false);
-      }
-      checkFinish();
-    });
-
-    // 5. تقويم الأقساط المجدولة
-    this.svc.getInstallmentsCalendar().pipe(
-      catchError(() => of({ data: {} }))
-    ).subscribe((calendar) => {
-      const inst = (calendar as any)?.data?.installments || [];
-      this.buildInstallmentsData(inst);
-      if (this.activeTab() === 'installments') {
-        this.loading.set(false);
-      }
-      checkFinish();
-    });
-
-    // 6. المنح والمساعدات
-    this.svc.listScholarships({ page_size: 100 }).pipe(
-      catchError(() => of({ data: [] }))
-    ).subscribe((scholarships) => {
-      const sc = (scholarships as any)?.data || [];
-      this.buildScholarshipsData(sc);
-      if (this.activeTab() === 'scholarships') {
-        this.loading.set(false);
-      }
-      checkFinish();
-    });
-
-    // صمام أمان زمني لضمان إغلاق شاشة التحميل دائماً حتى عند بطء الاتصال الخارجي
-    setTimeout(() => {
-      this.loading.set(false);
-    }, 1200);
   }
 
   // ---- بناء البيانات والتحويل المحاسبي ----
@@ -1800,11 +1794,12 @@ export class StudentFinanceReportsComponent implements OnInit {
   }
 
   private getSampleReceipts(): any[] {
+    const today = this.todayStr;
     return [
       {
         id: 'rec-01',
-        receipt_number: 'RCP-2026-0917-01',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-01`,
+        receipt_date: today,
         student_name: 'عثمان دفع الله إدريس',
         student_number: 'ST-2026-0041',
         branch_name: 'فرع البنين',
@@ -1826,8 +1821,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-02',
-        receipt_number: 'RCP-2026-0917-02',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-02`,
+        receipt_date: today,
         student_name: 'إخلاص ميرغني التوم',
         student_number: 'ST-2026-0052',
         branch_name: 'فرع البنات',
@@ -1849,8 +1844,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-03',
-        receipt_number: 'RCP-2026-0917-03',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-03`,
+        receipt_date: today,
         student_name: 'الفاتح بابكر عبد الله',
         student_number: 'ST-2026-0089',
         branch_name: 'فرع البنين',
@@ -1872,8 +1867,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-04',
-        receipt_number: 'RCP-2026-0917-04',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-04`,
+        receipt_date: today,
         student_name: 'فاطمة البدوي الزبير',
         student_number: 'ST-2026-0144',
         branch_name: 'فرع البنات',
@@ -1895,8 +1890,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-05',
-        receipt_number: 'RCP-2026-0917-05',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-05`,
+        receipt_date: today,
         student_name: 'مهند تاج السر حسن',
         student_number: 'ST-2026-0105',
         branch_name: 'فرع البنين',
@@ -1918,8 +1913,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-06',
-        receipt_number: 'RCP-2026-0917-06',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-06`,
+        receipt_date: today,
         student_name: 'آمنة الصديق كمال',
         student_number: 'ST-2026-0211',
         branch_name: 'فرع البنات',
@@ -1941,8 +1936,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-07',
-        receipt_number: 'RCP-2026-0917-07',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-07`,
+        receipt_date: today,
         student_name: 'يوسف عمر الصديق',
         student_number: 'ST-2026-0399',
         branch_name: 'فرع البنين',
@@ -1964,8 +1959,8 @@ export class StudentFinanceReportsComponent implements OnInit {
       },
       {
         id: 'rec-08',
-        receipt_number: 'RCP-2026-0917-08',
-        receipt_date: '2026-09-17',
+        receipt_number: `RCP-${today}-08`,
+        receipt_date: today,
         student_name: 'ريان السر الهادي',
         student_number: 'ST-2026-0312',
         branch_name: 'فرع البنات',
@@ -2588,8 +2583,39 @@ export class StudentFinanceReportsComponent implements OnInit {
     const pStatus = this.selectedPaymentStatus();
     const dFrom = this.dateFrom();
     const dTo = this.dateTo();
+    const hasDateFilter = !!dFrom || !!dTo;
 
-    const rows = this.customStatementData().filter((item) => {
+    const receipts = this.receiptsData();
+
+    // خريطة لتجميع مقبوضات كل طالب خلال الفترة المحددة
+    const studentPaymentsMap = new Map<string, number>();
+    if (hasDateFilter) {
+      for (const r of receipts) {
+        const rDate = r.receipt_date || r.payment_date || '';
+        if (dFrom && rDate < dFrom) continue;
+        if (dTo && rDate > dTo) continue;
+        const amt = Number(r.amount) || 0;
+        if (r.student_id) studentPaymentsMap.set(r.student_id, (studentPaymentsMap.get(r.student_id) || 0) + amt);
+        if (r.account_id) studentPaymentsMap.set(r.account_id, (studentPaymentsMap.get(r.account_id) || 0) + amt);
+        if (r.student_number) studentPaymentsMap.set(r.student_number, (studentPaymentsMap.get(r.student_number) || 0) + amt);
+        if (r.student_name) studentPaymentsMap.set(r.student_name, (studentPaymentsMap.get(r.student_name) || 0) + amt);
+      }
+    }
+
+    const rows = this.customStatementData().map((item) => {
+      let periodPaid = item.total_paid;
+      if (hasDateFilter) {
+        const p1 = item.student_id ? studentPaymentsMap.get(item.student_id) : undefined;
+        const p2 = item.account_id ? studentPaymentsMap.get(item.account_id) : undefined;
+        const p3 = item.student_number ? studentPaymentsMap.get(item.student_number) : undefined;
+        const p4 = item.student_name ? studentPaymentsMap.get(item.student_name) : undefined;
+        periodPaid = p1 ?? p2 ?? p3 ?? p4 ?? 0;
+      }
+      return {
+        ...item,
+        period_paid: periodPaid,
+      };
+    }).filter((item) => {
       // 1. بحث نصي
       if (q) {
         const matches =
@@ -2629,18 +2655,21 @@ export class StudentFinanceReportsComponent implements OnInit {
       }
 
       // 7. فلتر التاريخ
-      if (dFrom && item.last_payment_date && item.last_payment_date < dFrom) {
-        return false;
-      }
-      if (dTo && item.last_payment_date && item.last_payment_date > dTo) {
-        return false;
+      if (hasDateFilter) {
+        const hasPeriodReceipt = (item.period_paid || 0) > 0;
+        const lastDateInRange =
+          (!dFrom || (item.last_payment_date && item.last_payment_date >= dFrom)) &&
+          (!dTo || (item.last_payment_date && item.last_payment_date <= dTo));
+        if (!hasPeriodReceipt && !lastDateInRange) {
+          return false;
+        }
       }
 
       return true;
     });
 
     const totalBilled = rows.reduce((s, r) => s + (r.total_billed || 0), 0);
-    const totalPaid = rows.reduce((s, r) => s + (r.total_paid || 0), 0);
+    const totalPaid = rows.reduce((s, r) => s + (hasDateFilter ? (r.period_paid || 0) : (r.total_paid || 0)), 0);
     const totalRemaining = rows.reduce((s, r) => s + (r.outstanding_balance || 0), 0);
 
     return [
@@ -2836,7 +2865,8 @@ export class StudentFinanceReportsComponent implements OnInit {
     if (tab === 'custom_statement') {
       const rows = this.filteredCustomStatement().filter((r) => !r._isTotal);
       const totalBilled = rows.reduce((s, r) => s + (r.total_billed || 0), 0);
-      const totalPaid = rows.reduce((s, r) => s + (r.total_paid || 0), 0);
+      const hasPeriod = !!this.dateFrom() || !!this.dateTo() || this.datePreset() !== 'all';
+      const totalPaid = rows.reduce((s, r) => s + (r.period_paid != null ? r.period_paid : (r.total_paid || 0)), 0);
       const totalRemaining = rows.reduce((s, r) => s + (r.outstanding_balance || 0), 0);
       const rate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 0;
 
@@ -2857,12 +2887,12 @@ export class StudentFinanceReportsComponent implements OnInit {
           style: 'neutral',
         },
         {
-          label: 'المسدد الفعلي المعتمد',
+          label: hasPeriod ? 'المحصل المعتمد بالفترة' : 'المسدد الفعلي المعتمد',
           value: this.fmt(totalPaid),
           unit: 'ج.س',
           icon: '💵',
           style: 'success',
-          sub: `نسبة التحصيل ${rate.toFixed(1)}%`,
+          sub: hasPeriod ? `مجموع سداد الفترة` : `نسبة التحصيل ${rate.toFixed(1)}%`,
         },
         {
           label: 'إجمالي المتبقي للتحصيل',
@@ -3238,8 +3268,25 @@ export class StudentFinanceReportsComponent implements OnInit {
       sub: k.sub,
     }));
 
-    printStudentFinanceReport(title, cols, rows, filterInfo, kpiSummary);
+    printStudentFinanceReport(title, cols, rows, filterInfo, kpiSummary, undefined, this.receiptSchoolInfo());
   }
+
+  readonly exportPdfOfficial = async () => {
+    const title = this.activeReportTitle();
+    const cols = this.activeExportColumns();
+    const rows = this.activeExportRows();
+    const branchPart = this.selectedBranch() !== 'all' ? ` — ${this.selectedBranch()}` : '';
+    const stagePart = this.selectedStage() !== 'all' ? ` — ${this.selectedStage()}` : '';
+    const gradePart = this.selectedGrade() !== 'all' ? ` — ${this.selectedGrade()}` : '';
+    const filterInfo = `الفترة: ${this.getPresetLabel()}${branchPart}${stagePart}${gradePart}`;
+    const kpiSummary = this.currentKpis().map((k) => ({
+      label: k.label,
+      value: `${k.value} ${k.unit || ''}`.trim(),
+      sub: k.sub,
+    }));
+
+    await exportStudentFinanceReportToPdf(title, cols, rows, filterInfo, kpiSummary, undefined, this.receiptSchoolInfo());
+  };
 
   printClearance(student: any) {
     printClearanceCertificate({
@@ -3342,11 +3389,11 @@ export class StudentFinanceReportsComponent implements OnInit {
 
   private getPresetLabel(): string {
     const p = this.datePreset();
-    if (p === 'today') return 'سندات اليوم (17 سبتمبر 2026)';
+    if (p === 'today') return `سندات اليوم (${this.todayStr})`;
     if (p === 'week') return 'الأسبوع الحالي';
-    if (p === 'year') return 'العام الدراسي الحالي (2025/2026)';
+    if (p === 'year') return 'العام الدراسي الحالي';
     if (p === 'quarter') return 'الربع الدراسي الحالي';
-    if (p === 'month') return 'الشهر الحالي (سبتمبر 2026)';
+    if (p === 'month') return 'الشهر الحالي';
     return 'جميع الفترات المالية';
   }
 

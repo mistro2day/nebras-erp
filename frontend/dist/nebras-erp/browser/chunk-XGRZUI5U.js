@@ -1,1 +1,0 @@
-import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-FQWAWRFR.js").then(o=>o.TimetableDashboardComponent)}];export{t as TIMETABLE_ROUTES};

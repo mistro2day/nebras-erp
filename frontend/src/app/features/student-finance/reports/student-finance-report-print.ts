@@ -81,18 +81,20 @@ function cellValue(col: ExportColumn, row: any): string {
 }
 
 /**
- * طباعة تقرير مالي رسمي للطلاب بصيغة A4 أفقية (Landscape) بهوية المستأجر المعتمدة
+ * توليد كود HTML الكامل لتقرير مالي رسمي بصيغة A4 أفقية بهوية المستأجر المعتمدة
  */
-export function printStudentFinanceReport(
+export function renderStudentFinanceReportHtml(
   title: string,
   columns: ExportColumn[],
   rows: any[],
   filterInfo: string,
   kpis?: Array<{ label: string; value: string; sub?: string }>,
   customGrandTotal?: number,
-  tenantInfo?: any
-): void {
+  tenantInfo?: any,
+  forPdf = false
+): string {
   const branding = getTenantPrintBranding(tenantInfo);
+  const docStamp = branding.stampFinanceUrl || branding.stampUrl || '';
 
   // حساب المجموع الكلي
   let grandTotal = customGrandTotal ?? 0;
@@ -128,7 +130,9 @@ export function printStudentFinanceReport(
        </div>`
     : '';
 
-  const html = `<!doctype html>
+  const printScript = forPdf ? '' : '<script>window.onload = () => window.print();</script>';
+
+  return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
@@ -275,7 +279,7 @@ export function printStudentFinanceReport(
 
     ${tafqeetHtml}
 
-    <!-- توقيعات الاعتماد والختم الرسمي للمدرسة -->
+    <!-- توقيعات الاعتماد والختم المالي الرسمي للمدرسة -->
     <div class="signatures">
       <div class="sig">
         <span class="sig-label">إعداد المحاسب المسؤول</span>
@@ -290,7 +294,7 @@ export function printStudentFinanceReport(
         <div class="sig-line">مدير الإدارة المالية</div>
       </div>
       <div class="sig" style="flex: 0 0 100px;">
-        ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي">` : '<div class="stamp-box">الختم الرسمي للمدرسة</div>'}
+        ${docStamp ? `<img src="${docStamp}" class="stamp-img" alt="ختم الإدارة المالية">` : '<div class="stamp-box">ختم الإدارة المالية</div>'}
       </div>
     </div>
 
@@ -300,15 +304,88 @@ export function printStudentFinanceReport(
       <span>${BRAND_SYSTEM} &nbsp;•&nbsp; تم الاستخراج بتاريخ: ${timestamp()}</span>
     </div>
   </div>
-  <script>window.onload = () => window.print();</script>
+  ${printScript}
 </body>
 </html>`;
+}
 
+/**
+ * طباعة تقرير مالي رسمي للطلاب بصيغة A4 أفقية (Landscape) بهوية المستأجر المعتمدة
+ */
+export function printStudentFinanceReport(
+  title: string,
+  columns: ExportColumn[],
+  rows: any[],
+  filterInfo: string,
+  kpis?: Array<{ label: string; value: string; sub?: string }>,
+  customGrandTotal?: number,
+  tenantInfo?: any
+): void {
+  const html = renderStudentFinanceReportHtml(title, columns, rows, filterInfo, kpis, customGrandTotal, tenantInfo, false);
   const w = window.open('', '_blank', 'width=1100,height=750');
   if (!w) return;
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+/**
+ * تصدير ملف PDF رسمي عالي الدقة مطابق تماماً لمطبوعة A4 الأفقية
+ */
+export async function exportStudentFinanceReportToPdf(
+  title: string,
+  columns: ExportColumn[],
+  rows: any[],
+  filterInfo: string,
+  kpis?: Array<{ label: string; value: string; sub?: string }>,
+  customGrandTotal?: number,
+  tenantInfo?: any
+): Promise<void> {
+  const [jspdfMod, html2canvasMod]: any[] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  const JsPDF = jspdfMod.jsPDF ?? jspdfMod.default;
+  const html2canvas = html2canvasMod.default ?? html2canvasMod;
+
+  const html = renderStudentFinanceReportHtml(title, columns, rows, filterInfo, kpis, customGrandTotal, tenantInfo, true);
+
+  // إنشاء حاوية مخفية بأبعاد A4 Landscape (عرض 1122 بكسل بدقة A4)
+  const holder = document.createElement('div');
+  holder.setAttribute('dir', 'rtl');
+  holder.style.cssText = 'position:fixed; top:0; inset-inline-start:-10000px; width:1122px; background:#fff; z-index:-1;';
+  holder.innerHTML = html;
+  document.body.appendChild(holder);
+
+  try {
+    const canvas = await html2canvas(holder, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+    });
+    const pdf = new JsPDF('l', 'mm', 'a4');
+    const pageW = 297;
+    const pageH = 210;
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    const img = canvas.toDataURL('image/png');
+
+    let heightLeft = imgH;
+    let position = 0;
+    pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position -= pageH;
+      pdf.addPage();
+      pdf.addImage(img, 'PNG', 0, position, imgW, imgH);
+      heightLeft -= pageH;
+    }
+    const cleanName = `${title.replace(/[\s\/\\:*?"<>|]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    pdf.save(cleanName);
+  } finally {
+    document.body.removeChild(holder);
+  }
 }
 
 /**

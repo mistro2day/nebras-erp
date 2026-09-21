@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-Z7SP7MJ6.js").then(o=>o.ReportingDashboardComponent)}];export{t as REPORTING_ROUTES};
