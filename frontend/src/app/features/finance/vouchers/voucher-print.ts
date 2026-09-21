@@ -450,7 +450,7 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       <div class="sig-col stamp-col">
         <span class="sig-label">الختم المالي الرسمي</span>
         <div class="stamp-wrap">
-          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي للمدرسة" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-circle-ph" style="display:none;"><span>معتمد</span></div>` : '<div class="stamp-circle-ph"><span>الختم المعتمد</span></div>'}
+          ${branding.stampFinanceUrl ? `<img src="${branding.stampFinanceUrl}" class="stamp-img" alt="ختم الإدارة المالية" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-circle-ph" style="display:none;"><span>معتمد</span></div>` : '<div class="stamp-circle-ph"><span>الختم المعتمد</span></div>'}
         </div>
       </div>
     </div>

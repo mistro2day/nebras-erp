@@ -1,0 +1,1 @@
+import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-AXI4V6TG.js").then(o=>o.RulesDashboardComponent)}];export{t as RULES_ROUTES};

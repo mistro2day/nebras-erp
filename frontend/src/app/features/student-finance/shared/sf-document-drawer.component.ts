@@ -10,13 +10,13 @@ import { environment } from '../../../../environments/environment';
 export type SfDoc = { type: 'invoice' | 'receipt' | 'receivable'; data: any } | null;
 
 export const DEFAULT_BRAND = {
-  name: 'مدارس المورد الجديدة للتعليم الخاص',
-  name_ar: 'مدارس المورد الجديدة للتعليم الخاص',
-  name_en: 'Al-Mawred Aljadidah Private Schools',
+  name: 'مدارس المورد النموذجية الخاصة',
+  name_ar: 'مدارس المورد النموذجية الخاصة',
+  name_en: 'Al-Mawred Model Private Schools',
   accreditation: 'وزارة التعليم والتربية الوطنية',
   address: 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54',
-  logo_url: '/media/schools/logos/al-mawred.png',
-  stamp_url: '/media/schools/stamps/al-mawred-stamp.png',
+  logo_url: '',
+  stamp_url: '',
 };
 
 function tafqeetArabic(num: number, currency = 'جنيه'): string {
@@ -525,11 +525,13 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       margin: 0;
     }
     .school-logo-wrapper {
-      width: 74px;
-      height: 74px;
-      border-radius: 50%;
-      border: 2px solid #0284c7;
-      padding: 3px;
+      max-width: 140px;
+      max-height: 80px;
+      min-width: 60px;
+      min-height: 60px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      padding: 4px;
       background: #ffffff;
       display: flex;
       align-items: center;
@@ -538,8 +540,10 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       flex-shrink: 0;
     }
     .school-logo-img {
-      max-width: 100%;
-      max-height: 100%;
+      max-width: 130px;
+      max-height: 72px;
+      width: auto;
+      height: auto;
       object-fit: contain;
     }
     .school-logo-placeholder {
@@ -926,7 +930,10 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   getLogoUrl(): string {
     if (this.logoFailed()) return '';
     const info = this.schoolData();
-    let url = info?.logo_url || info?.logo || this.tenantService.currentTenant()?.logoUrl || DEFAULT_BRAND.logo_url;
+    let url = this.tenantService.currentTenant()?.logoUrl
+      || info?.logo_url
+      || info?.logo
+      || '';
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
       return url;
@@ -938,12 +945,11 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   getStampUrl(): string {
     if (this.stampFailed()) return '';
     const info = this.schoolData();
+    // سند القبض المالي والفواتير تتبع حصراً للإدارة المالية والخزينة
     let url = this.tenantService.currentTenant()?.stampFinanceUrl
       || info?.stamp_finance_url
-      || info?.stamp_url
-      || info?.stamp
-      || this.tenantService.currentTenant()?.stampUrl
-      || DEFAULT_BRAND.stamp_url;
+      || info?.stamp_finance
+      || '';
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
       return url;
@@ -1220,11 +1226,13 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             margin: 0 !important;
           }
           .school-logo-wrapper {
-            width: 76px !important;
-            height: 76px !important;
-            border-radius: 50% !important;
-            border: 2px solid #0284c7 !important;
-            padding: 3px !important;
+            max-width: 140px !important;
+            max-height: 80px !important;
+            min-width: 60px !important;
+            min-height: 60px !important;
+            border-radius: 8px !important;
+            border: 1px solid #cbd5e1 !important;
+            padding: 4px !important;
             background: #ffffff !important;
             display: flex !important;
             align-items: center !important;
@@ -1233,8 +1241,10 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             flex-shrink: 0 !important;
           }
           .school-logo-img {
-            max-width: 100% !important;
-            max-height: 100% !important;
+            max-width: 130px !important;
+            max-height: 72px !important;
+            width: auto !important;
+            height: auto !important;
             object-fit: contain !important;
           }
           .school-logo-placeholder {
@@ -1519,16 +1529,20 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             min-height: 65px !important;
           }
           .official-school-stamp-img {
-            max-height: 75px !important;
-            max-width: 105px !important;
+            max-height: 85px !important;
+            max-width: 140px !important;
+            width: auto !important;
+            height: auto !important;
             object-fit: contain !important;
             transform: rotate(-3deg) !important;
           }
           .stamp-badge, .stamp-circle {
-            width: 78px !important;
-            height: 54px !important;
+            min-width: 85px !important;
+            max-width: 130px !important;
+            height: 56px !important;
+            padding: 4px 8px !important;
             border: 1.5px dashed #0284c7 !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;

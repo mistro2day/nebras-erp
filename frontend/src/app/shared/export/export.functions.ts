@@ -132,11 +132,11 @@ function renderDocHtml(meta: ExportMeta, columns: ExportColumn[], rows: any[]): 
 
   let docStamp = branding.stampUrl;
   let stampTitle = 'الختم الرسمي للمؤسسة';
-  if (isFinance && (branding.stampFinanceUrl || branding.stampUrl)) {
-    docStamp = branding.stampFinanceUrl || branding.stampUrl;
+  if (isFinance) {
+    docStamp = branding.stampFinanceUrl || '';
     stampTitle = 'ختم الإدارة المالية والخزينة';
-  } else if (isAcademic && (branding.stampAcademicUrl || branding.stampUrl)) {
-    docStamp = branding.stampAcademicUrl || branding.stampUrl;
+  } else if (isAcademic) {
+    docStamp = branding.stampAcademicUrl || '';
     stampTitle = 'ختم الشؤون الأكاديمية والمتابعة';
   }
 

@@ -227,7 +227,7 @@ export function printLedgerStatement(account: any, entries: any[], tenantInfo?: 
       <div class="sig-col">
         <span class="sig-label">الختم المالي الرسمي</span>
         <div class="stamp-wrap">
-          ${branding.stampUrl ? `<img src="${branding.stampUrl}" class="stamp-img" alt="الختم الرسمي" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">معتمد</div>` : '<div class="stamp-ph">معتمد</div>'}
+          ${branding.stampFinanceUrl ? `<img src="${branding.stampFinanceUrl}" class="stamp-img" alt="ختم الإدارة المالية" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">معتمد</div>` : '<div class="stamp-ph">معتمد</div>'}
         </div>
       </div>
     </div>

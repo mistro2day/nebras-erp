@@ -1,1 +1,0 @@
-import"./chunk-Z3S5WG22.js";var o=[{path:"",redirectTo:"school-identity",pathMatch:"full"},{path:"school-identity",loadComponent:()=>import("./chunk-EFL5SLMY.js").then(t=>t.SchoolIdentitySettingsComponent)},{path:"features",loadComponent:()=>import("./chunk-HXLCDNVK.js").then(t=>t.FeatureFlagsComponent)}];export{o as CONFIG_ROUTES};

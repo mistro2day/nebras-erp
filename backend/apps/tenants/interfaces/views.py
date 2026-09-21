@@ -290,7 +290,7 @@ class TenantViewSet(viewsets.ModelViewSet):
         else:
             data['stamp_url'] = None
 
-        # ختم الإدارة المالية والخزينة (مع التراجع للختم العام إذا لم يتوفر)
+        # ختم الإدارة المالية والخزينة (منفصل تماماً عن ختم الإدارة العامة)
         if tenant.stamp_finance:
             try:
                 data['stamp_finance_url'] = request.build_absolute_uri(tenant.stamp_finance.url)
@@ -299,9 +299,9 @@ class TenantViewSet(viewsets.ModelViewSet):
         elif feat.get('stamp_finance_url'):
             data['stamp_finance_url'] = feat['stamp_finance_url']
         else:
-            data['stamp_finance_url'] = data['stamp_url']
+            data['stamp_finance_url'] = None
 
-        # ختم الشؤون الأكاديمية والمتابعة (مع التراجع للختم العام إذا لم يتوفر)
+        # ختم الشؤون الأكاديمية والمتابعة (منفصل تماماً عن ختم الإدارة العامة)
         if tenant.stamp_academic:
             try:
                 data['stamp_academic_url'] = request.build_absolute_uri(tenant.stamp_academic.url)
@@ -310,6 +310,6 @@ class TenantViewSet(viewsets.ModelViewSet):
         elif feat.get('stamp_academic_url'):
             data['stamp_academic_url'] = feat['stamp_academic_url']
         else:
-            data['stamp_academic_url'] = data['stamp_url']
+            data['stamp_academic_url'] = None
             
         return Response(data)

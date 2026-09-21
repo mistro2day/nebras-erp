@@ -71,19 +71,19 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
     info.stamp ||
     '';
 
-  // ختم الإدارة المالية والخزينة (يتراجع للختم العام إذا لم يحدد)
+  // ختم الإدارة المالية والخزينة (منفصل تماماً عن ختم المدير العام)
   const stampFinanceUrl =
     info.stampFinanceUrl ||
     info.stamp_finance_url ||
     info.stamp_finance ||
-    stampUrl;
+    '';
 
-  // ختم الشؤون الأكاديمية والمتابعة (يتراجع للختم العام إذا لم يحدد)
+  // ختم الشؤون الأكاديمية والمتابعة (منفصل تماماً عن ختم المدير العام)
   const stampAcademicUrl =
     info.stampAcademicUrl ||
     info.stamp_academic_url ||
     info.stamp_academic ||
-    stampUrl;
+    '';
 
   // الهواتف المعتمدة
   const defaultPhones = ['0123689814', '0110100504', '0110100505', '0110100506'];
@@ -139,9 +139,9 @@ export function getDepartmentStamp(
   if (!branding) return '';
   switch (dept) {
     case 'finance':
-      return branding.stampFinanceUrl || branding.stampUrl || '';
+      return branding.stampFinanceUrl || '';
     case 'academic':
-      return branding.stampAcademicUrl || branding.stampUrl || '';
+      return branding.stampAcademicUrl || '';
     case 'general':
     default:
       return branding.stampUrl || '';

@@ -443,8 +443,8 @@ export function printPurchaseRequest(request: any, tenantInfo?: any, printedBy?:
       <div class="sig-col stamp-col">
         <span class="sig-label">الختم المالي الرسمي</span>
         <div class="stamp-wrap">
-          ${(branding.stampFinanceUrl || branding.stampUrl) ? `
-            <img src="${branding.stampFinanceUrl || branding.stampUrl}" alt="ختم الإدارة المالية" class="stamp-img" onerror="this.parentElement.innerHTML='<div class=\\'stamp-placeholder\\'>ختم مالي<br>معتمد</div>'" />
+          ${branding.stampFinanceUrl ? `
+            <img src="${branding.stampFinanceUrl}" alt="ختم الإدارة المالية" class="stamp-img" onerror="this.parentElement.innerHTML='<div class=\\'stamp-placeholder\\'>ختم مالي<br>معتمد</div>'" />
           ` : `
             <div class="stamp-placeholder">ختم مالي<br>معتمد</div>
           `}
