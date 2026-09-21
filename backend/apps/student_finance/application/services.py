@@ -447,7 +447,8 @@ class PaymentService:
             payment_method_id=payment_method_id,
             bank_account_id=bank_account_id,
             cash_box_id=cash_box_id,
-            status='draft'
+            status='draft',
+            created_by=user_id
         )
 
         # 2. ترحيل السند المالي وتوليد القيود المحاسبية عبر موديول المالية (Finance Integration)

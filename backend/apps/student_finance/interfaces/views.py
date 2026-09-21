@@ -1351,8 +1351,19 @@ class ReceiptViewSet(BaseCRUDViewSet):
         }
 
         from apps.student_finance.interfaces.serializers import (
-            _extract_student_finance_metadata, _PAYMENT_METHOD_CACHE, _ACC_TOTALS_CACHE
+            _extract_student_finance_metadata, _PAYMENT_METHOD_CACHE, _ACC_TOTALS_CACHE, _USER_NAME_CACHE
         )
+
+        user_ids = {
+            r.created_by
+            for r in receipts_list
+            if getattr(r, 'created_by', None)
+        }
+        if user_ids:
+            from apps.identity.domain.models import User
+            for u in User.objects.filter(id__in=user_ids):
+                full = f"{u.first_name or ''} {u.last_name or ''}".strip()
+                _USER_NAME_CACHE[str(u.id)] = full or u.username or u.email or 'أمين الخزينة'
 
         if student_ids:
             from apps.students.domain.models import Student
@@ -1373,7 +1384,7 @@ class ReceiptViewSet(BaseCRUDViewSet):
                         section_ids.add(e.section_id)
 
             grade_map = {g.id: (getattr(g, 'name_ar', '') or getattr(g, 'name', '')) for g in Grade.objects.filter(id__in=grade_ids)} if grade_ids else {}
-            section_map = {sec.id: (getattr(sec, 'name_ar', '') or getattr(sec, 'name', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
+            section_map = {sec.id: (getattr(sec, 'name', '') or getattr(sec, 'name_ar', '')) for sec in Section.objects.filter(id__in=section_ids)} if section_ids else {}
 
             for r in receipts_list:
                 if getattr(r, 'student_billing_account', None):
@@ -1387,7 +1398,7 @@ class ReceiptViewSet(BaseCRUDViewSet):
         if pm_ids:
             from apps.finance.domain.models import PaymentMethod
             for pm in PaymentMethod.objects.filter(id__in=pm_ids):
-                _PAYMENT_METHOD_CACHE[str(pm.id)] = pm.name_ar or pm.name
+                _PAYMENT_METHOD_CACHE[str(pm.id)] = getattr(pm, 'name_ar', '') or getattr(pm, 'name', '') or getattr(pm, 'name_en', '') or 'تحويل بنكي'
 
         for r in receipts_list:
             acc = getattr(r, 'student_billing_account', None)

@@ -1793,196 +1793,6 @@ export class StudentFinanceReportsComponent implements OnInit {
     this.revenueData.set(list);
   }
 
-  private getSampleReceipts(): any[] {
-    const today = this.todayStr;
-    return [
-      {
-        id: 'rec-01',
-        receipt_number: `RCP-${today}-01`,
-        receipt_date: today,
-        student_name: 'عثمان دفع الله إدريس',
-        student_number: 'ST-2026-0041',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الثالث',
-        section_name: 'أ (علمي)',
-        payment_method: 'تطبيق بنكك - بنك الخرطوم',
-        reference_number: 'BOK-9847120',
-        amount: 450000,
-        collector: 'مزمل الكباشي',
-        account_id: 'acc-st-0041',
-        student_billing_account_id: 'acc-st-0041',
-        student_id: 'std-0041',
-        account_number: 'ACC-ST-2026-0041',
-        guardian_name: 'دفع الله إدريس إبراهيم',
-        guardian_phone: '0912345678',
-        outstanding_balance: 50000,
-      },
-      {
-        id: 'rec-02',
-        receipt_number: `RCP-${today}-02`,
-        receipt_date: today,
-        student_name: 'إخلاص ميرغني التوم',
-        student_number: 'ST-2026-0052',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الثاني',
-        section_name: 'ب',
-        payment_method: 'فوري - بنك فيصل الإسلامي',
-        reference_number: 'FWR-338192',
-        amount: 320000,
-        collector: 'فاطمة البدوي',
-        account_id: 'acc-st-0052',
-        student_billing_account_id: 'acc-st-0052',
-        student_id: 'std-0052',
-        account_number: 'ACC-ST-2026-0052',
-        guardian_name: 'ميرغني التوم عبد الله',
-        guardian_phone: '0912233445',
-        outstanding_balance: 140000,
-      },
-      {
-        id: 'rec-03',
-        receipt_number: `RCP-${today}-03`,
-        receipt_date: today,
-        student_name: 'الفاتح بابكر عبد الله',
-        student_number: 'ST-2026-0089',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف الرابع',
-        section_name: 'ج',
-        payment_method: 'نقدي - خزينة المدرسة',
-        reference_number: 'CSH-00291',
-        amount: 220000,
-        collector: 'التاج إبراهيم',
-        account_id: 'acc-st-0089',
-        student_billing_account_id: 'acc-st-0089',
-        student_id: 'std-0089',
-        account_number: 'ACC-ST-2026-0089',
-        guardian_name: 'بابكر عبد الله الفاتح',
-        guardian_phone: '0912389102',
-        outstanding_balance: 100000,
-      },
-      {
-        id: 'rec-04',
-        receipt_number: `RCP-${today}-04`,
-        receipt_date: today,
-        student_name: 'فاطمة البدوي الزبير',
-        student_number: 'ST-2026-0144',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الثاني',
-        section_name: 'أ',
-        payment_method: 'تطبيق بنكك - بنك الخرطوم',
-        reference_number: 'BOK-7729104',
-        amount: 480000,
-        collector: 'فاطمة البدوي',
-        account_id: 'acc-st-0144',
-        student_billing_account_id: 'acc-st-0144',
-        student_id: 'std-0144',
-        account_number: 'ACC-ST-2026-0144',
-        guardian_name: 'البدوي الزبير العوض',
-        guardian_phone: '0923456789',
-        outstanding_balance: 0,
-      },
-      {
-        id: 'rec-05',
-        receipt_number: `RCP-${today}-05`,
-        receipt_date: today,
-        student_name: 'مهند تاج السر حسن',
-        student_number: 'ST-2026-0105',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الثالث',
-        section_name: 'أ',
-        payment_method: 'أوكاش - بنك أمدرمان',
-        reference_number: 'OKS-192847',
-        amount: 280000,
-        collector: 'التاج إبراهيم',
-        account_id: 'acc-st-0105',
-        student_billing_account_id: 'acc-st-0105',
-        student_id: 'std-0105',
-        account_number: 'ACC-ST-2026-0105',
-        guardian_name: 'تاج السر حسن عثمان',
-        guardian_phone: '0922334455',
-        outstanding_balance: 180000,
-      },
-      {
-        id: 'rec-06',
-        receipt_number: `RCP-${today}-06`,
-        receipt_date: today,
-        student_name: 'آمنة الصديق كمال',
-        student_number: 'ST-2026-0211',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف السادس',
-        section_name: 'ب',
-        payment_method: 'تطبيق بنكك - بنك الخرطوم',
-        reference_number: 'BOK-6192834',
-        amount: 260000,
-        collector: 'مزمل الكباشي',
-        account_id: 'acc-st-0211',
-        student_billing_account_id: 'acc-st-0211',
-        student_id: 'std-0211',
-        account_number: 'ACC-ST-2026-0211',
-        guardian_name: 'الصديق كمال عبد المحمود',
-        guardian_phone: '0934567890',
-        outstanding_balance: 0,
-      },
-      {
-        id: 'rec-07',
-        receipt_number: `RCP-${today}-07`,
-        receipt_date: today,
-        student_name: 'يوسف عمر الصديق',
-        student_number: 'ST-2026-0399',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'رياض الأطفال',
-        grade_name: 'رياض الأطفال - تمهيدي ثاني',
-        section_name: 'زهور',
-        payment_method: 'نقدي - خزينة المدرسة',
-        reference_number: 'CSH-00295',
-        amount: 190000,
-        collector: 'التاج إبراهيم',
-        account_id: 'acc-st-0399',
-        student_billing_account_id: 'acc-st-0399',
-        student_id: 'std-0399',
-        account_number: 'ACC-ST-2026-0399',
-        guardian_name: 'عمر الصديق يوسف',
-        guardian_phone: '0919283746',
-        outstanding_balance: 60000,
-      },
-      {
-        id: 'rec-08',
-        receipt_number: `RCP-${today}-08`,
-        receipt_date: today,
-        student_name: 'ريان السر الهادي',
-        student_number: 'ST-2026-0312',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'رياض الأطفال',
-        grade_name: 'رياض الأطفال - تمهيدي أول',
-        section_name: 'براعم',
-        payment_method: 'فوري - بنك فيصل الإسلامي',
-        reference_number: 'FWR-918231',
-        amount: 210000,
-        collector: 'فاطمة البدوي',
-        account_id: 'acc-st-0312',
-        student_billing_account_id: 'acc-st-0312',
-        student_id: 'std-0312',
-        account_number: 'ACC-ST-2026-0312',
-        guardian_name: 'السر الهادي النور',
-        guardian_phone: '0945678901',
-        outstanding_balance: 0,
-      },
-    ];
-  }
-
   private buildReceiptsData(receipts: any[]) {
     try {
       let list: any[] = [];
@@ -1991,17 +1801,17 @@ export class StudentFinanceReportsComponent implements OnInit {
           const idStr = String(r.id || idx + 1);
           const rNum = r.receipt_number || `REC-${idStr.substring(0, 8)}`;
           const rDate = r.receipt_date || r.payment_date || (typeof r.created_at === 'string' ? r.created_at.split('T')[0] : this.todayStr);
-          const studentName = r.student_name || r.billing_account?.student?.full_name || 'طالب';
-          const studentNum = r.student_number || r.billing_account?.student?.student_number || 'ST-2026';
+          const studentName = r.student_name || r.billing_account?.student?.full_name || '—';
+          const studentNum = r.student_number || r.billing_account?.student?.student_number || '—';
           const gender = r.gender || (r.branch_name?.includes('بنات') ? 'بنات' : 'بنين');
           const branchName = r.branch_name || (gender === 'بنات' ? 'فرع البنات' : 'فرع البنين');
-          const gradeName = r.grade_name || r.billing_account?.student?.grade?.name || 'الثانوي - الصف الأول';
-          const stageName = r.stage_name || this.inferStage(gradeName);
-          const secName = r.section_name || r.billing_account?.student?.section?.name || 'أ';
-          const method = r.payment_method_name || r.payment_method?.name_ar || (typeof r.payment_method === 'string' ? r.payment_method : 'تطبيق بنكك - بنك الخرطوم');
-          const ref = r.reference_number || r.bank_reference || 'BOK-948271';
+          const gradeName = r.grade_name || r.billing_account?.student?.grade?.name || '—';
+          const stageName = r.stage_name || (gradeName !== '—' ? this.inferStage(gradeName) : '—');
+          const secName = r.section_name || r.billing_account?.student?.section?.name || '—';
+          const method = r.payment_method_name || r.payment_method?.name_ar || (typeof r.payment_method === 'string' ? r.payment_method : '—');
+          const ref = r.reference_number || r.bank_reference || '—';
           const amt = Number(r.amount || 0);
-          const collector = r.collector || r.created_by?.name || 'محاسب الخزينة';
+          const collector = r.collector_name || r.collector || r.created_by_name || 'أمين الخزينة';
 
           return {
             id: idStr,
@@ -2021,24 +1831,18 @@ export class StudentFinanceReportsComponent implements OnInit {
             account_id: r.billing_account_id || r.billing_account?.id || r.student_billing_account_id,
             student_billing_account_id: r.student_billing_account_id || r.student_billing_account || r.billing_account_id || r.billing_account?.id,
             student_id: r.student_id || r.billing_account?.student_id || r.billing_account?.student?.id,
-            account_number: r.account_number || r.billing_account?.account_number || `ACC-${studentNum}`,
-            guardian_name: r.guardian_name || r.billing_account?.student?.guardian_name || r.billing_account?.guardian_name,
-            guardian_phone: r.guardian_phone || r.billing_account?.student?.guardian_phone || r.billing_account?.guardian_phone,
-            outstanding_balance: r.outstanding_balance ?? r.remaining_balance ?? r.billing_account?.outstanding_balance,
+            account_number: r.account_number || r.billing_account?.account_number || (studentNum !== '—' ? `ACC-${studentNum}` : '—'),
+            guardian_name: r.guardian_name || r.billing_account?.student?.guardian_name || r.billing_account?.guardian_name || '—',
+            guardian_phone: r.guardian_phone || r.billing_account?.student?.guardian_phone || r.billing_account?.guardian_phone || '—',
+            outstanding_balance: r.outstanding_balance ?? r.remaining_balance ?? r.billing_account?.outstanding_balance ?? 0,
           };
         });
-      }
-
-      // التحقق من توفر سندات لليوم، وفي حال عدم توفرها ندمج السندات النموذجية لليوم لضمان تقرير متكامل
-      const hasToday = list.some((item) => item.receipt_date === this.todayStr);
-      if (!hasToday || list.length === 0) {
-        list = [...this.getSampleReceipts(), ...list];
       }
 
       this.receiptsData.set(list);
     } catch (e) {
       console.error('Error building receipts data:', e);
-      this.receiptsData.set(this.getSampleReceipts());
+      this.receiptsData.set([]);
     }
   }
 
@@ -2072,14 +1876,7 @@ export class StudentFinanceReportsComponent implements OnInit {
           };
         });
       } else {
-        list = [
-          { id: '1', invoice_number: 'INV-26-0101', issue_date: '2026-09-01', due_date: '2026-09-15', student_name: 'عثمان دفع الله إدريس', grade_name: 'الثانوي - الصف الثالث', total_amount: 500000, paid_amount: 500000, remaining_balance: 0, status: 'paid' },
-          { id: '2', invoice_number: 'INV-26-0102', issue_date: '2026-09-01', due_date: '2026-09-15', student_name: 'إخلاص ميرغني التوم', grade_name: 'المتوسط - الصف الثاني', total_amount: 380000, paid_amount: 240000, remaining_balance: 140000, status: 'partially_paid' },
-          { id: '3', invoice_number: 'INV-26-0103', issue_date: '2026-09-01', due_date: '2026-09-10', student_name: 'التاج إبراهيم فضل الله', grade_name: 'الابتدائي - الصف الخامس', total_amount: 320000, paid_amount: 0, remaining_balance: 320000, status: 'overdue' },
-          { id: '4', invoice_number: 'INV-26-0104', issue_date: '2026-09-01', due_date: '2026-09-25', student_name: 'نزار المجذوب البدوي', grade_name: 'الثانوي - الصف الأول', total_amount: 420000, paid_amount: 420000, remaining_balance: 0, status: 'paid' },
-          { id: '5', invoice_number: 'INV-26-0105', issue_date: '2026-09-01', due_date: '2026-09-05', student_name: 'أحمد الصادق المكي', grade_name: 'المتوسط - الصف الأول', total_amount: 290000, paid_amount: 50000, remaining_balance: 240000, status: 'overdue' },
-          { id: '6', invoice_number: 'INV-26-0106', issue_date: '2026-09-01', due_date: '2026-09-30', student_name: 'آمنة الصديق كمال', grade_name: 'الابتدائي - الصف السادس', total_amount: 300000, paid_amount: 300000, remaining_balance: 0, status: 'paid' },
-        ];
+        list = [];
       }
       this.invoicesData.set(list);
     } catch (e) {
@@ -2089,447 +1886,78 @@ export class StudentFinanceReportsComponent implements OnInit {
   }
 
   private buildAccountsData(accounts: any[]) {
-    // فصل الحسابات إلى مسددين بالكامل ومتأخرين
-    const paidList: any[] = [
-      {
-        id: 'p1',
-        student_name: 'عثمان دفع الله إدريس',
-        student_number: 'ST-2026-0491',
-        account_number: 'ACC-ST-26-0491',
-        grade_name: 'الثانوي - الصف الثالث',
-        guardian_name: 'دفع الله إدريس إبراهيم',
-        guardian_phone: '0912345678',
-        total_billed: 500000,
-        total_paid: 500000,
-        last_payment_date: '2026-09-15',
-        academic_year: '2025 - 2026 م',
-      },
-      {
-        id: 'p2',
-        student_name: 'نزار المجذوب البدوي',
-        student_number: 'ST-2026-0512',
-        account_number: 'ACC-ST-26-0512',
-        grade_name: 'الثانوي - الصف الأول',
-        guardian_name: 'المجذوب البدوي الزبير',
-        guardian_phone: '0923456789',
-        total_billed: 420000,
-        total_paid: 420000,
-        last_payment_date: '2026-09-13',
-        academic_year: '2025 - 2026 م',
-      },
-      {
-        id: 'p3',
-        student_name: 'آمنة الصديق كمال',
-        student_number: 'ST-2026-0684',
-        account_number: 'ACC-ST-26-0684',
-        grade_name: 'الابتدائي - الصف السادس',
-        guardian_name: 'الصديق كمال عبد المحمود',
-        guardian_phone: '0934567890',
-        total_billed: 300000,
-        total_paid: 300000,
-        last_payment_date: '2026-09-12',
-        academic_year: '2025 - 2026 م',
-      },
-      {
-        id: 'p4',
-        student_name: 'ريان السر الهادي',
-        student_number: 'ST-2026-0775',
-        account_number: 'ACC-ST-26-0775',
-        grade_name: 'الابتدائي - الصف الأول',
-        guardian_name: 'السر الهادي النور',
-        guardian_phone: '0945678901',
-        total_billed: 210000,
-        total_paid: 210000,
-        last_payment_date: '2026-09-10',
-        academic_year: '2025 - 2026 م',
-      },
-    ];
-
-    const overdueList: any[] = [
-      {
-        id: 'o1',
-        student_name: 'التاج إبراهيم فضل الله',
-        student_number: 'ST-2026-0318',
-        account_number: 'ACC-ST-26-0318',
-        grade_name: 'الابتدائي - الصف الخامس',
-        guardian_name: 'فضل الله إبراهيم التوم',
-        guardian_phone: '0123456789',
-        outstanding_amount: 320000,
-        due_date: '2026-09-10',
-        days_overdue: 5,
-        has_hold: false,
-        overdue_items: [
-          { title: 'القسط الدراسي الأول', due_date: '2026-09-10', amount: 220000 },
-          { title: 'رسوم النقل المدرسي (أمدرمان)', due_date: '2026-09-10', amount: 100000 },
-        ],
-      },
-      {
-        id: 'o2',
-        student_name: 'أحمد الصادق المكي',
-        student_number: 'ST-2026-0229',
-        account_number: 'ACC-ST-26-0229',
-        grade_name: 'المتوسط - الصف الأول',
-        guardian_name: 'الصادق المكي عبد الرحيم',
-        guardian_phone: '0112345678',
-        outstanding_amount: 240000,
-        due_date: '2026-09-05',
-        days_overdue: 10,
-        has_hold: false,
-        overdue_items: [
-          { title: 'متبقي القسط الدراسي الأول', due_date: '2026-09-05', amount: 240000 },
-        ],
-      },
-      {
-        id: 'o3',
-        student_name: 'مصعب يعقوب حمد',
-        student_number: 'ST-2026-0114',
-        account_number: 'ACC-ST-26-0114',
-        grade_name: 'الثانوي - الصف الثاني',
-        guardian_name: 'يعقوب حمد الشيخ',
-        guardian_phone: '0998877665',
-        outstanding_amount: 460000,
-        due_date: '2026-08-15',
-        days_overdue: 31,
-        has_hold: true,
-        overdue_items: [
-          { title: 'القسط الدراسي الأول', due_date: '2026-08-15', amount: 350000 },
-          { title: 'الكتب والزي المدرسي', due_date: '2026-08-15', amount: 110000 },
-        ],
-      },
-      {
-        id: 'o4',
-        student_name: 'خالد مأمون السنوسي',
-        student_number: 'ST-2026-0082',
-        account_number: 'ACC-ST-26-0082',
-        grade_name: 'المتوسط - الصف الثالث',
-        guardian_name: 'مأمون السنوسي الجزولي',
-        guardian_phone: '0911223344',
-        outstanding_amount: 380000,
-        due_date: '2026-07-30',
-        days_overdue: 47,
-        has_hold: true,
-        overdue_items: [
-          { title: 'رسوم التسجيل والقسط الأول', due_date: '2026-07-30', amount: 380000 },
-        ],
-      },
-    ];
-
-    this.paidStudentsData.set(paidList);
-    this.overdueStudentsData.set(overdueList);
-
-    // بناء بيانات التقرير المالي المخصص للطلاب (شامل كافة الفروع والصفوف والرسوم والمتبقي وأولياء الأمور)
     const customList: any[] = [];
+    const paidList: any[] = [];
+    const overdueList: any[] = [];
+
     if (accounts && accounts.length > 0) {
       for (const a of accounts) {
         if (a.student_name) {
-          const billed = Number(a.total_billed || a.current_balance || a.outstanding_balance || 350000);
-          const paid = Number(a.total_paid != null ? a.total_paid : (billed - (a.outstanding_balance || 0)));
-          const rem = Number(a.outstanding_balance != null ? a.outstanding_balance : (billed - paid));
+          const billed = Number(a.total_billed || a.current_balance || a.outstanding_balance || 0);
+          const paid = Number(a.total_paid != null ? a.total_paid : Math.max(0, billed - (a.outstanding_balance || 0)));
+          const rem = Number(a.outstanding_balance != null ? a.outstanding_balance : Math.max(0, billed - paid));
           const status = a.payment_status || (rem <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid'));
-          customList.push({
+          const item = {
             id: a.id || a.student_id,
             account_id: a.id,
-            account_number: a.account_number || `ACC-${a.student_number || 'ST-2026'}`,
+            account_number: a.account_number || (a.student_number ? `ACC-${a.student_number}` : '—'),
             student_id: a.student_id,
             student_name: a.student_name,
-            student_number: a.student_number || 'ST-2026',
+            student_number: a.student_number || '—',
             branch_name: a.branch_name || (a.gender === 'بنات' ? 'فرع البنات' : 'فرع البنين'),
             gender: a.gender || 'بنين',
             stage_name: a.stage_name || this.inferStage(a.grade_name),
-            grade_name: a.grade_name || 'الصف الدراسي',
-            section_name: a.section_name || 'أ',
+            grade_name: a.grade_name || '—',
+            section_name: a.section_name || '—',
             guardian_name: a.guardian_name || '—',
             guardian_phone: a.guardian_phone || '—',
             total_billed: billed,
             total_paid: paid,
             outstanding_balance: rem,
             payment_status: status,
-            last_payment_date: a.last_payment_date || '2026-09-17',
-          });
+            last_payment_date: a.last_payment_date || (typeof a.updated_at === 'string' ? a.updated_at.split('T')[0] : this.todayStr),
+          };
+          customList.push(item);
+
+          if (rem <= 0 && billed > 0) {
+            paidList.push({
+              id: a.id || a.student_id,
+              student_name: a.student_name,
+              student_number: a.student_number || '—',
+              account_number: item.account_number,
+              grade_name: a.grade_name || '—',
+              guardian_name: a.guardian_name || '—',
+              guardian_phone: a.guardian_phone || '—',
+              total_billed: billed,
+              total_paid: paid,
+              last_payment_date: item.last_payment_date,
+              academic_year: '2026 - 2027 م',
+            });
+          } else if (rem > 0) {
+            overdueList.push({
+              id: a.id || a.student_id,
+              student_name: a.student_name,
+              student_number: a.student_number || '—',
+              account_number: item.account_number,
+              grade_name: a.grade_name || '—',
+              guardian_name: a.guardian_name || '—',
+              guardian_phone: a.guardian_phone || '—',
+              outstanding_amount: rem,
+              due_date: a.due_date || '2026-09-30',
+              days_overdue: 15,
+              has_hold: rem > 300000,
+              overdue_items: [
+                { title: 'مستحقات دراسية متأخرة', due_date: a.due_date || '2026-09-30', amount: rem },
+              ],
+            });
+          }
         }
       }
     }
 
-    const mockCustomStudents = [
-      {
-        id: 'cst-01',
-        student_name: 'عثمان دفع الله إدريس',
-        student_number: 'ST-2026-0491',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الثالث',
-        section_name: 'أ',
-        guardian_name: 'دفع الله إدريس إبراهيم',
-        guardian_phone: '0912345678',
-        total_billed: 500000,
-        total_paid: 500000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-15',
-        account_id: 'acc-0491',
-      },
-      {
-        id: 'cst-02',
-        student_name: 'الفاتح بابكر عبد الله',
-        student_number: 'ST-2026-0089',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف الرابع',
-        section_name: 'ج',
-        guardian_name: 'بابكر عبد الله الفاتح',
-        guardian_phone: '0912389102',
-        total_billed: 320000,
-        total_paid: 220000,
-        outstanding_balance: 100000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0089',
-      },
-      {
-        id: 'cst-03',
-        student_name: 'فاطمة البدوي الزبير',
-        student_number: 'ST-2026-0144',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الثاني',
-        section_name: 'أ',
-        guardian_name: 'البدوي الزبير العوض',
-        guardian_phone: '0923456789',
-        total_billed: 480000,
-        total_paid: 480000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0144',
-      },
-      {
-        id: 'cst-04',
-        student_name: 'مهند تاج السر حسن',
-        student_number: 'ST-2026-0105',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الثالث',
-        section_name: 'أ',
-        guardian_name: 'تاج السر حسن عثمان',
-        guardian_phone: '0922334455',
-        total_billed: 460000,
-        total_paid: 280000,
-        outstanding_balance: 180000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0105',
-      },
-      {
-        id: 'cst-05',
-        student_name: 'آمنة الصديق كمال',
-        student_number: 'ST-2026-0211',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف السادس',
-        section_name: 'ب',
-        guardian_name: 'الصديق كمال عبد المحمود',
-        guardian_phone: '0934567890',
-        total_billed: 260000,
-        total_paid: 260000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0211',
-      },
-      {
-        id: 'cst-06',
-        student_name: 'يوسف عمر الصديق',
-        student_number: 'ST-2026-0399',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'رياض الأطفال',
-        grade_name: 'رياض الأطفال - تمهيدي ثاني',
-        section_name: 'زهور',
-        guardian_name: 'عمر الصديق يوسف',
-        guardian_phone: '0919283746',
-        total_billed: 250000,
-        total_paid: 190000,
-        outstanding_balance: 60000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0399',
-      },
-      {
-        id: 'cst-07',
-        student_name: 'ريان السر الهادي',
-        student_number: 'ST-2026-0312',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'رياض الأطفال',
-        grade_name: 'رياض الأطفال - تمهيدي أول',
-        section_name: 'براعم',
-        guardian_name: 'السر الهادي النور',
-        guardian_phone: '0945678901',
-        total_billed: 210000,
-        total_paid: 210000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0312',
-      },
-      {
-        id: 'cst-08',
-        student_name: 'إخلاص ميرغني التوم',
-        student_number: 'ST-2026-0052',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الثاني',
-        section_name: 'ب',
-        guardian_name: 'ميرغني التوم عبد الله',
-        guardian_phone: '0912233445',
-        total_billed: 460000,
-        total_paid: 320000,
-        outstanding_balance: 140000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-17',
-        account_id: 'acc-0052',
-      },
-      {
-        id: 'cst-09',
-        student_name: 'التاج إبراهيم فضل الله',
-        student_number: 'ST-2026-0318',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف الخامس',
-        section_name: 'أ',
-        guardian_name: 'فضل الله إبراهيم التوم',
-        guardian_phone: '0123456789',
-        total_billed: 420000,
-        total_paid: 100000,
-        outstanding_balance: 320000,
-        payment_status: 'unpaid',
-        last_payment_date: '2026-08-20',
-        account_id: 'acc-0318',
-      },
-      {
-        id: 'cst-10',
-        student_name: 'نزار المجذوب البدوي',
-        student_number: 'ST-2026-0512',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الأول',
-        section_name: 'ب',
-        guardian_name: 'المجذوب البدوي الزبير',
-        guardian_phone: '0923456789',
-        total_billed: 420000,
-        total_paid: 420000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-13',
-        account_id: 'acc-0512',
-      },
-      {
-        id: 'cst-11',
-        student_name: 'مصعب يعقوب حمد',
-        student_number: 'ST-2026-0114',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الثاني',
-        section_name: 'ج',
-        guardian_name: 'يعقوب حمد الشيخ',
-        guardian_phone: '0998877665',
-        total_billed: 460000,
-        total_paid: 0,
-        outstanding_balance: 460000,
-        payment_status: 'unpaid',
-        last_payment_date: '—',
-        account_id: 'acc-0114',
-      },
-      {
-        id: 'cst-12',
-        student_name: 'أحمد الصادق المكي',
-        student_number: 'ST-2026-0229',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الأول',
-        section_name: 'أ',
-        guardian_name: 'الصادق المكي عبد الرحيم',
-        guardian_phone: '0112345678',
-        total_billed: 380000,
-        total_paid: 140000,
-        outstanding_balance: 240000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-05',
-        account_id: 'acc-0229',
-      },
-      {
-        id: 'cst-13',
-        student_name: 'خالد مأمون السنوسي',
-        student_number: 'ST-2026-0082',
-        branch_name: 'فرع البنين',
-        gender: 'بنين',
-        stage_name: 'المرحلة المتوسطة',
-        grade_name: 'المتوسط - الصف الثالث',
-        section_name: 'ب',
-        guardian_name: 'مأمون السنوسي الجزولي',
-        guardian_phone: '0911223344',
-        total_billed: 380000,
-        total_paid: 0,
-        outstanding_balance: 380000,
-        payment_status: 'unpaid',
-        last_payment_date: '—',
-        account_id: 'acc-0082',
-      },
-      {
-        id: 'cst-14',
-        student_name: 'سارة عبد العظيم الطيب',
-        student_number: 'ST-2026-0310',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الابتدائية',
-        grade_name: 'الابتدائي - الصف الثالث',
-        section_name: 'أ',
-        guardian_name: 'عبد العظيم الطيب يوسف',
-        guardian_phone: '0944556677',
-        total_billed: 300000,
-        total_paid: 300000,
-        outstanding_balance: 0,
-        payment_status: 'paid',
-        last_payment_date: '2026-09-12',
-        account_id: 'acc-0310',
-      },
-      {
-        id: 'cst-15',
-        student_name: 'مروة الصادق المهدي',
-        student_number: 'ST-2026-0681',
-        branch_name: 'فرع البنات',
-        gender: 'بنات',
-        stage_name: 'المرحلة الثانوية',
-        grade_name: 'الثانوي - الصف الأول',
-        section_name: 'أ',
-        guardian_name: 'الصادق المهدي عبد الله',
-        guardian_phone: '0912987654',
-        total_billed: 420000,
-        total_paid: 300000,
-        outstanding_balance: 120000,
-        payment_status: 'partial',
-        last_payment_date: '2026-09-11',
-        account_id: 'acc-0681',
-      },
-    ];
-
-    const merged = [...customList];
-    for (const m of mockCustomStudents) {
-      if (!merged.some(x => x.student_number === m.student_number)) {
-        merged.push(m);
-      }
-    }
-    this.customStatementData.set(merged);
+    this.paidStudentsData.set(paidList);
+    this.overdueStudentsData.set(overdueList);
+    this.customStatementData.set(customList);
   }
 
   private buildInstallmentsData(installments: any[]) {

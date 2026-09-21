@@ -57,6 +57,7 @@ class InvoiceAdjustmentSerializer(BaseStudentFinanceSerializer):
 _STUDENT_META_CACHE = {}
 _ACC_TOTALS_CACHE = {}
 _PAYMENT_METHOD_CACHE = {}
+_USER_NAME_CACHE = {}
 
 def _get_payment_method_name(pm_id):
     if not pm_id:
@@ -67,11 +68,29 @@ def _get_payment_method_name(pm_id):
     try:
         from apps.finance.domain.models import PaymentMethod
         pm = PaymentMethod.objects.filter(id=pm_id).first()
-        name = (pm.name_ar or pm.name) if pm else 'تحويل بنكي'
+        name = (getattr(pm, 'name_ar', '') or getattr(pm, 'name', '') or getattr(pm, 'name_en', '')) if pm else 'تحويل بنكي'
         _PAYMENT_METHOD_CACHE[pm_key] = name
         return name
     except Exception:
         return 'تحويل بنكي'
+
+def _get_collector_name(user_id, tenant_id=None):
+    if not user_id:
+        return 'أمين الخزينة'
+    u_key = str(user_id)
+    if u_key in _USER_NAME_CACHE:
+        return _USER_NAME_CACHE[u_key]
+    try:
+        from apps.identity.domain.models import User
+        u = User.objects.filter(id=user_id).first()
+        if u:
+            full = f"{u.first_name or ''} {u.last_name or ''}".strip()
+            name = full or u.username or u.email or 'أمين الخزينة'
+            _USER_NAME_CACHE[u_key] = name
+            return name
+    except Exception:
+        pass
+    return 'أمين الخزينة'
 
 def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None, branch_map=None, **kwargs):
     if not billing_account:
@@ -160,6 +179,11 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
                                 data['stage_name'] = getattr(g.stage, 'name', '')
 
                 sid = getattr(enrollment, 'section_id', None)
+                if not sid:
+                    for other_e in enrs:
+                        if getattr(other_e, 'section_id', None):
+                            sid = other_e.section_id
+                            break
                 if sid:
                     if section_map is not None and sid in section_map:
                         data['section_name'] = section_map[sid]
@@ -167,7 +191,7 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
                         from apps.academics.domain.models import Section
                         sec = Section.objects.filter(id=sid).first()
                         if sec:
-                            data['section_name'] = getattr(sec, 'name_ar', '') or getattr(sec, 'name', '') or ''
+                            data['section_name'] = getattr(sec, 'name', '') or getattr(sec, 'name_ar', '') or ''
 
             if not data['branch_name']:
                 data['branch_name'] = 'فرع البنات' if gender_val == 'female' else 'فرع البنين'
@@ -431,6 +455,9 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
     total_invoiced = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
     payment_method_name = serializers.SerializerMethodField()
+    collector = serializers.SerializerMethodField()
+    collector_name = serializers.SerializerMethodField()
+    reference_number = serializers.SerializerMethodField()
     is_under_24h = serializers.SerializerMethodField()
     can_delete_edit = serializers.SerializerMethodField()
     can_reverse = serializers.SerializerMethodField()
@@ -561,6 +588,18 @@ class ReceiptSerializer(BaseStudentFinanceSerializer):
         req = self.context.get('request')
         is_su = bool(req and req.user and req.user.is_superuser)
         return (not self.get_is_under_24h(obj)) or is_su
+
+    def get_collector(self, obj):
+        return self.get_collector_name(obj)
+
+    def get_collector_name(self, obj):
+        created_by = getattr(obj, 'created_by', None)
+        return _get_collector_name(created_by, tenant_id=getattr(obj, 'tenant_id', None))
+
+    def get_reference_number(self, obj):
+        if getattr(obj, 'voucher_id', None):
+            return f"VCH-{str(obj.voucher_id)[:8].upper()}"
+        return getattr(obj, 'receipt_number', '') or '—'
 
 class RefundSerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
