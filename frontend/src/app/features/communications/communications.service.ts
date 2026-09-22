@@ -224,7 +224,9 @@ export class CommunicationsService {
 
   private toArray<T>(res: any, fallback: T[]): T[] {
     if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.data)) return res.data;
     if (res && Array.isArray(res.results)) return res.results;
+    if (res && res.data && Array.isArray(res.data.results)) return res.data.results;
     return fallback;
   }
 
@@ -280,9 +282,10 @@ export class CommunicationsService {
     );
   }
 
-  testProviderConnection(_id: string): Observable<any> {
+  testProviderConnection(_id?: string, instanceName?: string): Observable<any> {
+    const inst = instanceName || this.evoInstance;
     // فحص حالة الجلسة عبر Evolution API v2: GET /instance/connectionState/{instance}
-    return this.http.get<any>(`/whatsapp-api/instance/connectionState/${this.evoInstance}`, { headers: this.evoHeaders }).pipe(
+    return this.http.get<any>(`/whatsapp-api/instance/connectionState/${inst}`, { headers: this.evoHeaders }).pipe(
       map((res) => {
         const state = res?.instance?.state;
         const connected = state === 'open';
@@ -292,9 +295,10 @@ export class CommunicationsService {
           health_status: isOnline ? 'healthy' : 'down',
           ping_ms: isOnline ? 12 : 0,
           connected,
+          instance_name: inst,
           message: connected
-            ? 'خادم Evolution API متصل والواتساب مقترن بنجاح ✓'
-            : `خادم Evolution API يعمل وجاهز للاقتران (الحالة: ${state || 'بانتظار المسح'}).`,
+            ? `خادم Evolution API متصل وجلسة الواتساب (${inst}) مقترنة بنجاح ✓`
+            : `خادم Evolution API يعمل وجاهز للاقتران (الجلسة: ${inst}، الحالة: ${state || 'بانتظار المسح'}).`,
         };
       }),
       catchError(() => of({
@@ -302,35 +306,35 @@ export class CommunicationsService {
         health_status: 'down',
         ping_ms: 0,
         connected: false,
-        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيله على المنفذ 8050 وصحة مفتاح apikey.',
+        instance_name: inst,
+        message: `تعذر الاتصال بخادم Evolution API للجلسة (${inst}). تأكد من تشغيل الخادم وصحة مفتاح apikey.`,
       }))
     );
   }
 
-  getProviderQrCode(_id: string): Observable<any> {
+  getProviderQrCode(_id?: string, instanceName?: string): Observable<any> {
+    const inst = instanceName || this.evoInstance;
     // Evolution API v2: GET /instance/connect/{instance}
-    // عند الاتصال يرجع { instance: { state: 'open' } } — لا يوجد QR (الواتساب مربوط أصلاً)
-    // عند عدم الاتصال يرجع { base64, code, pairingCode }
-    return this.http.get<any>(`/whatsapp-api/instance/connect/${this.evoInstance}`, { headers: this.evoHeaders }).pipe(
+    return this.http.get<any>(`/whatsapp-api/instance/connect/${inst}`, { headers: this.evoHeaders }).pipe(
       map((res) => {
         const connected = res?.instance?.state === 'open';
         return {
           status: 'success',
-          instance_name: this.evoInstance,
+          instance_name: inst,
           connected,
           qr_code_base64: res?.base64 || null,
           pairing_code: res?.pairingCode || null,
           message: connected
-            ? 'الواتساب مقترن ومتصل بالفعل — لا حاجة لمسح رمز QR.'
-            : 'امسح رمز الـ QR أدناه من تطبيق واتساب على هاتفك (أجهزة مرتبطة).',
+            ? `الواتساب للجلسة (${inst}) مقترن ومتصل بالفعل — لا حاجة لمسح رمز QR.`
+            : `امسح رمز الـ QR أدناه من تطبيق واتساب لربط الجلسة (${inst}).`,
         };
       }),
       catchError(() => of({
         status: 'error',
-        instance_name: this.evoInstance,
+        instance_name: inst,
         connected: false,
         qr_code_base64: null,
-        message: 'تعذر الاتصال بخادم Evolution API. تأكد من تشغيل الخادم على المنفذ 8050 وصحة مفتاح apikey.'
+        message: `تعذر الاتصال بخادم Evolution API للجلسة (${inst}). تأكد من تشغيل الخادم وصحة مفتاح apikey.`
       }))
     );
   }
@@ -381,11 +385,9 @@ export class CommunicationsService {
     return this.http.get<any>(`${this.baseUrl}/messages/`).pipe(
       map((res) => {
         const raw = this.toArray<any>(res, []);
-        // إن لم يُرجع الخادم رسائل فعلية، نعرض بيانات العرض التجريبية
-        if (!raw.length) return FALLBACK_MESSAGES;
         return raw.map((m) => this.normalizeMessage(m));
       }),
-      catchError(() => of(FALLBACK_MESSAGES))
+      catchError(() => of([]))
     );
   }
 
@@ -441,6 +443,7 @@ export class CommunicationsService {
     // توجيه رسائل الواتساب إلى Evolution API v2 الحقيقية
     const isWhatsApp = data.channel === 'whatsapp' || data.channel_type === 'whatsapp' || data.provider_type?.includes('wa') || data.provider_type?.includes('baileys');
     if (isWhatsApp) {
+      const targetInst = data.instance_name || (data.config && data.config.instance_name) || this.evoInstance;
       // Evolution API v2: POST /message/sendText/{instance} مع الترويسة apikey والجسم { number, text }
       const rawNumber = data.recipient_address || data.phone || '';
       const number = this.normalizeWhatsappNumber(rawNumber);
@@ -448,7 +451,7 @@ export class CommunicationsService {
         number,
         text: data.body || data.message || data.subject || '',
       };
-      return this.http.post<any>(`/whatsapp-api/message/sendText/${this.evoInstance}`, payload, { headers: this.evoHeaders }).pipe(
+      return this.http.post<any>(`/whatsapp-api/message/sendText/${targetInst}`, payload, { headers: this.evoHeaders }).pipe(
         map((res) => ({
           status: res?.key?.id ? 'success' : 'error',
           sent: !!res?.key?.id,
@@ -531,12 +534,13 @@ export class CommunicationsService {
   // 5. Statistics
   getDashboardSummary(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/statistics/dashboard/`).pipe(
+      map((res) => (res && res.data ? res.data : res)),
       catchError(() =>
         of({
-          total_sent_today: 1420,
-          delivery_success_rate: 99.2,
-          failed_messages: 8,
-          active_channels_count: 4,
+          total_sent_today: 0,
+          delivery_success_rate: 100,
+          failed_messages: 0,
+          active_channels_count: 0,
         })
       )
     );

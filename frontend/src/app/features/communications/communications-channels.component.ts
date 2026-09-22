@@ -684,6 +684,7 @@ export class CommunicationsChannelsComponent {
   testDiagnostic = signal<{ name: string; message: string; provider: CommunicationProvider; health_status?: string; ping_ms?: number; connected?: boolean; status?: string } | null>(null);
 
   // حالة عرض كود الـ QR
+  activeQrProvider = signal<CommunicationProvider | null>(null);
   qrModalData = signal<any | null>(null);
   qrCountdown = signal(45);
   dockerOnline = signal(false);
@@ -778,8 +779,11 @@ export class CommunicationsChannelsComponent {
 
   // فتح وإدارة كود QR Code للواتساب
   openQrModal(p?: CommunicationProvider): void {
-    const targetId = p ? p.id : (this.whatsappProviders()[0]?.id || 'p2');
-    this.commService.getProviderQrCode(targetId).subscribe((res) => {
+    const targetProv = p || this.whatsappProviders()[0] || null;
+    this.activeQrProvider.set(targetProv);
+    const targetId = targetProv ? targetProv.id : 'p2';
+    const instanceName = targetProv?.config?.instance_name || 'nebras-khartoum-instance';
+    this.commService.getProviderQrCode(targetId, instanceName).subscribe((res) => {
       this.qrModalData.set(res);
       this.qrCountdown.set(45);
     });
@@ -787,11 +791,14 @@ export class CommunicationsChannelsComponent {
 
   closeQrModal(): void {
     this.qrModalData.set(null);
+    this.activeQrProvider.set(null);
   }
 
   refreshQrCode(): void {
-    const pId = this.whatsappProviders()[0]?.id || 'p2';
-    this.commService.getProviderQrCode(pId).subscribe((res) => {
+    const targetProv = this.activeQrProvider() || this.whatsappProviders()[0] || null;
+    const targetId = targetProv ? targetProv.id : 'p2';
+    const instanceName = targetProv?.config?.instance_name || 'nebras-khartoum-instance';
+    this.commService.getProviderQrCode(targetId, instanceName).subscribe((res) => {
       this.qrModalData.set(res);
       this.qrCountdown.set(45);
     });
@@ -823,16 +830,21 @@ export class CommunicationsChannelsComponent {
 
   openAddModal(): void {
     this.editingProvider = null;
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     this.providerForm = {
-      name: 'خادم إيفولوشن واتساب السودان',
-      code: 'EVOLUTION_WA_SD',
+      name: 'مزود واتساب إضافي (شريحة ثانية)',
+      code: `EVOLUTION_WA_${randomSuffix}`,
       provider_type: 'evolution_baileys',
       channel_name: 'واتساب الأعمال',
       daily_quota: 50000,
       is_active: true,
-      is_default: true,
+      is_default: false,
     };
-    this.configForm = { instance_name: 'nebras-khartoum-instance', webhook_url: 'https://wa.nebras.edu.sd', api_key: 'evo_key_998237465' };
+    this.configForm = {
+      instance_name: `nebras-session-${randomSuffix}`,
+      webhook_url: 'https://wa.nebras.edu.sd',
+      api_key: 'evo_key_998237465',
+    };
     this.showFormModal.set(true);
   }
 
@@ -890,7 +902,8 @@ export class CommunicationsChannelsComponent {
   }
 
   testConnection(p: CommunicationProvider): void {
-    this.commService.testProviderConnection(p.id).subscribe((res) => {
+    const instanceName = p.config?.instance_name;
+    this.commService.testProviderConnection(p.id, instanceName).subscribe((res) => {
       this.testDiagnostic.set({
         name: p.name,
         message: res.message,
@@ -933,6 +946,7 @@ export class CommunicationsChannelsComponent {
       channel_name: 'واتساب الأعمال (Evolution)',
       subject: 'رسالة إشعار الواتساب الفوري',
       body: this.waTestForm.message,
+      instance_name: chosenProv?.config?.instance_name,
     };
 
     this.commService.sendMessage(payload).subscribe((res: any) => {

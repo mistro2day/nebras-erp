@@ -132,11 +132,13 @@ class StudentApplicationService:
         
         # 4b. نقل أولياء الأمور وجهات الطوارئ من طلب القبول إلى ملف الطالب
         for g in Guardian.objects.filter(applicant=applicant):
+            wa_number = getattr(g, 'whatsapp_phone', None) or g.phone
             StudentFamilyRelation.objects.create(
                 student=student,
                 relationship=g.relationship or 'guardian',
                 full_name=g.full_name,
                 phone=g.phone,
+                whatsapp_phone=wa_number,
                 email=g.email or None,
                 occupation=g.occupation,
                 employer=getattr(g, 'employer', None),
@@ -259,7 +261,54 @@ class StudentApplicationService:
             "student_number": student_number,
             "tenant_id": str(tenant_id)
         })
-        
+
+        # 10. إرسال رسالة ترحيب واعتماد التسجيل الفعلي لولي الأمر عبر الواتساب المعتمد
+        try:
+            from apps.communications.application.services import CommunicationService
+            from apps.academics.domain.models import Grade
+
+            guardian_rel = (
+                student.family_relations.filter(whatsapp_phone__isnull=False).exclude(whatsapp_phone='').first()
+                or student.family_relations.first()
+            )
+            target_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
+
+            if target_phone:
+                grade_name = ""
+                if applicant.applying_grade_id:
+                    g_obj = Grade.objects.filter(id=applicant.applying_grade_id).first()
+                    if g_obj:
+                        grade_name = g_obj.name
+                if not grade_name and financial_config:
+                    grade_name = financial_config.get('grade_name', '')
+
+                std_name = f"{applicant.first_name} {applicant.last_name}".strip()
+                g_name = getattr(guardian_rel, 'full_name', '') or 'ولي الأمر الكريم'
+
+                policy_text = (
+                    "1. الالتزام بالحضور الصباحي والزي المدرسي المعتمد.\n"
+                    "2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n"
+                    "3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية."
+                )
+
+                CommunicationService.send_message(
+                    tenant_id=tenant_id,
+                    recipient_phone=target_phone,
+                    template_code='ADM_ENROLLED',
+                    channel_type='whatsapp',
+                    context={
+                        'guardian_name': g_name,
+                        'student_name': std_name,
+                        'student_code': student_number,
+                        'grade_level': grade_name or 'المرحلة المقررة',
+                        'academic_year': str(datetime.date.today().year),
+                        'registration_policy': policy_text,
+                    },
+                    user_id=user_id,
+                )
+        except Exception as comm_err:
+            logger.warning(f"Failed to dispatch enrollment welcome WhatsApp message: {comm_err}")
+
         return student
 
     @classmethod
@@ -337,13 +386,15 @@ class StudentApplicationService:
         )
 
         # 4c. إنشاء علاقة ولي الأمر الرئيسي (إن توفرت البيانات)
-        if guardian_data and (guardian_data.get('full_name') or guardian_data.get('phone')):
+        if guardian_data and (guardian_data.get('full_name') or guardian_data.get('phone') or guardian_data.get('whatsapp_phone')):
             from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyContact, StudentAddress
+            wa_num = guardian_data.get('whatsapp_phone') or guardian_data.get('phone', '')
             StudentFamilyRelation.objects.create(
                 student=student,
                 relationship=guardian_data.get('relationship', 'guardian'),
                 full_name=guardian_data.get('full_name', ''),
                 phone=guardian_data.get('phone', ''),
+                whatsapp_phone=wa_num,
                 email=guardian_data.get('email') or None,
                 occupation=guardian_data.get('occupation', ''),
                 employer=guardian_data.get('work_address', ''),
@@ -457,7 +508,53 @@ class StudentApplicationService:
             "student_number": student_number,
             "tenant_id": str(tenant_id)
         })
-        
+
+        # 7. إرسال رسالة ترحيب واعتماد التسجيل الفعلي لولي الأمر عبر الواتساب المعتمد
+        try:
+            from apps.communications.application.services import CommunicationService
+            from apps.academics.domain.models import Grade
+
+            guardian_rel = (
+                student.family_relations.filter(whatsapp_phone__isnull=False).exclude(whatsapp_phone='').first()
+                or student.family_relations.first()
+            )
+            target_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
+
+            if target_phone:
+                grade_name = ""
+                g_id = (academic_data or {}).get('grade_id')
+                if g_id:
+                    g_obj = Grade.objects.filter(id=uuid.UUID(str(g_id))).first()
+                    if g_obj:
+                        grade_name = g_obj.name
+
+                std_name = profile.arabic_name if profile else student_number
+                g_name = getattr(guardian_rel, 'full_name', '') or 'ولي الأمر الكريم'
+
+                policy_text = (
+                    "1. الالتزام بالحضور الصباحي والزي المدرسي المعتمد.\n"
+                    "2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n"
+                    "3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية."
+                )
+
+                CommunicationService.send_message(
+                    tenant_id=tenant_id,
+                    recipient_phone=target_phone,
+                    template_code='ADM_ENROLLED',
+                    channel_type='whatsapp',
+                    context={
+                        'guardian_name': g_name,
+                        'student_name': std_name,
+                        'student_code': student_number,
+                        'grade_level': grade_name or 'المرحلة المقررة',
+                        'academic_year': str(datetime.date.today().year),
+                        'registration_policy': policy_text,
+                    },
+                    user_id=user_id,
+                )
+        except Exception as comm_err:
+            logger.warning(f"Failed to dispatch manual enrollment welcome WhatsApp message: {comm_err}")
+
         return student
 
     @classmethod

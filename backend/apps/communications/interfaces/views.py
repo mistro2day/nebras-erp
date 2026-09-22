@@ -166,6 +166,18 @@ ADMISSIONS_DEFAULT_TEMPLATES = {
         'السلام عليكم {{guardian_name}}، تم تحديد موعد المقابلة الشخصية للتلميذ/ة {{student_name}} بـ {{school_name}} '
         '(طلب رقم {{application_number}}) بتاريخ {{interview_date}}. نرجو الحضور في الموعد المحدد.'
     ),
+    'ADM_ENROLLED': (
+        'إشعار تسجيل واعتماد التلميذ كطالب رسمي ولائحة التسجيل',
+        'السلام عليكم ورحمة الله وبركاته،\n'
+        'عزيزي ولي الأمر {{guardian_name}} المحترم،\n'
+        'نبارك لكم تسجيل واعتماد ابنكم/ابنتكم: ({{student_name}}) كطالب رسمي بـ ({{school_name}}) للعام الدراسي ({{academic_year}}).\n'
+        '- المرحلة / الصف الدراسي: {{grade_level}}\n'
+        '- الرقم المدرسي (الأكاديمي): {{student_code}}\n\n'
+        '📋 لائحة واشتراطات التسجيل:\n'
+        '{{registration_policy}}\n\n'
+        'نتمنى لابننا/ابنتنا دوام التوفيق والتميز الأكاديمي.\n'
+        'إدارة القبول والتسجيل — {{school_name}}'
+    ),
 }
 
 
@@ -184,6 +196,20 @@ SYSTEM_DEFAULT_TEMPLATES = {
         'إشعار صدور الفاتورة المدرسية',
         'finance',
         'عزيزي ولي الأمر {{guardian_name}}، تم إصدار الفاتورة الدراسية رقم {{invoice_number}} بمبلغ {{amount}} ج.س للطالب {{student_name}}.'
+    ),
+    'PAYMENT_RECEIPT': (
+        'إشعار سند قبض وسداد رسوم دراسية',
+        'finance',
+        'السلام عليكم ورحمة الله وبركاته،\n'
+        'عزيزي ولي الأمر {{guardian_name}} المحترم،\n'
+        'نحيطكم علماً باستلام وتوثيق سداد رسوم دراسية للتلميذ/ة: ({{student_name}}).\n'
+        '- سند قبض رقم: {{receipt_number}}\n'
+        '- المبلغ المسدد: {{amount}} ج.س ({{amount_words}})\n'
+        '- طريقة الدفع: {{payment_method}}\n'
+        '- تاريخ السداد: {{date}}\n'
+        '- الرصيد المتبقي على الحساب: {{remaining_balance}} ج.س\n\n'
+        'شاكرين ومقدرين حسن تعاونكم وحرصكم المستمر.\n'
+        'إدارة الشؤون المالية — {{school_name}}'
     ),
     'STUDENT_ABSENT_ALERT': (
         'تنبيه غياب الطالب الفوري',
@@ -208,6 +234,15 @@ class TemplateViewSet(BaseCRUDViewSet):
                     tenant_id=tenant.id, code=code, deleted_at__isnull=True,
                     defaults={
                         'name': name, 'category': category, 'channel': ch,
+                        'content_type': 'plain_text', 'language': 'ar',
+                        'body': body, 'is_active': True,
+                    }
+                )
+            for code, (name, body) in ADMISSIONS_DEFAULT_TEMPLATES.items():
+                CommunicationTemplate.objects.get_or_create(
+                    tenant_id=tenant.id, code=code, deleted_at__isnull=True,
+                    defaults={
+                        'name': name, 'category': 'admission', 'channel': ch,
                         'content_type': 'plain_text', 'language': 'ar',
                         'body': body, 'is_active': True,
                     }

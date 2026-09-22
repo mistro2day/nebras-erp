@@ -61,6 +61,7 @@ class CommunicationProvider(CombinedSharedModel):
         ('amazon_ses', 'Amazon SES'),
         ('sendgrid', 'SendGrid'),
         # WhatsApp
+        ('evolution_baileys', 'Evolution API (Baileys)'),
         ('meta_cloud_api', 'Meta Cloud API'),
         ('twilio_whatsapp', 'Twilio WhatsApp'),
         ('360dialog', '360Dialog'),
@@ -71,8 +72,9 @@ class CommunicationProvider(CombinedSharedModel):
         ('firebase_fcm', 'Firebase Cloud Messaging'),
         # Webhook
         ('generic_rest', 'Generic REST Webhook'),
-        # Custom
+        # Custom & Mock
         ('custom', 'مزود مخصص'),
+        ('mock', 'مزود محاكاة (Mock)'),
     )
 
     channel = models.ForeignKey(

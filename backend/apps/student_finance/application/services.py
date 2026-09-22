@@ -540,10 +540,10 @@ class PaymentService:
             st = Student.objects.filter(id=account.student_id).first()
             if st:
                 student_name = st.profile.arabic_name if hasattr(st, 'profile') and st.profile else ""
-                fam = st.family_relations.first()
+                fam = st.family_relations.filter(whatsapp_phone__isnull=False).exclude(whatsapp_phone='').first() or st.family_relations.first()
                 if fam:
                     guardian_name = getattr(fam, 'full_name', '') or ""
-                    guardian_phone = getattr(fam, 'phone', '') or ""
+                    guardian_phone = getattr(fam, 'whatsapp_phone', None) or getattr(fam, 'phone', '') or ""
         except Exception as e:
             logger.warning(f"Failed to resolve student info for payment event: {e}")
 
@@ -563,6 +563,36 @@ class PaymentService:
                 'date': str(date.today())
             }
         )
+
+        # إرسال إشعار سند القبض المالي فورياً عبر الواتساب إلى ولي الأمر
+        if guardian_phone:
+            try:
+                from apps.communications.application.services import CommunicationService
+                from apps.common.utils.tafqeet import tafqeet_arabic
+
+                pm_name = "طريقة الدفع المعتمدة"
+                if pm:
+                    pm_name = pm.name_ar or pm.name_en or pm.code
+
+                CommunicationService.send_message(
+                    tenant_id=tenant_id,
+                    recipient_phone=guardian_phone,
+                    template_code='PAYMENT_RECEIPT',
+                    channel_type='whatsapp',
+                    context={
+                        'guardian_name': guardian_name or 'ولي الأمر الكريم',
+                        'student_name': student_name or f"الطالب رقم {account.student_id}",
+                        'amount': f"{pay_amount:,.2f}",
+                        'amount_words': tafqeet_arabic(pay_amount, 'جنيه سوداني'),
+                        'receipt_number': receipt.receipt_number,
+                        'payment_date': str(actual_date),
+                        'payment_method': pm_name,
+                        'remaining_balance': f"{account.outstanding_balance:,.2f}",
+                    },
+                    user_id=user_id
+                )
+            except Exception as comm_err:
+                logger.warning(f"Failed to dispatch WhatsApp payment receipt notification: {comm_err}")
 
         return receipt
 

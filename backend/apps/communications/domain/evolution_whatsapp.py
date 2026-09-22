@@ -12,7 +12,7 @@ import os
 logger = logging.getLogger(__name__)
 
 class EvolutionWhatsAppClient:
-    def __init__(self, base_url: str = None, api_key: str = "evo_key_998237465", instance_name: str = "nebras-khartoum-instance"):
+    def __init__(self, base_url: str = None, api_key: str = None, instance_name: str = None):
         env_url = os.getenv("EVOLUTION_API_URL")
         if env_url:
             self.base_url = env_url.rstrip('/')
@@ -21,8 +21,8 @@ class EvolutionWhatsAppClient:
         else:
             self.base_url = base_url.rstrip('/')
 
-        self.api_key = api_key
-        self.instance_name = instance_name
+        self.api_key = api_key or os.getenv("EVOLUTION_API_KEY", "evo_key_998237465")
+        self.instance_name = instance_name or os.getenv("EVOLUTION_INSTANCE_NAME", "nebras-khartoum-instance")
         self.headers = {
             "Content-Type": "application/json",
             "apikey": self.api_key

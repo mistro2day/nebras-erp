@@ -46,10 +46,11 @@ class CommunicationService:
     def send_message(cls, tenant_id, channel_code, recipients, subject=None, body=None,
                      template_code=None, variables=None, attachments=None,
                      priority='normal', source_module=None, source_event=None,
-                     source_reference_id=None, scheduled_at=None, created_by=None):
+                     source_reference_id=None, scheduled_at=None, created_by=None,
+                     provider_code=None):
         """
         إرسال رسالة عبر المنصة المركزية.
-        يتم وضع الرسالة في الطابور ومعالجتها بشكل غير متزامن.
+        يتم وضع الرسالة في الطابور ومعالجتها بشكل غير متزامن أو مباشر.
         """
         with transaction.atomic():
             # 1. تحديد القناة
@@ -59,10 +60,16 @@ class CommunicationService:
             if not channel:
                 raise ValueError(f"القناة '{channel_code}' غير موجودة أو غير مفعلة.")
 
-            # 2. تحديد المزود الافتراضي
-            provider = CommunicationProvider.objects.filter(
-                tenant_id=tenant_id, channel=channel, is_active=True
-            ).order_by('-is_default', 'priority').first()
+            # 2. تحديد المزود (بالمعرف المحدد أو الافتراضي للقناة)
+            provider = None
+            if provider_code:
+                provider = CommunicationProvider.objects.filter(
+                    tenant_id=tenant_id, channel=channel, code=provider_code, is_active=True
+                ).first()
+            if not provider:
+                provider = CommunicationProvider.objects.filter(
+                    tenant_id=tenant_id, channel=channel, is_active=True
+                ).order_by('-is_default', 'priority').first()
 
             # 3. معالجة القالب والمتغيرات
             actual_subject = subject
@@ -164,13 +171,24 @@ class CommunicationService:
                 created_by=created_by,
             )
 
-            # 9. إطلاق مهمة Celery إذا لم تكن مجدولة
+            # 9. إطلاق مهمة Celery أو الإرسال المباشر
             if not scheduled_at:
+                dispatched = False
                 try:
                     from apps.communications.infrastructure.celery_tasks import send_message_task
-                    send_message_task.delay(str(message.id))
+                    task_res = getattr(send_message_task, 'delay', None)
+                    if callable(task_res):
+                        task_res(str(message.id))
+                        dispatched = True
                 except Exception as e:
                     logger.warning(f"فشل إطلاق مهمة Celery للرسالة {message.id}: {e}")
+
+                if not dispatched:
+                    try:
+                        from apps.communications.infrastructure.celery_tasks import send_message_task
+                        send_message_task(str(message.id))
+                    except Exception as err:
+                        logger.error(f"خطأ أثناء معالجة الرسالة المباشرة {message.id}: {err}")
 
             return message
 
@@ -590,17 +608,30 @@ class StatisticsService:
         now = timezone.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        messages = CommunicationMessage.objects.filter(tenant_id=tenant_id)
+        messages = CommunicationMessage.objects.filter(tenant_id=tenant_id, deleted_at__isnull=True)
         today_messages = messages.filter(created_at__gte=today_start)
 
         queue = CommunicationQueue.objects.filter(tenant_id=tenant_id)
 
+        sent_today = today_messages.filter(status__in=['sent', 'delivered', 'read']).count()
+        failed_today = today_messages.filter(status='failed').count()
+        total_today = today_messages.count()
+        success_rate = round((sent_today / total_today * 100) if total_today > 0 else 100.0, 1)
+
+        active_channels_count = CommunicationChannel.objects.filter(
+            tenant_id=tenant_id, is_active=True, deleted_at__isnull=True
+        ).count()
+
         return {
+            'total_sent_today': sent_today,
+            'delivery_success_rate': success_rate,
+            'failed_messages': failed_today,
+            'active_channels_count': active_channels_count,
             'total_messages': messages.count(),
-            'today_messages': today_messages.count(),
-            'sent_today': today_messages.filter(status='sent').count(),
+            'today_messages': total_today,
+            'sent_today': sent_today,
             'delivered_today': today_messages.filter(status='delivered').count(),
-            'failed_today': today_messages.filter(status='failed').count(),
+            'failed_today': failed_today,
             'queued': queue.filter(status='queued').count(),
             'processing': queue.filter(status='processing').count(),
             'dead_letter': queue.filter(status='dead_letter').count(),

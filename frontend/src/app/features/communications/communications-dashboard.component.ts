@@ -42,7 +42,10 @@ const CHANNEL_ICON: Record<string, string> = {
         title="مركز عمليات الاتصالات (Communications Command Center)"
         subtitle="متابعة حركة الرسائل عبر البريد الإلكتروني والواتساب وSMS والإشعارات بالسودان."
       >
-        <button class="nb-btn-primary" (click)="toggleNewMessageModal()">+ إرسال رسالة جديدة</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="nb-btn-secondary" (click)="loadData()" title="تحديث السجل والبيانات الحقيقية">🔄 تحديث البيانات</button>
+          <button class="nb-btn-primary" (click)="toggleNewMessageModal()">+ إرسال رسالة جديدة</button>
+        </div>
       </nb-page-header>
 
       <div class="stats-grid">
@@ -397,10 +400,10 @@ export class CommunicationsDashboardComponent {
   private commService = inject(CommunicationsService);
 
   summary = signal({
-    total_sent_today: 1420,
-    delivery_success_rate: 99.2,
-    failed_messages: 8,
-    active_channels_count: 4,
+    total_sent_today: 0,
+    delivery_success_rate: 100,
+    failed_messages: 0,
+    active_channels_count: 0,
   });
 
   messages = signal<CommunicationMessageItem[]>([]);
@@ -426,7 +429,13 @@ export class CommunicationsDashboardComponent {
   };
 
   constructor() {
-    this.commService.getDashboardSummary().subscribe((data) => this.summary.set(data));
+    this.loadData();
+  }
+
+  loadData(): void {
+    this.commService.getDashboardSummary().subscribe((data) => {
+      if (data) this.summary.set(data);
+    });
     this.commService.getMessages().subscribe((data) => {
       const arr = Array.isArray(data) ? data : (data as any)?.results || [];
       this.messages.set(arr);
@@ -585,6 +594,7 @@ export class CommunicationsDashboardComponent {
       this.sortDir.set('desc');
       this.toggleNewMessageModal();
       this.newMessageForm = { recipient_name: '', channel: 'email', address: '', subject: '', body: '' };
+      this.commService.getDashboardSummary().subscribe((data) => { if (data) this.summary.set(data); });
     });
   }
 }

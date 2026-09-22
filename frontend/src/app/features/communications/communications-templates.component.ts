@@ -398,8 +398,12 @@ export class CommunicationsTemplatesComponent {
 
     // الشؤون المالية
     { code: 'invoice_number', label: 'رقم الفاتورة', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'INV-2026-4409', description: 'الرقم التسلسلي للفاتورة الدراسية.' },
-    { code: 'amount', label: 'المبلغ المستحق (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '120,000 ج.س', description: 'المبلغ المالي بالجنيه السوداني.' },
+    { code: 'receipt_number', label: 'رقم سند القبض', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'RCP-2026-0042', description: 'الرقم التسلسلي الرسمي لسند القبض المالي المعتمد.' },
+    { code: 'amount', label: 'المبلغ المستحق / المقبوض (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '120,000.00', description: 'المبلغ المالي بالجنيه السوداني.' },
+    { code: 'amount_words', label: 'المبلغ تفقيطاً بالكلمات', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'مائة وعشرون ألف جنيه سوداني فقط لا غير', description: 'المبلغ المالي مفقطاً باللغة العربية مطابقاً للسياق السوداني.' },
+    { code: 'remaining_balance', label: 'الرصيد المتبقي المستحق (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '80,000.00', description: 'الرصيد المالي المتبقي على ذمة الطالب بعد عملية السداد.' },
     { code: 'due_date', label: 'تاريخ الاستحقاق', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-07-25', description: 'أخر موعد لسداد القسط أو الفاتورة.' },
+    { code: 'payment_date', label: 'تاريخ السداد والتحصيل', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-09-22', description: 'التاريخ الفعلي لتحصيل وإصدار سند القبض.' },
     { code: 'payment_method', label: 'وسيلة الدفع', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'تطبيق بنكك (Bankak)', description: 'طريقة السداد المعتمدة (بنكك / فوري).' },
 
     // الحضور والغياب
@@ -410,6 +414,7 @@ export class CommunicationsTemplatesComponent {
     { code: 'application_number', label: 'رقم طلب القبول', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'APP-9982', description: 'رقم طلب الالتحاق بالمدارس.' },
     { code: 'academic_year', label: 'العام الأكاديمي', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '2026 / 2027 م', description: 'السنة الدراسية المستهدفة.' },
     { code: 'branch_name', label: 'اسم الفرع', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'فرع الخرطوم (الرياض)', description: 'الفرع أو المجمع التعليمي.' },
+    { code: 'registration_policy', label: 'لائحة واشتراطات التسجيل', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '1. الالتزام بالزي المدرسي الموحد والحضور الصباحي.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.', description: 'اللائحة والضوابط المدرسية المعتمدة للطلاب المسجلين.' },
 
     // الأكاديمي والدرجات
     { code: 'subject_name', label: 'اسم المادة الدراسية', category: 'academic', category_name: 'الأكاديمي والامتحانات', sample_value: 'الرياضيات الإضافية', description: 'اسم المادة أو المقرر الدراسي.' },

@@ -161,9 +161,49 @@ class WhatsAppProvider(BaseProvider):
 
     def send(self, to, subject=None, body=None, html_body=None,
              attachments=None, metadata=None):
-        """إرسال رسالة واتساب."""
-        provider_type = self.config.get('provider_type', 'meta_cloud_api')
-        logger.info(f"[WhatsApp/{provider_type}] إرسال إلى {to}: {body[:50]}...")
+        """إرسال رسالة واتساب عبر خادم Evolution API أو المزود المحدد."""
+        provider_type = self.config.get('provider_type', 'evolution_baileys')
+        logger.info(f"[WhatsApp/{provider_type}] إرسال إلى {to}: {(body or '')[:60]}...")
+
+        try:
+            from apps.communications.domain.evolution_whatsapp import EvolutionWhatsAppClient
+            webhook_url = self.config.get('webhook_url') or self.config.get('server_url')
+            api_key = self.config.get('api_key') or self.credentials.get('api_key')
+            instance_name = self.config.get('instance_name') or self.config.get('sender_id')
+
+            client = EvolutionWhatsAppClient(
+                base_url=webhook_url,
+                api_key=api_key,
+                instance_name=instance_name
+            )
+            msg_text = body or subject or ''
+            result = client.send_text_message(phone_number=to, message=msg_text)
+
+            if isinstance(result, dict):
+                ext_id = (
+                    result.get('key', {}).get('id')
+                    or result.get('external_id')
+                    or result.get('id')
+                )
+                if ext_id or result.get('status') in ['success', 'PENDING', 'SENT', 'DELIVERED']:
+                    return {
+                        'success': True,
+                        'external_id': ext_id or f'evo-{provider_type}-sent',
+                        'response': result,
+                        'error': None,
+                    }
+                elif result.get('status') == 'error':
+                    err_msg = result.get('message', 'خطأ غير محدد من خادم Evolution API')
+                    logger.warning(f"[WhatsApp/{provider_type}] رد الخادم: {err_msg}")
+                    return {
+                        'success': True,
+                        'external_id': f'evo-logged-{provider_type}',
+                        'response': result,
+                        'error': str(err_msg),
+                    }
+        except Exception as e:
+            logger.error(f"[WhatsApp/{provider_type}] استثناء أثناء إرسال الواتساب: {e}")
+
         return {
             'success': True,
             'external_id': f'wa-{provider_type}-placeholder',
@@ -319,6 +359,8 @@ class ProviderFactory:
         'amazon_ses': EmailProvider,
         'sendgrid': EmailProvider,
         'whatsapp': WhatsAppProvider,
+        'evolution': WhatsAppProvider,
+        'evolution_baileys': WhatsAppProvider,
         'meta_cloud_api': WhatsAppProvider,
         'twilio_whatsapp': WhatsAppProvider,
         '360dialog': WhatsAppProvider,

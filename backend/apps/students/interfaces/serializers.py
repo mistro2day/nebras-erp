@@ -376,7 +376,7 @@ class StudentEnrollmentMinimalSerializer(serializers.ModelSerializer):
 class StudentFamilyRelationMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentFamilyRelation
-        fields = ['id', 'full_name', 'relationship', 'phone', 'emergency_contact']
+        fields = ['id', 'full_name', 'relationship', 'phone', 'whatsapp_phone', 'emergency_contact']
         read_only_fields = ['id', 'student']
 
 
