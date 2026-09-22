@@ -18,7 +18,9 @@ from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyC
 from apps.common.exceptions import BusinessException
 # الحقائق الطبية مرجعها العيادة — لا تُكتب ولا تُقرأ إلا عبرها
 from apps.clinic.application import profile_service as clinic_profiles
+import logging
 
+logger = logging.getLogger('nebras.students')
 
 def resolve_branch_for_gender(tenant_id, gender):
     """
@@ -528,7 +530,7 @@ class StudentApplicationService:
                     if g_obj:
                         grade_name = g_obj.name
 
-                std_name = profile.arabic_name if profile else student_number
+                std_name = str(profile_data.get('arabic_name') or student_number)
                 g_name = getattr(guardian_rel, 'full_name', '') or 'ولي الأمر الكريم'
 
                 policy_text = (

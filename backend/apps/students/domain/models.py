@@ -49,7 +49,7 @@ class StudentProfile(CombinedBaseModel):
         db_table = 'student_profiles'
 
     def __str__(self):
-        return self.arabic_name
+        return str(self.arabic_name)
 
 
 class StudentMedicalProfile(CombinedBaseModel):

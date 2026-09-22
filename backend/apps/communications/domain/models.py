@@ -436,7 +436,7 @@ class CommunicationAttachment(CombinedSharedModel):
         ordering = ['file_name']
 
     def __str__(self):
-        return self.file_name
+        return str(self.file_name)
 
 
 # ============================================================
@@ -802,7 +802,8 @@ class CommunicationStatistics(CombinedSharedModel):
         ]
 
     def __str__(self):
-        return f"إحصائيات {self.get_period_type_display()} — {self.period_start.date()}"
+        period_label = self.period_start.date() if hasattr(self.period_start, 'date') else self.period_start
+        return f"إحصائيات {self.get_period_type_display()} — {period_label}"
 
 
 # ============================================================

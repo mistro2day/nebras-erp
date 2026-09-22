@@ -24,9 +24,9 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    def send(self, to: str, subject: str = None, body: str = None,
-             html_body: str = None, attachments: list = None,
-             metadata: dict = None) -> dict:
+    def send(self, to: str, subject: str | None = None, body: str | None = None,
+             html_body: str | None = None, attachments: list | None = None,
+             metadata: dict | None = None) -> dict:
         """
         إرسال رسالة عبر المزود.
         يُرجع dict يحتوي على:
@@ -172,9 +172,9 @@ class WhatsAppProvider(BaseProvider):
             instance_name = self.config.get('instance_name') or self.config.get('sender_id')
 
             client = EvolutionWhatsAppClient(
-                base_url=webhook_url,
-                api_key=api_key,
-                instance_name=instance_name
+                base_url=str(webhook_url) if webhook_url else None,
+                api_key=str(api_key) if api_key else None,
+                instance_name=str(instance_name) if instance_name else None
             )
             msg_text = body or subject or ''
             result = client.send_text_message(phone_number=to, message=msg_text)
@@ -220,7 +220,11 @@ class WhatsAppProvider(BaseProvider):
             webhook_url = self.config.get('webhook_url') or self.config.get('server_url')
             api_key = self.config.get('api_key', 'evo_key_998237465')
             instance_name = self.config.get('instance_name', 'nebras-khartoum-instance')
-            client = EvolutionWhatsAppClient(base_url=webhook_url, api_key=api_key, instance_name=instance_name)
+            client = EvolutionWhatsAppClient(
+                base_url=str(webhook_url) if webhook_url else None,
+                api_key=str(api_key) if api_key else None,
+                instance_name=str(instance_name) if instance_name else None
+            )
             res = client.get_qr_code()
             if res and isinstance(res, dict) and ('qr_code_base64' in res or 'base64' in res or 'qrcode' in res or res.get('status') == 'success'):
                 return {'success': True, 'health_status': 'healthy', 'message': 'سيرفر Evolution حي وجاهز'}
@@ -242,7 +246,8 @@ class SMSProvider(BaseProvider):
              attachments=None, metadata=None):
         """إرسال رسالة SMS."""
         provider_type = self.config.get('provider_type', 'twilio_sms')
-        logger.info(f"[SMS/{provider_type}] إرسال إلى {to}: {body[:50]}...")
+        msg_preview = (body or "")[:50]
+        logger.info(f"[SMS/{provider_type}] إرسال إلى {to}: {msg_preview}...")
         return {
             'success': True,
             'external_id': f'sms-{provider_type}-placeholder',
@@ -374,7 +379,7 @@ class ProviderFactory:
     }
 
     @classmethod
-    def create(cls, provider_type: str, config: dict = None, credentials: dict = None) -> BaseProvider:
+    def create(cls, provider_type: str, config: dict | None = None, credentials: dict | None = None) -> BaseProvider:
         """
         إنشاء مزود بناءً على النوع.
         """

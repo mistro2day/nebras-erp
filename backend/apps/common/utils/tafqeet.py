@@ -32,8 +32,8 @@ def tafqeet_arabic(num, currency: str = "جنيه سوداني") -> str:
     hundreds = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"]
     scales = ["", "ألف", "مليون", "مليار", "تريليون"]
 
-    int_part = int(math.floor(val))
-    frac_part = int(round((val - int_part) * 100))
+    int_part = math.floor(val)
+    frac_part = round((val - int_part) * 100)
 
     def convert_3_digits(n: int) -> str:
         if n == 0:

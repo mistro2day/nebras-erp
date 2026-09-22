@@ -1,4 +1,5 @@
 import logging
+import typing
 from datetime import date
 from decimal import Decimal
 from django.db import transaction
@@ -31,7 +32,7 @@ class PostingService:
     """
 
     @classmethod
-    @transaction.atomic
+    @transaction.atomic  # type: ignore[arg-type]
     def post_journal_entry(cls, tenant_id, journal_entry_id, user_id=None):
         """
         ترحيل قيد يومية محدد.
@@ -148,7 +149,7 @@ class PostingService:
         return entry
 
     @classmethod
-    @transaction.atomic
+    @transaction.atomic  # type: ignore[arg-type]
     def reverse_journal_entry(cls, tenant_id, journal_entry_id, user_id=None, reversal_date=None, reversal_reason=None):
         """
         عمل قيد عكسي لقيد يومية مرحل لإلغاء تأثيره المالي، مع تسجيل سبب وتاريخ العكس.

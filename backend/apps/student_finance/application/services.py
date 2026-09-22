@@ -5,7 +5,7 @@ from datetime import date, datetime
 from functools import wraps
 from django.db import transaction
 from django.utils import timezone
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db.models import Sum, Q
 
 from apps.student_finance.domain.models import (
@@ -629,7 +629,7 @@ class PaymentService:
                     if has_admin_role:
                         is_admin = True
                     user_perms = list(RolePermission.objects.filter(role_id__in=roles_qs).values_list('permission__code', flat=True))
-            except User.DoesNotExist:
+            except ObjectDoesNotExist:
                 raise ValidationError("المستخدم غير موجود.")
 
         # --- 1. جلب الإيصال والتحقق من حالته ومنع تكرار العكس ---
@@ -717,7 +717,7 @@ class PaymentService:
                 # تحديث حالة السند المالي
                 voucher.status = 'cancelled'
                 voucher.save(update_fields=['status'])
-            except (Voucher.DoesNotExist, JournalEntry.DoesNotExist):
+            except ObjectDoesNotExist:
                 logger.warning(f"لم يتم العثور على السند أو القيد المرتبط بالإيصال {receipt.receipt_number}")
 
         if reversal_journal:
@@ -796,7 +796,7 @@ class PaymentService:
                     if has_admin_role:
                         is_admin = True
                     user_perms = list(RolePermission.objects.filter(role_id__in=roles_qs).values_list('permission__code', flat=True))
-            except User.DoesNotExist:
+            except ObjectDoesNotExist:
                 raise ValidationError("المستخدم غير موجود.")
 
         receipt = Receipt.objects.select_for_update().get(id=receipt_id, tenant_id=tenant_id)

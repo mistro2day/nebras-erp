@@ -12,11 +12,11 @@ import os
 logger = logging.getLogger(__name__)
 
 class EvolutionWhatsAppClient:
-    def __init__(self, base_url: str = None, api_key: str = None, instance_name: str = None):
+    def __init__(self, base_url: str | None = None, api_key: str | None = None, instance_name: str | None = None):
         env_url = os.getenv("EVOLUTION_API_URL")
         if env_url:
             self.base_url = env_url.rstrip('/')
-        elif not base_url or "wa.nebras.edu.sd" in str(base_url):
+        elif not base_url or "wa.nebras.edu.sd" in base_url:
             self.base_url = "http://localhost:8050"
         else:
             self.base_url = base_url.rstrip('/')

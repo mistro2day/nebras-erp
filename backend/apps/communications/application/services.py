@@ -1,4 +1,5 @@
 import re
+import typing
 import logging
 from datetime import timedelta
 from django.utils import timezone
@@ -43,16 +44,32 @@ class CommunicationService:
     """
 
     @classmethod
-    def send_message(cls, tenant_id, channel_code, recipients, subject=None, body=None,
+    def send_message(cls, tenant_id, channel_code=None, recipients=None, subject=None, body=None,
                      template_code=None, variables=None, attachments=None,
                      priority='normal', source_module=None, source_event=None,
                      source_reference_id=None, scheduled_at=None, created_by=None,
-                     provider_code=None):
+                     provider_code=None,
+                     # وسائط الاستدعاء المباشر (من موديولات الطلاب والمالية)
+                     recipient_phone=None, channel_type=None, context=None, user_id=None):
         """
         إرسال رسالة عبر المنصة المركزية.
-        يتم وضع الرسالة في الطابور ومعالجتها بشكل غير متزامن أو مباشر.
+        يدعم نمطين:
+        - النمط الكامل: channel_code + recipients (قائمة قواميس).
+        - النمط المباشر: recipient_phone + channel_type + context (للإرسال الفوري).
         """
-        with transaction.atomic():
+        # --- تطبيع مدخلات النمط المباشر ---
+        if recipient_phone and not channel_code:
+            channel_code = channel_type or 'whatsapp'
+        if context and not variables:
+            variables = context
+        if recipient_phone and not recipients:
+            recipients = [{'type': 'to', 'address': str(recipient_phone), 'entity_type': 'guardian'}]
+        if not recipients:
+            recipients = []
+        if not created_by and user_id:
+            created_by = user_id
+
+        with typing.cast(typing.Any, transaction.atomic)():
             # 1. تحديد القناة
             channel = CommunicationChannel.objects.filter(
                 tenant_id=tenant_id, code=channel_code, is_active=True
@@ -104,7 +121,7 @@ class CommunicationService:
                 subject=actual_subject,
                 body=actual_body,
                 body_html=(
-                    _branded_email_html(actual_body, actual_subject, _build_brand_context(tenant_id))
+                    _branded_email_html(actual_body, actual_subject or '', _build_brand_context(tenant_id))
                     if channel.channel_type == 'email' and actual_body else None
                 ),
                 variables_data=variables or {},
@@ -309,7 +326,7 @@ class TemplateService:
         """
         نشر إصدار وتحديث القالب الرئيسي.
         """
-        with transaction.atomic():
+        with typing.cast(typing.Any, transaction.atomic)():
             version = CommunicationTemplateVersion.objects.select_for_update().get(
                 id=version_id, tenant_id=tenant_id
             )
@@ -509,7 +526,11 @@ class CampaignService:
         # إطلاق مهمة Celery لمعالجة الحملة
         try:
             from apps.communications.infrastructure.celery_tasks import process_campaign_task
-            process_campaign_task.delay(str(campaign.id))
+            delay_fn = getattr(process_campaign_task, 'delay', None)
+            if callable(delay_fn):
+                delay_fn(str(campaign.id))
+            else:
+                process_campaign_task(str(campaign.id))  # type: ignore[call-arg]
         except Exception as e:
             logger.warning(f"فشل إطلاق مهمة الحملة {campaign.id}: {e}")
 

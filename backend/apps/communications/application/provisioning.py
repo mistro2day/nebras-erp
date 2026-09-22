@@ -7,6 +7,7 @@
 
 آمن للاستدعاء المتكرر (idempotent).
 """
+import typing
 from django.conf import settings
 from django.db import transaction
 
@@ -90,9 +91,11 @@ _CHANNELS = [
 ]
 
 
+
+
 def ensure_communication_defaults(tenant_id, created_by=None):
     """يهيّئ القنوات والمزوّد الافتراضي (mock) وقوالب الترحيب للمستأجر."""
-    with transaction.atomic():
+    with typing.cast(typing.Any, transaction.atomic)():
         channels = {}
         for code, name, ch_type, desc in _CHANNELS:
             channel, _ = CommunicationChannel.objects.get_or_create(
