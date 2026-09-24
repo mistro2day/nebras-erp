@@ -12,7 +12,7 @@ import { ExportColumn } from '../../../shared/export/export.types';
 import { printFinancialReport } from './finance-report-print';
 
 /** أنواع التقارير المالية */
-type ReportType = 'revenue' | 'trial-balance' | 'income-statement' | 'cost-center' | 'balance-sheet';
+type ReportType = 'revenue' | 'expense' | 'trial-balance' | 'income-statement' | 'cost-center' | 'balance-sheet';
 
 interface ReportTab {
   key: ReportType;
@@ -96,8 +96,8 @@ interface KPI {
           <label class="filter-label">حساب / تصنيف</label>
           <select class="nb-select" [(ngModel)]="accountFilter" (change)="generateReport()">
             <option value="">— جميع الحسابات —</option>
-            @for (acc of accounts(); track acc.id) {
-              <option [value]="acc.id">{{ acc.code }} - {{ acc.name }}</option>
+            @for (acc of filteredAccounts(); track acc.id) {
+              <option [value]="acc.id">{{ acc.code }} - {{ acc.name_ar || acc.name }}</option>
             }
           </select>
         </div>
@@ -223,21 +223,38 @@ interface KPI {
     .btn.ghost:hover { background: var(--nb-surface-raised); color: var(--nb-text); }
     .btn.sm { height: 38px; font-size: 12px; padding: 0 14px; }
 
-    /* ===== مؤشرات الأداء (KPIs) ===== */
-    .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
-    .kpi-card {
-      display: flex; flex-direction: column; gap: 3px; padding: 16px 18px;
-      background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: var(--nb-radius-card);
-      border-right: 4px solid var(--nb-border-soft); transition: transform 0.15s ease;
+    /* ===== مؤشرات الأداء (KPIs) — تمتد بكامل عرض الصفحة ===== */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+      width: 100%;
     }
-    .kpi-card:hover { transform: translateY(-1px); }
+    .kpi-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 16px 20px;
+      background: var(--nb-surface);
+      border: 1px solid var(--nb-border);
+      border-radius: var(--nb-radius-card);
+      border-right: 5px solid var(--nb-border-soft);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+      min-width: 0;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
     .kpi-card.success { border-right-color: var(--nb-success); }
     .kpi-card.danger { border-right-color: var(--nb-danger); }
     .kpi-card.info { border-right-color: var(--nb-info); }
     .kpi-card.warning { border-right-color: var(--nb-warning); }
-    .kpi-label { font-size: 11px; font-weight: 600; color: var(--nb-text-muted); letter-spacing: 0.3px; }
-    .kpi-value { font-size: 22px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
-    .kpi-sub { font-size: 11px; color: var(--nb-text-faint); }
+    .kpi-label { font-size: 11.5px; font-weight: 600; color: var(--nb-text-muted); letter-spacing: 0.3px; }
+    .kpi-value { font-size: 23px; font-weight: 800; color: var(--nb-text); font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+    .kpi-sub { font-size: 11px; color: var(--nb-text-faint); margin-top: 2px; }
 
     /* ===== جدول التقرير ===== */
     .report-table-panel { margin-bottom: 12px; }
@@ -294,6 +311,7 @@ export class FinanceReportsComponent implements OnInit {
   /* ───── التبويبات ───── */
   readonly tabs: ReportTab[] = [
     { key: 'revenue', label: 'الإيرادات حسب التاريخ', icon: '💰', desc: 'تحليل الإيرادات المحصّلة مصنّفة بالتاريخ والمصدر' },
+    { key: 'expense', label: 'المصروفات حسب التاريخ', icon: '💸', desc: 'تحليل المصروفات التشغيلية مصنّفة بالتاريخ وبند الصرف' },
     { key: 'trial-balance', label: 'ميزان المراجعة', icon: '⚖️', desc: 'أرصدة الحسابات المدينة والدائنة وصافي الفرق' },
     { key: 'income-statement', label: 'قائمة الدخل', icon: '📈', desc: 'الإيرادات مقابل المصروفات وصافي الربح أو الخسارة' },
     { key: 'cost-center', label: 'مراكز التكلفة', icon: '🎯', desc: 'تحليل الإيرادات والمصروفات حسب الفروع والأقسام' },
@@ -307,11 +325,20 @@ export class FinanceReportsComponent implements OnInit {
     switch (this.currentTab()) {
       case 'revenue':
         return [
-          { key: 'date', label: 'التاريخ', width: 15 },
-          { key: 'entry_number', label: 'رقم القيد', width: 14 },
+          { key: 'date', label: 'التاريخ', width: 14 },
+          { key: 'entry_number', label: 'رقم القيد / السند', width: 15 },
           { key: 'account_name', label: 'الحساب المحاسبي', width: 28 },
           { key: 'description', label: 'البيان', width: 30 },
-          { key: 'credit', label: 'المبلغ (ج.س)', align: 'end', width: 18, map: (r: any) => r._isTotal || r._isSubTotal ? this.fmt(r.credit) : this.fmt(r.credit) },
+          { key: 'credit', label: 'المبلغ (ج.س)', align: 'end', width: 18, map: (r: any) => this.fmt(r.credit) },
+        ];
+      case 'expense':
+        return [
+          { key: 'date', label: 'التاريخ', width: 14 },
+          { key: 'entry_number', label: 'رقم القيد / السند', width: 15 },
+          { key: 'account_name', label: 'بند المصروف (الحساب)', width: 26 },
+          { key: 'description', label: 'البيان وتفاصيل الصرف', width: 30 },
+          { key: 'cost_center', label: 'مركز التكلفة', width: 16 },
+          { key: 'debit', label: 'المبلغ (ج.س)', align: 'end', width: 18, map: (r: any) => this.fmt(r.debit) },
         ];
       case 'trial-balance':
         return [
@@ -352,6 +379,7 @@ export class FinanceReportsComponent implements OnInit {
     if (!data.length) return [];
     switch (this.currentTab()) {
       case 'revenue': return this.buildRevenueRows(data);
+      case 'expense': return this.buildExpenseRows(data);
       case 'trial-balance': return this.buildTrialBalanceRows(data);
       case 'income-statement': return this.buildIncomeStatementRows(data);
       case 'cost-center': return this.buildCostCenterRows(data);
@@ -371,10 +399,22 @@ export class FinanceReportsComponent implements OnInit {
         const avg = dataRows.length ? total / dataRows.length : 0;
         const maxRow = dataRows.reduce((m: any, r: any) => (Number(r.credit) || 0) > (Number(m?.credit) || 0) ? r : m, dataRows[0]);
         return [
-          { label: 'إجمالي الإيرادات', value: this.fmt(total) + ' ج.س', kind: 'success' as const },
-          { label: 'متوسط المبلغ لكل حركة', value: this.fmt(avg) + ' ج.س', kind: 'info' as const },
-          { label: 'عدد الحركات', value: String(dataRows.length), sub: 'حركة مالية', kind: 'default' as const },
+          { label: 'إجمالي الإيرادات', value: this.fmt(total) + ' ج.س', sub: 'إجمالي المحصّل للفترة', kind: 'success' as const },
+          { label: 'متوسط المبلغ لكل حركة', value: this.fmt(avg) + ' ج.س', sub: 'متوسط العملية المالية', kind: 'info' as const },
+          { label: 'عدد الحركات', value: String(dataRows.length), sub: 'حركة مالية مسجلة', kind: 'default' as const },
           { label: 'أعلى إيراد', value: maxRow ? this.fmt(maxRow.credit) + ' ج.س' : '—', sub: maxRow?.date || '', kind: 'warning' as const },
+        ];
+      }
+      case 'expense': {
+        const dataRows = rows.filter((r: any) => !r._isTotal && !r._isSubTotal);
+        const total = dataRows.reduce((s: number, r: any) => s + (Number(r.debit) || 0), 0);
+        const avg = dataRows.length ? total / dataRows.length : 0;
+        const maxRow = dataRows.reduce((m: any, r: any) => (Number(r.debit) || 0) > (Number(m?.debit) || 0) ? r : m, dataRows[0]);
+        return [
+          { label: 'إجمالي المصروفات', value: this.fmt(total) + ' ج.س', sub: 'إجمالي حركة الصرف للفترة', kind: 'danger' as const },
+          { label: 'متوسط حركة الصرف', value: this.fmt(avg) + ' ج.س', sub: 'لكل عملية صرف', kind: 'info' as const },
+          { label: 'عدد عمليات الصرف', value: String(dataRows.length), sub: 'سند / قيد محاسبي', kind: 'default' as const },
+          { label: 'أعلى حركة صرف', value: maxRow ? this.fmt(maxRow.debit) + ' ج.س' : '—', sub: maxRow ? (maxRow.account_name || maxRow.date) : '', kind: 'warning' as const },
         ];
       }
       case 'trial-balance': {
@@ -467,6 +507,7 @@ export class FinanceReportsComponent implements OnInit {
 
   switchTab(tab: ReportType): void {
     this.currentTab.set(tab);
+    this.accountFilter = '';
     this.generateReport();
   }
 
@@ -493,6 +534,9 @@ export class FinanceReportsComponent implements OnInit {
     switch (tab) {
       case 'revenue':
         obs = this.service.getRevenueReport(params);
+        break;
+      case 'expense':
+        obs = this.service.getExpenseReport(params);
         break;
       case 'income-statement':
         // جلب الإيرادات والمصروفات معًا
@@ -522,14 +566,29 @@ export class FinanceReportsComponent implements OnInit {
     });
   }
 
+  /* ───── الحسابات المفلترة حسب التبويب النشط ───── */
+  filteredAccounts = computed(() => {
+    const all = this.accounts();
+    const tab = this.currentTab();
+    if (tab === 'revenue') {
+      const subset = all.filter(a => a.account_type?.code === 'revenue' || a.account_type_code === 'revenue' || a.code?.startsWith('4'));
+      return subset.length ? subset : all;
+    }
+    if (tab === 'expense') {
+      const subset = all.filter(a => a.account_type?.code === 'expense' || a.account_type_code === 'expense' || a.code?.startsWith('5'));
+      return subset.length ? subset : all;
+    }
+    return all;
+  });
+
   /* ═══════════════ بناة الصفوف حسب نوع التقرير ═══════════════ */
 
   private buildRevenueRows(data: any[]): any[] {
     const rows: any[] = data.map((entry: any) => ({
-      date: entry.date || entry.journal_entry?.date || '—',
+      date: entry.date || entry.entry_date || entry.journal_entry?.date || '—',
       entry_number: entry.entry_number || entry.journal_entry?.entry_number || '—',
-      account_name: entry.account?.name || entry.account_name || '—',
-      description: entry.description || entry.journal_entry?.description || '—',
+      account_name: entry.account_name || entry.account?.name_ar || entry.account?.name || '—',
+      description: entry.line_description || entry.description || entry.journal_entry?.description || '—',
       credit: Number(entry.credit) || 0,
     }));
 
@@ -540,6 +599,28 @@ export class FinanceReportsComponent implements OnInit {
         date: '', entry_number: '', account_name: '',
         description: 'الإجمالي الكلي',
         credit: total,
+      });
+    }
+    return rows;
+  }
+
+  private buildExpenseRows(data: any[]): any[] {
+    const rows: any[] = data.map((entry: any) => ({
+      date: entry.date || entry.entry_date || entry.journal_entry?.date || '—',
+      entry_number: entry.entry_number || entry.journal_entry?.entry_number || '—',
+      account_name: entry.account_name || entry.account?.name_ar || entry.account?.name || '—',
+      description: entry.line_description || entry.description || entry.journal_entry?.description || '—',
+      cost_center: entry.cost_center_name || entry.cost_center?.name_ar || entry.cost_center?.name || 'عام',
+      debit: Number(entry.debit) || 0,
+    }));
+
+    if (rows.length) {
+      const total = rows.reduce((s: number, r: any) => s + r.debit, 0);
+      rows.push({
+        _isTotal: true,
+        date: '', entry_number: '', account_name: '', cost_center: '',
+        description: 'إجمالي المصروفات الكلي',
+        debit: total,
       });
     }
     return rows;

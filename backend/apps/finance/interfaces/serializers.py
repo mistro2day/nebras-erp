@@ -319,6 +319,8 @@ class LedgerEntrySerializer(serializers.ModelSerializer):
     entry_date = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.date')
     reference = serializers.ReadOnlyField(source='journal_entry_line.journal_entry.reference')
     cost_center_name = serializers.ReadOnlyField(source='cost_center.name_ar')
+    account_type_code = serializers.ReadOnlyField(source='account.account_type.code')
+    account_type_name = serializers.ReadOnlyField(source='account.account_type.name_ar')
     line_description = serializers.SerializerMethodField()
     partner_name = serializers.SerializerMethodField()
 

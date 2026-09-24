@@ -327,6 +327,9 @@ class LedgerEntryViewSet(BaseCRUDViewSet):
         account = self.request.query_params.get('account')
         cost_center = self.request.query_params.get('cost_center')
         date_param = self.request.query_params.get('date')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        account_type = self.request.query_params.get('account__account_type__code') or self.request.query_params.get('account_type')
         if ledger:
             qs = qs.filter(ledger_id=ledger)
         if account:
@@ -335,7 +338,13 @@ class LedgerEntryViewSet(BaseCRUDViewSet):
             qs = qs.filter(cost_center_id=cost_center)
         if date_param:
             qs = qs.filter(date=date_param)
-        return qs.select_related('account', 'cost_center', 'journal_entry_line__journal_entry')
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        if account_type:
+            qs = qs.filter(account__account_type__code=account_type)
+        return qs.select_related('account', 'account__account_type', 'cost_center', 'journal_entry_line__journal_entry')
 
 
 class BankViewSet(BaseCRUDViewSet):
