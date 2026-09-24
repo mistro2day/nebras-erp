@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@a
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CommunicationsService, CommunicationTemplate } from './communications.service';
+import { TenantService } from '../../core/services/tenant.service';
 import { NbPageHeaderComponent } from '../../shared/nebras/nb-page-header.component';
 import { NbPanelComponent } from '../../shared/nebras/nb-panel.component';
 
@@ -365,6 +366,7 @@ export interface SystemVariable {
 })
 export class CommunicationsTemplatesComponent {
   private commService = inject(CommunicationsService);
+  private tenantService = inject(TenantService);
 
   templates = signal<CommunicationTemplate[]>([]);
   searchTerm = signal('');
@@ -374,6 +376,11 @@ export class CommunicationsTemplatesComponent {
   previewTemplate = signal<CommunicationTemplate | null>(null);
   previewMode = signal<'rendered' | 'raw'>('rendered');
   editingTemplate: CommunicationTemplate | null = null;
+
+  currentSchoolName = computed(() => {
+    const t = this.tenantService.currentTenant();
+    return t?.schoolNameAr || t?.nameAr || 'مدارس المورد النموذجية';
+  });
 
   formData: Partial<CommunicationTemplate> = {
     name: '',
@@ -385,7 +392,8 @@ export class CommunicationsTemplatesComponent {
   };
 
   // قائمة جميع متغيرات النظام المتاحة
-  allVariables: SystemVariable[] = [
+  get allVariables(): SystemVariable[] {
+    return [
     // شؤون الطلاب
     { code: 'student_name', label: 'اسم الطالب الكامل', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'خالد عثمان إبراهيم الكباشي', description: 'اسم الطالب الثلاثي أو الرباعي من قاعدة البيانات.' },
     { code: 'student_code', label: 'الرقم الأكاديمي للطالب', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'STU-2026-0841', description: 'الرمز التعريف الموحد للطالب.' },
@@ -423,10 +431,11 @@ export class CommunicationsTemplatesComponent {
     // النقل والمواصلات
     { code: 'bus_number', label: 'رقم الحافلة', category: 'transport', category_name: 'النقل والمواصلات', sample_value: 'حافلة خط 08 (أم درمان)', description: 'رقم خط النقل المكتبي.' },
 
-    // العام والمؤسسة
-    { code: 'school_name', label: 'اسم المدرسة', category: 'general', category_name: 'عام والمؤسسة', sample_value: 'مدارس نبراس النموذجية بالسودان', description: 'الاسم الرسمي للمؤسسة التعليمية.' },
+    // العام والمؤسسة (مشتق من المستأجر الحالي ديناميكياً)
+    { code: 'school_name', label: 'اسم المدرسة / المستأجر', category: 'general', category_name: 'عام والمؤسسة', sample_value: this.currentSchoolName(), description: 'اسم المدرسة المستمد تلقائياً من بيانات المستأجر النشط.' },
     { code: 'today_date', label: 'تاريخ اليوم الحالي', category: 'general', category_name: 'عام والمؤسسة', sample_value: new Date().toISOString().split('T')[0], description: 'التاريخ التلقائي لحظة الإرسال.' },
-  ];
+    ];
+  }
 
   popularVariables = computed(() => this.allVariables.slice(0, 6));
 
