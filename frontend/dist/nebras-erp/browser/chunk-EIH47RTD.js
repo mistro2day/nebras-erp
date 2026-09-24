@@ -1,6 +1,6 @@
-import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647 \u0633\u0648\u062F\u0627\u0646\u064A"){if(!t||t<=0)return"\u0635\u0641\u0631 "+m;let u=["","\u0648\u0627\u062D\u062F","\u0627\u062B\u0646\u0627\u0646","\u062B\u0644\u0627\u062B\u0629","\u0623\u0631\u0628\u0639\u0629","\u062E\u0645\u0633\u0629","\u0633\u062A\u0629","\u0633\u0628\u0639\u0629","\u062B\u0645\u0627\u0646\u064A\u0629","\u062A\u0633\u0639\u0629","\u0639\u0634\u0631\u0629","\u0623\u062D\u062F \u0639\u0634\u0631","\u0627\u062B\u0646\u0627 \u0639\u0634\u0631","\u062B\u0644\u0627\u062B\u0629 \u0639\u0634\u0631","\u0623\u0631\u0628\u0639\u0629 \u0639\u0634\u0631","\u062E\u0645\u0633\u0629 \u0639\u0634\u0631","\u0633\u062A\u0629 \u0639\u0634\u0631","\u0633\u0628\u0639\u0629 \u0639\u0634\u0631","\u062B\u0645\u0627\u0646\u064A\u0629 \u0639\u0634\u0631","\u062A\u0633\u0639\u0629 \u0639\u0634\u0631"],s=["","","\u0639\u0634\u0631\u0648\u0646","\u062B\u0644\u0627\u062B\u0648\u0646","\u0623\u0631\u0628\u0639\u0648\u0646","\u062E\u0645\u0633\u0648\u0646","\u0633\u062A\u0648\u0646","\u0633\u0628\u0639\u0648\u0646","\u062B\u0645\u0627\u0646\u0648\u0646","\u062A\u0633\u0639\u0648\u0646"],v=["","\u0645\u0627\u0626\u0629","\u0645\u0627\u0626\u062A\u0627\u0646","\u062B\u0644\u0627\u062B\u0645\u0627\u0626\u0629","\u0623\u0631\u0628\u0639\u0645\u0627\u0626\u0629","\u062E\u0645\u0633\u0645\u0627\u0626\u0629","\u0633\u062A\u0645\u0627\u0626\u0629","\u0633\u0628\u0639\u0645\u0627\u0626\u0629","\u062B\u0645\u0627\u0646\u0645\u0627\u0626\u0629","\u062A\u0633\u0639\u0645\u0627\u0626\u0629"];function p(f){let d="",b=Math.floor(f/100),l=f%100;if(b>0&&(d+=v[b]),l>0)if(d&&(d+=" \u0648"),l<20)d+=u[l];else{let y=Math.floor(l/10),n=l%10;n>0&&(d+=u[n]+" \u0648"),d+=s[y]}return d}let c=Math.floor(t),e="",i=Math.floor(c/1e6),r=Math.floor(c%1e6/1e3),g=c%1e3;return i>0&&(i===1?e+="\u0645\u0644\u064A\u0648\u0646":i===2?e+="\u0645\u0644\u064A\u0648\u0646\u0627\u0646":i>=3&&i<=10?e+=p(i)+" \u0645\u0644\u0627\u064A\u064A\u0646":e+=p(i)+" \u0645\u0644\u064A\u0648\u0646"),r>0&&(e&&(e+=" \u0648"),r===1?e+="\u0623\u0644\u0641":r===2?e+="\u0623\u0644\u0641\u0627\u0646":r>=3&&r<=10?e+=p(r)+" \u0622\u0644\u0627\u0641":e+=p(r)+" \u0623\u0644\u0641"),g>0&&(e&&(e+=" \u0648"),e+=p(g)),`\u0641\u0642\u0637 ${e} ${m} \u0644\u0627 \u063A\u064A\u0631`}function U(t,m,u){if(!t)return;let s=z(m),v=s.schoolNameAr,p=s.schoolNameEn,c=s.logoUrl,e=s.phone,i=s.email,r=s.address,g=t.lines||[],f=g.reduce((a,o)=>a+(Number(o.debit)||0),0),d=g.reduce((a,o)=>a+(Number(o.credit)||0),0),b=F(f,"\u062C\u0646\u064A\u0647 \u0633\u0648\u062F\u0627\u0646\u064A"),l=new Date,y=`${l.toISOString().split("T")[0]} ${l.toLocaleTimeString("ar-SD",{hour:"2-digit",minute:"2-digit"})}`,n=t.partner_details,x=t.source_details,w=t.fee_breakdown||[],_=g.map((a,o)=>`
+import{a as _}from"./chunk-VT3BB4OL.js";function j(t,m="\u062C\u0646\u064A\u0647 \u0633\u0648\u062F\u0627\u0646\u064A"){if(!t||t<=0)return"\u0635\u0641\u0631 "+m;let u=["","\u0648\u0627\u062D\u062F","\u0627\u062B\u0646\u0627\u0646","\u062B\u0644\u0627\u062B\u0629","\u0623\u0631\u0628\u0639\u0629","\u062E\u0645\u0633\u0629","\u0633\u062A\u0629","\u0633\u0628\u0639\u0629","\u062B\u0645\u0627\u0646\u064A\u0629","\u062A\u0633\u0639\u0629","\u0639\u0634\u0631\u0629","\u0623\u062D\u062F \u0639\u0634\u0631","\u0627\u062B\u0646\u0627 \u0639\u0634\u0631","\u062B\u0644\u0627\u062B\u0629 \u0639\u0634\u0631","\u0623\u0631\u0628\u0639\u0629 \u0639\u0634\u0631","\u062E\u0645\u0633\u0629 \u0639\u0634\u0631","\u0633\u062A\u0629 \u0639\u0634\u0631","\u0633\u0628\u0639\u0629 \u0639\u0634\u0631","\u062B\u0645\u0627\u0646\u064A\u0629 \u0639\u0634\u0631","\u062A\u0633\u0639\u0629 \u0639\u0634\u0631"],o=["","","\u0639\u0634\u0631\u0648\u0646","\u062B\u0644\u0627\u062B\u0648\u0646","\u0623\u0631\u0628\u0639\u0648\u0646","\u062E\u0645\u0633\u0648\u0646","\u0633\u062A\u0648\u0646","\u0633\u0628\u0639\u0648\u0646","\u062B\u0645\u0627\u0646\u0648\u0646","\u062A\u0633\u0639\u0648\u0646"],v=["","\u0645\u0627\u0626\u0629","\u0645\u0627\u0626\u062A\u0627\u0646","\u062B\u0644\u0627\u062B\u0645\u0627\u0626\u0629","\u0623\u0631\u0628\u0639\u0645\u0627\u0626\u0629","\u062E\u0645\u0633\u0645\u0627\u0626\u0629","\u0633\u062A\u0645\u0627\u0626\u0629","\u0633\u0628\u0639\u0645\u0627\u0626\u0629","\u062B\u0645\u0627\u0646\u0645\u0627\u0626\u0629","\u062A\u0633\u0639\u0645\u0627\u0626\u0629"];function c(f){let d="",b=Math.floor(f/100),l=f%100;if(b>0&&(d+=v[b]),l>0)if(d&&(d+=" \u0648"),l<20)d+=u[l];else{let y=Math.floor(l/10),n=l%10;n>0&&(d+=u[n]+" \u0648"),d+=o[y]}return d}let p=Math.floor(t),e="",i=Math.floor(p/1e6),r=Math.floor(p%1e6/1e3),g=p%1e3;return i>0&&(i===1?e+="\u0645\u0644\u064A\u0648\u0646":i===2?e+="\u0645\u0644\u064A\u0648\u0646\u0627\u0646":i>=3&&i<=10?e+=c(i)+" \u0645\u0644\u0627\u064A\u064A\u0646":e+=c(i)+" \u0645\u0644\u064A\u0648\u0646"),r>0&&(e&&(e+=" \u0648"),r===1?e+="\u0623\u0644\u0641":r===2?e+="\u0623\u0644\u0641\u0627\u0646":r>=3&&r<=10?e+=c(r)+" \u0622\u0644\u0627\u0641":e+=c(r)+" \u0623\u0644\u0641"),g>0&&(e&&(e+=" \u0648"),e+=c(g)),`\u0641\u0642\u0637 ${e} ${m} \u0644\u0627 \u063A\u064A\u0631`}function U(t,m,u){if(!t)return;let o=_(m),v=o.schoolNameAr,c=o.schoolNameEn,p=o.logoUrl,e=o.phone,i=o.email,r=o.address,g=t.lines||[],f=g.reduce((a,s)=>a+(Number(s.debit)||0),0),d=g.reduce((a,s)=>a+(Number(s.credit)||0),0),b=j(f,"\u062C\u0646\u064A\u0647 \u0633\u0648\u062F\u0627\u0646\u064A"),l=new Date,y=`${l.toISOString().split("T")[0]} ${l.toLocaleTimeString("ar-SD",{hour:"2-digit",minute:"2-digit"})}`,n=t.partner_details,x=t.source_details,w=t.fee_breakdown||[],z=g.map((a,s)=>`
     <tr>
-      <td class="center mono">${o+1}</td>
+      <td class="center mono">${s+1}</td>
       <td class="mono font-bold">${a.account_code}</td>
       <td><strong>${a.account_name}</strong></td>
       <td class="text-muted">${a.cost_center_name||"\u2014"}</td>
@@ -34,17 +34,17 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
               <th class="end">\u0627\u0644\u0645\u0628\u0644\u063A \u0627\u0644\u0645\u062E\u0635\u0635</th>
             </tr>
           </thead>
-          <tbody>${w.map(o=>`
+          <tbody>${w.map(s=>`
       <tr>
-        <td><strong>${o.fee_name}</strong></td>
-        <td>${o.description||o.fee_name}</td>
-        <td class="mono center">${o.invoice_number||"\u2014"}</td>
-        <td class="end mono font-bold">${Number(o.allocated_amount||o.amount).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})} \u062C.\u0633</td>
+        <td><strong>${s.fee_name}</strong></td>
+        <td>${s.description||s.fee_name}</td>
+        <td class="mono center">${s.invoice_number||"\u2014"}</td>
+        <td class="end mono font-bold">${Number(s.allocated_amount||s.amount).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})} \u062C.\u0633</td>
       </tr>
     `).join("")}</tbody>
         </table>
       </div>
-    `);let S={draft:"\u0645\u0633\u0648\u062F\u0629 \u0645\u0628\u062F\u0626\u064A\u0629",approved:"\u0642\u064A\u062F \u0645\u0639\u062A\u0645\u062F",posted:"\u0645\u0631\u062D\u0644 \u0644\u062F\u0641\u062A\u0631 \u0627\u0644\u0623\u0633\u062A\u0627\u0630 \u0627\u0644\u0639\u0627\u0645",reversed:"\u0642\u064A\u062F \u0645\u062D\u0627\u0633\u0628\u064A \u0645\u0639\u0643\u0648\u0633",cancelled:"\u0645\u0644\u063A\u064A"}[t.status]||t.status,j=`<!doctype html>
+    `);let S={draft:"\u0645\u0633\u0648\u062F\u0629 \u0645\u0628\u062F\u0626\u064A\u0629",approved:"\u0642\u064A\u062F \u0645\u0639\u062A\u0645\u062F",posted:"\u0645\u0631\u062D\u0644 \u0644\u062F\u0641\u062A\u0631 \u0627\u0644\u0623\u0633\u062A\u0627\u0630 \u0627\u0644\u0639\u0627\u0645",reversed:"\u0642\u064A\u062F \u0645\u062D\u0627\u0633\u0628\u064A \u0645\u0639\u0643\u0648\u0633",cancelled:"\u0645\u0644\u063A\u064A"}[t.status]||t.status,F=`<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
@@ -457,11 +457,11 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
       <div class="org-meta">
         <p class="country-line">\u062C\u0645\u0647\u0648\u0631\u064A\u0629 \u0627\u0644\u0633\u0648\u062F\u0627\u0646 \u2022 \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645 \u0648\u0627\u0644\u062A\u0631\u0628\u064A\u0629 \u0627\u0644\u0648\u0637\u0646\u064A\u0629</p>
         <h2 class="org-name-ar">${v}</h2>
-        <h4 class="org-name-en">${p}</h4>
+        <h4 class="org-name-en">${c}</h4>
         <p class="contact-line">\u{1F4CD} ${r} \u2022 \u0647\u0627\u062A\u0641: ${e} \u2022 \u0628\u0631\u064A\u062F: ${i}</p>
       </div>
       <div class="logo-box">
-        ${c?`<img src="${c}" alt="\u0634\u0639\u0627\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629" class="logo-img" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><span class="logo-placeholder" style="display:none;">\u{1F3DB}\uFE0F</span>`:'<span class="logo-placeholder">\u{1F3DB}\uFE0F</span>'}
+        ${p?`<img src="${p}" alt="\u0634\u0639\u0627\u0631 \u0627\u0644\u0645\u062F\u0631\u0633\u0629" class="logo-img" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><span class="logo-placeholder" style="display:none;">\u{1F3DB}\uFE0F</span>`:'<span class="logo-placeholder">\u{1F3DB}\uFE0F</span>'}
       </div>
     </header>
 
@@ -494,6 +494,10 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
         <span class="k">\u0627\u0644\u0639\u0645\u0644\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629:</span>
         <span class="v">${t.currency?.name_ar||"\u0627\u0644\u062C\u0646\u064A\u0647 \u0627\u0644\u0633\u0648\u062F\u0627\u0646\u064A (\u062C.\u0633)"}</span>
       </div>
+      <div class="meta-col">
+        <span class="k">\u0627\u0644\u0645\u062D\u0627\u0633\u0628 \u0627\u0644\u0645\u0646\u0634\u0626:</span>
+        <span class="v font-bold">${t.accountant_name||t.created_by_name||"\u2014"}</span>
+      </div>
     </div>
 
     <!-- \u0627\u0644\u0628\u064A\u0627\u0646 \u0627\u0644\u0645\u062D\u0627\u0633\u0628\u064A \u0627\u0644\u0639\u0627\u0645 \u0644\u0644\u0642\u064A\u062F -->
@@ -522,7 +526,7 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
           </tr>
         </thead>
         <tbody>
-          ${_}
+          ${z}
         </tbody>
         <tfoot>
           <tr>
@@ -562,7 +566,7 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
       <div class="sig-col">
         <span class="sig-label">\u0627\u0644\u062E\u062A\u0645 \u0627\u0644\u0645\u0627\u0644\u064A \u0627\u0644\u0631\u0633\u0645\u064A</span>
         <div class="stamp-wrap">
-          ${s.stampFinanceUrl?`<img src="${s.stampFinanceUrl}" class="stamp-img" alt="\u062E\u062A\u0645 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0627\u0644\u064A\u0629" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">\u0645\u0639\u062A\u0645\u062F</div>`:'<div class="stamp-ph">\u0645\u0639\u062A\u0645\u062F</div>'}
+          ${o.stampFinanceUrl?`<img src="${o.stampFinanceUrl}" class="stamp-img" alt="\u062E\u062A\u0645 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0627\u0644\u064A\u0629" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="stamp-ph" style="display:none;">\u0645\u0639\u062A\u0645\u062F</div>`:'<div class="stamp-ph">\u0645\u0639\u062A\u0645\u062F</div>'}
         </div>
       </div>
     </div>
@@ -587,4 +591,4 @@ import{a as z}from"./chunk-VT3BB4OL.js";function F(t,m="\u062C\u0646\u064A\u0647
     };
   <\/script>
 </body>
-</html>`,h=window.open("","_blank","width=1000,height=800,menubar=no,toolbar=no,location=no,status=no");if(!h){console.warn("\u062A\u0639\u0630\u0631 \u0641\u062A\u062D \u0646\u0627\u0641\u0630\u0629 \u0627\u0644\u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0628\u062B\u0642\u0629\u060C \u064A\u0631\u062C\u0649 \u0627\u0644\u0633\u0645\u0627\u062D \u0628\u0627\u0644\u0646\u0648\u0627\u0641\u0630 \u0627\u0644\u0645\u0646\u0628\u062B\u0642\u0629 \u0644\u0644\u0645\u062A\u0635\u0641\u062D.");return}h.document.open(),h.document.write(j),h.document.close()}export{F as a,U as b};
+</html>`,h=window.open("","_blank","width=1000,height=800,menubar=no,toolbar=no,location=no,status=no");if(!h){console.warn("\u062A\u0639\u0630\u0631 \u0641\u062A\u062D \u0646\u0627\u0641\u0630\u0629 \u0627\u0644\u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0628\u062B\u0642\u0629\u060C \u064A\u0631\u062C\u0649 \u0627\u0644\u0633\u0645\u0627\u062D \u0628\u0627\u0644\u0646\u0648\u0627\u0641\u0630 \u0627\u0644\u0645\u0646\u0628\u062B\u0642\u0629 \u0644\u0644\u0645\u062A\u0635\u0641\u062D.");return}h.document.open(),h.document.write(F),h.document.close()}export{j as a,U as b};
