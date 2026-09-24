@@ -87,11 +87,20 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     partner_details = serializers.SerializerMethodField()
     source_details = serializers.SerializerMethodField()
     fee_breakdown = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    accountant_name = serializers.SerializerMethodField()
 
     class Meta:
         model = JournalEntry
         fields = '__all__'
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at', 'posted_at', 'posted_by', 'approved_at', 'approved_by')
+
+    def get_created_by_name(self, obj):
+        from apps.shared.application.people import resolve_user_display_name
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+
+    def get_accountant_name(self, obj):
+        return self.get_created_by_name(obj)
 
     def get_partner_details(self, obj):
         """
@@ -425,11 +434,20 @@ class FinancialDocumentSerializer(serializers.ModelSerializer):
 
 class VoucherSerializer(serializers.ModelSerializer):
     voucher_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    created_by_name = serializers.SerializerMethodField()
+    accountant_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Voucher
         fields = '__all__'
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at', 'journal_entry')
+
+    def get_created_by_name(self, obj):
+        from apps.shared.application.people import resolve_user_display_name
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='أمين الخزينة / المحاسب')
+
+    def get_accountant_name(self, obj):
+        return self.get_created_by_name(obj)
 
     def validate(self, attrs):
         v_num = (attrs.get('voucher_number') or '').strip()
@@ -446,10 +464,20 @@ class VoucherSerializer(serializers.ModelSerializer):
 
 
 class FinancialTransactionSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    accountant_name = serializers.SerializerMethodField()
+
     class Meta:
         model = FinancialTransaction
         fields = '__all__'
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at', 'journal_entry')
+
+    def get_created_by_name(self, obj):
+        from apps.shared.application.people import resolve_user_display_name
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+
+    def get_accountant_name(self, obj):
+        return self.get_created_by_name(obj)
 
 
 class RecurringJournalSerializer(serializers.ModelSerializer):

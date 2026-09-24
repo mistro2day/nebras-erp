@@ -10,6 +10,7 @@ import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.comp
 import { NbSearchableSelectComponent, NbSelectItem } from '../../../shared/nebras/nb-searchable-select.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+import { AuthService } from '../../../core/auth/auth.service';
 
 export interface CustomFeeEntry {
   id: string;
@@ -301,6 +302,10 @@ export interface CustomFeeEntry {
                   <span class="k">العملة:</span>
                   <span class="v">الجنيه السوداني (ج.س)</span>
                 </div>
+                <div class="rc-item">
+                  <span class="k">المحاسب المسؤول:</span>
+                  <span class="v bold">{{ getCurrentAccountantName() }}</span>
+                </div>
               </div>
 
               <div class="rc-section-title">بنود الفاتورة المشمولة ({{ totalItemsCount() }})</div>
@@ -392,6 +397,10 @@ export interface CustomFeeEntry {
                   <div class="src-row highlight">
                     <span class="lbl">إجمالي مبلغ الفاتورة:</span>
                     <span class="val bold ok mono font-amount">{{ (inv.total_amount || selectedTotal()) | number:'1.2-2' }} ج.س</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">المحاسب المنشئ للفاتورة:</span>
+                    <span class="val bold">{{ inv.created_by_name || inv.accountant_name || getCurrentAccountantName() }}</span>
                   </div>
                   <div class="src-row">
                     <span class="lbl">عدد بنود الرسوم:</span>
@@ -1028,6 +1037,18 @@ export class InvoiceCreateModalComponent implements OnInit, OnChanges {
   private svc = inject(StudentFinanceService);
   private studentsSvc = inject(StudentsService);
   private notify = inject(NotificationService);
+  private authService = inject(AuthService, { optional: true });
+
+  getCurrentAccountantName(): string {
+    const current = this.authService?.currentUser();
+    if (current) {
+      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+      if (full) return full;
+      if (current.username) return current.username;
+      if (current.email) return current.email;
+    }
+    return 'المحاسب المسؤول';
+  }
 
   @Input() open = false;
   @Input() preselectedAccountId?: string;

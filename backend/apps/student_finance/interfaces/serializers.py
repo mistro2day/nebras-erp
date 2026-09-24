@@ -11,8 +11,19 @@ from apps.student_finance.domain.models import (
 )
 
 class BaseStudentFinanceSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    accountant_name = serializers.SerializerMethodField()
+
     class Meta:
         read_only_fields = ('tenant_id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'deleted_at')
+
+    def get_created_by_name(self, obj):
+        from apps.shared.application.people import resolve_user_display_name
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+
+    def get_accountant_name(self, obj):
+        return self.get_created_by_name(obj)
+
 
 class FeeCategorySerializer(BaseStudentFinanceSerializer):
     class Meta(BaseStudentFinanceSerializer.Meta):
@@ -75,22 +86,9 @@ def _get_payment_method_name(pm_id):
         return 'تحويل بنكي'
 
 def _get_collector_name(user_id, tenant_id=None):
-    if not user_id:
-        return 'أمين الخزينة'
-    u_key = str(user_id)
-    if u_key in _USER_NAME_CACHE:
-        return _USER_NAME_CACHE[u_key]
-    try:
-        from apps.identity.domain.models import User
-        u = User.objects.filter(id=user_id).first()
-        if u:
-            full = f"{u.first_name or ''} {u.last_name or ''}".strip()
-            name = full or u.username or u.email or 'أمين الخزينة'
-            _USER_NAME_CACHE[u_key] = name
-            return name
-    except Exception:
-        pass
-    return 'أمين الخزينة'
+    from apps.shared.application.people import resolve_user_display_name
+    return resolve_user_display_name(user_id, default='أمين الخزينة')
+
 
 def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None, branch_map=None, **kwargs):
     if not billing_account:

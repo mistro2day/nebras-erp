@@ -8,6 +8,7 @@ import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component'
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { NbSearchableSelectComponent } from '../../../shared/nebras/nb-searchable-select.component';
 import { tafqeetArabic } from '../journals/journal-voucher-print';
+import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-voucher-create-modal',
@@ -187,6 +188,10 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
                 <span class="v font-bold text-primary">{{ tafqeet(amount) }}</span>
               </div>
               <div class="rev-row">
+                <span class="k">المحاسب المسؤول:</span>
+                <span class="v font-bold">{{ currentAccountantName() }}</span>
+              </div>
+              <div class="rev-row">
                 <span class="k">البيان المدون:</span>
                 <span class="v">{{ description }}</span>
               </div>
@@ -281,6 +286,18 @@ import { tafqeetArabic } from '../journals/journal-voucher-print';
 })
 export class VoucherCreateModalComponent implements OnInit, OnChanges {
   private http = inject(HttpClient);
+  private authService = inject(AuthService, { optional: true });
+
+  currentAccountantName(): string {
+    const current = this.authService?.currentUser();
+    if (current) {
+      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+      if (full) return full;
+      if (current.username) return current.username;
+      if (current.email) return current.email;
+    }
+    return 'المحاسب المسؤول';
+  }
 
   @Input() open = false;
   @Input() currencies: any[] = [];

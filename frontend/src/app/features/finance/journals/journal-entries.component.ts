@@ -713,6 +713,7 @@ export class JournalEntriesComponent implements OnInit {
       { key: 'partner', label: 'الطرف المعني', map: (r) => r.partner_details?.name || '—' },
       { key: 'reference', label: 'المستند المصدري', map: (r) => r.reference || '—' },
       { key: 'description', label: 'البيان' },
+      { key: 'accountant_name', label: 'المحاسب المنشئ', map: (r) => r.accountant_name || r.created_by_name || '—' },
       { key: 'source_type', label: 'المصدر', map: (r) => this.sourceLabel(r.source_type) },
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
     ];

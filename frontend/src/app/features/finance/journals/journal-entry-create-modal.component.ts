@@ -5,6 +5,7 @@ import { NbModalComponent } from '../../../shared/nebras/nb-modal.component';
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from './journal-voucher-print';
+import { AuthService } from '../../../core/auth/auth.service';
 
 export interface CreateJournalLine {
   account: string;
@@ -150,6 +151,7 @@ export interface CreateJournalLine {
               <div class="rm-col"><span class="k">التاريخ:</span><span class="v mono">{{ entryDate }}</span></div>
               <div class="rm-col"><span class="k">المستند المرجعي:</span><span class="v mono">{{ reference || '—' }}</span></div>
               <div class="rm-col"><span class="k">العملة:</span><span class="v">الجنيه السوداني (ج.س)</span></div>
+              <div class="rm-col"><span class="k">المحاسب المسؤول:</span><span class="v font-bold">{{ currentAccountantName() }}</span></div>
             </div>
 
             <div class="rm-desc">
@@ -277,6 +279,19 @@ export interface CreateJournalLine {
   `]
 })
 export class JournalEntryCreateModalComponent {
+  private authService = inject(AuthService, { optional: true });
+
+  currentAccountantName(): string {
+    const current = this.authService?.currentUser();
+    if (current) {
+      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+      if (full) return full;
+      if (current.username) return current.username;
+      if (current.email) return current.email;
+    }
+    return 'المحاسب المسؤول';
+  }
+
   @Input() open = false;
   @Input() accounts: any[] = [];
   @Input() periods: any[] = [];

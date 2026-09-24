@@ -10,6 +10,7 @@ import { NbSearchableSelectComponent, NbSelectItem } from '../../../shared/nebra
 import { NbDatepickerComponent } from '../../../shared/nebras/nb-datepicker.component';
 import { tafqeetArabic } from '../../finance/journals/journal-voucher-print';
 import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.component';
+import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-receipt-create-modal',
@@ -254,6 +255,10 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
                     <span class="v mono">{{ referenceNumber }}</span>
                   </div>
                 }
+                <div class="rc-item">
+                  <span class="k">المحاسب المسؤول:</span>
+                  <span class="v font-bold">{{ getCurrentAccountantName() }}</span>
+                </div>
               </div>
 
               <div class="rc-section-title">الأثر المالي والتسوية</div>
@@ -323,6 +328,10 @@ import { SfDocumentDrawerComponent, SfDoc } from '../shared/sf-document-drawer.c
                   <div class="src-row">
                     <span class="lbl">طريقة الدفع وجهة الإيداع:</span>
                     <span class="val">{{ getMethodName(paymentMethodId) }} — {{ getDepositDestination() }}</span>
+                  </div>
+                  <div class="src-row">
+                    <span class="lbl">المحاسب المنشئ للسند:</span>
+                    <span class="val bold">{{ r.accountant_name || r.collector_name || getCurrentAccountantName() }}</span>
                   </div>
                   <div class="src-row highlight">
                     <span class="lbl">المبلغ المحصل والمسجل:</span>
@@ -867,6 +876,7 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   private svc = inject(StudentFinanceService);
   private studentsSvc = inject(StudentsService);
   private notify = inject(NotificationService);
+  private authService = inject(AuthService, { optional: true });
 
   @Input() open = false;
   @Input() preselectedAccountId?: string;
@@ -904,6 +914,17 @@ export class ReceiptCreateModalComponent implements OnInit, OnChanges {
   cashBoxId: string | null = null;
   bankAccountId: string | null = null;
   referenceNumber = '';
+
+  getCurrentAccountantName(): string {
+    const current = this.authService?.currentUser();
+    if (current) {
+      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+      if (full) return full;
+      if (current.username) return current.username;
+      if (current.email) return current.email;
+    }
+    return 'المحاسب المسؤول';
+  }
 
   accountSelectItems = computed<NbSelectItem[]>(() => {
     return this.accounts().map((a) => {

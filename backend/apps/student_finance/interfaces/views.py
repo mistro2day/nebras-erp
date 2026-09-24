@@ -954,7 +954,8 @@ class InstallmentViewSet(BaseCRUDViewSet):
             payment_date=timezone.localdate(),
             amount=amount_to_pay,
             payment_method_id=payment_method_id,
-            status='posted'
+            status='posted',
+            created_by=request.user.id if request.user and request.user.is_authenticated else None
         )
 
         return StandardResponse(data={

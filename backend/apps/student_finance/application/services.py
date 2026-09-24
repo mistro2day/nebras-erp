@@ -81,7 +81,8 @@ class BillingService:
             status='draft',
             total_amount=Decimal('0.0'),
             paid_amount=Decimal('0.0'),
-            outstanding_amount=Decimal('0.0')
+            outstanding_amount=Decimal('0.0'),
+            created_by=user_id
         )
 
         total_amount = Decimal('0.0')

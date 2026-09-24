@@ -2,6 +2,18 @@
 
 جميع التغييرات والتحسينات المضافة للمنصة يتم توثيقها هنا تباعاً بالاعتماد على معايير الحوكمة ونسخ الإصدارات القياسية.
 
+## [v1.9.24] - 2026-09-24
+
+### Added
+- **ربط اسم المحاسب الحقيقي تلقائياً بكافة السندات المالية والفواتير (`Accountant & Creator User Resolution`)**:
+  * ربط اسم المحاسب الفعلي المنشئ للمستند المالي تلقائياً بمستخدم النظام المسجل دخولاً، دون أي إدخال يدوي أو اعتماد على معرفات ثابتة (Hardcoded IDs).
+  * إضافة دالة مركزية مخبأة بالذاكرة `resolve_user_display_name(user_id)` في طبقة الخدمات المشتركة (`apps/shared/application/people.py`) لاسترجاع الاسم الثلاثي العربي أو اسم المستخدم تلقائياً.
+  * تضمين حقلي `created_by_name` و `accountant_name` في كافة السيريالايزرات المالية (`BaseStudentFinanceSerializer`, `VoucherSerializer`, `JournalEntrySerializer`, `FinancialTransactionSerializer`).
+  * تمرير `created_by=request.user.id` في كافة نقاط ومسارات إنشاء الفواتير وسندات القبض والصرف، وسندات الرواتب والسلفيات.
+  * توافق هيكلي تام 100% مع بيئة الإنتاج السحابية (AWS) دون الحاجة لترحيلات قاعدة بيانات جديدة (`Zero Schema Migrations`).
+  * إدراج اسم المحاسب المنشئ في درجات الطباعة الرسمية A4 (`sf-document-drawer`), سندات الصرف والقبض (`voucher-print`), وقيود اليومية المحاسبية (`journal-voucher-print`).
+  * إظهار اسم المحاسب المنشئ في خطوة المراجعة والتأكيد وفي بطاقة الاعتماد والنجاح النهائية في معالجات نبراس لإنشاء الفواتير (`InvoiceCreateModalComponent`)، وسندات القبض (`ReceiptCreateModalComponent`)، وسندات الصرف (`VoucherCreateModalComponent`)، وقيود اليومية (`JournalEntryCreateModalComponent`).
+
 ## [v1.9.23] - 2026-09-24
 
 ### Added

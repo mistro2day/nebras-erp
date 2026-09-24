@@ -5,6 +5,7 @@ import { NbExportMenuComponent, ExportColumn, exportElementToPdf } from '../../.
 import { StudentsService } from '../../students/students.service';
 import { StudentFinanceService } from '../student-finance.service';
 import { TenantService } from '../../../core/services/tenant.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { environment } from '../../../../environments/environment';
 
 export type SfDoc = { type: 'invoice' | 'receipt' | 'receivable'; data: any } | null;
@@ -149,6 +150,10 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
                   <span class="val mono">{{ d.data?.due_date }}</span>
                 </div>
               }
+              <div class="meta-item-box">
+                <span class="lbl">{{ d.type === 'invoice' ? 'المحاسب المسؤول:' : 'أمين الصندوق / المحاسب:' }}</span>
+                <span class="val bold">{{ getAccountantName() }}</span>
+              </div>
             </div>
           </div>
 
@@ -359,6 +364,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
           <div class="signatures-section">
             <div class="sig-box">
               <span class="sig-title">{{ d.type === 'invoice' ? 'محاسب المدرسة / شؤون الطلاب المالية' : 'أمين الصندوق / المحاسب' }}</span>
+              <div class="sig-signer-name">{{ getAccountantName() }}</div>
               <div class="sig-space"></div>
               <span class="sig-hint">التوقيع والاعتماد</span>
             </div>
@@ -747,7 +753,17 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
       align-items: center;
       text-align: center;
     }
-    .sig-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 24px; }
+    .sig-title { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 8px; }
+    .sig-signer-name {
+      font-size: 11px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 12px;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
     .sig-space { width: 100%; border-bottom: 1px dashed #cbd5e1; margin-bottom: 4px; }
     .sig-hint { font-size: 10px; color: #94a3b8; }
     .stamp-container {
@@ -839,6 +855,7 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   private studentsService = inject(StudentsService);
   private studentFinanceService = inject(StudentFinanceService);
   private tenantService = inject(TenantService);
+  private authService = inject(AuthService, { optional: true });
 
   readonly printFn = () => this.printDocument();
   readonly pdfFn = () => this.exportVoucherPdf();
@@ -1104,6 +1121,23 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
   getInvoiceOutstandingTafqeetText(): string {
     const rem = this.getInvoiceOutstanding();
     return tafqeetArabic(rem, 'جنيه');
+  }
+
+  getAccountantName(): string {
+    const d = this.doc?.data;
+    if (!d) return 'المحاسب المسؤول';
+    const name = d.accountant_name || d.created_by_name || d.collector_name || d.collector;
+    if (name && typeof name === 'string' && name.trim() && name.trim() !== '—') {
+      return name.trim();
+    }
+    const current = this.authService?.currentUser();
+    if (current) {
+      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+      if (full) return full;
+      if (current.username) return current.username;
+      if (current.email) return current.email;
+    }
+    return 'المحاسب المسؤول';
   }
 
   meta(): { title: string; subtitle: string } {
@@ -1511,7 +1545,17 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             font-size: 11px !important;
             font-weight: 700 !important;
             color: #475569 !important;
-            margin-bottom: 22px !important;
+            margin-bottom: 8px !important;
+          }
+          .sig-signer-name {
+            font-size: 11px !important;
+            font-weight: 800 !important;
+            color: #0f172a !important;
+            margin-bottom: 10px !important;
+            background: #f1f5f9 !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            border: 1px solid #e2e8f0 !important;
           }
           .sig-space {
             width: 100% !important;

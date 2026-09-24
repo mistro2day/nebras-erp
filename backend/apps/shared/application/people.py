@@ -73,3 +73,27 @@ def resolve_person(index, person_type, person_id):
         'status': None,
         'orphan': True,
     }
+
+
+_USER_NAME_CACHE = {}
+
+
+def resolve_user_display_name(user_id, default='المحاسب المسؤول'):
+    """جلب الاسم الكامل للمستخدم المنشئ للسندات والفواتير المالية من جدول المستخدمين بشكل سريع ومخبأ بالذاكرة."""
+    if not user_id:
+        return default
+    u_key = str(user_id)
+    if u_key in _USER_NAME_CACHE:
+        return _USER_NAME_CACHE[u_key]
+    try:
+        from apps.identity.domain.models import User
+        u = User.objects.filter(id=user_id).first()
+        if u:
+            full = f"{u.first_name or ''} {u.last_name or ''}".strip()
+            name = full or u.username or u.email or default
+            _USER_NAME_CACHE[u_key] = name
+            return name
+    except Exception:
+        pass
+    return default
+

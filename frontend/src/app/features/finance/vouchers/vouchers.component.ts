@@ -10,8 +10,9 @@ import { NbDrawerComponent } from '../../../shared/nebras/nb-drawer.component';
 import { NbExportMenuComponent, ExportColumn } from '../../../shared/export';
 import { NbLoadingComponent } from '../../../shared/nebras/nb-loading.component';
 import { VoucherCreateModalComponent } from './voucher-create-modal.component';
-import { printVoucher } from './voucher-print';
 import { TenantService } from '../../../core/services/tenant.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { printVoucher } from './voucher-print';
 
 /**
  * السندات المالية (Vouchers) — سندات الصرف والقبض وترحيلها للدفاتر،
@@ -57,6 +58,7 @@ import { TenantService } from '../../../core/services/tenant.service';
                 <th class="end">المبلغ (ج.س)</th>
                 <th>طريقة السداد</th>
                 <th>البيان</th>
+                <th>المحاسب المنشئ</th>
                 <th>الحالة</th>
                 <th style="text-align: center;">إجراءات</th>
               </tr>
@@ -79,6 +81,7 @@ import { TenantService } from '../../../core/services/tenant.service';
                     <td class="end mono font-bold">{{ v.amount | number:'1.2-2' }}</td>
                     <td>{{ methodName(v.payment_method) }}</td>
                     <td class="desc">{{ v.description || '—' }}</td>
+                    <td class="mono font-bold">{{ v.accountant_name || v.created_by_name || 'المحاسب المسؤول' }}</td>
                     <td>
                       <span class="badge" [class.draft]="v.status === 'draft'" [class.posted]="v.status === 'posted'">
                         {{ statusLabel(v.status) }}
@@ -194,6 +197,7 @@ export class VouchersComponent implements OnInit {
   private notify = inject(NotificationService);
   private router = inject(Router);
   tenantService = inject(TenantService);
+  private authService = inject(AuthService, { optional: true });
 
   vouchers = signal<any[]>([]);
   loading = signal(true);
@@ -285,14 +289,17 @@ export class VouchersComponent implements OnInit {
 
   print(v: any) {
     if (!v) return;
+    const current = this.authService?.currentUser();
+    const currentFullName = current ? `${current.first_name || ''} ${current.last_name || ''}`.trim() || current.username : '';
     const populated = {
       ...v,
       payment_method_name: this.methodName(v.payment_method),
       gl_account_name: this.accName(v.gl_account),
       bank_account_name: this.bankName(v.bank_account),
       cash_box_name: this.boxName(v.cash_box),
+      accountant_name: v.accountant_name || v.created_by_name || currentFullName || 'المحاسب المالي',
     };
-    printVoucher(populated, this.tenantService.currentTenant());
+    printVoucher(populated, this.tenantService.currentTenant(), populated.accountant_name);
   }
 
   cols(): ExportColumn[] {
@@ -302,6 +309,7 @@ export class VouchersComponent implements OnInit {
       { key: 'date', label: 'التاريخ' },
       { key: 'amount', label: 'المبلغ', align: 'end' },
       { key: 'description', label: 'البيان' },
+      { key: 'accountant_name', label: 'المحاسب' },
       { key: 'status', label: 'الحالة', map: (r) => this.statusLabel(r.status) },
     ];
   }

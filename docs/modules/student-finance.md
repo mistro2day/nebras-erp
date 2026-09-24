@@ -269,6 +269,12 @@ graph TD
   - ترقية دالة مزامنة الأقساط `_sync_invoices_to_installments` لتستخدم `Installment.objects.bulk_create` دفعة واحدة.
   - اعتماد قواميس تخزين مؤقت في الذاكرة (`_STUDENT_META_CACHE`, `_PAYMENT_METHOD_CACHE`, `_ACC_TOTALS_CACHE`) لتقليص زمن معالجة وإرجاع السندات بنسبة 90% وضمان استجابة لحظية للواجهة.
   - مرونة وأمان استخراج البيانات الوصفية (`_extract_student_finance_metadata`): دعم استلام وسيط `branch_map` و `**kwargs` لمنع أي أخطاء `TypeError` غير متوقعة عند جلب الفروع دفعياً، مع التحويل الصريح للأرقام والهواتف لضمان سلامة بيانات الحسابات والفواتير في كافة واجهات النظام وملفات الطلاب.
-
-
+### ربط اسم المحاسب الفعلي المنشئ للفواتير وسندات القبض (Accountant Name Resolution):
+- **الربط التلقائي بمستخدم النظام (Automatic User Attribution):**
+  - تمرير `created_by=request.user.id` تلقائياً في كافة مسارات إنشاء الفواتير الدراسية (`StudentInvoice.objects.create`) وسندات تحصيل الأقساط (`Receipt.objects.create`).
+  - دعم استرجاع اسم المحاسب المنشئ في `BaseStudentFinanceSerializer` عبر حقلي `created_by_name` و `accountant_name`.
+  - الاعتماد على الدالة المركزية المخبأة بالذاكرة `resolve_user_display_name` المتاحة في `apps.shared.application.people` لاستخلاص الاسم الكامل باللغة العربية مع بدائل ديناميكية آمنة.
+  - إظهار اسم المحاسب في درج الطباعة الرسمي A4 (`sf-document-drawer`) فوق خانة توقيع المحاسب المختص مباشرة وفي شبكة بيانات المستند.
+  - تكامل اسم المحاسب في معالجات الإنشاء متعددة الخطوات بنمط نبراس (`InvoiceCreateModalComponent` و `ReceiptCreateModalComponent`) في خطوة المراجعة والتأكيد وفي بطاقة الاكتماد والنجاح النهائية.
+  - توافق تام 100% مع بيئة الإنتاج السحابية (AWS) دون الحاجة لترحيلات قاعدة بيانات جديدة (`Zero Schema Migrations`).
 

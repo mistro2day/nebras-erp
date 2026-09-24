@@ -602,6 +602,10 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
         <span class="k">العملة المعتمدة:</span>
         <span class="v">${journal.currency?.name_ar || 'الجنيه السوداني (ج.س)'}</span>
       </div>
+      <div class="meta-col">
+        <span class="k">المحاسب المنشئ:</span>
+        <span class="v font-bold">${journal.accountant_name || journal.created_by_name || 'المحاسب المسؤول'}</span>
+      </div>
     </div>
 
     <!-- البيان المحاسبي العام للقيد -->

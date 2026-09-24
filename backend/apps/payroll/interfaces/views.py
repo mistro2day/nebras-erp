@@ -100,7 +100,8 @@ class EmployeeLoanViewSet(BaseCRUDViewSet):
                         gl_account=receivable_acc,
                         status='posted',
                         description=f"سند صرف سلفة للموظف: {instance.employee.full_name_ar}",
-                        journal_entry=je
+                        journal_entry=je,
+                        created_by=request.user.id if request.user and request.user.is_authenticated else None
                     )
             except Exception:
                 pass
@@ -242,7 +243,8 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                     gl_account=expense_acc,
                     status='posted',
                     description=f"سند صرف رواتب الموظفين لشهر: {period_code}",
-                    journal_entry=je
+                    journal_entry=je,
+                    created_by=request.user.id if request.user and request.user.is_authenticated else None
                 )
         except Exception:
             pass

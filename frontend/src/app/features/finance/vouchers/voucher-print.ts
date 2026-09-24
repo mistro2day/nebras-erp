@@ -389,6 +389,10 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
         <span class="lbl">الحساب البنكي / الخزينة:</span>
         <span class="val">${voucher.bank_account_name || voucher.cash_box_name || 'الخزينة النقدية الرئيسية'}</span>
       </div>
+      <div class="info-cell">
+        <span class="lbl">المحاسب المنشئ:</span>
+        <span class="val">${voucher.accountant_name || voucher.created_by_name || printedBy || 'المحاسب المالي'}</span>
+      </div>
     </div>
 
     <!-- بطاقة المبلغ المميزة -->
@@ -433,7 +437,7 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
     <div class="signatures-matrix">
       <div class="sig-col">
         <span class="sig-label">أمين الخزينة / المحاسب</span>
-        <span class="sig-sign">${printedBy || 'توقيع المحاسب'}</span>
+        <span class="sig-sign">${voucher.accountant_name || voucher.created_by_name || printedBy || 'توقيع المحاسب'}</span>
       </div>
       <div class="sig-col">
         <span class="sig-label">المراجعة والتدقيق</span>
