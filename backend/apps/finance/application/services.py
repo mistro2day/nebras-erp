@@ -21,6 +21,9 @@ from apps.communications.application.events import EventBusConsumer
 
 logger = logging.getLogger('nebras.finance')
 
+# سياق المعاملات الذرية لحل تعارضات الفحص الثابت مع context managers
+atomic_transaction: typing.Any = transaction.atomic
+
 
 # ============================================================
 # 1. Posting Service — خدمة ترحيل قيود اليومية ودفتر الأستاذ
@@ -32,179 +35,179 @@ class PostingService:
     """
 
     @classmethod
-    @transaction.atomic  # type: ignore[arg-type]
     def post_journal_entry(cls, tenant_id, journal_entry_id, user_id=None):
         """
         ترحيل قيد يومية محدد.
         تتولد عنه قيود أستاذ (Ledger Entries) غير قابلة للتغيير.
         """
-        # 1. جلب القيد مع القفل لتجنب أي تعارض
-        entry = JournalEntry.objects.select_for_update().get(id=journal_entry_id, tenant_id=tenant_id)
+        with atomic_transaction():
+            # 1. جلب القيد مع القفل لتجنب أي تعارض
+            entry = JournalEntry.objects.select_for_update().get(id=journal_entry_id, tenant_id=tenant_id)
 
-        # 2. التحقق من الحالة الحالية
-        if entry.status == 'posted':
-            raise ValidationError("القيد مرحل بالفعل ولا يمكن ترحيله مرة أخرى.")
-        if entry.status == 'cancelled':
-            raise ValidationError("لا يمكن ترحيل قيد ملغي.")
+            # 2. التحقق من الحالة الحالية
+            if entry.status == 'posted':
+                raise ValidationError("القيد مرحل بالفعل ولا يمكن ترحيله مرة أخرى.")
+            if entry.status == 'cancelled':
+                raise ValidationError("لا يمكن ترحيل قيد ملغي.")
         
-        # 3. تكامل محرك مسارات العمل: التحقق من الاعتماد
-        settings = FinanceSettings.objects.filter(tenant_id=tenant_id).first()
-        if settings and settings.require_journal_approval and entry.status != 'approved':
-            # التحقق مما إذا كانت هناك شروط سماح مخصصة أو استخدام محرك القواعد
-            rule_check = cls._evaluate_posting_rule(tenant_id, entry)
-            if not rule_check.get('allow_posting', False):
-                raise ValidationError("قيد اليومية يجب أن يكون معتمداً (Approved) أولاً ليتم ترحيله.")
+            # 3. تكامل محرك مسارات العمل: التحقق من الاعتماد
+            settings = FinanceSettings.objects.filter(tenant_id=tenant_id).first()
+            if settings and settings.require_journal_approval and entry.status != 'approved':
+                # التحقق مما إذا كانت هناك شروط سماح مخصصة أو استخدام محرك القواعد
+                rule_check = cls._evaluate_posting_rule(tenant_id, entry)
+                if not rule_check.get('allow_posting', False):
+                    raise ValidationError("قيد اليومية يجب أن يكون معتمداً (Approved) أولاً ليتم ترحيله.")
 
-        # 4. التحقق من الفترات المالية المقفلة والمغلقة
-        period = entry.accounting_period
-        if entry.source_type != 'automatic' and period.status in ['closed', 'locked']:
-            raise ValidationError(f"الفترة المحاسبية '{period.name}' مغلقة أو مقفلة. لا يمكن الترحيل إليها.")
-        if entry.source_type != 'automatic' and period.fiscal_year.status in ['closed', 'locked']:
-            raise ValidationError(f"السنة المالية '{period.fiscal_year.name}' مغلقة أو مقفلة.")
+            # 4. التحقق من الفترات المالية المقفلة والمغلقة
+            period = entry.accounting_period
+            if entry.source_type != 'automatic' and period.status in ['closed', 'locked']:
+                raise ValidationError(f"الفترة المحاسبية '{period.name}' مغلقة أو مقفلة. لا يمكن الترحيل إليها.")
+            if entry.source_type != 'automatic' and period.fiscal_year.status in ['closed', 'locked']:
+                raise ValidationError(f"السنة المالية '{period.fiscal_year.name}' مغلقة أو مقفلة.")
 
-        # 5. التحقق من التوازن (Double Entry Checking)
-        lines = entry.lines.all()
-        if not lines.exists():
-            raise ValidationError("لا يمكن ترحيل قيد يومية فارغ.")
+            # 5. التحقق من التوازن (Double Entry Checking)
+            lines = entry.lines.all()
+            if not lines.exists():
+                raise ValidationError("لا يمكن ترحيل قيد يومية فارغ.")
 
-        total_debit = sum(line.debit for line in lines)
-        total_credit = sum(line.credit for line in lines)
+            total_debit = sum(line.debit for line in lines)
+            total_credit = sum(line.credit for line in lines)
 
-        if abs(total_debit - total_credit) > 0.001:
-            raise ValidationError(f"قيد اليومية غير متزن. إجمالي المدين ({total_debit}) لا يساوي إجمالي الدائن ({total_credit}).")
+            if abs(total_debit - total_credit) > 0.001:
+                raise ValidationError(f"قيد اليومية غير متزن. إجمالي المدين ({total_debit}) لا يساوي إجمالي الدائن ({total_credit}).")
 
-        # 6. تحديث قيم العملة الأساسية لكل سطر (Exchange Rate Calculation)
-        rate = Decimal(str(entry.exchange_rate))
-        for line in lines:
-            line.debit_base = Decimal(str(line.debit)) * rate
-            line.credit_base = Decimal(str(line.credit)) * rate
-            line.save(update_fields=['debit_base', 'credit_base'])
+            # 6. تحديث قيم العملة الأساسية لكل سطر (Exchange Rate Calculation)
+            rate = Decimal(str(entry.exchange_rate))
+            for line in lines:
+                line.debit_base = Decimal(str(line.debit)) * rate
+                line.credit_base = Decimal(str(line.credit)) * rate
+                line.save(update_fields=['debit_base', 'credit_base'])
 
-            # 7. التحقق من استهلاك الموازنة التقديرية (Budget Check)
-            if line.debit > 0 and line.account.account_type.code == 'expense':
-                BudgetService.check_and_consume_budget(tenant_id, line.account, line.cost_center, line.debit)
+                # 7. التحقق من استهلاك الموازنة التقديرية (Budget Check)
+                if line.debit > 0 and line.account.account_type.code == 'expense':
+                    BudgetService.check_and_consume_budget(tenant_id, line.account, line.cost_center, line.debit)
 
-        # 8. الحصول على أو إنشاء دفتر الأستاذ الافتراضي
-        ledger, _ = Ledger.objects.get_or_create(
-            tenant_id=tenant_id,
-            code='GL',
-            defaults={'name': 'دفتر الأستاذ العام الرئيسي'}
-        )
-
-        # 9. توليد قيود دفتر الأستاذ (Ledger Entries)
-        for line in lines:
-            # حساب الرصيد التراكمي للحساب كـ Snapshot
-            last_entry = LedgerEntry.objects.filter(
-                tenant_id=tenant_id, ledger=ledger, account=line.account
-            ).order_by('-date', '-created_at').first()
-            
-            prev_balance = Decimal(str(last_entry.balance_snapshot)) if last_entry else Decimal('0.0')
-            
-            # تحديد حركة الرصيد بناءً على طبيعة الحساب
-            if line.account.normal_balance == 'debit':
-                new_balance = prev_balance + Decimal(str(line.debit)) - Decimal(str(line.credit))
-            else:
-                new_balance = prev_balance + Decimal(str(line.credit)) - Decimal(str(line.debit))
-
-            LedgerEntry.objects.create(
+            # 8. الحصول على أو إنشاء دفتر الأستاذ الافتراضي
+            ledger, _ = Ledger.objects.get_or_create(
                 tenant_id=tenant_id,
-                ledger=ledger,
-                account=line.account,
-                cost_center=line.cost_center,
-                journal_entry_line=line,
-                date=entry.date,
-                debit=line.debit,
-                credit=line.credit,
-                balance_snapshot=new_balance
+                code='GL',
+                defaults={'name': 'دفتر الأستاذ العام الرئيسي'}
             )
 
-        # 10. تحديث حالة القيد
-        entry.status = 'posted'
-        entry.posted_at = timezone.now()
-        entry.posted_by = user_id
-        entry.save(update_fields=['status', 'posted_at', 'posted_by'])
+            # 9. توليد قيود دفتر الأستاذ (Ledger Entries)
+            for line in lines:
+                # حساب الرصيد التراكمي للحساب كـ Snapshot
+                last_entry = LedgerEntry.objects.filter(
+                    tenant_id=tenant_id, ledger=ledger, account=line.account
+                ).order_by('-date', '-created_at').first()
+            
+                prev_balance = Decimal(str(last_entry.balance_snapshot)) if last_entry else Decimal('0.0')
+            
+                # تحديد حركة الرصيد بناءً على طبيعة الحساب
+                if line.account.normal_balance == 'debit':
+                    new_balance = prev_balance + Decimal(str(line.debit)) - Decimal(str(line.credit))
+                else:
+                    new_balance = prev_balance + Decimal(str(line.credit)) - Decimal(str(line.debit))
 
-        # 11. تسجيل حركة التدقيق المالي
-        FinancialAudit.objects.create(
-            tenant_id=tenant_id,
-            action_type='post_journal',
-            performed_by=user_id or entry.created_by,
-            details={'journal_entry_id': str(entry.id), 'entry_number': entry.entry_number, 'amount': float(total_debit)}
-        )
+                LedgerEntry.objects.create(
+                    tenant_id=tenant_id,
+                    ledger=ledger,
+                    account=line.account,
+                    cost_center=line.cost_center,
+                    journal_entry_line=line,
+                    date=entry.date,
+                    debit=line.debit,
+                    credit=line.credit,
+                    balance_snapshot=new_balance
+                )
 
-        # 12. إرسال حدث للمنصة الاتصالات
-        EventBusConsumer.publish(
-            tenant_id=tenant_id,
-            event_type='JournalPosted',
-            source_module='finance',
-            event_data={
-                'entry_id': str(entry.id),
-                'entry_number': entry.entry_number,
-                'amount': float(total_debit),
-                'posted_by': str(user_id) if user_id else None
-            },
-            created_by=user_id
-        )
+            # 10. تحديث حالة القيد
+            entry.status = 'posted'
+            entry.posted_at = timezone.now()
+            entry.posted_by = user_id
+            entry.save(update_fields=['status', 'posted_at', 'posted_by'])
 
-        return entry
+            # 11. تسجيل حركة التدقيق المالي
+            FinancialAudit.objects.create(
+                tenant_id=tenant_id,
+                action_type='post_journal',
+                performed_by=user_id or entry.created_by,
+                details={'journal_entry_id': str(entry.id), 'entry_number': entry.entry_number, 'amount': float(total_debit)}
+            )
+
+            # 12. إرسال حدث للمنصة الاتصالات
+            EventBusConsumer.publish(
+                tenant_id=tenant_id,
+                event_type='JournalPosted',
+                source_module='finance',
+                event_data={
+                    'entry_id': str(entry.id),
+                    'entry_number': entry.entry_number,
+                    'amount': float(total_debit),
+                    'posted_by': str(user_id) if user_id else None
+                },
+                created_by=user_id
+            )
+
+            return entry
 
     @classmethod
-    @transaction.atomic  # type: ignore[arg-type]
     def reverse_journal_entry(cls, tenant_id, journal_entry_id, user_id=None, reversal_date=None, reversal_reason=None):
         """
         عمل قيد عكسي لقيد يومية مرحل لإلغاء تأثيره المالي، مع تسجيل سبب وتاريخ العكس.
         """
-        original = JournalEntry.objects.get(id=journal_entry_id, tenant_id=tenant_id)
-        if original.status != 'posted':
-            raise ValidationError("يمكن فقط عكس قيود اليومية المرحلة.")
+        with atomic_transaction():
+            original = JournalEntry.objects.get(id=journal_entry_id, tenant_id=tenant_id)
+            if original.status != 'posted':
+                raise ValidationError("يمكن فقط عكس قيود اليومية المرحلة.")
         
-        entry_date = reversal_date or date.today()
-        reason_note = f" — السبب: {reversal_reason}" if reversal_reason else ""
+            entry_date = reversal_date or date.today()
+            reason_note = f" — السبب: {reversal_reason}" if reversal_reason else ""
 
-        # 1. إنشاء قيد جديد كنسخة عكسية
-        rev_entry = JournalEntry.objects.create(
-            tenant_id=tenant_id,
-            entry_number=f"REV-{original.entry_number}-{timezone.now().strftime('%m%d%H%M')}",
-            date=entry_date,
-            accounting_period=original.accounting_period,
-            reference=original.entry_number,
-            description=f"قيد عكسي لتصحيح القيد رقم: {original.entry_number}{reason_note}",
-            source_type='reversing',
-            status='draft',
-            currency=original.currency,
-            exchange_rate=original.exchange_rate,
-            reversed_entry=original,
-            created_by=user_id
-        )
-
-        # 2. توليد السطور المعكوسة (عكس المدين والدائن)
-        for line in original.lines.all():
-            JournalEntryLine.objects.create(
+            # 1. إنشاء قيد جديد كنسخة عكسية
+            rev_entry = JournalEntry.objects.create(
                 tenant_id=tenant_id,
-                journal_entry=rev_entry,
-                account=line.account,
-                cost_center=line.cost_center,
-                debit=line.credit, # الدائن يصبح مديناً
-                credit=line.debit, # المدين يصبح دائناً
-                description=f"عكس سطر: {line.description or original.entry_number}"
+                entry_number=f"REV-{original.entry_number}-{timezone.now().strftime('%m%d%H%M')}",
+                date=entry_date,
+                accounting_period=original.accounting_period,
+                reference=original.entry_number,
+                description=f"قيد عكسي لتصحيح القيد رقم: {original.entry_number}{reason_note}",
+                source_type='reversing',
+                status='draft',
+                currency=original.currency,
+                exchange_rate=original.exchange_rate,
+                reversed_entry=original,
+                created_by=user_id
             )
 
-        # 3. اعتماد وتوجيه القيد الجديد تلقائياً
-        rev_entry.status = 'approved'
-        rev_entry.save(update_fields=['status'])
+            # 2. توليد السطور المعكوسة (عكس المدين والدائن)
+            for line in original.lines.all():
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id,
+                    journal_entry=rev_entry,
+                    account=line.account,
+                    cost_center=line.cost_center,
+                    debit=line.credit, # الدائن يصبح مديناً
+                    credit=line.debit, # المدين يصبح دائناً
+                    description=f"عكس سطر: {line.description or original.entry_number}"
+                )
 
-        # 4. ترحيل القيد العكسي
-        cls.post_journal_entry(tenant_id, rev_entry.id, user_id)
- 
-        # 5. تحديث القيد الأصلي ليصبح معكوساً
-        original.status = 'reversed'
-        original.save(update_fields=['status'])
+            # 3. اعتماد وتوجيه القيد الجديد تلقائياً
+            rev_entry.status = 'approved'
+            rev_entry.save(update_fields=['status'])
 
-        # 6. المزامنة التلقائية مع مالية الطلاب في حال كان القيد ناتجاً عن سند قبض طالب
-        cls._sync_reverse_student_finance(tenant_id, original, rev_entry, user_id, reversal_reason)
+            # 4. ترحيل القيد العكسي
+            cls.post_journal_entry(tenant_id, rev_entry.id, user_id)
  
-        rev_entry.refresh_from_db()
-        return rev_entry
+            # 5. تحديث القيد الأصلي ليصبح معكوساً
+            original.status = 'reversed'
+            original.save(update_fields=['status'])
+
+            # 6. المزامنة التلقائية مع مالية الطلاب في حال كان القيد ناتجاً عن سند قبض طالب
+            cls._sync_reverse_student_finance(tenant_id, original, rev_entry, user_id, reversal_reason)
+ 
+            rev_entry.refresh_from_db()
+            return rev_entry
 
     @classmethod
     def _sync_reverse_student_finance(cls, tenant_id, original, rev_entry, user_id=None, reversal_reason=None):
@@ -286,12 +289,10 @@ class PostingService:
             ])
 
             if receipt.voucher_id:
-                try:
-                    v = Voucher.objects.get(id=receipt.voucher_id, tenant_id=tenant_id)
+                v = Voucher.objects.filter(id=receipt.voucher_id, tenant_id=tenant_id).first()
+                if v:
                     v.status = 'cancelled'
                     v.save(update_fields=['status'])
-                except Voucher.DoesNotExist:
-                    pass
 
             BillingAudit.objects.create(
                 tenant_id=tenant_id,
@@ -330,52 +331,52 @@ class BudgetService:
     """
 
     @classmethod
-    @transaction.atomic
     def check_and_consume_budget(cls, tenant_id, account, cost_center, amount):
         """
         التحقق من الرصيد المتاح في الموازنة لبند معين واستهلاكه.
         """
-        if not cost_center:
-            return  # إذا لم يربط مركز تكلفة، نتجاوز التحقق المباشر
+        with atomic_transaction():
+            if not cost_center:
+                return  # إذا لم يربط مركز تكلفة، نتجاوز التحقق المباشر
         
-        # البحث عن موازنة معتمدة للفترة/العام المالي الحالي
-        active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
-        if not active_fy:
-            return
+            # البحث عن موازنة معتمدة للفترة/العام المالي الحالي
+            active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
+            if not active_fy:
+                return
 
-        budget = Budget.objects.filter(
-            tenant_id=tenant_id, fiscal_year=active_fy, cost_center=cost_center, status='approved'
-        ).first()
+            budget = Budget.objects.filter(
+                tenant_id=tenant_id, fiscal_year=active_fy, cost_center=cost_center, status='approved'
+            ).first()
 
-        if not budget:
-            return
+            if not budget:
+                return
 
-        item = BudgetItem.objects.filter(budget=budget, account=account).first()
-        if not item:
-            return
+            item = BudgetItem.objects.filter(budget=budget, account=account).first()
+            if not item:
+                return
 
-        # التحقق من تجاوز الموازنة
-        allocated = item.amount
-        consumed = item.consumed_amount
-        available = allocated - consumed
+            # التحقق من تجاوز الموازنة
+            allocated = item.amount
+            consumed = item.consumed_amount
+            available = allocated - consumed
 
-        if amount > available:
-            # تكامل محرك القواعد لمعرفة هل التجاوز مسموح به أم يمنع العملية
-            rule_context = {
-                'account_code': account.code,
-                'cost_center_code': cost_center.code,
-                'amount_requested': float(amount),
-                'budget_available': float(available)
-            }
-            # افتراضياً، نمنع التجاوز إذا لم توجد قواعد تسمح به
-            raise ValidationError(
-                f"تجاوز للموازنة التقديرية لحساب '{account.name_ar}' في مركز التكلفة '{cost_center.name_ar}'. "
-                f"المتاح: {available}، المطلوب: {amount}."
-            )
+            if amount > available:
+                # تكامل محرك القواعد لمعرفة هل التجاوز مسموح به أم يمنع العملية
+                rule_context = {
+                    'account_code': account.code,
+                    'cost_center_code': cost_center.code,
+                    'amount_requested': float(amount),
+                    'budget_available': float(available)
+                }
+                # افتراضياً، نمنع التجاوز إذا لم توجد قواعد تسمح به
+                raise ValidationError(
+                    f"تجاوز للموازنة التقديرية لحساب '{account.name_ar}' في مركز التكلفة '{cost_center.name_ar}'. "
+                    f"المتاح: {available}، المطلوب: {amount}."
+                )
 
-        # استهلاك الموازنة
-        item.consumed_amount += Decimal(str(amount))
-        item.save(update_fields=['consumed_amount'])
+            # استهلاك الموازنة
+            item.consumed_amount += Decimal(str(amount))
+            item.save(update_fields=['consumed_amount'])
 
 
 # ============================================================
@@ -391,9 +392,8 @@ class TaxService:
         """
         احتساب الضرائب لمبلغ معين بناءً على مجموعة ضريبية.
         """
-        try:
-            group = TaxGroup.objects.get(id=tax_group_id, tenant_id=tenant_id)
-        except TaxGroup.DoesNotExist:
+        group = TaxGroup.objects.filter(id=tax_group_id, tenant_id=tenant_id).first()
+        if not group:
             return []
 
         results = []
@@ -418,55 +418,54 @@ class ClosingService:
     """
 
     @classmethod
-    @transaction.atomic
     def close_period(cls, tenant_id, period_id, user_id):
         """
         إغلاق فترة محاسبية وقفلها.
         """
-        period = AccountingPeriod.objects.select_for_update().get(id=period_id, tenant_id=tenant_id)
-        if period.status == 'closed':
-            raise ValidationError("الفترة مغلقة بالفعل.")
+        with atomic_transaction():
+            period = AccountingPeriod.objects.select_for_update().get(id=period_id, tenant_id=tenant_id)
+            if period.status == 'closed':
+                raise ValidationError("الفترة مغلقة بالفعل.")
 
-        # التحقق من وجود قيود مسودة غير مرحلة في هذه الفترة
-        unposted = JournalEntry.objects.filter(
-            tenant_id=tenant_id, accounting_period=period, status__in=['draft', 'approved']
-        )
-        if unposted.exists():
-            raise ValidationError(f"لا يمكن إغلاق الفترة. هناك {unposted.count()} قيود يومية معلقة أو غير مرحلة.")
+            # التحقق من وجود قيود مسودة غير مرحلة في هذه الفترة
+            unposted = JournalEntry.objects.filter(
+                tenant_id=tenant_id, accounting_period=period, status__in=['draft', 'approved']
+            )
+            if unposted.exists():
+                raise ValidationError(f"لا يمكن إغلاق الفترة. هناك {unposted.count()} قيود يومية معلقة أو غير مرحلة.")
 
-        # تغيير حالة الفترة
-        period.status = 'closed'
-        period.save(update_fields=['status'])
+            # تغيير حالة الفترة
+            period.status = 'closed'
+            period.save(update_fields=['status'])
 
-        FinancialClosing.objects.create(
-            tenant_id=tenant_id,
-            closing_type='period',
-            closed_period=period,
-            closed_by=user_id,
-            status='completed'
-        )
+            FinancialClosing.objects.create(
+                tenant_id=tenant_id,
+                closing_type='period',
+                closed_period=period,
+                closed_by=user_id,
+                status='completed'
+            )
 
-        # تسجيل حركة التدقيق المالي
-        FinancialAudit.objects.create(
-            tenant_id=tenant_id,
-            action_type='close_period',
-            performed_by=user_id,
-            details={'period_id': str(period.id), 'period_name': period.name}
-        )
+            # تسجيل حركة التدقيق المالي
+            FinancialAudit.objects.create(
+                tenant_id=tenant_id,
+                action_type='close_period',
+                performed_by=user_id,
+                details={'period_id': str(period.id), 'period_name': period.name}
+            )
 
-        # إرسال إشعار بالحدث
-        EventBusConsumer.publish(
-            tenant_id=tenant_id,
-            event_type='ClosingCompleted',
-            source_module='finance',
-            event_data={'period_id': str(period.id), 'period_name': period.name, 'closed_by': str(user_id)},
-            created_by=user_id
-        )
+            # إرسال إشعار بالحدث
+            EventBusConsumer.publish(
+                tenant_id=tenant_id,
+                event_type='ClosingCompleted',
+                source_module='finance',
+                event_data={'period_id': str(period.id), 'period_name': period.name, 'closed_by': str(user_id)},
+                created_by=user_id
+            )
 
-        return period
+            return period
 
     @classmethod
-    @transaction.atomic
     def close_fiscal_year(cls, tenant_id, fiscal_year_id, retained_earnings_account_id, user_id):
         """
         إغلاق سنة مالية كاملة.
@@ -474,94 +473,95 @@ class ClosingService:
         2. قفل وتصفير حسابات الإيرادات والمصروفات وترحيل صافي الربح/الخسارة إلى حساب الأرباح المحتجزة.
         3. تدوير أرصدة الحسابات الدائمة (الأصول، الالتزامات، حقوق الملكية) للعام الجديد.
         """
-        fiscal_year = FiscalYear.objects.select_for_update().get(id=fiscal_year_id, tenant_id=tenant_id)
-        if fiscal_year.status == 'closed':
-            raise ValidationError("السنة المالية مغلقة بالفعل.")
+        with atomic_transaction():
+            fiscal_year = FiscalYear.objects.select_for_update().get(id=fiscal_year_id, tenant_id=tenant_id)
+            if fiscal_year.status == 'closed':
+                raise ValidationError("السنة المالية مغلقة بالفعل.")
 
-        # 1. التأكد من إغلاق الفترات
-        open_periods = fiscal_year.periods.exclude(status='closed')
-        if open_periods.exists():
-            raise ValidationError("يجب إغلاق كافة الفترات المحاسبية في السنة المالية أولاً.")
+            # 1. التأكد من إغلاق الفترات
+            open_periods = fiscal_year.periods.exclude(status='closed')
+            if open_periods.exists():
+                raise ValidationError("يجب إغلاق كافة الفترات المحاسبية في السنة المالية أولاً.")
 
-        # 2. تجميع أرصدة حسابات الإيرادات والمصروفات لتحديد الأرباح/الخسائر
-        retained_account = ChartOfAccount.objects.get(id=retained_earnings_account_id, tenant_id=tenant_id)
+            # 2. تجميع أرصدة حسابات الإيرادات والمصروفات لتحديد الأرباح/الخسائر
+            retained_account = ChartOfAccount.objects.get(id=retained_earnings_account_id, tenant_id=tenant_id)
         
-        # حساب إجمالي الإيرادات والمصروفات من خلال Ledger Entries
-        revenue_total = LedgerEntry.objects.filter(
-            tenant_id=tenant_id, account__account_type__code='revenue', date__range=(fiscal_year.start_date, fiscal_year.end_date)
-        ).aggregate(debit=Sum('debit'), credit=Sum('credit'))
+            # حساب إجمالي الإيرادات والمصروفات من خلال Ledger Entries
+            revenue_total = LedgerEntry.objects.filter(
+                tenant_id=tenant_id, account__account_type__code='revenue', date__range=(fiscal_year.start_date, fiscal_year.end_date)
+            ).aggregate(debit=Sum('debit'), credit=Sum('credit'))
         
-        expense_total = LedgerEntry.objects.filter(
-            tenant_id=tenant_id, account__account_type__code='expense', date__range=(fiscal_year.start_date, fiscal_year.end_date)
-        ).aggregate(debit=Sum('debit'), credit=Sum('credit'))
+            expense_total = LedgerEntry.objects.filter(
+                tenant_id=tenant_id, account__account_type__code='expense', date__range=(fiscal_year.start_date, fiscal_year.end_date)
+            ).aggregate(debit=Sum('debit'), credit=Sum('credit'))
 
-        rev_bal = (revenue_total['credit'] or 0.0) - (revenue_total['debit'] or 0.0)
-        exp_bal = (expense_total['debit'] or 0.0) - (expense_total['credit'] or 0.0)
-        net_profit_loss = rev_bal - exp_bal
+            rev_bal = (revenue_total['credit'] or 0.0) - (revenue_total['debit'] or 0.0)
+            exp_bal = (expense_total['debit'] or 0.0) - (expense_total['credit'] or 0.0)
+            net_profit_loss = rev_bal - exp_bal
 
-        # 3. إنشاء وتمرير قيد يومية الإغلاق السنوي التلقائي فقط إذا كانت هناك قيمة أرباح/خسائر
-        closing_period = fiscal_year.periods.all().last()
-        if net_profit_loss != 0:
-            closing_entry = JournalEntry.objects.create(
+            # 3. إنشاء وتمرير قيد يومية الإغلاق السنوي التلقائي فقط إذا كانت هناك قيمة أرباح/خسائر
+            closing_period = fiscal_year.periods.all().last()
+            if net_profit_loss != 0:
+                closing_entry = JournalEntry.objects.create(
+                    tenant_id=tenant_id,
+                    entry_number=f"YE-CLOSE-{fiscal_year.name}",
+                    date=fiscal_year.end_date,
+                    accounting_period=closing_period,
+                    description=f"قيد الإغلاق السنوي التلقائي للسنة المالية {fiscal_year.name}",
+                    source_type='automatic',
+                    status='draft',
+                    currency=Currency.objects.filter(tenant_id=tenant_id, is_base=True).first(),
+                    created_by=user_id
+                )
+
+                # إضافة سطر الأرباح المحتجزة
+                if net_profit_loss > 0:
+                    # ربح: دائن لحساب الأرباح المحتجزة
+                    JournalEntryLine.objects.create(
+                        tenant_id=tenant_id, journal_entry=closing_entry, account=retained_account, credit=net_profit_loss
+                    )
+                elif net_profit_loss < 0:
+                    # خسارة: مدين لحساب الأرباح المحتجزة
+                    JournalEntryLine.objects.create(
+                        tenant_id=tenant_id, journal_entry=closing_entry, account=retained_account, debit=abs(net_profit_loss)
+                    )
+
+                # لمحاكاة تصفير الحسابات المؤقتة في القيد
+                # نقوم بإنشاء سطر مقابل متزن
+                dummy_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, account_type__code='equity').exclude(id=retained_account.id).first()
+                if dummy_account:
+                    JournalEntryLine.objects.create(
+                        tenant_id=tenant_id,
+                        journal_entry=closing_entry,
+                        account=dummy_account,
+                        debit=net_profit_loss if net_profit_loss > 0 else 0,
+                        credit=abs(net_profit_loss) if net_profit_loss < 0 else 0
+                    )
+
+                # ترحيل قيد الإغلاق
+                closing_entry.status = 'approved'
+                closing_entry.save(update_fields=['status'])
+                PostingService.post_journal_entry(tenant_id, closing_entry.id, user_id)
+
+            # 4. تدوير الأرصدة (الحسابات الدائمة) للعام الجديد (Carry Forward)
+            next_fy = FiscalYear.objects.filter(tenant_id=tenant_id, start_date__gt=fiscal_year.end_date).order_by('start_date').first()
+            if next_fy:
+                cls._create_opening_entry_for_next_year(tenant_id, fiscal_year, next_fy, user_id)
+
+            # 5. تحديث حالة السنة المالية إلى مغلقة
+            fiscal_year.status = 'closed'
+            fiscal_year.save(update_fields=['status'])
+
+            FinancialClosing.objects.create(
                 tenant_id=tenant_id,
-                entry_number=f"YE-CLOSE-{fiscal_year.name}",
-                date=fiscal_year.end_date,
-                accounting_period=closing_period,
-                description=f"قيد الإغلاق السنوي التلقائي للسنة المالية {fiscal_year.name}",
-                source_type='automatic',
-                status='draft',
-                currency=Currency.objects.filter(tenant_id=tenant_id, is_base=True).first(),
-                created_by=user_id
+                closing_type='year',
+                closed_year=fiscal_year,
+                closed_by=user_id,
+                status='completed',
+                retained_earnings_account=retained_account
             )
 
-            # إضافة سطر الأرباح المحتجزة
-            if net_profit_loss > 0:
-                # ربح: دائن لحساب الأرباح المحتجزة
-                JournalEntryLine.objects.create(
-                    tenant_id=tenant_id, journal_entry=closing_entry, account=retained_account, credit=net_profit_loss
-                )
-            elif net_profit_loss < 0:
-                # خسارة: مدين لحساب الأرباح المحتجزة
-                JournalEntryLine.objects.create(
-                    tenant_id=tenant_id, journal_entry=closing_entry, account=retained_account, debit=abs(net_profit_loss)
-                )
-
-            # لمحاكاة تصفير الحسابات المؤقتة في القيد
-            # نقوم بإنشاء سطر مقابل متزن
-            dummy_account = ChartOfAccount.objects.filter(tenant_id=tenant_id, account_type__code='equity').exclude(id=retained_account.id).first()
-            if dummy_account:
-                JournalEntryLine.objects.create(
-                    tenant_id=tenant_id,
-                    journal_entry=closing_entry,
-                    account=dummy_account,
-                    debit=net_profit_loss if net_profit_loss > 0 else 0,
-                    credit=abs(net_profit_loss) if net_profit_loss < 0 else 0
-                )
-
-            # ترحيل قيد الإغلاق
-            closing_entry.status = 'approved'
-            closing_entry.save(update_fields=['status'])
-            PostingService.post_journal_entry(tenant_id, closing_entry.id, user_id)
-
-        # 4. تدوير الأرصدة (الحسابات الدائمة) للعام الجديد (Carry Forward)
-        next_fy = FiscalYear.objects.filter(tenant_id=tenant_id, start_date__gt=fiscal_year.end_date).order_by('start_date').first()
-        if next_fy:
-            cls._create_opening_entry_for_next_year(tenant_id, fiscal_year, next_fy, user_id)
-
-        # 5. تحديث حالة السنة المالية إلى مغلقة
-        fiscal_year.status = 'closed'
-        fiscal_year.save(update_fields=['status'])
-
-        FinancialClosing.objects.create(
-            tenant_id=tenant_id,
-            closing_type='year',
-            closed_year=fiscal_year,
-            closed_by=user_id,
-            status='completed',
-            retained_earnings_account=retained_account
-        )
-
-        return fiscal_year
+            return fiscal_year
 
     @classmethod
     def _create_opening_entry_for_next_year(cls, tenant_id, current_fy, next_fy, user_id):
@@ -606,107 +606,112 @@ class CashManagementService:
     """
 
     @classmethod
-    @transaction.atomic
     def process_voucher(cls, tenant_id, voucher_id, user_id):
         """
         معالجة سند (قبض أو صرف) واعتماده وتوليد قيد يومية تلقائي له.
         """
-        voucher = Voucher.objects.select_for_update().get(id=voucher_id, tenant_id=tenant_id)
-        if voucher.status in ['approved', 'posted']:
-            raise ValidationError("السند معتمد أو مرحل مسبقاً.")
+        with atomic_transaction():
+            voucher = Voucher.objects.select_for_update().get(id=voucher_id, tenant_id=tenant_id)
+            if voucher.status in ['approved', 'posted']:
+                raise ValidationError("السند معتمد أو مرحل مسبقاً.")
 
-        # 1. تحديد الحساب المقابل (الصندوق أو البنك)
-        gl_cash_or_bank = None
-        if voucher.voucher_type in ['payment', 'receipt']:
-            if voucher.cash_box:
-                gl_cash_or_bank = voucher.cash_box.gl_account
-            elif voucher.bank_account:
-                gl_cash_or_bank = voucher.bank_account.gl_account
-            else:
-                raise ValidationError("يجب تحديد صندوق (Cash Box) أو حساب بنكي (Bank Account) للمعاملة.")
+            # 1. تحديد الحساب المقابل (الصندوق أو البنك)
+            gl_cash_or_bank = None
+            if voucher.voucher_type in ['payment', 'receipt']:
+                if voucher.cash_box and voucher.cash_box.gl_account:
+                    gl_cash_or_bank = voucher.cash_box.gl_account
+                elif voucher.bank_account and voucher.bank_account.gl_account:
+                    gl_cash_or_bank = voucher.bank_account.gl_account
+                else:
+                    raise ValidationError("يجب تحديد صندوق (Cash Box) أو حساب بنكي (Bank Account) بحساب أستاذ عام صحيح للمعاملة.")
 
-        # 2. إنشاء قيد يومية تلقائي للسند
-        active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
-        if not active_fy:
-            raise ValidationError("لا توجد سنة مالية نشطة ومفتوحة.")
+            if not gl_cash_or_bank:
+                raise ValidationError("تعذر تحديد حساب الأستاذ العام للصندوق أو الحساب البنكي للمعاملة.")
+
+            gl_bank_name = gl_cash_or_bank.name_ar if gl_cash_or_bank else "" 
+
+            # 2. إنشاء قيد يومية تلقائي للسند
+            active_fy = FiscalYear.objects.filter(tenant_id=tenant_id, status='open', is_current=True).first()
+            if not active_fy:
+                raise ValidationError("لا توجد سنة مالية نشطة ومفتوحة.")
         
-        period = active_fy.periods.filter(start_date__lte=voucher.date, end_date__gte=voucher.date).first()
-        if not period:
-            raise ValidationError("تاريخ السند لا يقع ضمن أي فترة محاسبية نشطة.")
+            period = active_fy.periods.filter(start_date__lte=voucher.date, end_date__gte=voucher.date).first()
+            if not period:
+                raise ValidationError("تاريخ السند لا يقع ضمن أي فترة محاسبية نشطة.")
 
-        # استخراج بيانات الطرف المقابل (طالب / مستند قبض) إن وجدت
-        partner_info = ""
-        try:
-            from apps.student_finance.domain.models import Receipt
-            from apps.students.domain.models import Student
-            rcp = Receipt.objects.filter(voucher_id=voucher.id).first() or Receipt.objects.filter(receipt_number=voucher.voucher_number).first()
-            if rcp:
-                st = Student.objects.filter(id=rcp.student_billing_account.student_id).first()
-                if st and hasattr(st, 'profile') and st.profile:
-                    partner_info = f" — الطالب: {st.profile.arabic_name} ({st.student_number})"
-        except Exception:
-            pass
+            # استخراج بيانات الطرف المقابل (طالب / مستند قبض) إن وجدت
+            partner_info = ""
+            try:
+                from apps.student_finance.domain.models import Receipt
+                from apps.students.domain.models import Student
+                rcp = Receipt.objects.filter(voucher_id=voucher.id).first() or Receipt.objects.filter(receipt_number=voucher.voucher_number).first()
+                if rcp:
+                    st = Student.objects.filter(id=rcp.student_billing_account.student_id).first()
+                    if st and hasattr(st, 'profile') and st.profile:
+                        partner_info = f" — الطالب: {st.profile.arabic_name} ({st.student_number})"
+            except Exception:
+                pass
 
-        method_label = voucher.payment_method.name_ar if voucher.payment_method else ""
-        base_desc = voucher.description or f"قيد تلقائي لسند {voucher.get_voucher_type_display()} رقم {voucher.voucher_number}"
-        entry_description = f"{base_desc}{partner_info}"
+            method_label = voucher.payment_method.name_ar if voucher.payment_method else ""
+            base_desc = voucher.description or f"قيد تلقائي لسند {voucher.get_voucher_type_display()} رقم {voucher.voucher_number}"
+            entry_description = f"{base_desc}{partner_info}"
 
-        journal = JournalEntry.objects.create(
-            tenant_id=tenant_id,
-            entry_number=f"JV-{voucher.voucher_number}",
-            date=voucher.date,
-            accounting_period=period,
-            reference=voucher.voucher_number,
-            description=entry_description,
-            source_type='automatic',
-            status='draft',
-            currency=voucher.currency,
-            created_by=user_id
-        )
-
-        # 3. إضافة أسطر القيد مع توضيح الشريك وطريقة السداد
-        if voucher.voucher_type == 'payment':
-            JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, debit=voucher.amount,
-                description=f"صرف مالي - {voucher.voucher_number}{partner_info}"
-            )
-            JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, credit=voucher.amount,
-                description=f"سحب من {gl_cash_or_bank.name_ar} عبر {method_label}"
-            )
-        elif voucher.voucher_type == 'receipt':
-            JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, debit=voucher.amount,
-                description=f"إيداع تحصيل في {gl_cash_or_bank.name_ar} عبر {method_label}"
-            )
-            JournalEntryLine.objects.create(
-                tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, credit=voucher.amount,
-                description=f"تسديد مستحقات{partner_info} - سند {voucher.voucher_number}"
+            journal = JournalEntry.objects.create(
+                tenant_id=tenant_id,
+                entry_number=f"JV-{voucher.voucher_number}",
+                date=voucher.date,
+                accounting_period=period,
+                reference=voucher.voucher_number,
+                description=entry_description,
+                source_type='automatic',
+                status='draft',
+                currency=voucher.currency,
+                created_by=user_id
             )
 
-        # 4. ترحيل القيد تلقائياً
-        journal.status = 'approved'
-        journal.save(update_fields=['status'])
-        PostingService.post_journal_entry(tenant_id, journal.id, user_id)
+            # 3. إضافة أسطر القيد مع توضيح الشريك وطريقة السداد
+            if voucher.voucher_type == 'payment':
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, debit=voucher.amount,
+                    description=f"صرف مالي - {voucher.voucher_number}{partner_info}"
+                )
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, credit=voucher.amount,
+                    description=f"سحب من {gl_bank_name} عبر {method_label}"
+                )
+            elif voucher.voucher_type == 'receipt':
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id, journal_entry=journal, account=gl_cash_or_bank, debit=voucher.amount,
+                    description=f"إيداع تحصيل في {gl_bank_name} عبر {method_label}"
+                )
+                JournalEntryLine.objects.create(
+                    tenant_id=tenant_id, journal_entry=journal, account=voucher.gl_account, credit=voucher.amount,
+                    description=f"تسديد مستحقات{partner_info} - سند {voucher.voucher_number}"
+                )
 
-        # 5. تحديث حالة السند
-        voucher.status = 'posted'
-        voucher.journal_entry = journal
-        voucher.save(update_fields=['status', 'journal_entry'])
+            # 4. ترحيل القيد تلقائياً
+            journal.status = 'approved'
+            journal.save(update_fields=['status'])
+            PostingService.post_journal_entry(tenant_id, journal.id, user_id)
 
-        # 6. إرسال حدث للمنصة الاتصالات
-        event_name = 'PaymentIssued' if voucher.voucher_type == 'payment' else 'PaymentReceived'
-        EventBusConsumer.publish(
-            tenant_id=tenant_id,
-            event_type=event_name,
-            source_module='finance',
-            event_data={
-                'voucher_id': str(voucher.id),
-                'voucher_number': voucher.voucher_number,
-                'amount': float(voucher.amount),
-                'type': voucher.voucher_type
-            },
-            created_by=user_id
-        )
+            # 5. تحديث حالة السند
+            voucher.status = 'posted'
+            voucher.journal_entry = journal
+            voucher.save(update_fields=['status', 'journal_entry'])
 
-        return voucher
+            # 6. إرسال حدث للمنصة الاتصالات
+            event_name = 'PaymentIssued' if voucher.voucher_type == 'payment' else 'PaymentReceived'
+            EventBusConsumer.publish(
+                tenant_id=tenant_id,
+                event_type=event_name,
+                source_module='finance',
+                event_data={
+                    'voucher_id': str(voucher.id),
+                    'voucher_number': voucher.voucher_number,
+                    'amount': float(voucher.amount),
+                    'type': voucher.voucher_type
+                },
+                created_by=user_id
+            )
+
+            return voucher

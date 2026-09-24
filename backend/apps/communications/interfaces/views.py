@@ -393,6 +393,10 @@ class MessageViewSet(BaseCRUDViewSet):
     model_class = CommunicationMessage
     serializer_class = CommunicationMessageSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.select_related('channel', 'provider', 'template').prefetch_related('recipients').order_by('-created_at')
+
     @action(detail=False, methods=['post'], url_path='send')
     def send_message(self, request):
         """إرسال رسالة جديدة."""

@@ -268,14 +268,25 @@ class StudentApplicationService:
         try:
             from apps.communications.application.services import CommunicationService
             from apps.academics.domain.models import Grade
+            from apps.tenants.models import Tenant
 
             guardian_rel = (
                 student.family_relations.filter(whatsapp_phone__isnull=False).exclude(whatsapp_phone='').first()
                 or student.family_relations.first()
             )
-            target_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
+            raw_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
 
-            if target_phone:
+            if raw_phone:
+                clean_phone = re.sub(r'\D', '', str(raw_phone)).lstrip('0')
+                if len(clean_phone) == 9 and not clean_phone.startswith('249'):
+                    clean_phone = '249' + clean_phone
+                elif not clean_phone.startswith('249') and not any(clean_phone.startswith(c) for c in ['966', '20', '971', '974', '968', '965', '973', '962']):
+                    clean_phone = '249' + clean_phone
+                target_phone = '+' + clean_phone
+
+                tenant_obj = Tenant.objects.filter(id=tenant_id).first()
+                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد النموذجية'
+
                 grade_name = ""
                 if applicant.applying_grade_id:
                     g_obj = Grade.objects.filter(id=applicant.applying_grade_id).first()
@@ -299,6 +310,7 @@ class StudentApplicationService:
                     template_code='ADM_ENROLLED',
                     channel_type='whatsapp',
                     context={
+                        'school_name': school_name,
                         'guardian_name': g_name,
                         'student_name': std_name,
                         'student_code': student_number,
@@ -515,14 +527,25 @@ class StudentApplicationService:
         try:
             from apps.communications.application.services import CommunicationService
             from apps.academics.domain.models import Grade
+            from apps.tenants.models import Tenant
 
             guardian_rel = (
                 student.family_relations.filter(whatsapp_phone__isnull=False).exclude(whatsapp_phone='').first()
                 or student.family_relations.first()
             )
-            target_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
+            raw_phone = getattr(guardian_rel, 'whatsapp_phone', None) or getattr(guardian_rel, 'phone', None) if guardian_rel else None
 
-            if target_phone:
+            if raw_phone:
+                clean_phone = re.sub(r'\D', '', str(raw_phone)).lstrip('0')
+                if len(clean_phone) == 9 and not clean_phone.startswith('249'):
+                    clean_phone = '249' + clean_phone
+                elif not clean_phone.startswith('249') and not any(clean_phone.startswith(c) for c in ['966', '20', '971', '974', '968', '965', '973', '962']):
+                    clean_phone = '249' + clean_phone
+                target_phone = '+' + clean_phone
+
+                tenant_obj = Tenant.objects.filter(id=tenant_id).first()
+                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد النموذجية'
+
                 grade_name = ""
                 g_id = (academic_data or {}).get('grade_id')
                 if g_id:
@@ -545,6 +568,7 @@ class StudentApplicationService:
                     template_code='ADM_ENROLLED',
                     channel_type='whatsapp',
                     context={
+                        'school_name': school_name,
                         'guardian_name': g_name,
                         'student_name': std_name,
                         'student_code': student_number,

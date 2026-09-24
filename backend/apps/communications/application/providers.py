@@ -196,8 +196,8 @@ class WhatsAppProvider(BaseProvider):
                     err_msg = result.get('message', 'خطأ غير محدد من خادم Evolution API')
                     logger.warning(f"[WhatsApp/{provider_type}] رد الخادم: {err_msg}")
                     return {
-                        'success': True,
-                        'external_id': f'evo-logged-{provider_type}',
+                        'success': False,
+                        'external_id': None,
                         'response': result,
                         'error': str(err_msg),
                     }

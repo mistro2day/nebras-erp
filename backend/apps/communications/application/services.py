@@ -188,15 +188,17 @@ class CommunicationService:
                 created_by=created_by,
             )
 
-            # 9. إطلاق مهمة Celery أو الإرسال المباشر
+            # 9. إطلاق مهمة Celery أو الإرسال المباشر الفوري
             if not scheduled_at:
                 dispatched = False
                 try:
                     from apps.communications.infrastructure.celery_tasks import send_message_task
-                    task_res = getattr(send_message_task, 'delay', None)
-                    if callable(task_res):
-                        task_res(str(message.id))
-                        dispatched = True
+                    from django.conf import settings
+                    if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+                        task_res = getattr(send_message_task, 'delay', None)
+                        if callable(task_res):
+                            task_res(str(message.id))
+                            dispatched = True
                 except Exception as e:
                     logger.warning(f"فشل إطلاق مهمة Celery للرسالة {message.id}: {e}")
 

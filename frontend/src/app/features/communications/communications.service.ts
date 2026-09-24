@@ -397,21 +397,27 @@ export class CommunicationsService {
    */
   private normalizeMessage(m: any): CommunicationMessageItem {
     const primary = Array.isArray(m.recipients) && m.recipients.length ? m.recipients[0] : null;
+    const recipientName = primary?.name || m.recipient_name || m.sender_name || m.variables_data?.guardian_name || m.metadata?.guardian_name || 'ولي الأمر';
+    const recipientAddr = primary?.address || m.recipient_address || m.variables_data?.recipient_phone || '';
+    const errorMsg = m.last_error || primary?.error_message || undefined;
+    const timestamp = m.sent_at || m.created_at || undefined;
+    const channelType = this.mapChannelType(m.channel_type || m.channel?.channel_type);
+
     return {
       id: String(m.id),
-      channel_name: m.channel_name || '',
-      channel_type: this.mapChannelType(m.channel_type),
-      recipient_name: primary?.name || m.recipient_name || m.sender_name || '—',
-      recipient_address: primary?.address || m.recipient_address || '',
-      subject: m.subject || '',
+      channel_name: m.channel_name || (channelType === 'whatsapp' ? 'واتساب الأعمال' : channelType === 'sms' ? 'SMS' : 'البريد الإلكتروني'),
+      channel_type: channelType,
+      recipient_name: recipientName,
+      recipient_address: recipientAddr,
+      subject: m.subject || (channelType === 'whatsapp' ? 'رسالة واتساب معتمدة' : 'إشعار من النظام'),
       status: this.mapStatus(m.status),
       priority: this.mapPriority(m.priority),
-      sent_at: m.sent_at || undefined,
-      delivered_at: m.delivered_at || primary?.delivered_at || undefined,
+      sent_at: timestamp,
+      delivered_at: m.delivered_at || primary?.delivered_at || (m.status === 'sent' ? timestamp : undefined),
       read_at: m.read_at || primary?.read_at || undefined,
       attempts: (m.retry_count ?? 0) + (m.status && m.status !== 'draft' && m.status !== 'queued' ? 1 : 0),
-      external_status: m.external_status || undefined,
-      error_message: m.last_error || primary?.error_message || undefined,
+      external_status: m.external_status || (m.status === 'sent' ? 'DELIVERED' : m.status === 'failed' ? 'FAILED' : 'PENDING'),
+      error_message: errorMsg,
     };
   }
 

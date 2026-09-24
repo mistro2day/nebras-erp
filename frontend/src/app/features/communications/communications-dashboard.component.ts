@@ -439,7 +439,24 @@ export class CommunicationsDashboardComponent {
     this.commService.getMessages().subscribe((data) => {
       const arr = Array.isArray(data) ? data : (data as any)?.results || [];
       this.messages.set(arr);
+      this.recalculateSummaryFromMessages(arr);
     });
+  }
+
+  private recalculateSummaryFromMessages(arr: CommunicationMessageItem[]): void {
+    if (!arr || arr.length === 0) return;
+    const sentCount = arr.filter(m => m.status === 'sent' || m.status === 'delivered' || m.status === 'read').length;
+    const failedCount = arr.filter(m => m.status === 'failed' || m.status === 'bounced').length;
+    const total = arr.length;
+    const rate = total > 0 ? Math.round((sentCount / total) * 100) : 100;
+    const activeChannels = new Set(arr.map(m => m.channel_type)).size;
+
+    this.summary.update(current => ({
+      total_sent_today: current.total_sent_today > 0 ? current.total_sent_today : sentCount,
+      delivery_success_rate: current.delivery_success_rate > 0 && current.delivery_success_rate !== 100 ? current.delivery_success_rate : rate,
+      failed_messages: current.failed_messages > 0 ? current.failed_messages : failedCount,
+      active_channels_count: current.active_channels_count > 0 ? current.active_channels_count : Math.max(activeChannels, 1),
+    }));
   }
 
   // ---- الفلترة ----
@@ -558,7 +575,7 @@ export class CommunicationsDashboardComponent {
   priorityLabel(p: string): string { return p === 'high' ? 'عالية' : p === 'low' ? 'منخفضة' : 'عادية'; }
 
   formatTime(t?: string): string {
-    if (!t) return '';
+    if (!t) return '—';
     // نعرض التاريخ والوقت كما هو (قادم من الخادم بصيغة مقروءة)
     return t.replace('T', ' ').slice(0, 19);
   }

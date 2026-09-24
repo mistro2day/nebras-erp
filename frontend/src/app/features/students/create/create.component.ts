@@ -13,6 +13,8 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { RegistrationFinanceFormComponent, FinancialConfig } from '../shared/registration-finance-form.component';
 
 import { NbStepperComponent } from '../../../shared/nebras/nb-stepper.component';
+import { CommunicationsService } from '../../communications/communications.service';
+import { TenantService } from '../../../core/services/tenant.service';
 
 @Component({
   selector: 'app-student-create',
@@ -1094,6 +1096,8 @@ export class StudentCreateComponent implements OnInit {
   private admissionsService = inject(AdmissionsService);
   private router = inject(Router);
   private snack = inject(MatSnackBar);
+  private commsService = inject(CommunicationsService);
+  private tenantService = inject(TenantService);
 
   regMode = signal<'admission' | 'manual'>('admission');
   manualStep = signal<number>(1);
@@ -1440,6 +1444,18 @@ export class StudentCreateComponent implements OnInit {
       next: (res) => {
         this.submitting.set(false);
         const studentId = res?.data?.id || res?.id;
+        const studentCode = res?.data?.student_number || res?.student_number || '';
+        const phone = applicant.whatsapp_phone || applicant.phone || applicant.guardian_phone || '';
+        if (phone) {
+          this.sendEnrollmentConfirmationWhatsapp({
+            phone,
+            guardianName: applicant.guardian_name || applicant.parent_name || 'ولي الأمر',
+            studentName: applicant.arabic_full_name || `${applicant.first_name || ''} ${applicant.last_name || ''}`.trim(),
+            studentCode: studentCode || applicant.application_number || '—',
+            gradeName: applicant.grade_name || this.selectedGradeName(),
+            studentId
+          });
+        }
         if (studentId) {
           this.snack.open('تم تسجيل الطالب وتسكينه في الفرع والفصل بنجاح!', 'إغلاق', { duration: 5000 });
           this.router.navigate(['/students/details', studentId]);
@@ -1553,6 +1569,18 @@ export class StudentCreateComponent implements OnInit {
       next: (res) => {
         this.submitting.set(false);
         const studentId = res?.data?.id || res?.id;
+        const studentCode = res?.data?.student_number || res?.student_number || '';
+        const phone = this.guardianForm.whatsapp_phone || this.guardianForm.phone;
+        if (phone) {
+          this.sendEnrollmentConfirmationWhatsapp({
+            phone,
+            guardianName: this.guardianForm.full_name || 'ولي الأمر',
+            studentName: this.personalForm.arabic_name,
+            studentCode: studentCode || '—',
+            gradeName: this.selectedGradeName(),
+            studentId
+          });
+        }
         if (studentId) {
           this.snack.open('تم حفظ وتسجيل الطالب يدوياً وتسكينه في الفرع بنجاح!', 'إغلاق', { duration: 5000 });
           this.router.navigate(['/students/details', studentId]);
@@ -1572,6 +1600,92 @@ export class StudentCreateComponent implements OnInit {
           }
         }
         this.snack.open(msg || 'تعذّر حفظ الطالب. تحقق من صحة الحقول.', 'إغلاق', { duration: 6000 });
+      }
+    });
+  }
+
+  private sendEnrollmentConfirmationWhatsapp(opts: {
+    phone: string;
+    guardianName: string;
+    studentName: string;
+    studentCode: string;
+    gradeName: string;
+    studentId?: string;
+  }): void {
+    if (!opts.phone) return;
+
+    const schoolName = this.tenantService.currentTenant()?.schoolNameAr ||
+                       this.tenantService.currentTenant()?.nameAr ||
+                       this.tenantService.currentTenant()?.name ||
+                       'مدارس المورد النموذجية';
+    const yearName = new Date().getFullYear().toString();
+    const policyText = '1. الالتزام بالحضور الصباحي والزي المدرسي المعتمد.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية.';
+
+    this.commsService.getPublicTemplate('ADM_ENROLLED').subscribe({
+      next: (tmpl) => {
+        let body = tmpl?.body || (
+          'السلام عليكم ورحمة الله وبركاته،\n' +
+          'عزيزي ولي الأمر {{guardian_name}} المحترم،\n' +
+          'نبارك لكم تسجيل واعتماد ابنكم/ابنتكم: ({{student_name}}) كطالب رسمي بـ ({{school_name}}) للعام الدراسي ({{academic_year}}).\n' +
+          '- المرحلة / الصف الدراسي: {{grade_level}}\n' +
+          '- الرقم المدرسي (الأكاديمي): {{student_code}}\n\n' +
+          '📋 لائحة واشتراطات التسجيل:\n' +
+          '{{registration_policy}}\n\n' +
+          'نتمنى لابننا/ابنتنا دوام التوفيق والتميز الأكاديمي.\n' +
+          'إدارة القبول والتسجيل — {{school_name}}'
+        );
+
+        body = body
+          .replace(/\{\{\s*guardian_name\s*\}\}/g, opts.guardianName || 'ولي الأمر')
+          .replace(/\{\{\s*student_name\s*\}\}/g, opts.studentName)
+          .replace(/\{\{\s*school_name\s*\}\}/g, schoolName)
+          .replace(/\{\{\s*grade_level\s*\}\}/g, opts.gradeName || 'المرحلة المقررة')
+          .replace(/\{\{\s*student_code\s*\}\}/g, opts.studentCode || '—')
+          .replace(/\{\{\s*academic_year\s*\}\}/g, yearName)
+          .replace(/\{\{\s*registration_policy\s*\}\}/g, policyText);
+
+        const subject = tmpl?.subject || `إشعار اعتماد وتسجيل التلميذ - ${schoolName}`;
+
+        this.commsService.sendMessage({
+          channel: 'whatsapp',
+          channel_type: 'whatsapp',
+          recipient_address: opts.phone,
+          recipient_name: opts.guardianName || 'ولي الأمر',
+          subject: subject,
+          body: body,
+          template_code: 'ADM_ENROLLED',
+          source_module: 'students',
+          source_event: 'StudentManualEnrollment',
+          entity_type: 'guardian',
+          student_id: opts.studentId
+        }).subscribe();
+      },
+      error: () => {
+        const defaultBody = (
+          `السلام عليكم ورحمة الله وبركاته،\n` +
+          `عزيزي ولي الأمر ${opts.guardianName || 'المحترم'}،\n` +
+          `نبارك لكم تسجيل واعتماد ابنكم/ابنتكم: (${opts.studentName}) كطالب رسمي بـ (${schoolName}) للعام الدراسي (${yearName}).\n` +
+          `- المرحلة / الصف الدراسي: ${opts.gradeName || 'المرحلة المقررة'}\n` +
+          `- الرقم المدرسي (الأكاديمي): ${opts.studentCode || '—'}\n\n` +
+          `📋 لائحة واشتراطات التسجيل:\n` +
+          `${policyText}\n\n` +
+          `نتمنى لابننا/ابنتنا دوام التوفيق والتميز الأكاديمي.\n` +
+          `إدارة القبول والتسجيل — ${schoolName}`
+        );
+
+        this.commsService.sendMessage({
+          channel: 'whatsapp',
+          channel_type: 'whatsapp',
+          recipient_address: opts.phone,
+          recipient_name: opts.guardianName || 'ولي الأمر',
+          subject: `إشعار اعتماد وتسجيل التلميذ - ${schoolName}`,
+          body: defaultBody,
+          template_code: 'ADM_ENROLLED',
+          source_module: 'students',
+          source_event: 'StudentManualEnrollment',
+          entity_type: 'guardian',
+          student_id: opts.studentId
+        }).subscribe();
       }
     });
   }
