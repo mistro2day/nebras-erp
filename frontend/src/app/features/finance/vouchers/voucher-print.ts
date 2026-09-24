@@ -391,7 +391,7 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
       </div>
       <div class="info-cell">
         <span class="lbl">المحاسب المنشئ:</span>
-        <span class="val">${voucher.accountant_name || voucher.created_by_name || printedBy || 'المحاسب المالي'}</span>
+        <span class="val">${voucher.accountant_name || voucher.created_by_name || '—'}</span>
       </div>
     </div>
 
@@ -437,7 +437,7 @@ export function printVoucher(voucher: any, tenantInfo?: any, printedBy?: string)
     <div class="signatures-matrix">
       <div class="sig-col">
         <span class="sig-label">أمين الخزينة / المحاسب</span>
-        <span class="sig-sign">${voucher.accountant_name || voucher.created_by_name || printedBy || 'توقيع المحاسب'}</span>
+        <span class="sig-sign">${voucher.accountant_name || voucher.created_by_name || ''}</span>
       </div>
       <div class="sig-col">
         <span class="sig-label">المراجعة والتدقيق</span>

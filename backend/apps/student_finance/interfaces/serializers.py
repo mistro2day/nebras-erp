@@ -19,10 +19,11 @@ class BaseStudentFinanceSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         from apps.shared.application.people import resolve_user_display_name
-        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='')
 
     def get_accountant_name(self, obj):
         return self.get_created_by_name(obj)
+
 
 
 class FeeCategorySerializer(BaseStudentFinanceSerializer):
@@ -87,7 +88,8 @@ def _get_payment_method_name(pm_id):
 
 def _get_collector_name(user_id, tenant_id=None):
     from apps.shared.application.people import resolve_user_display_name
-    return resolve_user_display_name(user_id, default='أمين الخزينة')
+    return resolve_user_display_name(user_id, default='')
+
 
 
 def _extract_student_finance_metadata(billing_account, student_map=None, grade_map=None, section_map=None, branch_map=None, **kwargs):

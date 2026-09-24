@@ -604,7 +604,7 @@ export function printJournalVoucher(journal: any, tenantInfo?: any, printedBy?: 
       </div>
       <div class="meta-col">
         <span class="k">المحاسب المنشئ:</span>
-        <span class="v font-bold">${journal.accountant_name || journal.created_by_name || 'المحاسب المسؤول'}</span>
+        <span class="v font-bold">${journal.accountant_name || journal.created_by_name || '—'}</span>
       </div>
     </div>
 

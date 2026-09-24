@@ -81,7 +81,7 @@ import { printVoucher } from './voucher-print';
                     <td class="end mono font-bold">{{ v.amount | number:'1.2-2' }}</td>
                     <td>{{ methodName(v.payment_method) }}</td>
                     <td class="desc">{{ v.description || '—' }}</td>
-                    <td class="mono font-bold">{{ v.accountant_name || v.created_by_name || 'المحاسب المسؤول' }}</td>
+                    <td class="mono font-bold">{{ v.accountant_name || v.created_by_name || '—' }}</td>
                     <td>
                       <span class="badge" [class.draft]="v.status === 'draft'" [class.posted]="v.status === 'posted'">
                         {{ statusLabel(v.status) }}
@@ -297,7 +297,7 @@ export class VouchersComponent implements OnInit {
       gl_account_name: this.accName(v.gl_account),
       bank_account_name: this.bankName(v.bank_account),
       cash_box_name: this.boxName(v.cash_box),
-      accountant_name: v.accountant_name || v.created_by_name || currentFullName || 'المحاسب المالي',
+      accountant_name: v.accountant_name || v.created_by_name || '',
     };
     printVoucher(populated, this.tenantService.currentTenant(), populated.accountant_name);
   }

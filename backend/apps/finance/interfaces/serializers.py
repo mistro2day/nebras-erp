@@ -97,7 +97,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         from apps.shared.application.people import resolve_user_display_name
-        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='')
 
     def get_accountant_name(self, obj):
         return self.get_created_by_name(obj)
@@ -444,7 +444,7 @@ class VoucherSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         from apps.shared.application.people import resolve_user_display_name
-        return resolve_user_display_name(getattr(obj, 'created_by', None), default='أمين الخزينة / المحاسب')
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='')
 
     def get_accountant_name(self, obj):
         return self.get_created_by_name(obj)
@@ -474,7 +474,7 @@ class FinancialTransactionSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         from apps.shared.application.people import resolve_user_display_name
-        return resolve_user_display_name(getattr(obj, 'created_by', None), default='المحاسب المالي')
+        return resolve_user_display_name(getattr(obj, 'created_by', None), default='')
 
     def get_accountant_name(self, obj):
         return self.get_created_by_name(obj)

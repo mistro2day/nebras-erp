@@ -78,8 +78,8 @@ def resolve_person(index, person_type, person_id):
 _USER_NAME_CACHE = {}
 
 
-def resolve_user_display_name(user_id, default='المحاسب المسؤول'):
-    """جلب الاسم الكامل للمستخدم المنشئ للسندات والفواتير المالية من جدول المستخدمين بشكل سريع ومخبأ بالذاكرة."""
+def resolve_user_display_name(user_id, default=''):
+    """جلب الاسم الكامل للمستخدم المنشئ للسندات والفواتير المالية من جدول المستخدمين وسجل الموظفين بشكل سريع ومخبأ بالذاكرة."""
     if not user_id:
         return default
     u_key = str(user_id)
@@ -89,6 +89,21 @@ def resolve_user_display_name(user_id, default='المحاسب المسؤول'):
         from apps.identity.domain.models import User
         u = User.objects.filter(id=user_id).first()
         if u:
+            # 1. البحث في سجل الموظفين الإداريين بالبريد أو المعرف لجلب الاسم الرباعي المعتمد
+            try:
+                from apps.employees.domain.models import Employee
+                emp = None
+                if u.email:
+                    emp = Employee.objects.filter(email=u.email, deleted_at__isnull=True).first()
+                if not emp and u.username:
+                    emp = Employee.objects.filter(employee_number=u.username, deleted_at__isnull=True).first()
+                if emp and emp.full_name_ar:
+                    _USER_NAME_CACHE[u_key] = emp.full_name_ar.strip()
+                    return _USER_NAME_CACHE[u_key]
+            except Exception:
+                pass
+
+            # 2. جلب الاسم من نموذج المستخدم (User)
             full = f"{u.first_name or ''} {u.last_name or ''}".strip()
             name = full or u.username or u.email or default
             _USER_NAME_CACHE[u_key] = name

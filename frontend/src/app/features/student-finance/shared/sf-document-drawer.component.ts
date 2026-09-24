@@ -152,7 +152,7 @@ function tafqeetArabic(num: number, currency = 'جنيه'): string {
               }
               <div class="meta-item-box">
                 <span class="lbl">{{ d.type === 'invoice' ? 'المحاسب المسؤول:' : 'أمين الصندوق / المحاسب:' }}</span>
-                <span class="val bold">{{ getAccountantName() }}</span>
+                <span class="val bold">{{ getAccountantName() || '—' }}</span>
               </div>
             </div>
           </div>
@@ -1125,19 +1125,22 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
 
   getAccountantName(): string {
     const d = this.doc?.data;
-    if (!d) return 'المحاسب المسؤول';
+    if (!d) return '';
     const name = d.accountant_name || d.created_by_name || d.collector_name || d.collector;
     if (name && typeof name === 'string' && name.trim() && name.trim() !== '—') {
       return name.trim();
     }
-    const current = this.authService?.currentUser();
-    if (current) {
-      const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
-      if (full) return full;
-      if (current.username) return current.username;
-      if (current.email) return current.email;
+    // إذا كان المستند في طور الإنشاء الجديد فقط ولم يحفظ بعد، نأخذ المستخدم الحالي
+    if (d.is_new_creation) {
+      const current = this.authService?.currentUser();
+      if (current) {
+        const full = `${current.first_name || ''} ${current.last_name || ''}`.trim();
+        if (full) return full;
+        if (current.username) return current.username;
+      }
     }
-    return 'المحاسب المسؤول';
+    // السجلات القديمة تترك فارغة
+    return '';
   }
 
   meta(): { title: string; subtitle: string } {
