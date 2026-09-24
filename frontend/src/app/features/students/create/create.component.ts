@@ -1123,7 +1123,7 @@ export class StudentCreateComponent implements OnInit {
     if (branch) {
       return branch.name_ar || branch.name;
     }
-    const gender = this.regMode() === 'admission' 
+    const gender = this.regMode() === 'admission'
       ? (this.selectedApplicant()?.gender || 'male')
       : (this.personalForm.gender || 'male');
     return gender === 'male' ? 'فرع البنين' : 'فرع البنات';
@@ -1182,16 +1182,16 @@ export class StudentCreateComponent implements OnInit {
   readonly waCountries = [
     { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
     { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
-    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+20', name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
     { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
     { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
     { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
     { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
-    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
-    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
-    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+    { code: '+90', name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44', name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1', name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
   ];
   whatsappCountryCode = '+249';
   whatsappBody = '';
@@ -1283,7 +1283,7 @@ export class StudentCreateComponent implements OnInit {
         const currentGender = this.selectedApplicant()?.gender || this.personalForm.gender || 'male';
         this.autoSelectBranch(currentGender);
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
@@ -1293,7 +1293,7 @@ export class StudentCreateComponent implements OnInit {
         const list = res?.data?.results || res?.data || res || [];
         this.grades.set(Array.isArray(list) ? list : []);
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
@@ -1308,7 +1308,7 @@ export class StudentCreateComponent implements OnInit {
     const targetCode = isMale ? 'BR-BOYS' : 'BR-GIRLS';
     const targetWord = isMale ? 'بنين' : 'بنات';
 
-    const matched = list.find((b: any) => 
+    const matched = list.find((b: any) =>
       b.school_gender_type === targetType ||
       (b.code && b.code.toUpperCase().includes(targetCode)) ||
       (b.name_ar && b.name_ar.includes(targetWord)) ||
@@ -1615,9 +1615,9 @@ export class StudentCreateComponent implements OnInit {
     if (!opts.phone) return;
 
     const schoolName = this.tenantService.currentTenant()?.schoolNameAr ||
-                       this.tenantService.currentTenant()?.nameAr ||
-                       this.tenantService.currentTenant()?.name ||
-                       'مدارس المورد النموذجية';
+      this.tenantService.currentTenant()?.nameAr ||
+      this.tenantService.currentTenant()?.name ||
+      'مدارس المورد الجديدة للتعليم الخاص';
     const yearName = new Date().getFullYear().toString();
     const policyText = '1. الالتزام بالحضور الصباحي والزي المدرسي المعتمد.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية.';
 

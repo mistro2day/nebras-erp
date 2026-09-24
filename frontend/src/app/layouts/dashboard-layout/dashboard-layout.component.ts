@@ -1055,7 +1055,7 @@ export class DashboardLayoutComponent {
           this.platformTenants.set(list);
         }
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -1144,7 +1144,7 @@ export class DashboardLayoutComponent {
     const item = this.navGroups.flatMap((g) => g.items).find((i) => i.label === label);
     if (!item) return;
     const currentlyOpen = this.isExpanded(item);
-    
+
     const parents = this.navGroups.flatMap((g) => g.items).filter((i) => i.children && i.children.length > 0);
     const nextState: Record<string, boolean> = {};
     for (const p of parents) {
@@ -1562,7 +1562,7 @@ export class DashboardLayoutComponent {
   });
 
   readonly tenantName = computed(
-    () => this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'مدارس النبراس النموذجية الأهلية'
+    () => this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'مدارس النبراس الجديدة للتعليم الخاص الأهلية'
   );
 
   readonly userAvatarUrl = computed(() => {

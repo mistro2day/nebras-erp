@@ -30,7 +30,7 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
     code: 'ADM_ACCEPTED',
     name: 'إشعار قبول التلميذ المعتمد',
     category: 'admissions',
-    body: 'السلام عليكم {{guardian_name}}، نبارك لكم قبول التلميذ/ة {{student_name}} بـ {{school_name}} - مدارس المورد النموذجية للعام الدراسي. رقم الطلب: {{application_number}}. نرجو مراجعة قسم التسجيل لاستكمال الإجراءات.',
+    body: 'السلام عليكم {{guardian_name}}، نبارك لكم قبول التلميذ/ة {{student_name}} بـ {{school_name}} - مدارس المورد الجديدة للتعليم الخاص للعام الدراسي. رقم الطلب: {{application_number}}. نرجو مراجعة قسم التسجيل لاستكمال الإجراءات.',
   },
   {
     code: 'ADM_WAITLIST',
@@ -42,7 +42,7 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
     code: 'ADM_REJECTED',
     name: 'إشعار نتيجة التنافس ورفض الطلب',
     category: 'admissions',
-    body: 'السلام عليكم {{guardian_name}}، نشكركم للتواصل مع مدارس المورد النموذجية. نود إحاطتكم باكتفاء المقاعد المتاحة لطلب القبول رقم {{application_number}} للتلميذ/ة {{student_name}}. نتمنى لكم دوام التوفيق.',
+    body: 'السلام عليكم {{guardian_name}}، نشكركم للتواصل مع مدارس المورد الجديدة للتعليم الخاص. نود إحاطتكم باكتفاء المقاعد المتاحة لطلب القبول رقم {{application_number}} للتلميذ/ة {{student_name}}. نتمنى لكم دوام التوفيق.',
   },
   {
     code: 'ADM_INTERVIEW',
@@ -60,7 +60,7 @@ const DEFAULT_ADM_TEMPLATES: { code: string; name: string; category: string; bod
 const ADM_SUBMITTED_TEMPLATE = {
   code: 'ADM_SUBMITTED',
   name: 'إشعار استلام طلب الالتحاق',
-  body: 'السلام عليكم {{guardian_name}}، تم استلام طلب الالتحاق بنجاح بالرقم: ({{application_number}}) للتلميذ/ة ({{student_name}}) بـ ({{school_name}}) - مدارس المورد النموذجية للعام الدراسي ({{academic_year}}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.',
+  body: 'السلام عليكم {{guardian_name}}، تم استلام طلب الالتحاق بنجاح بالرقم: ({{application_number}}) للتلميذ/ة ({{student_name}}) بـ ({{school_name}}) - مدارس المورد الجديدة للتعليم الخاص للعام الدراسي ({{academic_year}}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.',
 };
 
 /**
@@ -431,7 +431,7 @@ const ADM_SUBMITTED_TEMPLATE = {
           <nb-panel title="هـ / الأشقاء بالمدرسة واللوائح المعتمدة">
             <div class="info-grid vertical">
               <div class="info-item">
-                <strong>الأشقاء بالمورد النموذجية:</strong> 
+                <strong>الأشقاء بالمورد الجديدة للتعليم الخاص:</strong> 
                 <span>{{ a.has_siblings ? 'يوجد أشقاء مسجلين' : 'لا يوجد أشقاء' }}</span>
                 @if (a.has_siblings && a.siblings_details) {
                   <p class="sub-detail">تفاصيل: {{ a.siblings_details }} (قسم {{ a.siblings_section || 'إبتدائي' }})</p>
@@ -942,16 +942,16 @@ export class ApplicationDetailsComponent implements OnInit {
   readonly waCountries = [
     { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
     { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
-    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+20', name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
     { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
     { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
     { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
     { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
-    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
-    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
-    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+    { code: '+90', name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44', name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1', name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
   ];
   readonly editingWaId = signal<string | null>(null);
   readonly composedWa = signal('');

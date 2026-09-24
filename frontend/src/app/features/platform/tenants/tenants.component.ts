@@ -117,7 +117,7 @@ import { SaasBillingService } from '../../saas-billing/saas-billing.service';
               <div class="grid2">
                 <label>
                   <span>اسم المدرسة (بالعربي) <b class="req">*</b></span>
-                  <input type="text" [(ngModel)]="form.name_ar" placeholder="مثال: مدارس المورد الأهلية النموذجية" />
+                  <input type="text" [(ngModel)]="form.name_ar" placeholder="مثال: مدارس المورد الأهلية الجديدة للتعليم الخاص" />
                 </label>
                 <label>
                   <span>اسم المدرسة (بالإنجليزي)</span>
@@ -432,21 +432,21 @@ export class PlatformTenantsComponent implements OnInit {
     });
   }
 
-  openNew(): void { 
-    this.form = { 
-      name_ar: '', 
-      name_en: '', 
-      subdomain: '', 
-      email: '', 
-      phone_number: '', 
-      address: '', 
-      is_active: true 
-    }; 
-    this.editing.set({}); 
+  openNew(): void {
+    this.form = {
+      name_ar: '',
+      name_en: '',
+      subdomain: '',
+      email: '',
+      phone_number: '',
+      address: '',
+      is_active: true
+    };
+    this.editing.set({});
   }
 
-  openEdit(t: any): void { 
-    this.form = { 
+  openEdit(t: any): void {
+    this.form = {
       id: t.id,
       name_ar: t.name_ar || t.name || '',
       name_en: t.name_en || '',
@@ -455,8 +455,8 @@ export class PlatformTenantsComponent implements OnInit {
       phone_number: t.phone_number || '',
       address: t.address || '',
       is_active: t.is_active !== false
-    }; 
-    this.editing.set(t); 
+    };
+    this.editing.set(t);
   }
 
   save(): void {
@@ -474,28 +474,28 @@ export class PlatformTenantsComponent implements OnInit {
       is_active: this.form.is_active !== false,
     };
 
-    const done = () => { 
-      this.saving.set(false); 
-      this.editing.set(null); 
-      this.load(); 
+    const done = () => {
+      this.saving.set(false);
+      this.editing.set(null);
+      this.load();
     };
 
-    const fail = (e: any) => { 
-      this.saving.set(false); 
+    const fail = (e: any) => {
+      this.saving.set(false);
       const msg = e?.error?.message || e?.error?.detail || 'تعذّر حفظ بيانات المؤسسة.';
-      this.notify.error(msg); 
+      this.notify.error(msg);
     };
 
-    const req = this.form.id 
-      ? this.svc.updateTenant(this.form.id, body) 
+    const req = this.form.id
+      ? this.svc.updateTenant(this.form.id, body)
       : this.svc.createTenant(body);
 
-    req.subscribe({ 
-      next: () => { 
-        this.notify.success('تم حفظ بيانات المدرسة والمستأجر بنجاح.'); 
-        done(); 
-      }, 
-      error: fail 
+    req.subscribe({
+      next: () => {
+        this.notify.success('تم حفظ بيانات المدرسة والمستأجر بنجاح.');
+        done();
+      },
+      error: fail
     });
   }
 

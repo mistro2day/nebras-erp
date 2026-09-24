@@ -59,7 +59,7 @@ import { exportElementToPdf } from '../../../shared/export';
                      (error)="onLogoError($event)" />
               </div>
               <div class="school-names">
-                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'مدارس المورد النموذجية الخاصة' }}</h1>
+                <h1 class="school-name-ar">{{ statement()?.tenant?.name_ar || statement()?.tenant?.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة' }}</h1>
                 <span class="school-name-en">{{ statement()?.tenant?.name_en || 'Al-Mawred Model Private Schools' }}</span>
                 <span class="school-affiliation">{{ statement()?.tenant?.affiliation || 'المرحلة الابتدائية والمتوسطة والثانوية • ولاية الخرطوم' }}</span>
               </div>
@@ -1164,7 +1164,7 @@ export class StudentAccountStatementComponent implements OnInit {
       // 1. ترويسة المدرسة الرسمية
       ws.mergeCells('A1:H1');
       const schoolCell = ws.getCell('A1');
-      schoolCell.value = s.tenant?.name_ar || s.tenant?.name || 'مدارس المورد النموذجية الخاصة';
+      schoolCell.value = s.tenant?.name_ar || s.tenant?.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة';
       schoolCell.font = { bold: true, size: 15, color: { argb: 'FFFFFFFF' } };
       schoolCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND_BLUE } };
       schoolCell.alignment = { horizontal: 'center', vertical: 'middle' };

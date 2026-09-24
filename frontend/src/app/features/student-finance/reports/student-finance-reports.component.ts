@@ -2751,7 +2751,7 @@ export class StudentFinanceReportsComponent implements OnInit {
     const name = studentOrItem.guardian_name && studentOrItem.guardian_name !== '—'
       ? studentOrItem.guardian_name
       : (studentOrItem.student_name ? `ولي أمر الطالب/ـة: ${studentOrItem.student_name}` : 'ولي الأمر');
-    
+
     const phone = studentOrItem.guardian_phone && studentOrItem.guardian_phone !== '—'
       ? studentOrItem.guardian_phone
       : '';
@@ -2775,7 +2775,7 @@ export class StudentFinanceReportsComponent implements OnInit {
       branch_name: studentOrItem.branch_name || '',
       due_date: studentOrItem.due_date || 'فوراً',
       academic_year: studentOrItem.academic_year || '2025/2026 م',
-      school_name: 'مدارس نبراس النموذجية',
+      school_name: 'مدارس نبراس الجديدة للتعليم الخاص',
       date: this.todayStr,
     });
     this.showMsgModal.set(true);

@@ -204,14 +204,14 @@ interface ExtendedGuardianForm {
                   </div>
                 </div>
 
-                <!-- الأشقاء بالمورد النموذجية -->
+                <!-- الأشقاء بالمورد الجديدة للتعليم الخاص -->
                 <div class="sub-card">
                   <div class="sub-head">الأشقاء المسجلين في المدرسة</div>
                   <div class="grid">
                     <div class="fld wide">
                       <label class="chk-label">
                         <input type="checkbox" [(ngModel)]="a.has_siblings" />
-                        <span>هل للتلميذ أشقاء بالمورد النموذجية؟</span>
+                        <span>هل للتلميذ أشقاء بالمورد الجديدة للتعليم الخاص؟</span>
                       </label>
                     </div>
 
@@ -893,16 +893,16 @@ export class PublicApplyComponent implements OnInit {
   readonly waCountries = [
     { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
     { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
-    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+20', name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
     { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
     { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
     { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
     { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
-    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
-    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
-    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+    { code: '+90', name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44', name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1', name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
   ];
 
   whatsappCountryCode = '+249';
@@ -1050,7 +1050,7 @@ export class PublicApplyComponent implements OnInit {
     const academicYear = this.yearName(this.a.academic_year_id);
 
     // النص الاحتياطي إن تعذّر جلب القالب المعتمد (استمارة عامة غير مصادَقة)
-    const fallback = `السلام عليكم ${guardianName}، تم استلام طلب الالتحاق بنجاح بالرقم : (${appNum}) للتلميذ/ة (${studentName}) بـ (${schoolName}) - مدارس المورد النموذجية للعام الدراسي (${academicYear}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.`;
+    const fallback = `السلام عليكم ${guardianName}، تم استلام طلب الالتحاق بنجاح بالرقم : (${appNum}) للتلميذ/ة (${studentName}) بـ (${schoolName}) - مدارس المورد الجديدة للتعليم الخاص للعام الدراسي (${academicYear}). نرجو الاحتفاظ برقم الطلب لمتابعة حالة القبول وتحديد المقابلة. شكرًا لثقتكم.`;
 
     // القالب المعتمد (ADM_SUBMITTED) هو المصدر — أي تعديل من صفحة القوالب ينعكس هنا. راجع ADR-008.
     this.commsSvc.getPublicTemplate('ADM_SUBMITTED').subscribe((tmpl) => {

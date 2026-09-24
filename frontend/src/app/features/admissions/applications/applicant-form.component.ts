@@ -182,12 +182,12 @@ interface StaffGuardianForm {
             </div>
 
             <div class="box-card">
-              <div class="box-head">الأشقاء بالمدارس النموذجية</div>
+              <div class="box-head">الأشقاء بالمدارس الجديدة للتعليم الخاص</div>
               <div class="form-grid">
                 <div class="fld wide">
                   <label class="chk-lbl">
                     <input type="checkbox" [(ngModel)]="a.has_siblings" />
-                    <span>هل للتلميذ أشقاء بالمورد النموذجية؟</span>
+                    <span>هل للتلميذ أشقاء بالمورد الجديدة للتعليم الخاص؟</span>
                   </label>
                 </div>
                 @if (a.has_siblings) {
@@ -571,16 +571,16 @@ export class ApplicantFormComponent implements OnInit {
   readonly waCountries = [
     { code: '+249', name: '🇸🇩 السودان', len: [9, 9], sample: '9XXXXXXXX' },
     { code: '+966', name: '🇸🇦 السعودية', len: [9, 9], sample: '5XXXXXXXX' },
-    { code: '+20',  name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
+    { code: '+20', name: '🇪🇬 مصر', len: [10, 10], sample: '1XXXXXXXXX' },
     { code: '+971', name: '🇦🇪 الإمارات', len: [9, 9], sample: '5XXXXXXXX' },
     { code: '+974', name: '🇶🇦 قطر', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+968', name: '🇴🇲 عُمان', len: [8, 8], sample: '9XXXXXXX' },
     { code: '+965', name: '🇰🇼 الكويت', len: [8, 8], sample: '5XXXXXXX' },
     { code: '+973', name: '🇧🇭 البحرين', len: [8, 8], sample: '3XXXXXXX' },
     { code: '+962', name: '🇯🇴 الأردن', len: [9, 9], sample: '7XXXXXXXX' },
-    { code: '+90',  name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
-    { code: '+44',  name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
-    { code: '+1',   name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
+    { code: '+90', name: '🇹🇷 تركيا', len: [10, 10], sample: '5XXXXXXXXX' },
+    { code: '+44', name: '🇬🇧 المملكة المتحدة', len: [10, 10], sample: '7XXXXXXXXX' },
+    { code: '+1', name: '🇺🇸 أمريكا / كندا', len: [10, 10], sample: 'XXXXXXXXXX' },
   ];
 
   whatsappCountryCode = '+249';
@@ -756,7 +756,7 @@ export class ApplicantFormComponent implements OnInit {
     if (!phone) return;
 
     const schoolName = (this.a as any)['target_school_type'] === 'girls' ? 'مدرسة البنات' : 'مدرسة البنين';
-    const msg = `السلام عليكم ${this.g.full_name || 'ولي الأمر المحترم'}، تم تسجيل طلب الالتحاق بنجاح بالرقم الرسمي: (${appNum}) للتلميذ/ة (${this.a.arabic_full_name}) بـ (${schoolName}) - مدارس المورد النموذجية للعام الدراسي (${this.yearName(this.a.academic_year_id)}). يمكنكم متابعة حالة الطلب لدى إدارة القبول. شكرًا لثقتكم.`;
+    const msg = `السلام عليكم ${this.g.full_name || 'ولي الأمر المحترم'}، تم تسجيل طلب الالتحاق بنجاح بالرقم الرسمي: (${appNum}) للتلميذ/ة (${this.a.arabic_full_name}) بـ (${schoolName}) - مدارس المورد الجديدة للتعليم الخاص للعام الدراسي (${this.yearName(this.a.academic_year_id)}). يمكنكم متابعة حالة الطلب لدى إدارة القبول. شكرًا لثقتكم.`;
 
     this.commsSvc.sendMessage({
       channel: 'whatsapp',

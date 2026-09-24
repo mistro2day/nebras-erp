@@ -71,7 +71,7 @@ import { getTenantPrintBranding } from '../../../core/helpers/tenant-print-brand
               </tr>
               <tr>
                 <td colspan="2">
-                  <b>هل للتلميذ أشقاء بالمورد النموذجية؟</b> {{ applicant.has_siblings ? 'نعم' : 'لا' }}
+                  <b>هل للتلميذ أشقاء بالمورد الجديدة للتعليم الخاص؟</b> {{ applicant.has_siblings ? 'نعم' : 'لا' }}
                   @if (applicant.has_siblings) {
                     <span> | القسم: {{ applicant.siblings_section || 'إبتدائي' }} | عددهم: {{ applicant.siblings_count || '1' }}</span>
                   }

@@ -232,7 +232,7 @@ class StudentBillingAccountViewSet(BaseCRUDViewSet):
             from apps.tenants.models import Tenant
             tenant = Tenant.objects.first()
 
-        tenant_name_ar = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد النموذجية الخاصة'
+        tenant_name_ar = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد الجديدة للتعليم الخاص الخاصة'
         tenant_name_en = (tenant.name_en or tenant.name) if (tenant and tenant.name_en) else 'Al-Mawred Model Private Schools'
 
         tenant_info = {
@@ -1030,7 +1030,7 @@ class InstallmentViewSet(BaseCRUDViewSet):
         if not tenant:
             from apps.tenants.models import Tenant
             tenant = Tenant.objects.filter(id=tenant_id).first() or Tenant.objects.first()
-        school_name = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد النموذجية الخاصة'
+        school_name = (tenant.name_ar or tenant.name) if tenant else 'مدارس المورد الجديدة للتعليم الخاص الخاصة'
 
         # إنشاء مصنف العمل
         wb = openpyxl.Workbook()

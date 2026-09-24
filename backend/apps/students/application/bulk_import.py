@@ -226,7 +226,7 @@ class StudentBulkImportService:
                 row_copy['section_name'] = 'شعبة (أ)'
             dynamic_samples.append(row_copy)
 
-        # تعبئة الأسطر النموذجية التوضيحية (الصفوف 5 و 6 و 7)
+        # تعبئة الأسطر الجديدة للتعليم الخاص التوضيحية (الصفوف 5 و 6 و 7)
         for row_idx, sample in enumerate(dynamic_samples, start=5):
             for col_idx, col_def in enumerate(cls.TEMPLATE_COLUMNS, start=1):
                 col_key = str(col_def.get('id', ''))

@@ -170,9 +170,9 @@ export class TenantService {
         const tenant: TenantInfo = {
           id: d.id,
           name: d.name || d.name_en || d.name_ar || 'Al-Mawred',
-          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
           nameEn: d.name_en || d.school_name_en || 'Al-Mawred Model Private Schools',
-          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
           schoolNameEn: d.school_name_en || d.name_en || 'Al-Mawred Model Private Schools',
           primaryColor: d.primary_color || '#1e3a8a',
           secondaryColor: d.secondary_color || '#10b981',
@@ -227,9 +227,9 @@ export class TenantService {
         const tenant: TenantInfo = {
           id: d.id,
           name: d.name || d.name_en || d.name_ar || 'Al-Mawred',
-          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          nameAr: d.name_ar || d.school_name_ar || d.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
           nameEn: d.name_en || d.school_name_en || 'Al-Mawred Model Private Schools',
-          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد النموذجية الخاصة',
+          schoolNameAr: d.school_name_ar || d.name_ar || d.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
           schoolNameEn: d.school_name_en || d.name_en || 'Al-Mawred Model Private Schools',
           primaryColor: d.primary_color || '#1e3a8a',
           secondaryColor: d.secondary_color || '#10b981',
@@ -265,7 +265,7 @@ export class TenantService {
     this.activeBranch.set(branch);
     try {
       localStorage.setItem('nb_active_branch', branch);
-    } catch {}
+    } catch { }
   }
 
   clearTenant() {

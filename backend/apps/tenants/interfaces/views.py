@@ -248,9 +248,9 @@ class TenantViewSet(viewsets.ModelViewSet):
             
         # إضافة المسارات الكاملة للوغو والختم وبيانات المدرسة
         data = self.get_serializer(tenant).data
-        data['name'] = tenant.name or tenant.name_ar or 'مدارس المورد النموذجية الخاصة'
-        data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
-        data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد النموذجية الخاصة'
+        data['name'] = tenant.name or tenant.name_ar or 'مدارس المورد الجديدة للتعليم الخاص الخاصة'
+        data['name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الجديدة للتعليم الخاص الخاصة'
+        data['school_name_ar'] = tenant.name_ar or tenant.name or 'مدارس المورد الجديدة للتعليم الخاص الخاصة'
         data['school_name_en'] = tenant.name_en or 'Al-Mawred Model Private Schools'
         data['phone'] = tenant.phone_number or '0123689814'
         data['phone_number'] = tenant.phone_number or '0123689814'

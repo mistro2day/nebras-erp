@@ -171,7 +171,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                   id="schoolNameAr"
                   type="text"
                   [(ngModel)]="nameAr"
-                  placeholder="مثال: مدارس المورد النموذجية الخاصة / مدارس المورد الجديدة للتعليم الخاص"
+                  placeholder="مثال: مدارس المورد الجديدة للتعليم الخاص الخاصة / مدارس المورد الجديدة للتعليم الخاص"
                   class="form-control"
                 />
                 <span class="hint">يظهر في أعلى كل الترويسات الرسمية، السندات المالية، واستمارات القبول.</span>
@@ -351,7 +351,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
                   <div class="mock-side right">
                     <div class="country">جمهورية السودان</div>
                     <div class="state">ولاية الخرطوم — وزارة التعليم والتربية الوطنية</div>
-                    <div class="school-ar">{{ nameAr() || 'مدارس المورد النموذجية الخاصة' }}</div>
+                    <div class="school-ar">{{ nameAr() || 'مدارس المورد الجديدة للتعليم الخاص الخاصة' }}</div>
                   </div>
 
                   <div class="mock-logo">
@@ -1160,7 +1160,7 @@ import { NbPanelComponent } from '../../../shared/nebras/nb-panel.component';
 export class SchoolIdentitySettingsComponent implements OnInit {
   private tenantService = inject(TenantService);
 
-  nameAr = signal('مدارس المورد النموذجية الخاصة');
+  nameAr = signal('مدارس المورد الجديدة للتعليم الخاص الخاصة');
   nameEn = signal('Al-Mawred Model Private Schools');
   email = signal('accounts@almawred.edu.sd');
   stateCity = signal('جمهورية السودان — ولاية الخرطوم — أركويت');
@@ -1263,11 +1263,11 @@ export class SchoolIdentitySettingsComponent implements OnInit {
   }
 
   private populateFromTenant(t: TenantInfo): void {
-    this.nameAr.set(t.nameAr || t.schoolNameAr || t.name || 'مدارس المورد النموذجية الخاصة');
+    this.nameAr.set(t.nameAr || t.schoolNameAr || t.name || 'مدارس المورد الجديدة للتعليم الخاص الخاصة');
     this.nameEn.set(t.nameEn || t.schoolNameEn || 'Al-Mawred Model Private Schools');
     this.email.set(t.email || 'accounts@almawred.edu.sd');
     this.address.set(t.address || 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54');
-    
+
     if (t.logoUrl) {
       this.logoUrl.set(t.logoUrl);
     } else {

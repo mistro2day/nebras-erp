@@ -286,7 +286,7 @@ class StudentApplicationService:
                 target_phone = '+' + clean_phone
 
                 tenant_obj = Tenant.objects.filter(id=tenant_id).first()
-                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد النموذجية'
+                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد الجديدة للتعليم الخاص'
 
                 grade_name = ""
                 if applicant.applying_grade_id:
@@ -545,7 +545,7 @@ class StudentApplicationService:
                 target_phone = '+' + clean_phone
 
                 tenant_obj = Tenant.objects.filter(id=tenant_id).first()
-                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد النموذجية'
+                school_name = getattr(tenant_obj, 'name_ar', '') or getattr(tenant_obj, 'name', '') or 'مدارس المورد الجديدة للتعليم الخاص'
 
                 grade_name = ""
                 g_id = (academic_data or {}).get('grade_id')

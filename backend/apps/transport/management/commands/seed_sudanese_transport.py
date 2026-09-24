@@ -15,7 +15,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("بدء بذر بيانات النقل المدرسي والأسطول السوداني...")
 
-        # جلب المستأجر النشط (مدارس المورد النموذجية)
+        # جلب المستأجر النشط (مدارس المورد الجديدة للتعليم الخاص)
         tenant = Tenant.objects.filter(is_active=True).first()
         if not tenant:
             self.stdout.write(self.style.ERROR("لا يوجد مستأجر نشط في النظام."))
@@ -113,7 +113,7 @@ class Command(BaseCommand):
                 'odometer_value': Decimal('65200.00'),
                 'status': 'available',
                 'ownership_type': 'owned',
-                'owner_name': 'مدارس المورد النموذجية الخاصة',
+                'owner_name': 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
                 'owner_phone': '0912345678',
                 'monthly_rent_sdg': Decimal('0.00'),
                 'rent_payment_method': 'cash'
@@ -230,7 +230,7 @@ class Command(BaseCommand):
             ('محطة لفة الجريف غرب', 'Al-Jiraif West Stop', 1, 15.5822000, 32.5695000),
             ('محطة شارع الستين تقاطع المشتل', 'Al-Mashtal & 60th St', 2, 15.5780000, 32.5590000),
             ('محطة شارع 15 العمارات', 'Street 15 Al-Amarat', 3, 15.5720000, 32.5450000),
-            ('مجمع مدارس المورد النموذجية (المقر)', 'Al-Mawred School Campus', 4, 15.5680000, 32.5390000),
+            ('مجمع مدارس المورد الجديدة للتعليم الخاص (المقر)', 'Al-Mawred School Campus', 4, 15.5680000, 32.5390000),
         ]
         for name_ar, name_en, seq, lat, lng in stops_r1:
             RouteStop.objects.get_or_create(
@@ -259,7 +259,7 @@ class Command(BaseCommand):
             ('محطة حي المهندسين - مربع 24', 'Al-Mohandessin Sq 24', 1, 15.6020000, 32.4750000),
             ('محطة الفتيحاب مربع 5', 'Al-Fitehab Sq 5', 2, 15.6120000, 32.4820000),
             ('محطة مدخل كبري النيل الأبيض', 'White Nile Bridge Entry', 3, 15.6180000, 32.4960000),
-            ('مجمع مدارس المورد النموذجية (المقر)', 'Al-Mawred School Campus', 4, 15.5680000, 32.5390000),
+            ('مجمع مدارس المورد الجديدة للتعليم الخاص (المقر)', 'Al-Mawred School Campus', 4, 15.5680000, 32.5390000),
         ]
         for name_ar, name_en, seq, lat, lng in stops_r2:
             RouteStop.objects.get_or_create(

@@ -11,8 +11,8 @@ import { environment } from '../../../../environments/environment';
 export type SfDoc = { type: 'invoice' | 'receipt' | 'receivable'; data: any } | null;
 
 export const DEFAULT_BRAND = {
-  name: 'مدارس المورد النموذجية الخاصة',
-  name_ar: 'مدارس المورد النموذجية الخاصة',
+  name: 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
+  name_ar: 'مدارس المورد الجديدة للتعليم الخاص الخاصة',
   name_en: 'Al-Mawred Model Private Schools',
   accreditation: 'وزارة التعليم والتربية الوطنية',
   address: 'جمهورية السودان — ولاية الخرطوم — أركويت — شارع الفردوس — مربع 54',
@@ -896,7 +896,7 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
         next: (res) => {
           if (res) this.brandingData.set(res);
         },
-        error: () => {}
+        error: () => { }
       });
     }
 
@@ -911,7 +911,7 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
             this.resolvedStudent.set(res.data);
           }
         },
-        error: () => {}
+        error: () => { }
       });
     }
 
@@ -923,7 +923,7 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
           const acc = res?.data?.[0];
           if (acc) this.resolvedAccount.set(acc);
         },
-        error: () => {}
+        error: () => { }
       });
     }
   }
@@ -993,51 +993,51 @@ export class SfDocumentDrawerComponent implements OnInit, OnChanges {
 
   getStudentName(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.student_name 
-      || this.studentName 
-      || s?.profile?.arabic_name 
-      || s?.arabic_name 
-      || s?.profile?.english_name 
-      || s?.english_name 
+    return this.doc?.data?.student_name
+      || this.studentName
+      || s?.profile?.arabic_name
+      || s?.arabic_name
+      || s?.profile?.english_name
+      || s?.english_name
       || '—';
   }
 
   getStudentNumber(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.student_number 
-      || s?.student_number 
+    return this.doc?.data?.student_number
+      || s?.student_number
       || '—';
   }
 
   getGradeName(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.grade_name 
-      || s?.grade_name 
-      || s?.enrollments?.[0]?.grade_level 
+    return this.doc?.data?.grade_name
+      || s?.grade_name
+      || s?.enrollments?.[0]?.grade_level
       || '—';
   }
 
   getSectionName(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.section_name 
-      || s?.section_name 
-      || s?.enrollments?.[0]?.section_name 
+    return this.doc?.data?.section_name
+      || s?.section_name
+      || s?.enrollments?.[0]?.section_name
       || '—';
   }
 
   getGuardianName(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.guardian_name 
-      || s?.guardian_name 
-      || s?.family_relations?.[0]?.full_name 
+    return this.doc?.data?.guardian_name
+      || s?.guardian_name
+      || s?.family_relations?.[0]?.full_name
       || '—';
   }
 
   getGuardianPhone(): string {
     const s = this.getStudentObj();
-    return this.doc?.data?.guardian_phone 
-      || s?.guardian_phone 
-      || s?.family_relations?.[0]?.phone 
+    return this.doc?.data?.guardian_phone
+      || s?.guardian_phone
+      || s?.family_relations?.[0]?.phone
       || '—';
   }
 

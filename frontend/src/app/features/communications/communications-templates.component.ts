@@ -379,7 +379,7 @@ export class CommunicationsTemplatesComponent {
 
   currentSchoolName = computed(() => {
     const t = this.tenantService.currentTenant();
-    return t?.schoolNameAr || t?.nameAr || 'مدارس المورد النموذجية';
+    return t?.schoolNameAr || t?.nameAr || 'مدارس المورد الجديدة للتعليم الخاص';
   });
 
   formData: Partial<CommunicationTemplate> = {
@@ -394,46 +394,46 @@ export class CommunicationsTemplatesComponent {
   // قائمة جميع متغيرات النظام المتاحة
   get allVariables(): SystemVariable[] {
     return [
-    // شؤون الطلاب
-    { code: 'student_name', label: 'اسم الطالب الكامل', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'خالد عثمان إبراهيم الكباشي', description: 'اسم الطالب الثلاثي أو الرباعي من قاعدة البيانات.' },
-    { code: 'student_code', label: 'الرقم الأكاديمي للطالب', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'STU-2026-0841', description: 'الرمز التعريف الموحد للطالب.' },
-    { code: 'grade_level', label: 'الصف / المرحلة', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'الصف العاشر الثانوية', description: 'المرحلة الدراسية المسجل بها الطالب.' },
-    { code: 'classroom_name', label: 'اسم الفصل / الشعبة', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'شعبة أ (العلوم)', description: 'الفصل الدراسي المقيد به الطالب.' },
+      // شؤون الطلاب
+      { code: 'student_name', label: 'اسم الطالب الكامل', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'خالد عثمان إبراهيم الكباشي', description: 'اسم الطالب الثلاثي أو الرباعي من قاعدة البيانات.' },
+      { code: 'student_code', label: 'الرقم الأكاديمي للطالب', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'STU-2026-0841', description: 'الرمز التعريف الموحد للطالب.' },
+      { code: 'grade_level', label: 'الصف / المرحلة', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'الصف العاشر الثانوية', description: 'المرحلة الدراسية المسجل بها الطالب.' },
+      { code: 'classroom_name', label: 'اسم الفصل / الشعبة', category: 'students', category_name: 'شؤون الطلاب', sample_value: 'شعبة أ (العلوم)', description: 'الفصل الدراسي المقيد به الطالب.' },
 
-    // أولياء الأمور
-    { code: 'guardian_name', label: 'اسم ولي الأمر', category: 'guardians', category_name: 'أولياء الأمور', sample_value: 'عثمان إبراهيم الكباشي', description: 'اسم ولي الأمر أو الكفيل المباشر.' },
-    { code: 'guardian_phone', label: 'هاتف ولي الأمر', category: 'guardians', category_name: 'أولياء الأمور', sample_value: '0912345678', description: 'رقم هاتف ولي الأمر السوداني المعتمد.' },
+      // أولياء الأمور
+      { code: 'guardian_name', label: 'اسم ولي الأمر', category: 'guardians', category_name: 'أولياء الأمور', sample_value: 'عثمان إبراهيم الكباشي', description: 'اسم ولي الأمر أو الكفيل المباشر.' },
+      { code: 'guardian_phone', label: 'هاتف ولي الأمر', category: 'guardians', category_name: 'أولياء الأمور', sample_value: '0912345678', description: 'رقم هاتف ولي الأمر السوداني المعتمد.' },
 
-    // الشؤون المالية
-    { code: 'invoice_number', label: 'رقم الفاتورة', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'INV-2026-4409', description: 'الرقم التسلسلي للفاتورة الدراسية.' },
-    { code: 'receipt_number', label: 'رقم سند القبض', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'RCP-2026-0042', description: 'الرقم التسلسلي الرسمي لسند القبض المالي المعتمد.' },
-    { code: 'amount', label: 'المبلغ المستحق / المقبوض (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '120,000.00', description: 'المبلغ المالي بالجنيه السوداني.' },
-    { code: 'amount_words', label: 'المبلغ تفقيطاً بالكلمات', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'مائة وعشرون ألف جنيه سوداني فقط لا غير', description: 'المبلغ المالي مفقطاً باللغة العربية مطابقاً للسياق السوداني.' },
-    { code: 'remaining_balance', label: 'الرصيد المتبقي المستحق (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '80,000.00', description: 'الرصيد المالي المتبقي على ذمة الطالب بعد عملية السداد.' },
-    { code: 'due_date', label: 'تاريخ الاستحقاق', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-07-25', description: 'أخر موعد لسداد القسط أو الفاتورة.' },
-    { code: 'payment_date', label: 'تاريخ السداد والتحصيل', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-09-22', description: 'التاريخ الفعلي لتحصيل وإصدار سند القبض.' },
-    { code: 'payment_method', label: 'وسيلة الدفع', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'تطبيق بنكك (Bankak)', description: 'طريقة السداد المعتمدة (بنكك / فوري).' },
+      // الشؤون المالية
+      { code: 'invoice_number', label: 'رقم الفاتورة', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'INV-2026-4409', description: 'الرقم التسلسلي للفاتورة الدراسية.' },
+      { code: 'receipt_number', label: 'رقم سند القبض', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'RCP-2026-0042', description: 'الرقم التسلسلي الرسمي لسند القبض المالي المعتمد.' },
+      { code: 'amount', label: 'المبلغ المستحق / المقبوض (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '120,000.00', description: 'المبلغ المالي بالجنيه السوداني.' },
+      { code: 'amount_words', label: 'المبلغ تفقيطاً بالكلمات', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'مائة وعشرون ألف جنيه سوداني فقط لا غير', description: 'المبلغ المالي مفقطاً باللغة العربية مطابقاً للسياق السوداني.' },
+      { code: 'remaining_balance', label: 'الرصيد المتبقي المستحق (ج.س)', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '80,000.00', description: 'الرصيد المالي المتبقي على ذمة الطالب بعد عملية السداد.' },
+      { code: 'due_date', label: 'تاريخ الاستحقاق', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-07-25', description: 'أخر موعد لسداد القسط أو الفاتورة.' },
+      { code: 'payment_date', label: 'تاريخ السداد والتحصيل', category: 'finance', category_name: 'المالية (ج.س)', sample_value: '2026-09-22', description: 'التاريخ الفعلي لتحصيل وإصدار سند القبض.' },
+      { code: 'payment_method', label: 'وسيلة الدفع', category: 'finance', category_name: 'المالية (ج.س)', sample_value: 'تطبيق بنكك (Bankak)', description: 'طريقة السداد المعتمدة (بنكك / فوري).' },
 
-    // الحضور والغياب
-    { code: 'date', label: 'تاريخ الغياب / التنبيه', category: 'attendance', category_name: 'الحضور والغياب', sample_value: '2026-07-20', description: 'التاريخ الفعلي لتسجيل غياب الطالب.' },
-    { code: 'session_name', label: 'الحصة الدراسية', category: 'attendance', category_name: 'الحضور والغياب', sample_value: 'طابور الصباح والحصة الأولى', description: 'اسم الحصة أو الفترة التي غاب فيها الطالب.' },
+      // الحضور والغياب
+      { code: 'date', label: 'تاريخ الغياب / التنبيه', category: 'attendance', category_name: 'الحضور والغياب', sample_value: '2026-07-20', description: 'التاريخ الفعلي لتسجيل غياب الطالب.' },
+      { code: 'session_name', label: 'الحصة الدراسية', category: 'attendance', category_name: 'الحضور والغياب', sample_value: 'طابور الصباح والحصة الأولى', description: 'اسم الحصة أو الفترة التي غاب فيها الطالب.' },
 
-    // القبول والتسجيل
-    { code: 'application_number', label: 'رقم طلب القبول', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'APP-9982', description: 'رقم طلب الالتحاق بالمدارس.' },
-    { code: 'academic_year', label: 'العام الأكاديمي', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '2026 / 2027 م', description: 'السنة الدراسية المستهدفة.' },
-    { code: 'branch_name', label: 'اسم الفرع', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'فرع الخرطوم (الرياض)', description: 'الفرع أو المجمع التعليمي.' },
-    { code: 'registration_policy', label: 'لائحة واشتراطات التسجيل', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '1. الالتزام بالزي المدرسي الموحد والحضور الصباحي.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.', description: 'اللائحة والضوابط المدرسية المعتمدة للطلاب المسجلين.' },
+      // القبول والتسجيل
+      { code: 'application_number', label: 'رقم طلب القبول', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'APP-9982', description: 'رقم طلب الالتحاق بالمدارس.' },
+      { code: 'academic_year', label: 'العام الأكاديمي', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '2026 / 2027 م', description: 'السنة الدراسية المستهدفة.' },
+      { code: 'branch_name', label: 'اسم الفرع', category: 'admission', category_name: 'القبول والتسجيل', sample_value: 'فرع الخرطوم (الرياض)', description: 'الفرع أو المجمع التعليمي.' },
+      { code: 'registration_policy', label: 'لائحة واشتراطات التسجيل', category: 'admission', category_name: 'القبول والتسجيل', sample_value: '1. الالتزام بالزي المدرسي الموحد والحضور الصباحي.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.', description: 'اللائحة والضوابط المدرسية المعتمدة للطلاب المسجلين.' },
 
-    // الأكاديمي والدرجات
-    { code: 'subject_name', label: 'اسم المادة الدراسية', category: 'academic', category_name: 'الأكاديمي والامتحانات', sample_value: 'الرياضيات الإضافية', description: 'اسم المادة أو المقرر الدراسي.' },
-    { code: 'score', label: 'الدرجة المحصلة', category: 'academic', category_name: 'الأكاديمي والامتحانات', sample_value: '94 / 100', description: 'درجة الطالب في الاختبار.' },
+      // الأكاديمي والدرجات
+      { code: 'subject_name', label: 'اسم المادة الدراسية', category: 'academic', category_name: 'الأكاديمي والامتحانات', sample_value: 'الرياضيات الإضافية', description: 'اسم المادة أو المقرر الدراسي.' },
+      { code: 'score', label: 'الدرجة المحصلة', category: 'academic', category_name: 'الأكاديمي والامتحانات', sample_value: '94 / 100', description: 'درجة الطالب في الاختبار.' },
 
-    // النقل والمواصلات
-    { code: 'bus_number', label: 'رقم الحافلة', category: 'transport', category_name: 'النقل والمواصلات', sample_value: 'حافلة خط 08 (أم درمان)', description: 'رقم خط النقل المكتبي.' },
+      // النقل والمواصلات
+      { code: 'bus_number', label: 'رقم الحافلة', category: 'transport', category_name: 'النقل والمواصلات', sample_value: 'حافلة خط 08 (أم درمان)', description: 'رقم خط النقل المكتبي.' },
 
-    // العام والمؤسسة (مشتق من المستأجر الحالي ديناميكياً)
-    { code: 'school_name', label: 'اسم المدرسة / المستأجر', category: 'general', category_name: 'عام والمؤسسة', sample_value: this.currentSchoolName(), description: 'اسم المدرسة المستمد تلقائياً من بيانات المستأجر النشط.' },
-    { code: 'today_date', label: 'تاريخ اليوم الحالي', category: 'general', category_name: 'عام والمؤسسة', sample_value: new Date().toISOString().split('T')[0], description: 'التاريخ التلقائي لحظة الإرسال.' },
+      // العام والمؤسسة (مشتق من المستأجر الحالي ديناميكياً)
+      { code: 'school_name', label: 'اسم المدرسة / المستأجر', category: 'general', category_name: 'عام والمؤسسة', sample_value: this.currentSchoolName(), description: 'اسم المدرسة المستمد تلقائياً من بيانات المستأجر النشط.' },
+      { code: 'today_date', label: 'تاريخ اليوم الحالي', category: 'general', category_name: 'عام والمؤسسة', sample_value: new Date().toISOString().split('T')[0], description: 'التاريخ التلقائي لحظة الإرسال.' },
     ];
   }
 

@@ -43,7 +43,7 @@ export function getTenantPrintBranding(overrideInfo?: any): TenantPrintBranding 
 
   // منع أي ظهور لاسم نبراس كاسم مستأجر في الترويسة
   if (!schoolNameAr || schoolNameAr.includes('نبراس') || schoolNameAr.toLowerCase().includes('nebras')) {
-    schoolNameAr = 'مدارس المورد النموذجية الخاصة';
+    schoolNameAr = 'مدارس المورد الجديدة للتعليم الخاص الخاصة';
   }
 
   // الاسم الإنجليزي للمستأجر

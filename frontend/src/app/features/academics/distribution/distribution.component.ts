@@ -1604,7 +1604,7 @@ export class AcademicDistributionComponent implements OnInit {
 
   readonly tenantName = computed(() => {
     const t = this.tenantService.currentTenant();
-    return t?.nameAr || t?.name || 'مدارس النبراس النموذجية الأهلية';
+    return t?.nameAr || t?.name || 'مدارس النبراس الجديدة للتعليم الخاص الأهلية';
   });
 
   readonly tenantLogo = computed(() => {

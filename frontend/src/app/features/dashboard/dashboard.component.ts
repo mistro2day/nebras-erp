@@ -1654,7 +1654,7 @@ export class DashboardComponent implements OnInit {
   });
 
   readonly tenantName = computed(() => {
-    return this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'مدارس النبراس النموذجية الأهلية';
+    return this.tenantService.currentTenant()?.nameAr || this.tenantService.currentTenant()?.name || 'مدارس النبراس الجديدة للتعليم الخاص الأهلية';
   });
 
   readonly greeting = computed(() => {

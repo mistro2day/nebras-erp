@@ -169,7 +169,7 @@ class EmployeeBulkImportService:
             'dependent_relation': 'ابنة',
             'dependent_stage_grade': 'المرحلة الابتدائية - الصف الأول',
             'dependent_discount': '50',
-            'prior_school_name': 'مدارس الجزيرة النموذجية',
+            'prior_school_name': 'مدارس الجزيرة الجديدة للتعليم الخاص',
             'prior_country': 'السودان',
             'prior_time_period': '2021 - 2025',
             'basic_salary': '240000',
@@ -335,7 +335,7 @@ class EmployeeBulkImportService:
             cell.border = thin_border
             ws.column_dimensions[get_column_letter(col_idx)].width = col_def['width']
 
-        # 4. تعبئة الأسطر النموذجية التوضيحية (الصفوف 6, 7, 8)
+        # 4. تعبئة الأسطر الجديدة للتعليم الخاص التوضيحية (الصفوف 6, 7, 8)
         sample_fill_1 = PatternFill('solid', fgColor='F8FAFC')
         sample_fill_2 = PatternFill('solid', fgColor='F1F5F9')
         for row_idx, sample in enumerate(cls.SAMPLE_ROWS, start=6):
