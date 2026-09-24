@@ -14,6 +14,13 @@
   * إدراج اسم المحاسب المنشئ في درجات الطباعة الرسمية A4 (`sf-document-drawer`), سندات الصرف والقبض (`voucher-print`), وقيود اليومية المحاسبية (`journal-voucher-print`).
   * إظهار اسم المحاسب المنشئ في خطوة المراجعة والتأكيد وفي بطاقة الاعتماد والنجاح النهائية في معالجات نبراس لإنشاء الفواتير (`InvoiceCreateModalComponent`)، وسندات القبض (`ReceiptCreateModalComponent`)، وسندات الصرف (`VoucherCreateModalComponent`)، وقيود اليومية (`JournalEntryCreateModalComponent`).
 
+### Fixed
+- **معالجة وتصحيح كافة التنبيهات والتحذيرات البرمجية في الباك إند (`Zero IDE Problems`)**:
+  * استيراد حزمة `re` الصريحة في خدمة تسجيل وربط الطلاب (`apps/students/application/services.py`) لتطبيع أرقام الهواتف بأمان.
+  * تصحيح استخلاص كائن الطلب والمستخدم `actor_user_id` في سندات مسيرات الرواتب (`apps/payroll/interfaces/views.py`) واستبدال استثناء `SalaryStructure.DoesNotExist` ببحث مرن وآمن (`.filter().first()`).
+  * تأكيد سلامة مديري السجلات `r_mgr` و `v_mgr` في خدمة تحصيل الأقساط (`apps/student_finance/application/services.py`) ومنع أي احتمالية لخطأ `NoneType`.
+  * تحويل نص الصف الأكاديمي صراحة إلى `str` في سيريالايزر مالية الطلاب لتوافق الفحص السكوني للأنواع.
+
 ## [v1.9.23] - 2026-09-24
 
 ### Added

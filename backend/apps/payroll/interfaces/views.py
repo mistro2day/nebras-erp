@@ -168,13 +168,16 @@ class PayrollRunViewSet(BaseCRUDViewSet):
             except Exception:
                 pass
 
-    def _generate_payroll_finance_records(self, instance):
+    def _generate_payroll_finance_records(self, instance, request=None):
         try:
             from django.utils import timezone
             from apps.finance.domain.models import (
                 Voucher, JournalEntry, JournalEntryLine, Currency, 
                 PaymentMethod, AccountingPeriod, ChartOfAccount
             )
+            
+            req = request or getattr(self, 'request', None)
+            actor_user_id = req.user.id if req and getattr(req, 'user', None) and req.user.is_authenticated else None
             
             tenant_id = instance.tenant_id
             period_code = instance.period.code if instance.period else ""
@@ -244,7 +247,7 @@ class PayrollRunViewSet(BaseCRUDViewSet):
                     status='posted',
                     description=f"سند صرف رواتب الموظفين لشهر: {period_code}",
                     journal_entry=je,
-                    created_by=request.user.id if request.user and request.user.is_authenticated else None
+                    created_by=actor_user_id
                 )
         except Exception:
             pass
@@ -347,15 +350,14 @@ class PayrollRunViewSet(BaseCRUDViewSet):
         total_cost = 0.0
         
         for employee in emp_qs:
-            try:
-                struct = SalaryStructure.objects.get(employee=employee, is_active=True)
-                basic = float(struct.basic_salary)
-                housing = float(struct.housing_allowance)
-                transport = float(struct.transport_allowance)
-                other = float(struct.other_allowances)
-            except SalaryStructure.DoesNotExist:
+            struct = SalaryStructure.objects.filter(employee=employee, is_active=True).first()
+            if not struct:
                 # إذا لم يكن هناك هيكل رواتب معرف — تخطي الموظف بدلاً من استخدام قيم افتراضية
                 continue
+            basic = float(struct.basic_salary)
+            housing = float(struct.housing_allowance)
+            transport = float(struct.transport_allowance)
+            other = float(struct.other_allowances)
                 
             gross_earnings = basic + housing + transport + other
             total_deductions = 0.0

@@ -196,7 +196,7 @@ def _extract_student_finance_metadata(billing_account, student_map=None, grade_m
 
             # Fallback for stage_name if not retrieved from grade relation
             if not data['stage_name'] and data['grade_name']:
-                gname = data['grade_name']
+                gname = str(data['grade_name'] or '')
                 if 'متوسط' in gname:
                     data['stage_name'] = 'المرحلة المتوسطة'
                 elif 'ثانوي' in gname:

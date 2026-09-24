@@ -376,8 +376,13 @@ class PaymentService:
         # 1. إنشاء إيصال التحصيل الداخلي وسند القبض برقم متسلسل فريد ومقاوم للتكرار
         prefix = f"RCP-{timezone.now().year}-"
         pattern = re.compile(r'^' + re.escape(prefix) + r'(\d+)$')
-        r_mgr = getattr(Receipt, 'all_objects', Receipt.objects)
-        v_mgr = getattr(Voucher, 'all_objects', Voucher.objects)
+        r_mgr = Receipt.objects
+        if hasattr(Receipt, 'all_objects') and getattr(Receipt, 'all_objects', None) is not None:
+            r_mgr = Receipt.all_objects
+
+        v_mgr = Voucher.objects
+        if hasattr(Voucher, 'all_objects') and getattr(Voucher, 'all_objects', None) is not None:
+            v_mgr = Voucher.all_objects
 
         max_seq = 0
         r_existing = r_mgr.filter(tenant_id=tenant_id, receipt_number__startswith=prefix).values_list('receipt_number', flat=True)
