@@ -1,1 +1,0 @@
-import"./chunk-Z3S5WG22.js";var t=[{path:"",redirectTo:"dashboard",pathMatch:"full"},{path:"dashboard",loadComponent:()=>import("./chunk-CS4P6GKO.js").then(o=>o.SchedulingDashboardComponent)}];export{t as SCHEDULING_ROUTES};
