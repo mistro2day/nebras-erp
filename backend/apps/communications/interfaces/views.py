@@ -174,7 +174,9 @@ ADMISSIONS_DEFAULT_TEMPLATES = {
         '- المرحلة / الصف الدراسي: {{grade_level}}\n'
         '- الرقم المدرسي (الأكاديمي): {{student_code}}\n\n'
         '📋 لائحة واشتراطات التسجيل:\n'
-        '{{registration_policy}}\n\n'
+        '1. الالتزام بالزي المدرسي الموحد والحضور الصباحي.\n'
+        '2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n'
+        '3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية.\n\n'
         'نتمنى لابننا/ابنتنا دوام التوفيق والتميز الأكاديمي.\n'
         'إدارة القبول والتسجيل — {{school_name}}'
     ),
@@ -238,13 +240,20 @@ class TemplateViewSet(BaseCRUDViewSet):
                         body=body, is_active=True,
                     )
             for code, (name, body) in ADMISSIONS_DEFAULT_TEMPLATES.items():
-                if not CommunicationTemplate.objects.filter(tenant_id=tenant.id, code=code, deleted_at__isnull=True).exists():
+                tmpl = CommunicationTemplate.objects.filter(tenant_id=tenant.id, code=code, deleted_at__isnull=True).first()
+                if not tmpl:
                     CommunicationTemplate.objects.create(
                         tenant_id=tenant.id, code=code,
                         name=name, category='admission', channel=ch,
                         content_type='plain_text', language='ar',
                         body=body, is_active=True,
                     )
+                elif '{{registration_policy}}' in tmpl.body:
+                    tmpl.body = tmpl.body.replace(
+                        '{{registration_policy}}',
+                        '1. الالتزام بالزي المدرسي الموحد والحضور الصباحي.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية.'
+                    )
+                    tmpl.save(update_fields=['body', 'updated_at'])
         return super().list(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-by-code')
