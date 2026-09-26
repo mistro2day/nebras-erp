@@ -2,6 +2,19 @@
 
 جميع التغييرات والتحسينات المضافة للمنصة يتم توثيقها هنا تباعاً بالاعتماد على معايير الحوكمة ونسخ الإصدارات القياسية.
 
+## [v1.9.26] - 2026-09-26
+
+### Fixed
+- **منع تكرار تسجيل الطالب والنقر المزدوج على زر التسجيل (`Double-Click & Duplicate Prevention`)**:
+  * إضافة حالة قفل صارمة `studentCreated` في مكون إنشاء الطلاب (`frontend/src/app/features/students/create/create.component.ts`).
+  * تعطيل زر التسجيل فور النقر الأولي واستمرار حالة `submitting` حتى اكتمال إرسال رسالة الواتساب والانتقال لشاشة التفاصيل، مع تغيير نص الزر إلى «جارٍ حفظ واعتماد ملف الطالب وإرسال الواتساب…».
+  * إضافة فحص أمان خلفي لحظر التكرار (Idempotency Debounce Guard) في `create_student_manually` بـ `apps/students/application/services.py` لمنع إنشاء أكثر من سجل للطالب في حال وصول طلبين متطابقين في نافذة 20 ثانية لنفس المستأجر.
+
+### Added
+- **التكامل الديناميكي مع قوالب الرسائل القابلة للتعديل (`Dynamic Communication Template Binding`)**:
+  * تحميل قالب الرسائل المعتمد `ADM_ENROLLED` ديناميكياً من واجهة `/communications/templates` عند فتح شاشة تسجيل الطلاب.
+  * في حال قيام الإدارة بتعديل نص أو محتوى القالب من لوحة التحكم (`https://nebraserp.duckdns.org/communications/templates`)، يتم تطبيق النص المحدث فورياً وإسناد المتغيرات (`{{guardian_name}}`, `{{student_name}}`, `{{school_name}}`, `{{grade_level}}`, `{{student_code}}`, `{{academic_year}}`, `{{registration_policy}}`) مع الحفاظ على النص الاحتياطي السوداني الأصيل.
+
 ## [v1.9.25] - 2026-09-26
 
 ### Fixed

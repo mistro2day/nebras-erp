@@ -193,9 +193,9 @@ import { TenantService } from '../../../core/services/tenant.service';
               </div>
 
               <div class="form-actions">
-                <button class="nb-btn-secondary" (click)="cancelSelection()">إلغاء التحديد</button>
-                <button class="nb-btn-primary" (click)="registerStudent()" [disabled]="submitting()">
-                  {{ submitting() ? 'جارٍ تسجيل الطالب والفوترة…' : 'إكمال تسجيل الطالب وإصدار السندات ✓' }}
+                <button class="nb-btn-secondary" (click)="cancelSelection()" [disabled]="submitting() || studentCreated()">إلغاء التحديد</button>
+                <button class="nb-btn-primary" (click)="registerStudent()" [disabled]="submitting() || studentCreated()">
+                  {{ (submitting() || studentCreated()) ? 'جارٍ تسجيل الطالب والفوترة وإرسال الواتساب…' : 'إكمال تسجيل الطالب وإصدار السندات ✓' }}
                 </button>
               </div>
             </nb-panel>
@@ -565,9 +565,9 @@ import { TenantService } from '../../../core/services/tenant.service';
               </div>
 
               <div class="form-actions">
-                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(4)">→ السابق: الرسوم والأقساط</button>
-                <button type="button" class="nb-btn-primary btn-save-final" (click)="submitManualStudent()" [disabled]="submitting()">
-                  {{ submitting() ? 'جارٍ حفظ واعتماد ملف الطالب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
+                <button type="button" class="nb-btn-secondary" (click)="manualStep.set(4)" [disabled]="submitting() || studentCreated()">→ السابق: الرسوم والأقساط</button>
+                <button type="button" class="nb-btn-primary btn-save-final" (click)="submitManualStudent()" [disabled]="submitting() || studentCreated()">
+                  {{ (submitting() || studentCreated()) ? 'جارٍ حفظ واعتماد ملف الطالب وإرسال الواتساب…' : '✓ حفظ واعتماد تسجيل الطالب يدوياً' }}
                 </button>
               </div>
             </div>
@@ -1109,6 +1109,8 @@ export class StudentCreateComponent implements OnInit {
   availableSections = signal<any[]>([]);
   selectedSectionId = signal<string>('');
   submitting = signal(false);
+  studentCreated = signal(false);
+  enrolledTemplate = signal<{ code: string; name: string; subject: string; body: string } | null>(null);
   errorMessage = signal('');
   financialConfig = signal<FinancialConfig | null>(null);
 
@@ -1274,6 +1276,16 @@ export class StudentCreateComponent implements OnInit {
     this.loadBranches();
     this.loadAcceptedApplicants();
     this.loadGrades();
+    this.loadEnrolledTemplate();
+  }
+
+  loadEnrolledTemplate() {
+    this.commsService.getPublicTemplate('ADM_ENROLLED').subscribe({
+      next: (tmpl) => {
+        if (tmpl) this.enrolledTemplate.set(tmpl);
+      },
+      error: () => {}
+    });
   }
 
   loadBranches() {
@@ -1425,6 +1437,8 @@ export class StudentCreateComponent implements OnInit {
   }
 
   registerStudent() {
+    if (this.submitting() || this.studentCreated()) return;
+
     const applicant = this.selectedApplicant();
     if (!applicant) return;
 
@@ -1443,7 +1457,7 @@ export class StudentCreateComponent implements OnInit {
 
     this.studentsService.createStudentFromApplicant(applicant.id, config as any).subscribe({
       next: (res) => {
-        this.submitting.set(false);
+        this.studentCreated.set(true);
         const studentId = res?.data?.id || res?.id;
         const studentCode = res?.data?.student_number || res?.student_number || '';
         const phone = applicant.whatsapp_phone || applicant.phone || applicant.guardian_phone || '';
@@ -1475,6 +1489,8 @@ export class StudentCreateComponent implements OnInit {
     if (event) {
       event.preventDefault();
     }
+    if (this.submitting() || this.studentCreated()) return;
+
     // تحديث رقم الواتساب المعتمد بالصيغة الدولية فوراً قبل التحقق والإرسال
     this.updateFullWhatsappNumber();
 
@@ -1569,7 +1585,7 @@ export class StudentCreateComponent implements OnInit {
 
     this.studentsService.createStudent(payload).subscribe({
       next: (res) => {
-        this.submitting.set(false);
+        this.studentCreated.set(true);
         const studentId = res?.data?.id || res?.id;
         const studentCode = res?.data?.student_number || res?.student_number || '';
         const phone = this.guardianForm.whatsapp_phone || this.guardianForm.phone;
@@ -1633,25 +1649,38 @@ export class StudentCreateComponent implements OnInit {
     const yearName = new Date().getFullYear().toString();
     const policyText = '1. الالتزام بالحضور الصباحي والزي المدرسي المعتمد.\n2. الالتزام بسداد الأقساط والرسوم وفق التقويم المالي المعلن.\n3. المحافظة على البيئة المدرسية والممتلكات العامة واللوائح السلوكية.';
 
-    const defaultBody = (
+    // استخدام القالب المعتمد المحمل من https://nebraserp.duckdns.org/communications/templates إن وجد
+    const tmpl = this.enrolledTemplate();
+    const rawBody = tmpl?.body || (
       `السلام عليكم ورحمة الله وبركاته،\n` +
-      `عزيزي ولي الأمر ${opts.guardianName || 'المحترم'}،\n` +
-      `نبارك لكم تسجيل واعتماد ابنكم/ابنتكم: (${opts.studentName}) كطالب رسمي بـ (${schoolName}) للعام الدراسي (${yearName}).\n` +
-      `- المرحلة / الصف الدراسي: ${opts.gradeName || 'المرحلة المقررة'}\n` +
-      `- الرقم المدرسي (الأكاديمي): ${opts.studentCode || '—'}\n\n` +
+      `عزيزي ولي الأمر {{guardian_name}} المحترم،\n` +
+      `نبارك لكم تسجيل واعتماد ابنكم/ابنتكم: ({{student_name}}) كطالب رسمي بـ ({{school_name}}) للعام الدراسي ({{academic_year}}).\n` +
+      `- المرحلة / الصف الدراسي: {{grade_level}}\n` +
+      `- الرقم المدرسي (الأكاديمي): {{student_code}}\n\n` +
       `📋 لائحة واشتراطات التسجيل:\n` +
-      `${policyText}\n\n` +
+      `{{registration_policy}}\n\n` +
       `نتمنى لابننا/ابنتنا دوام التوفيق والتميز الأكاديمي.\n` +
-      `إدارة القبول والتسجيل — ${schoolName}`
+      `إدارة القبول والتسجيل — {{school_name}}`
     );
+
+    const body = rawBody
+      .replace(/\{\{\s*guardian_name\s*\}\}/g, opts.guardianName || 'ولي الأمر')
+      .replace(/\{\{\s*student_name\s*\}\}/g, opts.studentName)
+      .replace(/\{\{\s*school_name\s*\}\}/g, schoolName)
+      .replace(/\{\{\s*grade_level\s*\}\}/g, opts.gradeName || 'المرحلة المقررة')
+      .replace(/\{\{\s*student_code\s*\}\}/g, opts.studentCode || '—')
+      .replace(/\{\{\s*academic_year\s*\}\}/g, yearName)
+      .replace(/\{\{\s*registration_policy\s*\}\}/g, policyText);
+
+    const subject = tmpl?.subject || `إشعار اعتماد وتسجيل التلميذ - ${schoolName}`;
 
     return this.commsService.sendMessage({
       channel: 'whatsapp',
       channel_type: 'whatsapp',
       recipient_address: opts.phone,
       recipient_name: opts.guardianName || 'ولي الأمر',
-      subject: `إشعار اعتماد وتسجيل التلميذ - ${schoolName}`,
-      body: defaultBody,
+      subject: subject,
+      body: body,
       template_code: 'ADM_ENROLLED',
       source_module: 'students',
       source_event: 'StudentManualEnrollment',

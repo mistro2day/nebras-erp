@@ -342,6 +342,23 @@ class StudentApplicationService:
         if not grade_id:
             raise BusinessException("اختيار الصف الدراسي إجباري لتسجيل وتسكين الطالب في النظام.", code="grade_required")
 
+        # منع تكرار التسجيل لنفس الطالب عند الضغط المزدوج (Idempotency / Anti-duplicate guard)
+        ar_name = (profile_data.get('arabic_name') or '').strip()
+        dob_val = profile_data.get('date_of_birth')
+        if ar_name and dob_val:
+            from django.utils import timezone
+            import datetime
+            cutoff = timezone.now() - datetime.timedelta(seconds=20)
+            dup_profile = StudentProfile.objects.filter(
+                tenant_id=tenant_id,
+                arabic_name=ar_name,
+                date_of_birth=dob_val,
+                created_at__gte=cutoff
+            ).first()
+            if dup_profile:
+                logger.info(f"Duplicate student creation prevented for: {ar_name}")
+                return dup_profile.student
+
         # 1. توليد رقم الطالب الأكاديمي
         student_number = StudentNumberGenerator.generate(
             tenant_id=tenant_id,

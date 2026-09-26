@@ -33,8 +33,12 @@ class AdmissionsRepository {
         int rejected = 0;
         for (var item in list) {
           final s = item['status']?.toString();
-          if (s == 'under_review' || s == 'submitted' || s == 'draft') underReview++;
-          if (s == 'interview_scheduled' || s == 'qualified_exam' || s == 'exam_scored') interviews++;
+          if (s == 'under_review' || s == 'submitted' || s == 'draft')
+            underReview++;
+          if (s == 'interview_scheduled' ||
+              s == 'qualified_exam' ||
+              s == 'exam_scored')
+            interviews++;
           if (s == 'accepted' || s == 'enrolled') accepted++;
           if (s == 'rejected') rejected++;
         }
@@ -155,13 +159,14 @@ class AdmissionsRepository {
         gender: 'ذكر',
         dateOfBirth: '2012-01-15',
         nationalId: '102849104820',
-        previousSchool: 'مدارس النيل النموذجية - مدني',
+        previousSchool: 'مدارس النيل الجديدة للتعليم الخاص - مدني',
         previousGrade: 'الصف الثامن أساس',
         applyingGrade: 'الصف الأول ثانوي',
         applicationNumber: 'APP-2026-0816',
         status: ApplicantStatus.accepted,
         createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        notes: 'اجتاز امتحان القدرات والمقابلة بنسبة 92%. بانتظار سداد رسوم التسجيل.',
+        notes:
+            'اجتاز امتحان القدرات والمقابلة بنسبة 92%. بانتظار سداد رسوم التسجيل.',
         primaryGuardian: const GuardianModel(
           id: 'g-03',
           relationship: 'أب',
@@ -210,7 +215,9 @@ class AdmissionsRepository {
     try {
       final res = await _api.get('/admissions/applicants/$id/');
       if (res is Map) {
-        final data = res['data'] is Map ? res['data'] as Map<String, dynamic> : res as Map<String, dynamic>;
+        final data = res['data'] is Map
+            ? res['data'] as Map<String, dynamic>
+            : res as Map<String, dynamic>;
         return ApplicantModel.fromJson(data);
       }
     } catch (_) {}
@@ -225,10 +232,10 @@ class AdmissionsRepository {
     String? reason,
   }) async {
     try {
-      await _api.patch('/admissions/applicants/$id/set-status/', data: {
-        'status': statusToString(status),
-        'reason': reason,
-      });
+      await _api.patch(
+        '/admissions/applicants/$id/set-status/',
+        data: {'status': statusToString(status), 'reason': reason},
+      );
     } catch (_) {}
   }
 
@@ -238,10 +245,13 @@ class AdmissionsRepository {
     String? recommendation,
   }) async {
     try {
-      await _api.post('/admissions/applicants/$id/schedule-interview/', data: {
-        'scheduled_at': scheduledAt.toIso8601String(),
-        'recommendation': recommendation ?? 'مقابلة شخصية وتقييم قدرات',
-      });
+      await _api.post(
+        '/admissions/applicants/$id/schedule-interview/',
+        data: {
+          'scheduled_at': scheduledAt.toIso8601String(),
+          'recommendation': recommendation ?? 'مقابلة شخصية وتقييم قدرات',
+        },
+      );
     } catch (_) {}
   }
 
@@ -272,45 +282,57 @@ class AdmissionsRepository {
     String? academicYearId,
     String? applyingGradeId,
   }) async {
-    final defaultYearId = academicYearId ?? '5a4b8aa8-f768-4b7c-a96e-620f1c884c40';
-    final defaultGradeId = applyingGradeId ?? '49260172-f08b-411a-b5c6-405d36fbc9e5';
-    final gen = (gender == 'أنثى' || gender.toLowerCase() == 'female') ? 'female' : 'male';
+    final defaultYearId =
+        academicYearId ?? '5a4b8aa8-f768-4b7c-a96e-620f1c884c40';
+    final defaultGradeId =
+        applyingGradeId ?? '49260172-f08b-411a-b5c6-405d36fbc9e5';
+    final gen = (gender == 'أنثى' || gender.toLowerCase() == 'female')
+        ? 'female'
+        : 'male';
 
     String rel = 'father';
-    if (guardianRelationship == 'أم' || guardianRelationship.toLowerCase() == 'mother') {
+    if (guardianRelationship == 'أم' ||
+        guardianRelationship.toLowerCase() == 'mother') {
       rel = 'mother';
-    } else if (guardianRelationship == 'أب' || guardianRelationship.toLowerCase() == 'father') {
+    } else if (guardianRelationship == 'أب' ||
+        guardianRelationship.toLowerCase() == 'father') {
       rel = 'father';
     } else {
       rel = 'guardian';
     }
 
     try {
-      final res = await _api.post('/admissions/settings/public-apply/', data: {
-        'applicant': {
-          'arabic_full_name': studentFullName,
-          'gender': gen,
-          'date_of_birth': dateOfBirth,
-          'nationality': 'سوداني',
-          'national_id': nationalId,
-          'academic_year_id': defaultYearId,
-          'applying_grade_id': defaultGradeId,
-          'previous_school': previousSchool,
-          'notes': notes,
+      final res = await _api.post(
+        '/admissions/settings/public-apply/',
+        data: {
+          'applicant': {
+            'arabic_full_name': studentFullName,
+            'gender': gen,
+            'date_of_birth': dateOfBirth,
+            'nationality': 'سوداني',
+            'national_id': nationalId,
+            'academic_year_id': defaultYearId,
+            'applying_grade_id': defaultGradeId,
+            'previous_school': previousSchool,
+            'notes': notes,
+          },
+          'guardian': {
+            'full_name': guardianFullName,
+            'relationship': rel,
+            'phone': guardianPhone,
+            'whatsapp_phone':
+                (guardianWhatsapp != null && guardianWhatsapp.isNotEmpty)
+                ? guardianWhatsapp
+                : guardianPhone,
+            'email': guardianEmail ?? '',
+            'address': guardianAddress ?? 'الخرطوم، السودان',
+          },
         },
-        'guardian': {
-          'full_name': guardianFullName,
-          'relationship': rel,
-          'phone': guardianPhone,
-          'whatsapp_phone': (guardianWhatsapp != null && guardianWhatsapp.isNotEmpty)
-              ? guardianWhatsapp
-              : guardianPhone,
-          'email': guardianEmail ?? '',
-          'address': guardianAddress ?? 'الخرطوم، السودان',
-        },
-      });
+      );
 
-      if (res is Map && res['data'] is Map && res['data']['application_number'] != null) {
+      if (res is Map &&
+          res['data'] is Map &&
+          res['data']['application_number'] != null) {
         return res['data']['application_number'].toString();
       }
     } catch (_) {}
@@ -332,17 +354,19 @@ class AdmissionsRepository {
     String? previousSchool,
   }) async {
     try {
-      await _api.post('/admissions/applicants/', data: {
-        'arabic_full_name': arabicFullName,
-        'gender': gender == 'أنثى' ? 'female' : 'male',
-        'date_of_birth': dateOfBirth,
-        'national_id': nationalId,
-        'nationality': 'سوداني',
-        'applying_grade_id': '49260172-f08b-411a-b5c6-405d36fbc9e5',
-        'academic_year_id': '5a4b8aa8-f768-4b7c-a96e-620f1c884c40',
-        'previous_school': previousSchool,
-      });
+      await _api.post(
+        '/admissions/applicants/',
+        data: {
+          'arabic_full_name': arabicFullName,
+          'gender': gender == 'أنثى' ? 'female' : 'male',
+          'date_of_birth': dateOfBirth,
+          'national_id': nationalId,
+          'nationality': 'سوداني',
+          'applying_grade_id': '49260172-f08b-411a-b5c6-405d36fbc9e5',
+          'academic_year_id': '5a4b8aa8-f768-4b7c-a96e-620f1c884c40',
+          'previous_school': previousSchool,
+        },
+      );
     } catch (_) {}
   }
 }
-
