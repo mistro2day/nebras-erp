@@ -230,23 +230,21 @@ class TemplateViewSet(BaseCRUDViewSet):
                 tenant_id=tenant.id, channel_type='whatsapp', deleted_at__isnull=True
             ).order_by('-is_active').first()
             for code, (name, category, body) in SYSTEM_DEFAULT_TEMPLATES.items():
-                CommunicationTemplate.objects.get_or_create(
-                    tenant_id=tenant.id, code=code, deleted_at__isnull=True,
-                    defaults={
-                        'name': name, 'category': category, 'channel': ch,
-                        'content_type': 'plain_text', 'language': 'ar',
-                        'body': body, 'is_active': True,
-                    }
-                )
+                if not CommunicationTemplate.objects.filter(tenant_id=tenant.id, code=code, deleted_at__isnull=True).exists():
+                    CommunicationTemplate.objects.create(
+                        tenant_id=tenant.id, code=code,
+                        name=name, category=category, channel=ch,
+                        content_type='plain_text', language='ar',
+                        body=body, is_active=True,
+                    )
             for code, (name, body) in ADMISSIONS_DEFAULT_TEMPLATES.items():
-                CommunicationTemplate.objects.get_or_create(
-                    tenant_id=tenant.id, code=code, deleted_at__isnull=True,
-                    defaults={
-                        'name': name, 'category': 'admission', 'channel': ch,
-                        'content_type': 'plain_text', 'language': 'ar',
-                        'body': body, 'is_active': True,
-                    }
-                )
+                if not CommunicationTemplate.objects.filter(tenant_id=tenant.id, code=code, deleted_at__isnull=True).exists():
+                    CommunicationTemplate.objects.create(
+                        tenant_id=tenant.id, code=code,
+                        name=name, category='admission', channel=ch,
+                        content_type='plain_text', language='ar',
+                        body=body, is_active=True,
+                    )
         return super().list(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='public-by-code')

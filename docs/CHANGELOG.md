@@ -9,6 +9,9 @@
   * إضافة حالة قفل صارمة `studentCreated` في مكون إنشاء الطلاب (`frontend/src/app/features/students/create/create.component.ts`).
   * تعطيل زر التسجيل فور النقر الأولي واستمرار حالة `submitting` حتى اكتمال إرسال رسالة الواتساب والانتقال لشاشة التفاصيل، مع تغيير نص الزر إلى «جارٍ حفظ واعتماد ملف الطالب وإرسال الواتساب…».
   * إضافة فحص أمان خلفي لحظر التكرار (Idempotency Debounce Guard) في `create_student_manually` بـ `apps/students/application/services.py` لمنع إنشاء أكثر من سجل للطالب في حال وصول طلبين متطابقين في نافذة 20 ثانية لنفس المستأجر.
+- **إصلاح بذر وعرض قوالب القبول والتسجيل وقالب اعتماد التلميذ في واجهة القوالب (`Template Seeding & Visibility Fix`)**:
+  * تصحيح استعلام بذر القوالب في `TemplateViewSet.list` واستبدال `get_or_create(deleted_at__isnull=True)` بـ `filter().exists()` لمنع استثناء الخطأ 500.
+  * إدراج قالب اعتماد التلميذ `ADM_ENROLLED` وقوالب القبول (`ADM_SUBMITTED`, `ADM_ACCEPTED`) وقالب سند القبض (`PAYMENT_RECEIPT`) ضمن `FALLBACK_TEMPLATES` لضمان ظهورها وتعديلها فورياً من واجهة `/communications/templates` تحت تبويب «الكل» أو «القبول والتسجيل».
 
 ### Added
 - **التكامل الديناميكي مع قوالب الرسائل القابلة للتعديل (`Dynamic Communication Template Binding`)**:
