@@ -404,6 +404,7 @@ class StudentApplicationService:
         if guardian_data and (guardian_data.get('full_name') or guardian_data.get('phone') or guardian_data.get('whatsapp_phone')):
             from apps.students.domain.models import StudentFamilyRelation, StudentEmergencyContact, StudentAddress
             wa_num = guardian_data.get('whatsapp_phone') or guardian_data.get('phone', '')
+            phone2_note = f"هاتف إضافي: {guardian_data.get('phone2')}" if guardian_data.get('phone2') else None
             StudentFamilyRelation.objects.create(
                 student=student,
                 relationship=guardian_data.get('relationship', 'guardian'),
@@ -414,6 +415,23 @@ class StudentApplicationService:
                 occupation=guardian_data.get('occupation', ''),
                 employer=guardian_data.get('work_address', ''),
                 national_id=guardian_data.get('national_id', ''),
+                emergency_contact=False,
+                custody_information_placeholder=phone2_note,
+                tenant_id=tenant_id,
+                created_by=user_id,
+            )
+
+        # 4c-2. إنشاء علاقة والدة الطالب في حال توفر هاتف الأم ولم تكن هي ولي الأمر المسجل أعلاه
+        mother_phone = guardian_data.get('mother_phone') if guardian_data else None
+        if mother_phone and str(mother_phone).strip() and (not guardian_data or guardian_data.get('relationship') != 'mother'):
+            from apps.students.domain.models import StudentFamilyRelation
+            clean_m_phone = str(mother_phone).strip()
+            StudentFamilyRelation.objects.create(
+                student=student,
+                relationship='mother',
+                full_name='والدة الطالب/ـة',
+                phone=clean_m_phone,
+                whatsapp_phone=clean_m_phone,
                 emergency_contact=False,
                 tenant_id=tenant_id,
                 created_by=user_id,
